@@ -1,5 +1,3 @@
-# ZeroFee: a NEAR confidential wallet for every chain.
-
 **ZeroFee is a mobile app: it runs on your iPhone.** There is also a web wallet build (B), with fewer protections.
 
 Any coin on any chain in. Any coin to any wallet on any chain out, through NEAR Intents. The middle of every Send is

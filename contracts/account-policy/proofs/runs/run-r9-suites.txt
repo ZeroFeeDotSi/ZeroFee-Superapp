@@ -1,0 +1,29 @@
+Names and labels rewritten for the public export; the results are unchanged.
+Release 9: the contract's whole suite. cargo test --no-fail-fast, default features (short-waits), the five fuzz_ loops
+included; 1 Nov 2026, 10:34-10:44 by the machine clock, in the worktree, on lib.rs
+e83ec614796ce334b1f8ce6515c9aaf80b8d70531d7a642d651762f2fc8eec5e and tests.rs
+fffb90b4924ee673873618d5c1631d4feb2c4fafa9d4bc5880c4c24ecb5a7956: the exact bytes committed and tagged r9-frozen-3 a
+minute later (5eab317d; tests/ at the tag identical too). A repeat on a clean archive of the tag was started at 14:51 and
+stopped by the lead at 15:0x to keep the shared machine usable (not counted). tests/r9_mutants.rs, added after the tag,
+passes with the suite (run-r9-mutants.txt: 206 passed, the fuzz_ loops filtered out).
+
+One libtest summary per binary, in cargo's order:
+src/lib.rs (unit)  test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.20s
+tests/audit        test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 103.43s
+tests/audit_a      test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 166.45s
+tests/audit_a2     test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.18s
+tests/audit_contract_review  test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.70s
+tests/r7_completion test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+tests/r8           test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+tests/r8_mutants   test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+tests/r9           test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+tests/reaudit      test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 210.71s
+tests/reaudit2     test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 453.55s
+tests/reaudit3     test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+tests/upgrade      test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+doc-tests          test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Total: 210 passed, 0 failed, 0 ignored (the suite's long-ignored FB-3 finish test now passes).
+
+Also: cargo test --no-default-features --lib r7_release_minimum (the release's constants): 1 passed.
+cargo test --features modules --lib (Agent, Legacy, Kids; compiled out of the release wasm): builds; 57 passed, 6 failed,
+the same 6 that fail on release 8 (671883c7), checked on a clean archive of it: pre-existing, not a release-9 change.

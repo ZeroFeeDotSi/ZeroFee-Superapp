@@ -1,0 +1,10 @@
+Release 7 (lib.rs 5d6a2b0b…698c, wasm aea989b0…5345), 29 Oct: cargo test --release checker, PROOFS_DEPTH=4 PROOFS_DEPTH_CORE=4, all keys (P, N, D1, D2, W, W2, a stranger; approve_recovery, refuse_recovery, a stale yes), Time steps +1 s, +1 h, +2 h, +1 d, +1 d 2 h 1 s, +7 d; delay 1 h, fallback 7 d. 2,521 s on the shared box.
+from set-up: 93144 states, 291354 transitions, liveness checked on 1073 states
+aged device, window over: 94745 states, 295542 transitions, liveness checked on 90219 states
+role separation left to NEAR's method lists (assumption A1), 0 pair(s):
+core, aged device: 43256 states, 73469 transitions, liveness checked on 345 states
+role separation left to NEAR's method lists (assumption A1), 0 pair(s):
+3 counterexample(s)
+test result: FAILED. 4 passed; 1 failed; 1 ignored; 0 measured; 39 filtered out; finished in 2521.38s
+
+The three random-walk counterexamples of this run were the checker's own I7 ledger judged against bands tightened after the money left (set_protection in the first day applies at once); the check now runs where money leaves, against the bands then in force (run-r7-walks.txt).

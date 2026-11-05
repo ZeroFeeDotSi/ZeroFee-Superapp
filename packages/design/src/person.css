@@ -1,0 +1,12 @@
+.zf-person {
+  appearance: none; border: 0; background: none; padding: 0; width: 56px; display: grid; justify-items: center; gap: 7px;
+  color: var(--ink-2); cursor: pointer; flex: none;
+}
+.zf-person__face {
+  width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center;
+  font: 400 17px/1 var(--font); transition: background var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out);
+}
+.zf-person__name { font: 400 12px/1.2 var(--font); max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zf-person.on { color: var(--ink); }
+.zf-person.on .zf-person__face { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.zf-person--add .zf-person__face { border-style: dashed; border-color: var(--mute); }

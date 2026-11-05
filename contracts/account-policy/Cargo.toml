@@ -1,0 +1,43 @@
+[package]
+name = "account-policy"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Release 10: Agent's own key with a daily limit (src/agent.rs), ON in the release. Agent pays only what the phone's
+# Face ID alone could pay at that moment, within the budget the person set; no standing orders.
+agent = ["dep:agent-limits"]
+# Agent (its older glue, with standing orders), Legacy and Kids. Off in the release (product decision, 28 Oct: the release has
+# only what the app shows, D31): Legacy's and Kids' methods aren't in it, so nothing can call them. Their storage keys
+# and their places in `Change` stay reserved, so a later audited release can add them back with no change to how anything
+# is stored. `cargo test --features modules` tests them (src/modules.rs; it replaces src/agent.rs).
+modules = ["agent", "dep:legacy", "dep:kids"]
+# A 60-second shortest recovery delay instead of a day (product decision, 29 Oct), for tests and the sandbox copy only. On by
+# default so `cargo test` and the proofs run; the release wasm is built with `--no-default-features` and pinned by hash,
+# so it can never take under 24 hours (release 10: `--no-default-features --features agent`).
+short-waits = []
+default = ["short-waits", "agent"]
+
+[dependencies]
+near-sdk = "5"
+# The raw runtime calls, for adding and deleting ML-DSA-65 keys (near-sdk's PublicKey type predates them).
+near-sys = "=0.2.14"
+# The modules other sessions write (pure: no promises, no storage, no guards); with `modules`, this contract adds those.
+legacy = { path = "modules/legacy", optional = true }
+agent-limits = { path = "modules/agent", optional = true }
+kids = { path = "modules/kids", optional = true }
+
+[dev-dependencies]
+near-sdk = { version = "5", features = ["unit-testing"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true

@@ -1,0 +1,26 @@
+/* D137: the live step monitor (LiveTrack.tsx). Home's rows are the shared LiveRow (packages/design liverow.css); this
+   file is the tracker and the row's leaving. Motion is the design system's (fill, flow, settle, live, draw); under
+   Reduce Motion it all snaps there. */
+.lv-tracker { display: grid; gap: 18px; padding: 8px 0 24px; }
+.lv-tracker__head { display: grid; justify-items: center; gap: 12px; padding: 16px 0 4px; }
+.lv-tracker__head .zf-receipt--mark { width: 72px; height: 72px; }
+.lv-tracker__title { margin: 0; font: 600 17px/22px var(--font); color: var(--ink); text-align: center; }
+.lv-tracker__status { text-align: center; }
+.lv-tracker__status { margin: 0; font: 400 15px/20px var(--font); color: var(--mute); font-variant-numeric: tabular-nums; }
+.lv-steps { list-style: none; margin: 0; padding: 0; display: grid; }
+.lv-step { display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); font: 400 17px/22px var(--font); }
+.lv-step.is-waiting .lv-step__label { color: var(--mute); }
+.lv-step.is-failed .lv-step__label { color: var(--down); }
+.lv-step__time { font: 400 15px/20px var(--font); color: var(--mute); font-variant-numeric: tabular-nums; }
+.lv-mark { width: 20px; height: 20px; display: grid; place-items: center; }
+svg.lv-mark { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.lv-mark.is-done { stroke: var(--up); }
+.lv-mark.is-failed { stroke: var(--down); }
+.lv-mark.is-waiting { width: 10px; height: 10px; margin: 5px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--ink) 25%, transparent); }
+.lv-tracker__end { margin: 0; font-size: 15px; line-height: 1.45; }
+.lv-tracker__note { margin: 0; color: var(--mute); }
+.wl-live { margin: 2px 0 8px; }
+/* settle, then leave: a done row holds --m-hold-ms (LiveTrack FOLD_AFTER_MS), then fades and rises 4 px in FOLD_MS */
+.wl-now .zf-lrow.is-done { animation: lv-leave var(--dur-base) var(--ease-out) var(--m-hold-ms, 2500ms) forwards; }
+@keyframes lv-leave { to { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .wl-now .zf-lrow.is-done { animation: none; } }

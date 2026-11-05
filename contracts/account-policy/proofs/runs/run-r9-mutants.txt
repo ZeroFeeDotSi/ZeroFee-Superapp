@@ -1,0 +1,107 @@
+cargo-mutants 27.1.0 on release 9. Test command: the whole suite except the five fuzz_ property loops (cargo test -- --skip fuzz_), -j 1, --timeout 240, default features (the suite's: short-waits on, modules off); each process with its own CARGO_TARGET_DIR and its own TMPDIR under the run's scratch directory (never the worktree's target). Mutated: a `git archive` copy of contracts/account-policy at tag r9-frozen-3 (commit 5eab317d), src/lib.rs sha256 e83ec614796ce334b1f8ce6515c9aaf80b8d70531d7a642d651762f2fc8eec5e (src/tests.rs fffb90b4924ee673873618d5c1631d4feb2c4fafa9d4bc5880c4c24ecb5a7956). `cargo mutants --file src/lib.rs`: every function of the whole file, no --re filter (412 mutants). Neither src/lib.rs nor src/tests.rs was edited.
+
+=== Earlier starts on superseded sources (not counted) ===
+r9-frozen (lib.rs 1e8736ad…10f1): stopped after 4 minutes when the lead re-froze as r9-frozen-2 (a comment in src/tests.rs and proofs/build.rs; lib.rs byte-identical).
+r9-frozen-2 (lib.rs 1e8736ad…10f1): stopped at 120 of 405 tested when the red team's RT3 changed lib.rs (finish_recovery's delete-then-add, `add_after_delete`, the callback's `asked_at_ns`). Its misses up to then were all of kinds also found below (cfg(modules), the equivalents, and the on_recovery_key role guard).
+The counted round below restarted from scratch on r9-frozen-3.
+
+=== Round A: every function of lib.rs e83ec614…ec5e (r9-frozen-3), 4 shards (round-robin) ===
+External stop: the four shards ran 37 minutes and were then interrupted from outside the run (the session hit an account usage limit; another session had also SIGSTOPped processes on the box earlier). Each shard had tested 86-89 of its 103 mutants. The outcomes already recorded were kept; the 62 mutants with no outcome (the full list minus every caught/missed/unviable/timeout name, checked to be exactly 62 and every recorded name on the list) were run afterwards as two parts with an anchored --re of their exact names (checked with --list to select exactly those 62), at most 2 mutant processes at once (the box's limit then).
+--- shard 0/4 ---
+Found 103 mutants to test
+ok       Unmutated baseline in 7s build + 118s test
+89 tested before the stop: 73 caught, 8 missed, 8 unviable, 0 timeouts
+--- shard 1/4 ---
+Found 103 mutants to test
+ok       Unmutated baseline in 9s build + 111s test
+88 tested before the stop: 80 caught, 3 missed, 5 unviable, 0 timeouts
+--- shard 2/4 ---
+Found 103 mutants to test
+ok       Unmutated baseline in 10s build + 101s test
+87 tested before the stop: 74 caught, 5 missed, 8 unviable, 0 timeouts
+--- shard 3/4 ---
+Found 103 mutants to test
+ok       Unmutated baseline in 8s build + 117s test
+86 tested before the stop: 70 caught, 7 missed, 9 unviable, 0 timeouts
+--- the rest, part 0/2 (after the stop) ---
+Found 31 mutants to test
+ok       Unmutated baseline in 15s build + 106s test
+31 mutants tested in 15m: 3 missed, 27 caught, 1 unviable
+--- the rest, part 1/2 (after the stop) ---
+Found 31 mutants to test
+ok       Unmutated baseline in 17s build + 117s test
+31 mutants tested in 20m: 3 missed, 26 caught, 2 unviable
+Accounting: 89 + 88 + 87 + 86 + 31 + 31 = 412 outcomes, every name of `cargo mutants --list --file src/lib.rs` exactly once.
+Totals: 350 caught, 29 missed, 33 unviable, 0 timeouts.
+
+[every missed mutant of round A, with its disposition]
+src/lib.rs:207:9: replace Level::with_device -> Level with Default::default()  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:336:9: delete match arm Change::KidsSet{..} | Change::KidsOff in is_setup_step  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:477:38: replace == with != in AccountPolicy::execute  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:527:38: replace == with != in AccountPolicy::execute_many  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:635:138: replace == with != in AccountPolicy::approve  =>  equivalent: in approve's co_signed_before, `sha256(d) != k` differs from `== k` only for a row naming a removed device; both then leave a request that is not co-signed (the observable outcome is the same); round 8's 598:138, the code unchanged
+src/lib.rs:669:27: replace && with || in AccountPolicy::decline  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:853:45: replace && with || in AccountPolicy::on_recovery_key  =>  killed by a new test in tests/r9_mutants.rs (round B)
+src/lib.rs:853:86: replace && with || in AccountPolicy::on_recovery_key  =>  killed by a new test in tests/r9_mutants.rs (round B)
+src/lib.rs:1169:77: replace > with >= in AccountPolicy::level_for_moves  =>  equivalent: a coin with `x > 0` in this request always has total `a >= x > 0` (add_move only adds), so `a >= 0` admits no other coin; round 8's 1050:77, the code unchanged
+src/lib.rs:1258:27: replace || with && in AccountPolicy::key_in_use  =>  dead in the release wasm: #[cfg(feature = "modules")] code (`let known = known || modules::agent_key_is(key)`), compiled out
+src/lib.rs:1478:9: replace AccountPolicy::drop_waiting with ()  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1808:5: replace parties -> Option<Vec<AccountId>> with None  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1808:5: replace parties -> Option<Vec<AccountId>> with Some(vec![])  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1808:5: replace parties -> Option<Vec<AccountId>> with Some(vec![Default::default()])  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1812:13: replace || with && in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1812:26: replace == with != in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1812:37: replace && with || in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1812:52: replace == with != in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1813:12: delete ! in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1821:55: replace || with && in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1821:71: replace == with != in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1821:88: replace && with || in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1821:91: delete ! in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1822:42: replace == with != in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1822:53: replace && with || in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1823:21: replace && with || in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1823:24: delete ! in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1826:12: delete ! in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1985:36: replace - with / in signer_key  =>  equivalent: signer_key's register id u64::MAX - 1 vs u64::MAX / 1; any register id works; round 8's 1795:36
+Dispositions: {'modules': 24, 'killed': 2, 'equivalent': 3, 'OPEN': 0}
+(modules = the mutant's line lies in an item, statement or match arm under #[cfg(feature = "modules")], checked by a span scan of lib.rs for each one.)
+
+On the two killed ones: 853 is `on_recovery_key`'s guard on taking an added key off NEAR again when its recovery didn't finish ("unless a role holds it": not a second device, not the backup words, not on the phone list). Through the contract's methods it can't be reached with a key that holds a role: the callback acts only for the finish on record, a finish's new key is a waiting recovery's new key, and from the start of that recovery until the callback `key_in_use` (the waiting recovery's key, then the Finishing record's) refuses that key every role and `device_gate` refuses it as a phone. So the guard is belt and braces, not a bug. The killing test puts the Finishing record in storage by hand (the contract's borsh layout) to drive the guard with each role's key.
+
+[unviable: 33, each fails to build]
+31 replace a function's result with Default::default() (or Some/Ok/vec! of it) for a type that has no Default (Outcome, Level, Pending, Promise, Band, RecoveryStatus, PendingRecovery, Base64VecU8, load_key's T, and Reserved's borsh/serde impls); 2 are constant overflows rustc refuses (is_ml_dsa_65_key 1839:22 `1 + LEN -> 1 - LEN`, signer_key 1985:36 `u64::MAX - 1 -> u64::MAX + 1`).
+
+=== Round B: the new test (tests/r9_mutants.rs, 1 test) with the whole suite, against EVERY mutant of each function that had a survivor, on the same frozen lib.rs e83ec614…ec5e ===
+The frozen copy plus tests/r9_mutants.rs (sha256 2c4a0d9c5bcdee9e8505a95f2db4ffdf93eba3819881f35efd6f4c90365e114e); lib.rs and tests.rs unchanged. Same test command and timeout; CARGO_BUILD_JOBS=2, RUST_TEST_THREADS=4 (the shared box's limits then), 2 processes.
+Selection: --re 'AccountPolicy::(on_recovery_key|approve|level_for_moves)\b' (the function-level mutants too, which round 8's round-C regex missed) and, separately, --re '\bsigner_key\b'.
+The unmutated suite with the new test PASSES on the frozen source: 206 passed, 0 failed (15 test binaries; the 5 fuzz_ loops filtered out), including
+test a_callback_for_a_recovery_that_did_not_finish_never_deletes_a_key_that_holds_a_role ... ok
+--- on_recovery_key, approve, level_for_moves: shard 0/2 ---
+Found 22 mutants to test
+ok       Unmutated baseline in 12s build + 69s test
+22 mutants tested in 17m: 1 missed, 20 caught, 1 unviable
+--- on_recovery_key, approve, level_for_moves: shard 1/2 ---
+Found 21 mutants to test
+ok       Unmutated baseline in 13s build + 68s test
+21 mutants tested in 14m: 1 missed, 19 caught, 1 unviable
+--- signer_key ---
+Found 5 mutants to test
+ok       Unmutated baseline in 4s build + 57s test
+5 mutants tested in 2m: 1 missed, 3 caught, 1 unviable
+Totals of round B: 48 mutants, 42 caught, 3 missed, 3 unviable, 0 timeouts.
+[the two mutants killed by the new test: caught, and the failing test in each one's log is the new one]
+src/lib.rs:853:45: replace && with || in AccountPolicy::on_recovery_key  =>  caught: a_callback_for_a_recovery_that_did_not_finish_never_deletes_a_key_that_holds_a_role FAILED ("the second device's key must stay on NEAR")
+src/lib.rs:853:86: replace && with || in AccountPolicy::on_recovery_key  =>  caught: a_callback_for_a_recovery_that_did_not_finish_never_deletes_a_key_that_holds_a_role FAILED ("the second device's key must stay on NEAR")
+[on_recovery_key: all 15 of its mutants caught: 833:9 (-> ()), 833:12, 833:80, 833:97, 833:110 (the finish-on-record check), 837:21, 842:43, 843:18, 843:26, 848:12, 853:12, 853:45, 853:75, 853:86, 853:89]
+[missed: exactly the three argued equivalents above]
+src/lib.rs:635:138: replace == with != in AccountPolicy::approve
+src/lib.rs:1169:77: replace > with >= in AccountPolicy::level_for_moves
+src/lib.rs:1985:36: replace - with / in signer_key
+[unviable]
+src/lib.rs:616:9: replace AccountPolicy::approve -> Outcome with Default::default()
+src/lib.rs:1162:9: replace AccountPolicy::level_for_moves -> Level with Default::default()
+src/lib.rs:1985:36: replace - with + in signer_key
+
+=== Result ===
+On release 9's frozen lib.rs (r9-frozen-3), every function of the file was mutated (412 mutants, all with an outcome). Every viable mutant is caught by a test, except 24 in #[cfg(feature = "modules")] code compiled out of the release wasm and 3 argued equivalents (approve 635:138, level_for_moves 1169:77, signer_key 1985:36, all three the same code and argument as round 8). The 2 survivors in release-9 code (on_recovery_key's role guard, 853:45 and 853:86) are killed by tests/r9_mutants.rs. No surviving mutant showed a contract bug.

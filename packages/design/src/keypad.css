@@ -1,0 +1,18 @@
+/* The keypad is the brand (DESIGN-REBRAND §2.2): Geist 400 at 28, rows of 56, a soft disc on press, the glyph gives. */
+.zf-keypad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 56px; }
+.zf-keypad button { position: relative; appearance: none; border: 0; background: none; color: var(--ink); font: 400 28px/1 var(--font-money, var(--font));
+  font-feature-settings: "tnum" 1; display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+.zf-keypad button::before { content: ""; position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px; border-radius: 50%;
+  background: var(--fill); opacity: 0; transform: scale(.98); transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.zf-keypad button:active::before { opacity: 1; transform: none; transition-duration: var(--dur-fast); }
+.zf-keypad button > * { position: relative; transition: transform var(--dur-base) var(--ease-out); }
+.zf-keypad button:active > * { transform: scale(var(--press-key, .98)); transition-duration: var(--dur-fast); }
+.zf-keypad button[aria-label="Delete"] { color: var(--mute); }
+.zf-keypad button svg { width: 26px; height: 26px; display: block; }
+.zf-keypad .zf-hl { stroke-width: 1.5; }
+.zf-keypad button:disabled { visibility: hidden; }
+@media (max-height: 740px) { .zf-keypad { grid-auto-rows: 48px; } }
+@media (prefers-reduced-motion: reduce) { .zf-keypad button::before, .zf-keypad button > * { transition: none; } }
+/* A fifteen (5 Nov): a key squeezed under 44 (Send with its network row sets 42) still takes a 44 pt tap: an inert hit box
+   1 beyond its top and bottom edges; the disc stays the press film. */
+.zf-keypad button::after { content: ""; position: absolute; inset: -1px 0; }

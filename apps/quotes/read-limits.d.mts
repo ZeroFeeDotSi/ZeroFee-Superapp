@@ -1,0 +1,16 @@
+export declare const HEALTH_CLIENT_MS: number;
+export declare const HEALTH_PING_MS: number;
+export declare const READS_PER_IP_MINUTE: { readonly app: number; readonly other: number };
+export declare const READS_PER_ORIGIN_MINUTE: { readonly app: number; readonly other: number };
+export declare const READS_APP_FLOOR_PER_IP_MINUTE: number;
+export declare const READS_RESERVE_SHARE: number;
+export declare const READS_LIGHT_BUCKET_DAY: number;
+export declare const SOL_READ_METHODS: readonly string[];
+export declare const NEAR_SEND_PER_IP_MINUTE: number;
+export declare const NEAR_SEND_RELAY_MINUTE: number;
+export declare const NEAR_SEND_RELAY_DAY: number;
+export declare const NEAR_SEND_TX_MAX: number;
+export declare const NEAR_SEND_PER_ADDRESS_DAY: number;
+export declare const NEAR_SEND_LIGHT_DAY: number;
+export declare const NEAR_SEND_RESERVE_SHARE: number;
+export declare const NEAR_SEND_LIVE_CHECK_MS: number;

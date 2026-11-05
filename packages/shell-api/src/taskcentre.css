@@ -1,0 +1,30 @@
+/* D144: the Activity centre (TaskCentre.tsx): two lists, Now and Earlier, of the one shared row (packages/design
+   liverow.css). No cards, no app groups, no numbered steps: the row's mark says which app, its line says where it is.
+   Motion is the design system's (fill, flow, settle, press); under Reduce Motion it is still. */
+.tc { display: grid; gap: 32px; padding: 8px 0 24px; }
+.tc-empty { margin: 24px 0 0; text-align: center; color: var(--mute); }
+.tc-part { display: grid; gap: 4px; }
+.tc-h { min-height: 44px; display: flex; align-items: center; margin: 0; font: 600 20px/25px var(--font); letter-spacing: -.012em; color: var(--ink); }
+.tc-part__h { margin: 0; color: var(--mute); }
+.tc-chip { justify-self: start; display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px 0 14px; border: 0; border-radius: 17px; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); font: 500 14px/1 var(--font); cursor: pointer; }
+.tc-chip span { font-size: 12px; color: var(--mute); }
+/* the one Activity: Home's money history sits under Now, a section apart; its own live rows are already the tasks above,
+   so they are not drawn twice */
+.tc-history { margin-top: 0; gap: 12px; }
+.tc-history .wl-now, .tc-history .wl-live { display: none; }
+
+/* a task's public transaction under its row (S3): its id quiet on the row's text edge, Copy and View beside it */
+.tc-proof { display: flex; align-items: center; gap: 14px; margin: -4px 0 8px 56px; color: var(--mute); }
+.tc-proof__id { font-variant-numeric: tabular-nums; }
+/* a receipt (a finished task with a public transaction): label left, value right, then its proof */
+.tc-receipt__row { display: flex; justify-content: space-between; gap: 16px; margin: 0; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.tc-receipt__row > span:last-child { text-align: right; }
+.tc-receipt__note { margin-top: 12px; color: var(--mute); }
+
+/* one empty state (review, 5 Nov): both lists empty = Home's one quiet line (naming trades too), no "Trade" label, no second line;
+   only one list with rows = that list, the other's empty line skipped. */
+.wl-none__all { display: none; }
+.tc-history:has(.wl-none):has(~ .tc-history .tr-none) .wl-none__solo { display: none; }
+.tc-history:has(.wl-none):has(~ .tc-history .tr-none) .wl-none__all { display: inline; }
+.tc-history:has(.tr-none) { display: none; }
+.tc-history:has(.wl-none):has(~ .tc-history .tr-cards) { display: none; }

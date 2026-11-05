@@ -1,0 +1,30 @@
+/* The segmented control (Segmented.tsx): Monument's hairline pill, quiet names, one soft thumb with the marker's glow. */
+.zf-seg {
+  position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr); height: 44px; padding: 3px; box-sizing: border-box;
+  border-radius: 22px; box-shadow: inset 0 0 0 1px var(--line); -webkit-user-select: none; user-select: none;
+}
+.zf-seg__thumb {
+  position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n)); border-radius: 19px;
+  background: var(--marker-bg); box-shadow: var(--glow); transform: translateX(calc(var(--at) * 100%));
+  transition: transform var(--dur-base) var(--ease-out); pointer-events: none;
+}
+.zf-seg__item {
+  appearance: none; border: 0; background: none; padding: 0 4px; margin: -3px 0; min-height: 44px; position: relative; cursor: pointer;
+  color: var(--mute); font: 500 13px/1 var(--font); letter-spacing: .01em; white-space: nowrap;
+  transition: color var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+.zf-seg__item.on { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .zf-seg__thumb { transition: none; } }
+/* v2 (REVAMP): Apple's segmented shape. A soft-filled track with no outline, and the chosen segment a raised thumb
+   (white on White; a lighter step of ink in Black), concentric (22 outer, 18 inner, 4 apart), on the snap spring. */
+.zf-seg { box-shadow: none; background: var(--act-fill); }
+.zf-seg__thumb { background: #fff; box-shadow: 0 0 0 .5px rgba(0, 0, 0, .06), 0 2px 6px -1px rgba(0, 0, 0, .12); transition: transform var(--snap-ms, var(--spring-ms)) var(--ease-out); }
+:root[data-theme="dark"] .zf-seg__thumb { background: rgba(242, 242, 243, .16); box-shadow: inset 0 .5px 0 rgba(255, 255, 255, .1); }
+/* Rebrand: the track is the one --fill, the thumb its own token (white on White, a lighter step in Black). */
+.zf-seg { background: var(--fill); }
+.zf-seg__thumb, :root[data-theme="dark"] .zf-seg__thumb { background: var(--thumb); box-shadow: var(--e-thumb); }
+/* The keyboard ring follows the pill (shell audit 15c: a square ring on a round track, cut at its edge). */
+.zf-seg__item { border-radius: 22px; }
+/* Theme v3.1 (THEME.md): a raised fill carries its 1 px top highlight. */
+.zf-seg { box-shadow: inset 0 1px 0 var(--edge-hi); }
+/* A shell 3: no OUTER ring on the track; the theme's 1 px inset top highlight is the only shadow. */

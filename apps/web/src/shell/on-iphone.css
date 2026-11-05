@@ -1,0 +1,5 @@
+/* The web wallet's "On iPhone" page (OnIphoneSheet.tsx): its line, then two text links, each a 44 px row. */
+.oni { display: grid; gap: 16px; padding: 8px 16px 24px; }
+.oni__line { margin: 0; color: var(--ink-2); }
+.oni__links { display: grid; border-top: .5px solid var(--line); }
+.oni__link { display: flex; align-items: center; box-sizing: border-box; min-height: 44px; padding: 12px 0; border-bottom: .5px solid var(--line); color: var(--ink); font: 400 17px/20px var(--font); text-decoration: underline; text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; }

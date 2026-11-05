@@ -1,0 +1,208 @@
+.sec-hero { display: grid; justify-items: center; text-align: center; padding-top: 22px; }
+.sec-list { margin-top: 26px; }
+.sec-account { text-align: center; margin-top: 18px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; word-break: break-all; }
+.sec-empty { height: 100%; display: grid; place-items: center; text-align: center; }
+.sec-other { margin-top: 18px; display: grid; gap: 6px; }
+.sec-handle { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+.sec-remove { justify-self: start; padding: 6px 0; color: var(--ink); font-weight: 500; }
+.sec-rowbtn { appearance: none; background: none; border: 0; border-bottom: 1px solid var(--line); width: 100%; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.sec-other__actions { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.sec-act { justify-self: start; padding: 6px 0; color: var(--ink); font-weight: 500; }
+.sec-tab-head { text-align: center; padding: 18px 0 8px; display: grid; gap: 6px; }
+.sec-layer { padding: 16px 0; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.sec-layer__top { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; }
+.sec-layer__top .t { font-size: 16px; letter-spacing: -.01em; }
+.sec-layer__why, .sec-layer__how { padding-left: 42px; }
+.sec-layer .sec-act { margin-left: 42px; }
+/* a step's why, one tap down (UI-SIMPLICITY-RULES 2): under the name, no second hairline */
+.sec-layer .sec-layer__more { margin: -6px 0 0 42px; border-top: 0; }
+.sec-layer .sec-layer__more > .zf-more__label { color: var(--mute); }
+.sec-layer .sec-layer__more .sec-layer__how { padding-left: 0; margin-top: 6px; }
+.sec-status { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.sec-status .t { font-size: 16px; } .sec-status .d { font-size: 13px; color: var(--mute); margin-top: 3px; line-height: 1.45; }
+.sec-pending { margin-top: 10px; }
+.sec-sub { margin: 26px 0 6px; }
+.sec-lose { margin-top: 0; border-top: 0; border-bottom: 1px solid var(--line); }
+/* A row's steps: a quiet fold inside the row, no second hairline (the row's own line closes it). */
+.sec-act-more { margin-top: 2px; border-top: 0; }
+.sec-act-more > .zf-more__label { min-height: 36px; color: var(--mute); }
+.sec-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.sec-steps li { counter-increment: step; display: grid; grid-template-columns: 30px 1fr; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 15px; line-height: 1.4; }
+.sec-steps li::before { content: counter(step); font: var(--t-label); letter-spacing: .18em; color: var(--ink); padding-top: 2px; }
+.sec-act-row { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.sec-act-row .t { font-size: 15.5px; } .sec-act-row .d { font-size: 12.5px; color: var(--mute); margin-top: 3px; }
+.sec-act-row a { color: var(--ink); }
+/* A row with a transaction is one target, the whole row (grade 02f, F4); its "See it" is the label, not a tiny link. */
+.sec-act-link { display: block; color: inherit; text-decoration: none; min-height: 44px; -webkit-tap-highlight-color: transparent; }
+.sec-act-link:active { background: var(--line); }
+.sec-see { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+/* Reading the history: rows of its own shape at once (F9), never a bare spinner. */
+.sec-act-skel .t, .sec-act-skel .d { height: 14px; border-radius: 4px; background: var(--line); }
+.sec-act-skel .t { width: 70%; } .sec-act-skel .d { width: 40%; height: 11px; margin-top: 8px; }
+@media (prefers-reduced-motion: no-preference) { .sec-act-skel { animation: none; } }
+.sec-center { height: 100%; display: grid; place-items: center; }
+.sec-devices { display: flex; justify-content: center; align-items: flex-end; gap: 26px; margin-top: 46px; color: var(--ink); }
+.sec-center-text { text-align: center; margin-top: 34px; }
+.sec-qr { display: grid; place-items: center; margin-top: 30px; }
+.sec-wait { display: flex; gap: 12px; align-items: center; justify-content: center; }
+.sec-amount { font-size: 64px; font-weight: 500; font-family: var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; margin-top: 10px; font-variant-numeric: tabular-nums; }
+.sec-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 34px; }
+.sec-presets button { appearance: none; height: 44px; border-radius: 14px; border: 1px solid var(--line); background: none; color: var(--ink); font: 400 14px var(--font); cursor: pointer; }
+.sec-presets button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.sec-act-row.failed .t { color: var(--mute); }
+.sec-act-lines { margin: 6px 0 0; padding-left: 16px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.sec-by { color: var(--ink-2); }
+.sec-scan { position: relative; width: 220px; height: 220px; margin: 34px auto 0; }
+.sec-scan span { position: absolute; width: 34px; height: 34px; border-color: var(--ink); border-style: solid; border-width: 0; }
+.sec-scan span:nth-child(1) { top: 0; left: 0; border-top-width: 1.5px; border-left-width: 1.5px; border-top-left-radius: 12px; }
+.sec-scan span:nth-child(2) { top: 0; right: 0; border-top-width: 1.5px; border-right-width: 1.5px; border-top-right-radius: 12px; }
+.sec-scan span:nth-child(3) { bottom: 0; left: 0; border-bottom-width: 1.5px; border-left-width: 1.5px; border-bottom-left-radius: 12px; }
+.sec-scan span:nth-child(4) { bottom: 0; right: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; border-bottom-right-radius: 12px; }
+.sec-code { display: grid; gap: 10px; margin-top: 34px; }
+.sec-code input { height: 56px; border: 1px solid var(--line); border-radius: 18px; background: var(--bg); color: var(--ink); padding: 0 18px; font: 400 18px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .08em; outline: none; }
+.sec-code input:focus { border-color: var(--ink); }
+/* Email alerts (EmailAlerts.tsx) on the Recovery tab. */
+.sec-alerts { margin-top: 26px; }
+.sec-alerts__input { width: 100%; box-sizing: border-box; height: 50px; margin-top: 12px; padding: 0 16px; border: 1px solid var(--line); border-radius: 14px; background: none; color: var(--ink); font: var(--t-body); outline: 0; }
+.sec-alerts__input:focus { border-color: var(--ink); }
+.sec-alerts__acts { display: flex; justify-content: space-between; margin-top: 10px; }
+.sec-alerts__stop { color: var(--mute); }
+.sec-alerts__keeps { margin-top: 10px; }
+/* A held request to fear (held.ts `warning`: code ZeroFee doesn't know, say): red, with why. */
+.sec-row--alert .t, .sec-row--alert .d { color: var(--alert); }
+/* The laptop card on Overview (devices.ts offerLaptop). */
+.sec-laptop-card { margin-top: 18px; }
+.sec-laptop-card .t { font: var(--t-body); font-weight: 600; }
+/* Being someone's guardian (GuardianSide.tsx). */
+.sec-guard__code { display: grid; justify-items: center; gap: 6px; margin-top: 22px; }
+.sec-guard__qr { width: min(280px, 78vw); background: #fff; padding: 12px; border-radius: 16px; }
+.sec-guard__qr svg, .sec-guard__qr canvas { width: 100%; height: auto; }
+.sec-guard__fp { font: 15px/1.4 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .08em; }
+.sec-guard__account { font: var(--t-body); padding: 6px 0; }
+.sec-guard__req { border-bottom: 1px solid var(--line); padding: 14px 0; display: grid; gap: 4px; }
+.sec-guard__req .t { font: var(--t-body); }
+/* Face ID changed (Rearm.tsx): the instruction to remove a face someone else added, before the words. */
+.sec-rearm__warn { color: var(--alert); }
+/* Release 7: the recovery facts (the chosen wait, the second device, the fallback, a change's wait). */
+.sec-facts { margin-top: 6px; }
+.sec-fact { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.sec-fact__v { font-size: 14px; color: var(--ink); text-align: right; }
+.sec-laptop-code { font: 400 14px/1.4 ui-monospace, "SF Mono", Menlo, monospace; overflow-wrap: anywhere; color: var(--ink-2, var(--ink)); }
+.sec-laptop-letters { font: 500 28px/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .12em; color: var(--ink); }
+/* The web demo laptop side (LaptopWindow): its own header and its Copy button, on the laptop screen. */
+.sec-lw-code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 4px 0 0; }
+.sec-lw-letters { font-size: 22px; margin: 2px 0 0; }
+.sec-lw-btn { margin-top: 12px; height: 44px; }
+/* The "Your key" proof card (KeyProof.tsx, L6): the first row of Security and the end of set-up. */
+.sec-key { margin-top: 18px; display: grid; gap: 4px; text-align: left; }
+.sec-key .t { font: var(--t-body); font-weight: 600; }
+.sec-key__match { display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: center; margin-top: 8px; font: var(--t-body); }
+.sec-key__btn { justify-self: start; margin-top: 2px; }
+.sec-key__how { margin: 2px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.sec-key__how li { padding: 10px 0 0; border-top: 1px solid var(--line); line-height: 1.45; word-break: break-word; }
+.sec-key--problem .t { color: var(--alert); }
+/* The key's one line on a hairline, no box: the tick and the answer, how we know one tap down. */
+.sec-key--row { gap: 0; border-bottom: 1px solid var(--line); }
+.sec-key--row .sec-key__match { margin-top: 0; min-height: 44px; }
+.sec-key__more { margin-top: 0; }
+.sec-key--row .t { display: block; font-weight: 400; }
+.sec-key__d { display: block; }
+.sec-key--row .sec-key__match { padding: 8px 0; }
+/* H13: the second device's one fixed address, with its Copy */
+.sec-copy-address { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; margin-top: 14px; }
+.sec-copy-address__a { font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.sec-window { margin-top: 14px; }
+/* The key's one line (Job 1, criterion 7; B13: never one word per line): the tick and the words side by side. */
+.sec-key__line { display: flex; align-items: center; gap: 12px; }
+.sec-key__line .t { font-size: 16px; letter-spacing: -.01em; }
+.sec-acts { display: grid; justify-items: start; gap: 2px; margin-top: 8px; }
+.sec-act-head { margin: 0 0 6px; }
+
+/* Devices, Recovery and the Guardian add screen (design review 2 Nov §2, §4, §5): a picture, one headline, one line,
+   hairline rows for facts, one button; no boxes around sentences, no caps labels, nothing above the title. */
+.sec-dev { display: flex; flex-direction: column; align-items: stretch; padding-top: 6px; }
+.sec-dev__pic { display: block; margin: 8px auto 0; color: var(--ink); }
+.sec-phone--on { fill: var(--ink); stroke: var(--ink); stroke-width: 1.25; }
+.sec-phone__tick { fill: none; stroke: var(--bg); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sec-dev__head { text-align: center; margin: 20px 0 0; }
+.sec-dev__line { text-align: center; margin: 10px 0 0; color: var(--ink-2, var(--ink)); }
+.sec-dev__rows { display: grid; margin-top: 22px; border-top: 1px solid var(--line); }
+.sec-fact-row { appearance: none; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); font: 400 16px/1.3 var(--font); display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 56px; padding: 0; width: 100%; text-align: left; }
+.sec-fact-row .v { color: var(--mute); display: inline-flex; align-items: center; gap: 8px; text-align: right; }
+.sec-fact-row--btn { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sec-fact-row--btn:disabled { cursor: default; opacity: 1; }
+.sec-key-row__tick { width: 20px; height: 20px; }
+.sec-key-row__more { padding: 8px 0 12px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
+.sec-key-row__more .zf-small { margin: 0; }
+.sec-dev__note { margin: 10px 0 0; }
+.sec-dev__acts { display: grid; justify-items: center; gap: 10px; margin-top: 26px; text-align: center; }
+.sec-dev__acts .zf-btn { width: 100%; }
+.sec-dev__lost { display: block; margin: 14px auto 0; }
+.sec-dev__guard { margin-top: 26px; border-top: 1px solid var(--line); }
+.sec-alert-row { border-left: 2px solid var(--alert); padding: 4px 0 4px 12px; margin: 4px 0 14px; display: grid; gap: 6px; }
+.sec-alert-row .t { color: var(--alert); font: 500 16px/1.3 var(--font); }
+.sec-alert-row .zf-btn { margin-top: 6px; }
+.sec-ask-row { margin: 22px 0 24px; display: grid; gap: 12px; }
+.sec-ask-row__label { text-align: center; margin: 0; }
+.sec-step-line { text-align: center; margin: 0 0 12px; }
+.sec-dev__acts .sec-act { justify-self: center; text-align: center; min-height: 44px; }
+
+/* ── R2 (4 Nov, the design review §4.9): Devices and Recovery on the grouped system ───────────────────────────────────
+   The picture, T2 and one T6 line (G3), then the facts as one inset card, the other ways as a second card of rows (no
+   stacked text buttons), the guardian's side alone in its card, and the one B1 on a pinned floor with a 24 pt fade.
+   A setup window's date is the facts card's footer (T7). */
+.sec-dev { min-height: 100%; box-sizing: border-box; }
+.sec-dev__line { color: var(--mute); font: 400 15px/20px var(--font); text-wrap: balance; }
+.sec-dev__head { text-wrap: balance; }
+.sec-dev__rows { margin-top: 24px; padding: 0 16px; border-top: 0; border-radius: 16px; background: var(--act-fill); }
+.sec-dev__rows:empty { display: none; }
+.sec-dev__rows > * { border-bottom: .5px solid var(--line); }
+.sec-dev__rows > :last-child { border-bottom: 0; }
+.sec-dev__rows .sec-fact-row { min-height: 52px; font: 400 17px/22px var(--font); }
+.sec-dev__other { margin-top: 32px; }
+.sec-dev__fn { margin: 8px 16px 0; color: var(--mute); font: 400 13px/18px var(--font); text-align: left; }
+.sec-dev__guard { margin-top: 32px; padding: 0 16px; border: 0; border-radius: 16px; background: var(--act-fill); min-height: 52px; font: 400 17px/22px var(--font); }
+.sec-dev__floor { order: 99; position: sticky; bottom: 0; z-index: 1; margin-top: auto; padding: 24px 0 16px; background: linear-gradient(to bottom, transparent, var(--bg) 24px); }
+.sec-dev__floor .zf-btn { width: 100%; }
+.sec-dev > .sec-lose { margin-top: 32px; padding: 0 16px; border: 0; border-radius: 16px; background: var(--act-fill); }
+.sec-dev > .sec-lose > .zf-more__label { min-height: 52px; color: var(--ink); font: 400 17px/22px var(--font); }
+.sec-dev { flex: 1 0 auto; }
+/* R2: the email disclosure as the card's last row (its label a T5 row, its body inside the card) */
+.sec-dev__rows > .sec-lose { margin: 0; padding: 0; border: 0; border-radius: 0; background: none; }
+.sec-dev__rows > .sec-lose > .zf-more__label { min-height: 52px; padding: 15px 0; box-sizing: border-box; color: var(--ink); font: 400 17px/22px var(--font); }
+/* sd-security (f): a flow's one action stays in sight above the app bar while its words scroll under it (D135: the body
+   scrolls, the footer stays); it sat at the end of the words, under the bar, until the person scrolled. */
+.sec-flow .zf-floor { position: sticky; bottom: 0; z-index: 1; padding-top: 24px; background: linear-gradient(to bottom, transparent, var(--bg) 24px); }
+/* sd-security (f, 047): the guardian page has no floor, so its last lines (the letters to check) sat under the app bar
+   with nothing to scroll: its end keeps the bar's room, as a floor does. */
+.sec-guard-page::after { content: ""; flex: none; display: block; height: calc(var(--zf-safe-bottom, env(safe-area-inset-bottom, 0px)) + 24px); }
+
+/* Quantum-safe's sheet (quantum.ts): a headline, one line, one card of tick rows, the old key's row, the Trade line. */
+.sec-q { display: flex; flex-direction: column; padding-top: 8px; }
+.sec-q__head { margin: 0; text-wrap: balance; }
+.sec-q__line { margin: 10px 0 0; color: var(--mute); font: 400 15px/20px var(--font); text-wrap: pretty; }
+.sec-q__rows { margin-top: 24px; }
+.sec-q__rows + .sec-q__rows { margin-top: 16px; }
+.sec-q__rows .sec-fact-row { padding: 12px 0; }
+.sec-q__t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sec-q__sub { color: var(--mute); font: 400 14px/18px var(--font); }
+/* the audit: a full-access key on an account with rules bypasses the contract: red, on the card and its row. */
+.sec-q__bypass .sec-q__sub, .wl-nav[data-tone="red"] .d, .wl-nav[data-tone="red"] .vd, .sec-q__bypass-line { color: var(--down); }
+.sec-other__line { margin-top: 6px; }
+.sec-q__remove { flex: none; position: relative; background: var(--bg); }
+.sec-q__trade { margin: 16px 16px 0; color: var(--mute); }
+.sec-q--ask { min-height: 100%; }
+.sec-q__floor { display: grid; gap: 8px; padding-top: 24px; }
+
+/* ── Theme v3.1 (THEME.md; A apps 4): fields on --fill, no border, hairline only as the focus ring; choices on a capsule
+   track; a command at --r-cmd; a card at --r-card. ─────────────────────────────────────────────────────────────── */
+.sec-presets { gap: 0; padding: 3px; border-radius: var(--r-pill); background: var(--fill); box-shadow: inset 0 1px 0 var(--edge-hi); }
+.sec-presets button { height: 44px; border: 0; border-radius: var(--r-pill); background: none; color: var(--ink); font: 500 14px var(--font); }
+.sec-presets button[aria-pressed="true"] { background: var(--thumb); color: var(--ink); border: 0; box-shadow: var(--thumb-shadow); }
+.sec-code input { border: 0; border-radius: var(--r-cmd); background: var(--fill); }
+.sec-code input:focus { border: 0; box-shadow: inset 0 0 0 1px var(--ink); }
+.sec-alerts__input { border: 0; border-radius: var(--r-field); background: var(--fill); }
+.sec-alerts__input:focus { border: 0; box-shadow: inset 0 0 0 1px var(--ink); }
+.sec-copy-address { border: 0; border-radius: var(--r-card); background: var(--fill); }
+.sec-guard__qr { border-radius: var(--r-field); }
+.sec-dev__rows, .sec-dev__guard, .sec-dev > .sec-lose, .pr-rows, .pr-row--pending { border-radius: var(--r-card); }

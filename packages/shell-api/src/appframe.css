@@ -1,0 +1,31 @@
+.af-top { position: relative; flex: none; height: 52px; margin-top: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 6px); display: grid; place-items: center; }
+.af-menu { position: absolute; left: calc(var(--gutter) - 8px); top: 12px; }
+/* D144: the Activity centre, top right: its icon and a badge counting what is still going, softly pulsing while it is
+   (motion.css's zf-ping; still under Reduce Motion) */
+.af-tasks { position: absolute; right: calc(var(--gutter) - 8px); top: 12px; box-sizing: border-box; min-width: 44px; min-height: 44px; } /* a 44 px target (k-chat S3) */
+.af-tasks__n { position: absolute; top: -3px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; display: grid; place-items: center; font: 600 10.5px/1 var(--font); font-variant-numeric: tabular-nums; color: var(--bg); background: var(--up); animation: none; }
+@media (prefers-reduced-motion: reduce) { .af-tasks__n { animation: none; } }
+/* The app's own sections, at the top under its name (J2): air above the content, never a second bar at the bottom. */
+.af-seg { flex: none; padding: 4px 24px 14px; }
+/* The scroll's end keeps clear what the bottom of the screen holds (the app bar and the home indicator, tokens.css
+   --zf-safe-bottom); what is inside it doesn't add it again (a floor sits on the scroll's end), and a sticky floor reads
+   the scroll's own end (--zf-end). */
+/* Firm frame (bug report, 4 Nov): the frame never scrolls; its header, sections and pinned row stay put, and only
+   .af-main's content scrolls, up and down only, with no bounce. */
+.zf-screen.af-frame { overflow: hidden; }
+.af-pinned { flex: none; padding: 0 24px; }
+.af-main { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 0 24px calc(var(--zf-safe-bottom, 0px) + 18px); overscroll-behavior: none; --zf-end: var(--zf-safe-bottom, 0px); }
+.af-main > * { --zf-safe-bottom: 0px; }
+.af-main--pushed { display: flex; flex-direction: column; }
+/* R2 (4 Nov): the count never balloons. The badge stays still; a halo behind it pings three times (transform and
+   opacity), then rests (the phone stays cool: the test list, row 12). */
+.af-tasks__n { animation: none; isolation: isolate; }
+.af-tasks__n::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--up); animation: zf-ping var(--dur-base) var(--ease-out) 3; }
+@media (prefers-reduced-motion: reduce) { .af-tasks__n::after { animation: none; opacity: 0; } }
+.af-tasks__n::after { border-radius: 999px; animation-name: af-ping; }
+@keyframes af-ping { from { transform: scale(1); opacity: .55; } to { transform: scale(1.02); opacity: 0; } }
+/* a job just made (product decision, 5 Nov): one short pulse of the bell, 450 ms; each job draws
+   the icon again (TaskBell's key), so it plays once per job; Reduce Motion: none, the badge's count still changes */
+.af-tasks--bump svg { animation: af-bump var(--dur-base) var(--ease-out); }
+@keyframes af-bump { 0% { transform: scale(1); } 35% { transform: scale(1.02); color: var(--up); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .af-tasks--bump svg { animation: none; } }

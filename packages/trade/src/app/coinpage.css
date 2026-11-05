@@ -1,0 +1,172 @@
+/* The coin page (D136; design review 2026-11-03 items 1-3, 10, 17-19), scoped under .cp so it reads after Trade's older
+   rules whatever the bundle's order. Black and white; light is the accent (the coin's own, blurred behind its logo). */
+
+/* 1: the coin's light fades out inside the page, never cut flat by the scroll's edge */
+.cp .tr-coin-head { gap: 14px; margin-top: 0; padding-top: 18px; }
+.cp .cp-logo { width: 48px; height: 48px; flex: none; }
+.cp .cp-logo .zf-halo__light { -webkit-mask-image: radial-gradient(closest-side, #000 50%, transparent); mask-image: radial-gradient(closest-side, #000 50%, transparent); }
+.cp .tr-coin-head .tr-sym { font: 500 19px/1.2 var(--font); letter-spacing: -.01em; }
+.cp .cp-where { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+
+/* the price: big and thin; a move is a soft glint in its own colour, never a box, and the digits never roll (17) */
+.cp .tr-price { display: flex; align-items: center; gap: 12px; font-size: 48px; font-weight: 500; font-family: var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: var(--tr-hero, -.035em); font-variant-numeric: tabular-nums; margin-top: 16px; }
+.cp .tr-price > span:first-child { position: relative; }
+.cp .cp-live { flex: none; margin-top: 6px; }
+/* v2: the glint is a light of its colour on its own layer, fading once (opacity); it used to animate text-shadow and
+   colour, a paint every frame on every row that ticked */
+.cp-glint-up, .cp-glint-down { position: relative; }
+.cp-glint-up::after, .cp-glint-down::after { content: ""; position: absolute; inset: -6px -10px; pointer-events: none; animation: cp-glint var(--dur-base) var(--ease-out) both; }
+.cp-glint-up::after { background: radial-gradient(closest-side, color-mix(in srgb, var(--up) 26%, transparent), transparent); }
+.cp-glint-down::after { background: radial-gradient(closest-side, color-mix(in srgb, var(--down) 26%, transparent), transparent); }
+@keyframes cp-glint { 0% { opacity: 0; } 10% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 2: the chart, full bleed, its own height; nothing printed on it */
+.cp .cp-chart { margin: 18px calc(-1 * var(--gutter, 24px)) 0; overflow: hidden; }
+.cp .cp-chart-empty { height: 220px; align-content: center; }
+.cp .tr-ranges { margin-top: 6px; }
+
+/* 19: what you hold, one row */
+.cp-hold { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; margin-top: 18px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.cp-hold-t { display: grid; gap: 3px; min-width: 0; font: 400 15px/1.3 var(--font); }
+.cp-hold-t .zf-small { color: var(--mute); }
+.cp-hold-v { font: 500 15px/1.2 var(--font); font-variant-numeric: tabular-nums; }
+
+/* 10: Safety, a hairline row (no box, no eyebrow); its checks one sentence each with a drawn mark */
+.cp details.tr-safety { margin-top: 0; border-radius: 0; box-shadow: none; padding: 0; border-bottom: 1px solid var(--line); }
+.cp details.tr-safety[open] { padding-bottom: 8px; }
+.cp .cp-safety-head { list-style: none; display: flex; align-items: center; gap: 12px; min-height: 60px; cursor: pointer; }
+.cp .cp-safety-head::-webkit-details-marker { display: none; }
+.cp .cp-safety-t { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.cp .cp-safety-name { font: 500 15px/1.2 var(--font); color: var(--ink); }
+.cp .cp-safety-head .tr-safety-sum { margin: 0; font: 400 13px/1.3 var(--font); color: var(--mute); }
+.cp .cp-ring { width: 26px; height: 26px; flex: none; border-radius: 50%; background: conic-gradient(var(--up) 0 var(--fine, 0%), var(--line) var(--fine, 0%) 100%);
+  -webkit-mask: radial-gradient(circle, transparent 9.5px, #000 10.5px); mask: radial-gradient(circle, transparent 9.5px, #000 10.5px); }
+.cp .cp-chev { width: 8px; height: 8px; flex: none; margin-right: 4px; border-right: 1.5px solid var(--mute); border-bottom: 1.5px solid var(--mute); transform: rotate(45deg) translateY(-3px); transition: transform var(--dur-base) var(--ease-out); }
+.cp details[open] > .cp-safety-head .cp-chev { transform: rotate(-135deg) translateY(-2px); }
+.cp .cp-chev--r { transform: rotate(-45deg); }
+.cp .tr-safety-row { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 0; font: 400 14.5px/1.4 var(--font); }
+.cp .tr-safety-row > span:first-child { color: var(--ink); }
+.cp .tr-safety-row--unread > span { color: var(--mute); }
+.cp .tr-safety-row--know > span:last-child { color: var(--ink); font-weight: 500; }
+.cp .cp-mark { font: 500 14px/1 var(--font); text-align: center; }
+.cp details.tr-safety[open] > .tr-safety-row { animation: zf-rise var(--dur-base) var(--ease-out) both; }
+
+/* 19: two facts side by side, then More */
+.cp-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.cp-facts > div { display: grid; gap: 3px; }
+.cp-facts b { font: 500 16px/1.2 var(--font); font-variant-numeric: tabular-nums; }
+.cp-facts .zf-small { color: var(--mute); }
+.cp-more { appearance: none; border: 0; background: none; color: var(--ink); width: 100%; display: flex; align-items: center; justify-content: space-between; min-height: 56px; padding: 0; font: 400 15px/1 var(--font); border-bottom: 1px solid var(--line); cursor: pointer; }
+.cp-more:active { opacity: .6; }
+.cp-more-sheet .tr-kvs { margin-top: 18px; }
+.cp-more-sheet .tr-kvs:first-child { margin-top: 0; }
+.cp-fact > span { color: var(--ink-2); }
+
+/* 3: a solid floor, two buttons, nothing printing through. Product decision, 5 Nov ("empty space under Buy"; "Buy should hover and
+   stay at the bottom"): the floor sits on the app bar at every scroll, its first, its middle and its end. The page gives
+   the scroll area's foot (18 px + the bar, --zf-end) back to the floor, so at the scroll's end the floor's own foot is the
+   screen's foot, never a band of empty page under Buy. */
+.cp.tr-coin { padding-bottom: 0; margin-bottom: calc(-18px - var(--zf-end, 0px)); }
+.cp .tr-coin-floor { padding-bottom: calc(12px + var(--zf-end, env(safe-area-inset-bottom, 0px))); }
+/* a bar that is away (a list's scroll hid it before this page came): the floor goes down to the screen's foot with it */
+:root:has(.zf-appbar[data-hidden]) .cp .tr-coin-floor { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+.cp .tr-coin-floor { background: var(--bg); box-shadow: 0 -1px 0 var(--line); margin-top: 18px; }
+.cp .tr-coin-floor > * { flex: 1; }
+.cp .cp-pair { display: flex; gap: 10px; width: 100%; }
+.cp .cp-pair > button { flex: 1; height: 50px; border-radius: 14px; }
+.cp .cp-pair .tr-btn2 { box-shadow: none; } /* B2: the soft fill (trade.css), never an outline */
+
+@media (prefers-reduced-motion: reduce) { .cp-glint-up::after, .cp-glint-down::after, .cp details.tr-safety[open] > .tr-safety-row { animation: none; } .cp-glint-up::after, .cp-glint-down::after { opacity: 0; } }
+
+/* Chart bug ("like Phantom", re-test of 9e8ff98c). The page never moves on a range tap: no scroll anchoring, the
+   chart box (chart and its time labels) has one height, and the change line keeps its own while a range loads. */
+.cp { overflow-anchor: none; }
+.cp .cp-chart { position: relative; height: 248px; }
+.cp .tr-change { min-height: 20px; }
+/* the range's change in its colour, the words after it quiet */
+.cp-move--up { color: var(--up); }
+.cp-move--down { color: var(--down); }
+/* the coin's own icon, faint, behind the line or the candles; a finger goes through it to the chart */
+.cp .cp-chart-mark { position: absolute; left: 50%; top: 110px; width: 128px; height: 128px; margin: -64px 0 0 -64px; border-radius: 50%; object-fit: cover; pointer-events: none; opacity: .07; z-index: 0; }
+:root[data-theme="dark"] .cp .cp-chart-mark { opacity: .04; }   /* a16 (Sim re-walk): .1 read as a watermark */
+:root:not([data-theme="dark"]) .cp .cp-chart-mark { display: none; }   /* the dim halo is Black only */
+.cp .cp-chart .tr-chart { position: relative; z-index: 1; }
+/* four time labels under the chart, its first and last at the edges */
+.cp .cp-ticks { display: flex; justify-content: space-between; height: 28px; align-items: center; padding: 0 var(--gutter, 24px); font: 400 12px/1 var(--font); color: var(--faint, var(--mute)); font-variant-numeric: tabular-nums; }
+.cp .cp-ticks--candle { padding-right: 64px; }
+
+/* product decision, 4 Nov ("show it better"): how the price moved, four chips (pump.fun's row), and the coin's numbers (Phantom's Info) */
+.cp .cp-chips { display: grid; grid-template-columns: repeat(var(--n, 4), 1fr); gap: 8px; margin-top: 14px; }
+.cp .cp-chip { display: grid; gap: 4px; justify-items: center; padding: 10px 4px; border-radius: var(--r-sm, 12px); background: var(--line); font-variant-numeric: tabular-nums; }
+.cp .cp-chip-w { font: 400 12px/1 var(--font); color: var(--mute); }
+.cp .cp-chip b { font: 600 14px/1 var(--font); color: var(--ink); }
+.cp .cp-chip--up { background: var(--up-wash, var(--line)); }
+.cp .cp-chip--up b { color: var(--up); }
+.cp .cp-chip--down { background: var(--down-wash, var(--line)); }
+.cp .cp-chip--down b { color: var(--down); }
+.cp .cp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px 12px; padding: 18px 0 16px; margin-top: 14px; border-top: 1px solid var(--line); }
+.cp .cp-stat { display: grid; gap: 4px; min-width: 0; align-content: start; }
+.cp .cp-stat b { font: 600 16px/1.2 var(--font); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp .cp-stat .zf-small { color: var(--mute); line-height: 1.25; }
+.cp .cp-trades24 { margin: 0; padding: 0 0 14px; color: var(--mute); font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--line); }
+.cp .cp-stats:not(:has(+ .cp-trades24)) { border-bottom: 1px solid var(--line); }
+/* a range not read yet: the last chart stays, faded, until the range's own candles come */
+.cp .cp-chart--wait .tr-chart { opacity: .35; transition: opacity var(--dur-base); }
+@media (max-width: 340px) { .cp .cp-stats { grid-template-columns: repeat(2, 1fr); } }
+/* Phone test (5 Nov, laptop frame in a tall window): a short coin page left a black band under Buy down to the frame's
+   foot, because a sticky floor only sticks while there is content to scroll. The page fills its screen and the floor is its
+   last row, pushed to the foot (grid: the floor's row takes the slack); long pages still scroll and the floor still sticks. */
+.af-main > .cp.tr-coin, .af-main > .tr-coin { display: flex; flex-direction: column; min-height: 100%; }
+.af-main > .tr-coin > * { flex: none; }
+.af-main > .tr-coin > .tr-coin-floor { margin-top: auto; margin-bottom: calc(-18px - var(--zf-end, env(safe-area-inset-bottom, 0px))); }
+/* the old 104 px of slack under the floor was the band itself: the floor is in flow, nothing needs clearing */
+.af-main > .cp.tr-coin { padding-bottom: 0; }
+
+/* product decision, 5 Nov: what More held, on the page itself; one hairline system (1 px var(--line)), headings as the rest of Trade's */
+.cp .cp-more-inline { display: grid; }
+.cp .cp-more-inline .tr-kvs { margin-top: 8px; }
+.cp .cp-more-inline .tr-sec { margin: 22px 0 2px; }
+/* "New price order" and "New repeat buy": rows of the page, a chevron at the end, never a floating centred link */
+.cp .tr-order-new { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 52px; padding: 0; text-align: left; border-bottom: 1px solid var(--line); font: 400 15px/1.3 var(--font); color: var(--ink); }
+.cp .tr-order-new:disabled { color: var(--mute); }
+.cp .tr-order-new:active { opacity: .6; }
+/* the address row: two plain links side by side, each a 44 pt target */
+.cp .cp-addr { align-items: center; padding: 0; }
+.cp .cp-addr > span:last-child { display: flex; gap: 16px; }
+.cp .cp-addr .tr-copy { min-height: 44px; min-width: 0; padding: 0; font: 400 14.5px/1.2 var(--font); color: var(--ink); }
+.cp .cp-addr > span:first-child { padding: 11px 0; }
+.cp .tr-sizes button { min-height: 44px; padding: 0; }
+.cp .tr-trades-head { align-items: center; }
+.cp .tr-trades-head .tr-sizes { margin: 12px 0 0; }
+.cp .cp-source { margin: 18px 0 0; color: var(--mute); }
+/* a figure not read yet: a shimmer of its size, never a dash */
+.cp .cp-stat-sk { display: block; width: 64%; height: 19px; border-radius: 6px; }
+.cp .cp-price-sk { display: inline-block; width: 200px; height: 44px; border-radius: 10px; vertical-align: middle; }
+/* labels on one line, never two (product decision, 5 Nov), and the last line clears the floor's 32 px fade at the scroll's end */
+.cp .cp-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cp .cp-stat .zf-small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp .cp-source { margin-bottom: 28px; }
+/* the chart never peeks out under the bar with ‹ and the title once scrolled (the Sim builder's rule, ed4a609a): on a coin
+   page the bar's ground is solid to its foot */
+.tr-app:has(.af-main > .cp.tr-coin) .af-top { background: var(--bg); }
+/* the bar's grab handle sits 14 px over its top: Buy clears it (it drew across Buy's foot at 4 px) */
+.cp .tr-coin-floor { padding-bottom: calc(16px + var(--zf-end, env(safe-area-inset-bottom, 0px))); }
+/* with the bar solid, what scrolls up fades over the 16 px under it, never sliced through its digits */
+.tr-app .af-main:has(> .cp.tr-coin) { -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 20px, #000 36px); mask-image: linear-gradient(to bottom, transparent 0, transparent 20px, #000 36px); }
+/* All · Whales: the chosen one underlined at its words (as the ranges), level with "Latest trades" */
+.cp .tr-sizes button.on { box-shadow: none; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 7px; }
+.cp .tr-sizes button { min-width: 44px; }
+.cp .tr-trades-head .tr-sizes { margin: 22px 0 2px; }
+/* one hairline between what you hold and the numbers, never two 15 px apart */
+.cp .cp-hold { border-bottom: 0; padding-bottom: 0; }
+/* the order rows (review, 5 Nov: an ellipsis label reads as cut): a title and a quiet sub-line, then the chevron */
+.cp .tr-order-new { min-height: 60px; padding: 10px 0; }
+.cp .tr-order-t { display: grid; gap: 3px; min-width: 0; }
+.cp .tr-order-t .t { font: 400 15px/1.3 var(--font); color: var(--ink); }
+.cp .tr-order-t .d { font: 400 13px/1.3 var(--font); color: var(--mute); }
+.cp .tr-order-new:disabled .t { color: var(--mute); }
+
+/* Theme v3.1 (THEME.md; GAPS "Trade", 5 Nov): the coin's figures in the money face, tabular; the floor's commands are the
+   concept's rect 18 at 56 pt (the lit Buy and the quiet Sell, one shape for one meaning) */
+.cp .tr-price, .cp .cp-move, .cp .cp-stat b, .cp .cp-hold-v, .cp .cp-chip b, .cp .cp-trades24 { font-family: var(--font-money, var(--font)); font-variant-numeric: tabular-nums; }
+.cp .tr-coin-floor .zf-btn, .cp .tr-coin-floor .tr-btn2 { height: 56px; border-radius: var(--r-cmd, 18px); }

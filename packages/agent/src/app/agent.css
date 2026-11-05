@@ -1,0 +1,146 @@
+/* The Agent app, on @zerofee/design's tokens ("Monument"), at Legacy's scale: hairlines, spaced capitals, one solid
+   pill per screen. Calm: the only colour is the alert on a row the account refused. Every colour comes from tokens.css. */
+/* flex-shrink 0: in a pushed page's column (appframe.css .af-main--pushed) min-height 100% let the page shrink to the
+   screen and its rows spill out under what came next (QA 5 Nov: memory drawn over Receipts, the Turn on
+   button over the memory line) */
+.ag { font-variant-numeric: tabular-nums; display: flex; flex-direction: column; min-height: 100%; flex-shrink: 0; }
+.ag-head { display: grid; gap: 14px; padding-top: 28px; }
+.ag-floor { flex: none; margin-top: auto; display: grid; gap: 2px; text-align: center; padding-top: 16px; padding-bottom: 8px; }
+.ag-floor .zf-small { margin-top: 8px; }
+/* The first run's one step (Fund) stays in view on a 390×844 phone, never below the fold (UX hunt G9): it sticks above the tab bar. */
+.ag-floor:has(> .zf-btn) { position: sticky; bottom: 0; z-index: 2; padding-top: 32px; background: linear-gradient(to bottom, transparent, var(--bg) 28px); } /* soft top fade: no card is cut by a hard edge; the floor is last in the flow, so every card clears it at the end */
+.ag-center { flex: 1; display: grid; place-items: center; }
+
+.ag-rows { padding-top: 14px; }
+.ag-row { width: 100%; appearance: none; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); font: inherit; text-align: left; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 15px 0; }
+button.ag-row { cursor: pointer; }
+.ag-row .t { font-size: 16px; letter-spacing: -.01em; display: block; }
+.ag-row .d { display: block; font-size: 12.5px; color: var(--mute); margin-top: 3px; text-wrap: pretty; }
+.ag-row .v { font-size: 13px; color: var(--mute); white-space: nowrap; }
+.ag-row.alert .t { color: var(--alert); }
+.ag-row.alert .zf-link { color: var(--alert); padding: 6px 0 0; font-size: 13px; }
+
+/* Facts in two columns: what the model sees, the plan card. */
+.ag-facts { display: grid; gap: 0; }
+.ag-fact { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.ag-fact .k { font: var(--t-small); color: var(--mute); }
+.ag-fact .v { font-size: 15px; line-height: 1.4; letter-spacing: -.01em; text-wrap: pretty; }
+
+/* The key: one field, a hairline under it. */
+.ag-field { display: grid; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.ag-field input { border: 0; background: none; outline: none; color: var(--ink); font: 400 17px/1.3 var(--font); padding: 0; min-width: 0; }
+.ag-field input::placeholder { color: var(--mute); }
+.ag-pick { display: flex; gap: 8px; flex-wrap: wrap; }
+.ag-chip { appearance: none; border: 1px solid var(--line); background: none; color: var(--ink); font: 400 15px/1 var(--font); padding: 10px 18px; min-height: 44px; min-width: 64px; border-radius: 999px; cursor: pointer; }
+.ag-chip.on { border-color: var(--ink); }
+
+/* Ask: the field and its outlined send button sit together on a hairline. */
+.ag-ask { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 10px; align-items: end; padding: 10px 0 12px; border-bottom: 1px solid var(--line); }
+.ag-ask textarea { border: 0; background: none; outline: none; resize: none; color: var(--ink); font: 400 17px/1.35 var(--font); padding: 6px 0; min-height: 30px; max-height: 120px; field-sizing: content; }
+.ag-ask textarea::placeholder { color: var(--mute); }
+.ag-send { appearance: none; background: none; border: 1px solid var(--ink); color: var(--ink); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; transition: opacity var(--dur-base) var(--ease-out); }
+.ag-send:disabled { opacity: .3; cursor: default; }
+
+/* Plan: the person's words as a bubble, then the card. */
+.ag-bubble { justify-self: end; max-width: 86%; border: 1px solid var(--line); border-radius: 18px 18px 4px 18px; padding: 12px 16px; font: var(--t-body); color: var(--ink); margin-top: 22px; text-wrap: pretty; }
+.ag-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px 6px; margin-top: 22px; display: grid; gap: 10px; }
+.ag-card + .ag-card { margin-top: 12px; }
+.ag-card .zf-title { font-size: 21px; }
+.ag-card .ag-fact:last-child { border-bottom: 0; }
+
+/* A toggle, hairline, ink when on. */
+.ag-switch { appearance: none; border: 1px solid var(--line); background: none; width: 46px; height: 28px; border-radius: 14px; position: relative; cursor: pointer; padding: 0; transition: background var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out); }
+.ag-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); transition: transform var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out); }
+.ag-switch[aria-checked="true"] { background: var(--ink); border-color: var(--ink); }
+.ag-switch[aria-checked="true"]::after { transform: translateX(18px); background: var(--bg); }
+.ag-switch:disabled { opacity: .4; cursor: default; }
+
+.ag-examples { display: grid; gap: 0; padding-top: 10px; }
+.ag-example { appearance: none; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); font: 400 16px/1.35 var(--font); letter-spacing: -.01em; text-align: left; padding: 14px 0; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.ag-example .v { color: var(--mute); }
+.ag-foot { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; padding: 14px 0 0; }
+
+/* The first-run journey: a centred hero, then numbered steps. */
+.ag-hero { display: grid; justify-items: center; text-align: center; }
+.ag-step { grid-template-columns: 22px minmax(0, 1fr); }
+.ag-field-problem { padding-top: 10px; display: grid; gap: 2px; }
+.ag-field-problem .zf-small:first-child { color: var(--ink); }
+.ag-coin-row { grid-template-columns: 26px minmax(0, 1fr); }
+.ag-example .ag-ex { display: inline-flex; align-items: center; gap: 12px; }
+.ag-card-title { display: flex; align-items: center; gap: 12px; }
+.ag-coin-act { grid-template-columns: 26px minmax(0, 1fr) auto; }
+
+/* The Sign-up Robot's walk: the strip that says ZeroFee is acting, and the partner's page as the robot sees it. */
+.ag-strip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); margin-top: 8px; }
+.ag-strip .t { display: block; font-size: 15px; letter-spacing: -.01em; }
+.ag-strip .d { display: block; font-size: 12.5px; color: var(--mute); margin-top: 2px; }
+.ag-partner .zf-title { font-size: 19px; }
+.ag-rows .ag-row .d { font-size: 13px; color: var(--mute); }
+.ag-turn { display: grid; gap: 10px; padding: 16px 0 18px; border-bottom: 1px solid var(--line); }
+
+/* Release 10 Ask: an answer, a refusal. */
+.ag-answer { font: var(--t-body); color: var(--ink); margin: 0; text-wrap: pretty; }
+.ag-refused { color: var(--alert); }
+.ag-card .zf-link { justify-self: center; }
+
+/* AgentZero (AZ1): one screen. Spaced-capital section labels, hairline rows, the stop at the floor. */
+.ag-section { padding-top: 26px; }
+.ag-rows--tight { padding-top: 4px; }
+.ag-under { margin-top: 8px; }
+.ag-stop { color: var(--alert); font-size: 15px; padding: 12px 0; }
+.ag-sheet-floor { display: grid; gap: 2px; padding-top: 18px; padding-bottom: 6px; }
+/* The funding page's Add button stays in view while the words above it scroll (UX hunt G9). */
+.ag-sheet-floor:has(> .zf-btn) { position: sticky; bottom: 0; z-index: 2; padding-top: 32px; background: linear-gradient(to bottom, transparent, var(--bg) 28px); }
+.ag-big { font-size: 22px; letter-spacing: -.02em; padding-top: 4px; }
+.ag-said { margin: 0 0 4px; }
+.ag-field textarea.ag-address { border: 0; background: none; outline: none; resize: none; color: var(--ink); font: 400 15px/1.35 var(--font); padding: 0; min-width: 0; word-break: break-all; }
+.ag-field textarea.ag-address::placeholder { color: var(--mute); }
+/* "Use AgentZero on a computer": the computer's code, pasted (long; it wraps). */
+.ag-paste { display: block; width: 100%; box-sizing: border-box; margin: 12px 0; border: 1px solid var(--line); border-radius: 12px; background: none; color: var(--ink); font: 400 13px/1.4 ui-monospace, monospace; padding: 10px 12px; resize: vertical; word-break: break-all; }
+/* ST-C: the leader card under "The wallet to copy" */
+.ag-leader { margin-top: 18px; }
+.ag-leader .zf-link { padding-left: 0; }
+/* Rebrand §3.7: the words box is a 50 pt --fill pill, no underline. */
+.ag-ask { min-height: 50px; padding: 3px 3px 3px 18px; border-bottom: 0; border-radius: 25px; background: var(--fill); align-items: center; }
+.ag-activity { margin-top: 12px; align-self: flex-start; padding-left: 0; padding-right: 0; min-height: 44px; }
+/* UI audit 5 Nov: the settings card after the Jobs card gets the air a section has */
+.ag-rows.ag-rows--more { margin-top: var(--sp-5, 20px); }
+
+/* ── concept v3.1 (5 Nov): the start page as a stack of cards. The field first with its send circle lit (the page's one
+   action), every list one grouped card (zf-group's fill, hairlines between rows, no row borders), a soft glyph per job,
+   AgentZero's wallet row with its meter, the tagline as the one notice at the foot. Tokens only. */
+.ag-head { padding-top: 8px; gap: 0; }
+.ag-send:not(:disabled) { background: var(--lit, var(--mint)); border-color: transparent; color: var(--on-mint); }
+.ag-send:not(:disabled):active { transform: scale(.98); }
+.ag-section { margin-top: var(--sp-6, 24px); padding-top: 0; }
+.ag-under + .ag-section { margin-top: var(--sp-5, 20px); }
+.ag-rows { padding: 0 var(--sp-3, 12px); margin-top: var(--sp-2, 8px); border-radius: var(--r-md, 16px); background: var(--act-fill); }
+.ag-rows .ag-row { border-bottom: 0; position: relative; padding-left: 0; padding-right: 0; }
+.ag-rows > * + *::before { content: ""; position: absolute; left: 0; right: 0; top: 0; border-top: .5px solid var(--line); pointer-events: none; }
+.ag-row--job { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; }
+.ag-row--job .v { margin-left: 2px; }
+.ag-glyph { width: 28px; height: 28px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); display: grid; place-items: center; }
+.ag-glyph svg { width: 16px; height: 16px; }
+.ag-meter { grid-column: 1 / -1; display: block; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; margin: 2px 0 4px; }
+.ag-meter i { display: block; height: 100%; width: var(--w, 0%); border-radius: 2px; background: var(--lit, var(--mint)); transition: width var(--dur-base) var(--ease-out); }
+/* The page's lead (AzLead.tsx): what AgentZero does, then its fee line, set in from the rows' edge as their words are. */
+.ag-lead { margin-bottom: var(--sp-4, 16px); }
+.ag-fee { margin: var(--sp-3, 12px) var(--sp-3, 12px) 0; }
+.ag-fee .ag-nowrap { white-space: nowrap; }
+
+.ag-under.ag-web { text-align: center; color: var(--mute); padding: 0 var(--sp-4, 16px); text-wrap: balance; }
+.ag-answer + .ag-rows { margin-top: var(--sp-4, 16px); }
+.ag-section:first-child { margin-top: var(--sp-2, 8px); }
+
+/* ── Theme v3.1 (A apps 4): the pasted-text box and the cards on the theme's radii, no borders; the ask field 48 pt. ── */
+.ag-ask { min-height: 48px; }
+.ag-paste { border: 0; border-radius: var(--r-field); background: var(--fill); }
+.ag-card { border: 0; border-radius: var(--r-card); background: var(--fill); }
+.ag-bubble { border: 0; border-radius: var(--r-card) var(--r-card) 4px var(--r-card); background: var(--fill); }
+.ag-chip { border: 0; background: var(--fill); min-height: 44px; }
+.ag-chip.on { background: var(--thumb); box-shadow: var(--thumb-shadow); }
+/* the field's ring is the field's (a pill), not its textarea's square one: the hairline only on focus, inset */
+.ag-ask textarea:focus, .ag-ask textarea:focus-visible { box-shadow: none; outline: 0; }
+.ag-ask:focus-within { box-shadow: inset 0 0 0 1px var(--ink); }
+/* A fifteen (5 Nov): the words box's field is a 44 pt tap (it drew 35); its margin gives the 2 back so the 48 pill keeps its height. */
+.ag-ask textarea { min-height: 44px; padding: 10.5px 0; margin: -1px 0; box-sizing: border-box; }

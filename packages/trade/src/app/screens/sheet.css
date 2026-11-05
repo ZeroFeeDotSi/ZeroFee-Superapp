@@ -1,0 +1,132 @@
+/* Trade's Buy and Sell page and its moment (D136, D135; the A+ review TRADE-A-PLUS-2026-11-03). Black and white; the coin's
+   own light (its logo, blurred) is the only colour, the AgentZero orb the only other. Dollars first. One pill: the button. */
+.tp { position: relative; display: flex; flex-direction: column; min-height: 100%; padding-bottom: 4px; }
+/* the coin's light rises up under the glass header and fades out round, never cut flat (review 1) */
+.tp-glow { position: absolute; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: -120px; height: 420px; pointer-events: none; z-index: 0; overflow: hidden;
+  -webkit-mask-image: radial-gradient(60% 50% at 50% 45%, #000 40%, transparent); mask-image: radial-gradient(60% 50% at 50% 45%, #000 40%, transparent);
+  animation: tp-glow-in var(--dur-base) var(--ease-out) both; will-change: transform, opacity; } /* v2: its own layer, so the blurred light is drawn once and only moved */
+.tp-glow img { position: absolute; left: 50%; top: 120px; width: 240px; height: 240px; margin-left: -120px; border-radius: 50%; object-fit: cover; filter: blur(50px) saturate(1.5); opacity: .38; }
+:root[data-theme="dark"] .tp-glow img { opacity: .55; }
+@keyframes tp-glow-in { from { opacity: 0; transform: scale(.98); } }
+.tp > :not(.tp-glow) { position: relative; z-index: 1; }
+/* the coin is its logo; its name is the title (review 14) */
+.tp-coin { display: flex; justify-content: center; margin-top: 4px; }
+.tp-logo .zf-halo__light { -webkit-mask-image: radial-gradient(closest-side, #000 50%, transparent); mask-image: radial-gradient(closest-side, #000 50%, transparent); }
+.tp-amt { appearance: none; border: 0; background: none; color: var(--ink); width: 100%; min-height: 96px; display: grid; place-items: center; padding: 8px 0 0; cursor: pointer; }
+.tp-amt-n { font: 500 var(--fs, 84px)/1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.045em; font-variant-numeric: tabular-nums; text-shadow: 0 0 44px rgba(var(--glow-rgb), .14); } /* v2: no font-size transition (it laid out every frame as you typed) */
+.tp-amt-n.zero { color: var(--mute); text-shadow: none; }
+.tp-amt-sk { display: block; width: 46%; height: 64px; border-radius: 16px; }
+/* one line: what you get and the fee; a tap opens Details (review 15) */
+.tp-get { appearance: none; border: 0; background: none; display: inline-flex; align-items: center; justify-content: center; gap: 0; min-height: 30px; margin: 2px auto 0; padding: 4px 8px;
+  font: 400 14.5px/1.4 var(--font); color: var(--ink-2); font-variant-numeric: tabular-nums; cursor: pointer; }
+.tp-get:disabled { cursor: default; }
+.tp-fee { color: var(--mute); white-space: pre; }
+.tp-chev { width: 6px; height: 6px; margin-left: 9px; border-right: 1.3px solid var(--mute); border-bottom: 1.3px solid var(--mute); transform: rotate(-45deg); }
+.tp-get-sk { display: inline-block; width: 15ch; height: 1em; vertical-align: -2px; }
+/* AgentZero's line: its orb and six words, no box (review 16) */
+.tp-filled { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 0; font: 400 13px/1.3 var(--font); color: var(--ink-2); text-align: center; }
+.tp-orb { width: 14px; height: 14px; flex: none; border-radius: 50%; background: radial-gradient(circle at 34% 30%, #fff 0 9%, #22d3ee 26%, #3b82f6 58%, #4f46e5 92%); box-shadow: 0 0 10px rgba(59, 130, 246, .45); }
+:root[data-theme="dark"] .tp-orb { background: radial-gradient(circle at 34% 30%, #fff 0 9%, #2dd4bf 26%, #8b5cf6 58%, #ec4899 92%); box-shadow: 0 0 10px rgba(139, 92, 246, .5); }
+/* the wallet it pays from (or a sale's proceeds go to): one plain line, no box (review 13) */
+.tp-pay { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 14px 0 0; font: 400 14px/1.3 var(--font); color: var(--ink-2); }
+.tp-pay b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+/* what the wallet keeps for its fees, one quiet line under it (a web test: "$198.82 to spend" beside a $199.82 wallet) */
+.tp-kept { margin: 4px 0 0; text-align: center; color: var(--mute); }
+/* the chips: plain words, the chosen one lit (review 13; one pill: the button) */
+.tp-chips { display: flex; justify-content: center; gap: 26px; margin-top: 10px; }
+.tp-chips button { appearance: none; border: 0; background: none; min-width: 44px; height: 44px; padding: 0 4px; color: var(--mute); font: 500 16px/1 var(--font); cursor: pointer; transition: color var(--dur-base), text-shadow var(--dur-base), transform var(--dur-fast) var(--ease-out); }
+.tp-chips button:active { transform: scale(.98); }
+.tp-chips button.on { color: var(--ink); font-weight: 600; text-shadow: 0 0 14px rgba(var(--glow-rgb), .35); }
+.tp-note { text-align: center; margin-top: 10px; }
+/* the keypad sits on the button, in the thumb's reach; the air goes under the amount (review 14) */
+.tp-pad { margin-top: auto; padding-top: 8px; }
+.tp-pad .zf-keypad button { height: 52px; font-size: 26px; }
+.tp-floor { margin-top: 6px; display: grid; gap: 8px; text-align: center; }
+.tp-floor--sell { margin-top: auto; }
+.tp-go { height: 50px; border-radius: 14px; font-size: 17px; }
+@media (max-height: 740px) { .tp-amt { min-height: 80px; } .tp-pad .zf-keypad button { height: 46px; } }
+@media (prefers-reduced-motion: reduce) { .tp-glow, .tp-logo { animation: none; } }
+
+/* The moment (Moment.tsx): the page becomes the trade, then its receipt, on the design package's one object (receipt.css:
+   the coin, its ring, its badge). Here only the clock, the held row and the floor: Done is the lit verb, the choices
+   under it are quiet (one lit action per screen). */
+.tm { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 0 6vh; text-align: center; opacity: 0; transform: translateY(8px); transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out); }
+.tm.is-in { opacity: 1; transform: none; }
+.tm-clock { display: inline-block; min-width: 5ch; text-align: left; font-variant-numeric: tabular-nums; }
+/* what you hold now, one hairline row, then the next step (review 12, the approved panel 4) */
+.tm-held { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; width: 100%; margin-top: 24px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; animation: zf-rise var(--dur-base) 0ms var(--ease-out) both; }
+.tm-held-t { display: grid; gap: 2px; font: 500 15px/1.2 var(--font); }
+.tm-held-t small { font: 400 12.5px/1.2 var(--font); color: var(--mute); font-variant-numeric: tabular-nums; }
+.tm-held-v { font: 500 15px/1.2 var(--font); font-variant-numeric: tabular-nums; }
+.tm-floor { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 22px; animation: zf-rise var(--dur-base) 0ms var(--ease-out) both; }
+.tm-floor .zf-btn { margin-top: 0; }
+.tm-btn1 { grid-column: 1 / -1; order: -1; }
+.tm-btn2:only-child, .tm-btn2:last-child:nth-child(2) { grid-column: 1 / -1; }
+/* the tap's ring (ui.css .zf-tapring) bursts past the button: no clipping on the go buttons */
+.tp-floor .tr-press { overflow: visible; }
+@media (prefers-reduced-motion: reduce) {
+  .tm { transition: none; transform: none; opacity: 1; }
+  .tm-held, .tm-floor { animation: none; }
+}
+/* R3 edges (review, 4 Nov; Home's cdd8204d + 19f8bb7e, same values): nothing in Trade is cut hard at either edge.
+   Top: what scrolls up in any of Trade's sheets fades out over 20 px before it reaches the title, never showing through.
+   Floor: the coin page's Buy/Sell bar is solid ground across the gutters and down to the screen's foot, with 32 px of
+   fade above it and no hairline, so a row scrolled under it fades away, never sliced. */
+.tr-app .zf-sheet__content { -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 48px), #000 calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 68px)); mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 48px), #000 calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 68px)); }
+.tr-app .cp .tr-coin-floor { box-shadow: none; }
+.tr-app .cp .tr-coin-floor::before { content: ""; position: absolute; z-index: -1; left: calc(-1 * var(--gutter, 28px)); right: calc(-1 * var(--gutter, 28px)); top: -32px; bottom: 0; background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 0%, transparent) 0, var(--bg) 32px); pointer-events: none; }
+/* The same at the top of Trade's own screens (the list, a coin's page): what scrolls up fades out over 20 px before it
+   meets the bar with ‹ and the title (the price was cut flat under it). The scroll area starts 20 px higher, under the
+   bar, and keeps those 20 px as padding, so nothing at rest is dimmed; the bar stays on top for ‹ and its ground is solid
+   down to those 20 px, then clear, so nothing shows through behind ‹ or the title (as the sheets' glass head). The Buy page is its
+   sheet's height exactly (its 4 px of foot no longer added on top), so it never scrolls by 4 px. */
+.tr-app .af-top { z-index: 2; background: linear-gradient(to bottom, var(--bg) calc(100% - 20px), color-mix(in srgb, var(--bg) 0%, transparent)); }
+.tr-app .af-main { margin-top: -20px; padding-top: 20px; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px); mask-image: linear-gradient(to bottom, transparent 0, #000 20px); }
+.tp { box-sizing: border-box; }
+
+/* ══ Rebrand (DESIGN-REBRAND §2, product decision, 4 Nov; "the glow… more subtle, and on white it looks weird") ════════
+   The coin's light is Black's only: dim (--glow-coin .30), tight (200 px, 40 px blur), it fades in once and is then
+   still; White draws none (no brown stain) and sets the coin on a plinth. The figure is the money face (Geist 500,
+   tabular) with no text-shadow. The hero floats in the free space and every control sits just above the button, so no
+   dead gap; the chips are one sliding track (moneyentry.css). No loops: the logo doesn't float, the button doesn't sweep. */
+.tp-glow { top: -60px; height: 360px; -webkit-mask-image: radial-gradient(closest-side, #000 35%, transparent); mask-image: radial-gradient(closest-side, #000 35%, transparent); }
+.tp-glow img, :root[data-theme="dark"] .tp-glow img { top: 80px; width: var(--glow-size, 200px); height: var(--glow-size, 200px); margin-left: calc(var(--glow-size, 200px) / -2); filter: blur(var(--glow-blur, 40px)) saturate(1.4); opacity: var(--glow-coin, .3); }
+:root:not([data-theme="dark"]) .tp-glow { display: none; }
+.tp-logo { animation: none; }
+.tp-logo .zf-halo__light { display: none; }
+.tp-coin > span { border-radius: 50%; box-shadow: var(--plinth); }
+.tp-coin { margin-top: auto; padding-top: 8px; }
+.tp-get { margin-bottom: auto; }
+.tp-amt { min-height: 80px; padding: 12px 0 0; }
+.tp-amt-n { font: 500 var(--fs, 72px)/1 var(--font-money, var(--font)); letter-spacing: -.045em; font-feature-settings: "tnum" 1; text-shadow: none; }
+.tp-amt-n.zero { color: var(--faint); }
+.tp-get { font: 400 15px/20px var(--font); color: var(--mute); }
+.tp-pay { margin: 16px 0 0; font: 400 15px/20px var(--font); color: var(--mute); }
+.tp-pay b { font-weight: 600; }
+.tp-chips.zf-me__chips { display: grid; justify-content: stretch; margin-top: 16px; gap: 0; }
+.tp-chips.zf-me__chips button, .tp-chips.zf-me__chips button.on { min-width: 0; height: auto; padding: 0; font: 600 15px/20px var(--font-money, var(--font)); font-variant-numeric: tabular-nums; text-shadow: none; } /* the design track's face: money (THEME.md) */
+.tp-chips.zf-me__chips button.on { color: var(--ink); }
+.tp-pad { margin-top: 16px; padding-top: 0; }
+.tp-pad .zf-keypad button { height: auto; font-size: 28px; }
+.tp-floor { margin-top: 12px; }
+.tp-floor--sell { margin-top: 16px; }
+.tp-go { height: 56px; border-radius: 16px; }
+/* the moment: its light is the glow token, with no breathing and no flare; White has none */
+.tm-light, .tm--done .tm-light { animation: none; }
+.tm-light img, :root[data-theme="dark"] .tm-light img { opacity: var(--glow-coin, .3); filter: blur(var(--glow-blur, 40px)) saturate(1.4); }
+:root:not([data-theme="dark"]) .tm-light { display: none; }
+.tm-lens { box-shadow: inset 0 0 0 1px var(--line), var(--plinth); }
+.tm-amt { font: 500 56px/60px var(--font-money, var(--font)); letter-spacing: -.04em; font-feature-settings: "tnum" 1; color: var(--ink); }
+/* the receipt's proof (Moment.tsx, webd-money2 test, 4 Nov): the short tx id, Copy and View, centred under the result */
+.tm-proof { display: flex; justify-content: center; align-items: center; gap: 14px; margin: 12px 0 0; color: var(--mute); }
+.tm-proof__id { font-variant-numeric: tabular-nums; }
+/* audit 5 Nov: the receipt's proof is one quiet line, its link the line's own size (it was 17 px beside 13 px words) */
+.tm-proof, .tm-proof .zf-link { font: 400 13.5px/1.3 var(--font); }
+.tm-proof .zf-link { color: var(--ink); padding: 0; min-height: 44px; }
+
+/* Theme v3.1 (THEME.md; GAPS "Trade", 5 Nov): the sheet's commands are rect 18 at 56 pt (the lit Buy, Done, Try again and
+   the quiet ones beside them); the line under the amount is a 44 pt target */
+.tp-go, .tm-floor .zf-btn { height: 56px; border-radius: var(--r-cmd, 18px); }
+.tp-get { min-height: 44px; }
+/* NEAR on NEAR's public servers while ZeroFee's server isn't answering: one calm line under the amount's, never a banner */
+.tp-switched { max-width: 320px; margin: 6px auto 0; text-align: center; }

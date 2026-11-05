@@ -1,0 +1,125 @@
+Release 9: the explicit-state checker on the frozen source (written 2026-11-01, 14:53 to 17:05)
+
+Source: tag r9-frozen-3 (commit 5eab317d), `git archive r9-frozen-3 contracts/account-policy` into a scratch copy;
+every counted run below is in that copy.
+  src/lib.rs   sha256 e83ec614796ce334b1f8ce6515c9aaf80b8d70531d7a642d651762f2fc8eec5e  (= PINNED_LIB_SHA256 in proofs/build.rs)
+  src/tests.rs sha256 fffb90b4924ee673873618d5c1631d4feb2c4fafa9d4bc5880c4c24ecb5a7956  (= PINNED_TESTS_SHA256)
+  build.rs checked both pins on every build (no PROOFS_SKIP_PIN on any counted run).
+Harness (this round's, copied into proofs/src/ of the scratch copy over the tag's; also committed here):
+  proofs/src/checker.rs sha256 1675fe17… (the exhaustive run, the walks and core depth 4) and c982c5e7afc316891b9b17af67fb9abc84b9f4ad06fd079c3b34eb7ef5c72ab4 (the final: everything after 16:33; the fix is below)
+  proofs/src/model.rs   sha256 368a1fd886ac90a498e8dbdf1f64c9f78c235553a750b5072a46917163afc1ec
+Toolchain: rust 1.95.0 (rust-toolchain.toml), near-sdk 5.29.1, `cargo test --release` (overflow and debug assertions on).
+Times are the machine clock. Machine: 10 cores shared with Kani, fuzz, mutants and a sandbox red team; at most 2 checker processes at once.
+
+Commands (in contracts/account-policy/proofs, CARGO_TARGET_DIR in the scratch copy):
+  PROOFS_DEPTH_CORE=5 cargo test --release checker_exhaustive_deep_core -- --nocapture --test-threads 1
+  PROOFS_DEPTH=4      cargo test --release checker_exhaustive -- --nocapture --test-threads 1 --exact contract::checker::checker_exhaustive
+  (walks, finish interleavings, the whole suite and the controls: below, as they run)
+
+Started 2026-11-01 14:53 (both). Earlier attempts, NOT counted: on r9-frozen-2 (10:09, stopped at 10:19 for the RT3 fix);
+before that two short starts on r9-frozen-2 stopped to add the finish-interleavings test.
+
+== checker_exhaustive (every actor's every action, both start states, depth 4): PASSED
+  14:53:38 to 15:49:11 (3,332.8 s), exit 0, max RSS 1.23 GB
+  from set-up:              93,413 states, 308,170 transitions, liveness on 1,078 states, states by depth [1, 18, 307, 5205, 87882], 0 counterexamples, 1,969.7 s
+  aged device, window over: 94,784 states, 312,497 transitions, liveness on 1,106 states, states by depth [1, 18, 310, 5273, 89182], 0 counterexamples, 1,350.4 s
+  role separation left to NEAR's method lists (assumption A1): 0 pairs
+  test result: ok. 1 passed; 0 failed
+
+== checker_random_walks (the test's own defaults, no env override: 2,000 walks x 120 steps, every actor incl. the thief's keys): PASSED
+  command: cargo test --release checker_random_walks -- --nocapture --test-threads 1
+  15:49:45 to 16:12:25 (1,359.3 s), exit 0, max RSS 80 MB
+  random walks: 2000 x 120 steps (240,000 transitions), 0 counterexamples; liveness at the end of every walk
+  role separation left to NEAR's method lists (assumption A1): 0 pairs
+  test result: ok. 1 passed; 0 failed
+
+== checker_exhaustive_deep_core at the documented bound (owner's keys, aged device, PROOFS_DEPTH_CORE=5): NOT COMPLETED, NOT COUNTED
+  14:53:38 to 16:28:11 (5,673 s); stopped by me (SIGINT) at the agreed memory cap (5 GB footprint; it was at 4.9 GB)
+  the last progress line: 5,401 s: 382,319 states, 722,496 transitions, expanding depth-4 states, queue 354,309
+  (progress lines every 600 s: 600 s 32,934 states at depth 3; 1,200 s 76,112 at depth 4; ... see run-r9-core-d5-partial.txt)
+  So every state to depth 4 was reached, and some (not all) of the depth-5 states. This harness collects counterexamples and
+  prints them only at the end of a run, so the stopped run can't say whether any were found. It is NOT evidence of the
+  absence of violations; it only measures the size. Release 9 has more actions than round 2's depth-5 run (440,095 states,
+  843,212 transitions): the callback's success, failure and loss, the words' refill, and the allowlist. Depth 5 doesn't fit
+  in this round's 5 GB or its time.
+  Instead (a REDUCED bound, said so): the same test at PROOFS_DEPTH_CORE=4, to completion, below.
+
+== checker_finish_interleavings, first attempt (16:12:49 to 16:31:52, harness 1675fe17…): FAILED, A HARNESS FAULT, NOT COUNTED
+  5 of the 6 start states passed at depth 3 (5,651 / 6,664 / 7,005 / 5,669 / 5,431 states, 0 counterexamples). The 6th, "a late
+  callback after the retry an hour later" (two finishes on their way), gave counterexamples of two kinds, both from the harness:
+  (1) "no phone key on NEAR" after [Callback(1, true), Callback(0, false)]: the harness ran the RETRY's receipts and callback
+      first (completing the recovery), and only then the FIRST finish's delete of the new key (which deleted the new phone's
+      key) and its add (refused). NEAR runs one account's receipts in the order they were made (local receipts at once,
+      delayed receipts first in, first out), so the first finish's delete and add always run before the retry's, and its
+      callback before the retry's. Fix: the explorer runs only the oldest finish on its way (FIFO).
+  (2) "a lost callback changed the contract" after [Callback(1, _), CallbackLost(0)]: the check wrongly required a FINISHING
+      record to remain; a lost callback must leave the storage as it was, record or not. Fix: compare the storage.
+  Neither is a contract fault. The exhaustive run and the walks above used harness 1675fe17… (no FIFO): a superset of the
+  orderings, no counterexample. Two finishes on their way take at least 3 actions after a ready recovery, which depth 4 from
+  set-up can't reach, and the walks never hit the out-of-order case. Every run from here uses the fixed harness:
+  checker.rs c982c5e7afc316891b9b17af67fb9abc84b9f4ad06fd079c3b34eb7ef5c72ab4.
+
+== checker_exhaustive_deep_core at a REDUCED bound (PROOFS_DEPTH_CORE=4; the documented bound is 5, see above): PASSED
+  command: PROOFS_DEPTH_CORE=4 cargo test --release checker_exhaustive_deep_core -- --nocapture --test-threads 1
+  16:28:46 to 16:38:50 (602.9 s), exit 0, max RSS 0.56 GB, harness 1675fe17… (two finishes on their way take 5 actions here,
+  past depth 4, so the FIFO fix above doesn't apply to this run)
+  core, aged device: 43,204 states, 76,633 transitions, liveness on 358 states, states by depth [1, 15, 211, 2924, 40053],
+  0 counterexamples
+  test result: ok. 1 passed; 0 failed
+  For scale: the stopped depth-5 run above had found 382,319 states (about 339,000 of them at depth 5) when it stopped,
+  having expanded part of the 40,053 depth-4 states.
+
+== Controls (the checker's power on release 9): mutants of the frozen lib.rs, each in its own copy (PROOFS_SKIP_PIN, renamed
+   crate), harness c982c5e7…; round 1 = walks 100 x 80 + finish interleavings depth 1 (16:39 to 16:46)
+  m1 the callback completes even when NEAR refused the add (R8-RS1 back): CAUGHT (no phone key on NEAR; conformance; a phone
+     key deleted without a seen add; liveness)
+  m2 a second finish within the hour is taken: CAUGHT (conformance: model refused "finishing already"; transition)
+  m3 an added key of a recovery that didn't finish stays on NEAR: CAUGHT (transition: not taken off NEAR)
+  m4 an upgrade runs to a release not on the list: CAUGHT by the walks (an upgrade ran to a release not on the list; conformance)
+  m5 a release joins the list by the phone alone after the floor (no fallback wait): SURVIVED round 1 (rerun larger below)
+  m6 the callback ignores whether the same recovery still waits: SURVIVED round 1 (rerun larger below)
+  m7 RT3 back (the add without the delete before it): CAUGHT (the finish's key receipts; the RT3 start fails)
+  m8 a superseded (late) callback acts anyway: CAUGHT (the late-callback start: the late callback finished the recovery)
+  m9 RT3-b back (a stale finish record's key left on NEAR): CAUGHT (the RT3-b start: that key left on NEAR)
+
+== checker_finish_interleavings (every interleaving, full action set, depth 3, from 6 states with a finish on its way): PASSED
+  command: PROOFS_DEPTH_FINISH=3 cargo test --release checker_finish_interleavings -- --nocapture --test-threads 1
+  16:33:52 to 16:47:35 (822.3 s), exit 0, harness c982c5e7…
+  finishing, no device of age:                                  5,636 states, 20,683 transitions, liveness on 350, [1, 20, 329, 5286], 0 counterexamples
+  finishing, the device of age said yes:                        6,649 states, 23,220 transitions, liveness on 389, [1, 21, 367, 6260], 0
+  finishing, a silent device of age, after the fallback:        6,990 states, 24,344 transitions, liveness on 409, [1, 22, 386, 6581], 0
+  RT3: a lost callback after a successful add, then the retry:  5,654 states, 20,735 transitions, liveness on 351, [1, 20, 330, 5303], 0
+  a late callback after the retry an hour later:                5,388 states, 20,079 transitions, liveness on 334, [1, 19, 314, 5054], 0
+  RT3-b: a lost finish, a stop, a new recovery to another key:  5,416 states, 20,261 transitions, liveness on 341, [1, 20, 320, 5075], 0
+  Before exploring, each start also runs its callbacks in order, each add succeeding. The asserts: the recovery completes on
+  the latest finish; a late one does nothing; the new phone's key is on NEAR, P's is gone, no other key is left.
+  test result: ok. 1 passed; 0 failed
+
+== The proofs crate's whole suite (cargo test --release), the four checker runs above excepted (counted separately):
+  command: cargo test --release -- --test-threads 2 --skip checker_exhaustive --skip checker_random_walks --skip checker_finish_interleavings
+  16:47:56 to 16:48:01, exit 0
+  test result: ok. 51 passed; 0 failed; 1 ignored (replay_trace, a debugging aid); 4 filtered out (= checker_exhaustive,
+  checker_exhaustive_deep_core, checker_random_walks, checker_finish_interleavings, all above)
+  The 51: the contract's own 50 unit tests (src/tests.rs at the pin, through the generated module) and
+  p1_chain_gas_overflow_refused_at_the_door.
+  Round 2 for the two survivors (walks 600 x 100 + finish interleavings depth 3), 16:47 to 17:03:
+  m5: CAUGHT by the walks (5 counterexamples: "a release was added to the list by the phone alone before the fallback";
+      conformance: the model refused it, the release list [7] vs [])
+  m6: CAUGHT by the RT3-b start at depth 3 (2 counterexamples: a callback of the stopped recovery finished the new one;
+      conformance, the phone list, an added key not taken off NEAR)
+  So all 9 controls were caught: the checker can fail for each release-9 rule it claims.
+
+== Summary
+  checker_exhaustive (depth 4, every actor, both start states)  PASSED  188,197 states, 620,667 transitions, 0 counterexamples
+  checker_random_walks (2,000 x 120, the test's defaults)         PASSED  240,000 transitions, 0 counterexamples
+  checker_finish_interleavings (depth 3, 6 finishing states)      PASSED  35,733 states, 129,322 transitions, 0 counterexamples
+  checker_exhaustive_deep_core at depth 5 (the documented bound)  NOT COMPLETED: stopped at the 5 GB cap after 5,673 s with
+                                                                  382,319 states and 722,496 transitions (all states to depth 4
+                                                                  reached, part of depth 5); counterexamples unknown (printed only
+                                                                  at the end); NOT COUNTED
+  checker_exhaustive_deep_core at depth 4 (reduced, said so)      PASSED  43,204 states, 76,633 transitions, 0 counterexamples
+  the rest of the proofs crate (50 unit tests + p1)               PASSED  51 passed, 0 failed, 1 ignored
+  controls m1..m9                                                 9 of 9 caught
+  No counterexample on r9-frozen-3 is a contract fault. The two kinds seen were harness faults, fixed and recorded above.
+  Not modelled, assumed: NEAR runs one account's receipts in the order they were made. The second device's add callback
+  (FB-3) always succeeds. One release hash. A lost callback is modelled only with its add succeeding.

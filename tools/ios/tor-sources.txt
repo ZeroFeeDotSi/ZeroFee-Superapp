@@ -1,0 +1,24 @@
+# The Tor build's sources (tools/ios/build-tor.sh reads this file; D130/D131, the Browser's Private browsing).
+# Each release is at least 90 days old on 3 Nov 2026 and still supported. build-tor.sh fails closed unless the tarball's
+# sha256 is the one below AND its detached signature is good from one of the listed primary keys (tools/ios/tor-keys/).
+#
+# name|version|tarball URL|signature URL|signed file (tarball, or tor's sha256sum)|tarball sha256|allowed primary key fingerprints (space-separated)
+#
+# tor 0.4.9.11, 2026-06-25 (0.4.9 is tor's stable series; 0.4.9.12 is 2026-09-08, under 90 days). Its .sha256sum is
+# signed, here by David Goulet and by Alexander Færøy (both the release keys tor's own "verify little-t-tor" page names).
+tor|0.4.9.11|https://dist.torproject.org/tor-0.4.9.11.tar.gz|https://dist.torproject.org/tor-0.4.9.11.tar.gz.sha256sum.asc|sha256sum|2e6c1720118c812acf0079fd47cf91b6bfaba5d766c321c4d3d2a28d6a11a8ed|B74417EDDF22AC9F9E90F49142E86A2A11F48D36 1C1BC007A9F607AA8152C040BEA7B180B1491921 2133BC600AB133E1D826D173FE43009C4607B1FB
+# OpenSSL 3.5.7, 2026-06-09 (3.5 is OpenSSL's LTS, supported to 2030; 3.5.8 is 2026-08-25, under 90 days). Signed by the
+# OpenSSL key BA54 73A2 … 81EF, which openssl-library.org/source/ names for releases before its new B146 647E key.
+openssl|3.5.7|https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz|https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz.asc|tarball|a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8|BA5473A2B0587B07FB27CF2D216094DFD0CB81EF
+# libevent 2.1.12-stable, 2020-07-05 (libevent's current stable). Signed by Azat Khuzhin, libevent's release manager.
+libevent|2.1.12-stable|https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz|https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz.asc|tarball|92e6de1be9ec176428fd2367677e61ceffc2ee1cb119035037a27d346b0403bb|9E3AC83A27974B84D1B3401DB86086848EF8686D
+#
+# Where each key came from (fetched once, 3 Nov 2026, exported minimal into tools/ios/tor-keys/):
+#   tor-dgoulet.asc   B744 17ED DF22 AC9F 9E90  F491 42E8 6A2A 11F4 8D36  David Goulet: WKD, openpgpkey.torproject.org (dgoulet@torproject.org)
+#                     (his published key expired 2026-03-24, on WKD and keyserver.ubuntu.com alike: build-tor.sh doesn't count his
+#                     signature; tor 0.4.9.11 passes on Alexander Færøy's, which is good)
+#   tor-ahf.asc       1C1B C007 A9F6 07AA 8152  C040 BEA7 B180 B149 1921  Alexander Færøy: WKD, openpgpkey.torproject.org (ahf@torproject.org); signs with subkey 5141 0245 4D0A 87DB 0767 A1EB BE6A 0531 C18A 9179
+#   tor-nickm.asc     2133 BC60 0AB1 33E1 D826  D173 FE43 009C 4607 B1FB  Nick Mathewson: WKD, openpgpkey.torproject.org (nickm@torproject.org)
+#   openssl-ba54.asc  BA54 73A2 B058 7B07 FB27  CF2D 2160 94DF D0CB 81EF  OpenSSL: openssl-library.org/source/pubkeys.asc
+#                     (expired 2026-09-08; it signed 3.5.7 on 2026-06-09, while live, which build-tor.sh accepts)
+#   libevent-azat.asc 9E3A C83A 2797 4B84 D1B3  401D B860 8684 8EF8 686D  Azat Khuzhin: keyserver.ubuntu.com (the key that signs libevent's GitHub releases)

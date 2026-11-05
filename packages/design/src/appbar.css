@@ -1,0 +1,82 @@
+/* The app bar (AppBar.tsx), the capsule (product decision, 4 Nov: "I really like YouTube's bottom bar… interactive, subtle
+   animations… a bit more reactive to what the user is doing"): a floating capsule 16 pt in from each edge, above the
+   home indicator, the page blurred through it with a hairline edge; icons only (each tab's name stays for screen
+   readers); a lighter pill behind the app on screen. Each theme's colours are tokens (tokens.css --bar-*), so this is the
+   one rule set. Sheets, the Approve sheet, a Problem screen and the tray all rise over it. Motion: transform and opacity
+   only (press, settle and the pop from the motion system), a crossfade under Reduce Motion. */
+.zf-appbar {
+  position: absolute; left: 16px; right: 16px; bottom: var(--bar-gap); z-index: 25; padding: 6px;
+  border-radius: var(--r-pill, 999px); background: var(--glass);
+  -webkit-backdrop-filter: saturate(1.6) blur(22px); backdrop-filter: saturate(1.6) blur(22px);
+  box-shadow: var(--glass-shadow); /* Theme v3.1: the concept's glass, its edge inside the shadow token */
+  transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+  /* a swipe on the bar is the bar's, never the page's scroll */
+  touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+.zf-appbar__in { position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr); height: calc(var(--bar-h) - 12px); }
+/* The pill's place: one tab wide, moved by --at (a tab's index, fractional between two; slide.ts animates it on a tap);
+   the pill inside it stretches by --stretch (glideBar, under a finger), widest halfway between two tabs. */
+.zf-appbar__marker { position: absolute; top: 0; bottom: 0; left: 0; width: calc(100% / var(--n)); transform: translateX(calc(var(--at) * 100%)); pointer-events: none; transition: opacity var(--dur-base) var(--ease-out); }
+.zf-appbar__pill { position: absolute; inset: 0 4px; border-radius: var(--r-pill, 999px); background: var(--bar-pill); transform: scaleX(var(--stretch, 1)); }
+.zf-appbar[data-off] .zf-appbar__marker { opacity: 0; }
+/* a tab: 44 pt and more; the press is the one press (ui.css .zf-press), a little deeper here */
+.zf-appbar__item {
+  appearance: none; border: 0; background: none; padding: 0; margin: 0; position: relative; min-height: 44px; --press-scale: .98;
+  display: grid; place-items: center; color: var(--mute); cursor: pointer;
+}
+/* each tab's own pill: shown only under Reduce Motion, where the pill fades in place instead of sliding */
+.zf-appbar__item::before { content: ""; position: absolute; inset: 0 4px; border-radius: var(--r-pill, 999px); background: var(--bar-pill); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
+.zf-appbar__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.zf-appbar__icon { position: relative; display: grid; place-items: center; }
+.zf-appbar__icon svg { display: block; width: 24px; height: 24px; }
+/* the icon: an outline, and on the tab on screen a filled one in ink, swapped by opacity; the tab popping in from .9 */
+.zf-appbar__glyph { grid-area: 1 / 1; display: grid; transition: opacity var(--dur-fast) var(--ease-out); }
+.zf-appbar__glyph--on { color: var(--ink); opacity: 0; }
+.zf-appbar__item[data-on] { color: var(--ink); }
+.zf-appbar__item[data-on] .zf-appbar__glyph--on { opacity: 1; }
+.zf-appbar__item[data-on] .zf-appbar__glyph:has(+ .zf-appbar__glyph--on) { opacity: 0; }
+.zf-appbar__item[data-on] .zf-appbar__icon { animation: zf-tab-pop var(--dur-base) var(--ease-out) both; }
+@keyframes zf-tab-pop { from { transform: scale(.98); } }
+/* a tab whose app has something going (shell-api tasks.ts newsApps): one quiet dot, still */
+.zf-appbar__news { position: absolute; top: -1px; right: -4px; width: 6px; height: 6px; border-radius: 50%; background: var(--up); }
+/* reacting to the person: a scroll down eases the capsule down and out, a scroll up or a switch brings it back
+   (bar-scroll.ts); a keyboard's or a screen reader's focus on it brings it back too (a tap's focus doesn't) */
+.zf-appbar[data-hidden] { transform: translateY(16px); opacity: 0; pointer-events: none; }
+.zf-appbar[data-hidden]:has(:focus-visible) { transform: none; opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .zf-appbar__marker { opacity: 0; }
+  .zf-appbar__item[data-on]::before { opacity: 1; }
+  .zf-appbar__item[data-on] .zf-appbar__icon { animation: none; }
+  .zf-appbar[data-hidden] { transform: none; opacity: 1; pointer-events: auto; }
+}
+
+/* The grab bar: the tray is one swipe up (or this tap), just above the capsule. */
+.zf-appbar__grab { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); width: 64px; height: 14px; padding: 0; margin: 0; border: 0; background: none; cursor: pointer; z-index: 1; }
+.zf-appbar__grab span { display: block; width: 32px; height: 4px; border-radius: 2px; background: var(--line); margin: 5px auto 0; }
+.zf-site-icon { border-radius: 6px; display: block; }
+/* The All apps button hints (product decision, 5 Nov; replaces the glow): about 1 s after the app opens, then every 30 s, its bar nudges
+   up 1 px and back (about 600 ms, once), until the tray has been opened once. Transform only. Reduce Motion: no movement,
+   a still 4 px dot above the button instead (opacity only). */
+.zf-appbar__grab span { position: relative; }
+.zf-appbar__grab span::after { content: ""; position: absolute; left: 50%; top: -10px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--mute); opacity: 0; pointer-events: none; }
+.zf-appbar__all--hint span { animation: zf-hint 30s 1s var(--ease-out) infinite; }
+@keyframes zf-hint {
+  0%, 2%, 100% { transform: none; }
+  1% { transform: translateY(-1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zf-appbar__all--hint span { animation: none; }
+  .zf-appbar__all--hint span::after { opacity: 1; }
+}
+/* While pages slide under the bar (AppHost sets data-moving at a flight's or a finger's start and clears it at rest),
+   the bar is solid ground: a backdrop blur over moving pages is recomputed every frame (speed worker, 3 Nov). */
+.ah[data-moving] .zf-appbar { background: var(--bar-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* Under a sheet the bar is covered, and its blur is what leaked: Chrome drew the blurred page in the frame's last 2 px
+   under every sheet in Black (desktop audit, 5 Nov). Solid while a sheet is up; nobody sees the glass there. */
+.ah:has(.zf-sheet) .zf-appbar { background: var(--bar-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* ── Theme v3.1 (A apps 4) ── */
+/* "All apps": a 44 pt target centred above the capsule; the visible bar stays 32x4, the hit area is 38 above the capsule and
+   6 over its top padding; it is centred and narrow, so the rows above keep every tap beside it. */
+.zf-appbar__grab { width: 96px; height: 44px; top: calc(-1 * var(--bar-reach, 38px)); }
+.zf-appbar__grab span { margin: 29px auto 0; }

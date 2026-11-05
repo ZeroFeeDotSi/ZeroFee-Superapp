@@ -1,0 +1,138 @@
+.ob-center { display: grid; justify-items: center; text-align: center; }
+.ob-more { margin-top: 22px; width: 100%; max-width: 340px; }
+.ob-words {
+  list-style: none; margin: 26px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; column-gap: 26px;
+}
+.ob-words { margin-bottom: 12px; }
+/* S2 (privsec hunt, 5 Nov): the backup words can't be selected, copied, called out or printed; written down by hand. */
+.ob-words { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+@media print { .ob-words { display: none !important; } }
+.ob-words li { display: flex; gap: 12px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
+.ob-words i { font-style: normal; font-size: 12px; color: var(--mute); width: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+.ob-dots { display: flex; gap: 8px; justify-content: center; }
+.ob-dots span { width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--ink); transition: background var(--dur-base) var(--ease-out); }
+.ob-dots span.on { background: var(--ink); }
+.ob-options { display: grid; gap: 12px; margin-top: 40px; }
+.ob-option {
+  appearance: none; height: 58px; border: 1px solid var(--line); border-radius: 18px; background: var(--bg); color: var(--ink);
+  text-align: left; padding: 0 20px; font: 400 18px/1 var(--font); letter-spacing: -.01em; cursor: pointer; transition: border-color var(--dur-base) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.ob-option:active { transform: scale(0.99); border-color: var(--ink); }
+.ob-option.miss { border-color: var(--alert); animation: ob-shake var(--dur-base) var(--ease-out); }
+@keyframes ob-shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.ob-receive { display: grid; gap: 14px; margin-top: 44px; }
+.ob-chain { display: flex; align-items: center; gap: 12px; height: 54px; padding: 0 16px; border: 1px solid var(--line); border-radius: 16px; font-size: 16px; }
+.ob-chain__ico { width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.ob-addr {
+  appearance: none; border: 0; background: none; color: var(--ink); padding: 6px 0; display: flex; align-items: center; gap: 14px; cursor: pointer; text-align: left;
+  font: 400 17px/1.5 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .01em; word-break: break-all;
+}
+.ob-copy { margin-left: auto; flex: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 12px; display: grid; place-items: center; font: 500 12px var(--font); color: var(--ink); }
+/* The first run's three steps under "Opening your bank…": dim until the core reaches them, a tick once done. */
+.ob-steps { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; text-align: left; }
+.ob-steps li { display: grid; grid-template-columns: 18px auto; align-items: center; gap: 8px; font-size: 14px; color: var(--mute); transition: color var(--dur-base); }
+.ob-steps li.now, .ob-steps li.done { color: var(--ink); }
+.ob-steps__mark { width: 18px; height: 18px; border-radius: 50%; border: 1px solid currentColor; display: grid; place-items: center; font-size: 12px; }
+.ob-steps li.done .ob-steps__mark { background: var(--ink); color: var(--bg); }
+/* Words: the list and its notes scroll between the title and the button (390 x 844 fits the 24 words; the notes may scroll). */
+.ob-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: none; margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter); }
+.ob-notes { display: grid; gap: 10px; margin: 6px 0 16px; }
+.ob-floor { padding-top: 12px; border-top: 1px solid var(--line); margin: 0 calc(-1 * var(--gutter)); padding-left: var(--gutter); padding-right: var(--gutter); }
+.ob-key { margin-top: 18px; }
+
+/* Make your key: the key centred in the air; with the terms beside it, the middle scrolls if a short screen needs it. */
+.ob-mk { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.ob-mk--terms { justify-content: flex-start; overflow-y: auto; overscroll-behavior: none; padding-top: 6px; margin: 0 calc(-1 * var(--gutter)); padding-left: var(--gutter); padding-right: var(--gutter); }
+
+/* Make your key's two keys (product decision, 2 Nov): a hairline list, the name above what it does. */
+.ob-keys { margin: 22px 0 0; display: grid; gap: 0; text-align: left; border-top: 1px solid var(--line); }
+.ob-keys > div { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.ob-keys dt { font-size: 15px; letter-spacing: -.01em; color: var(--ink); }
+.ob-keys dd { margin: 3px 0 0; font: var(--t-small); color: var(--ink-2); }
+
+/* ── REVAMP: set-up, A+ pass (3 Nov) ──────────────────────────────────────────────────────────────────────
+   One anatomy for every step: the top row (Back), the step's hero (a mark in a soft light, the 28/500 title, one 17
+   line), its content, then the floor's one ink pill. No boxes with outlines, no stray hairlines, one type scale.
+   Progress is five short segments sitting IN the top row, centred, like a page's dots: no floating bar, no line under it.
+   Every light is a gradient on its own layer (two breaths, then still); Reduce Motion stills it. */
+.ob-top { position: relative; flex: none; }
+.ob-top .zf-thread { position: absolute; left: 50%; top: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 26px); width: 132px; margin-left: -66px; padding: 0; gap: 0; border: 0; pointer-events: none; }
+.ob-top > div.zf-thread:has(> .zf-thread__line > span:empty:only-child) { margin: 0 0 0 -66px; }
+.ob-top .zf-thread__steps { gap: 4px; }
+.ob-top .zf-thread__seg { height: 4px; border-radius: 2px; }
+.ob-top .zf-thread__line:has(> span:empty:only-child) { display: none; }
+.ob-top .zf-thread__step--now .zf-thread__seg::after { animation-iteration-count: 2; }
+
+/* The hero's soft light: behind a mark at the top of any centred step (welcome, the key, opening, open) */
+.ob-center:has(> .zf-mark) { position: relative; isolation: isolate; }
+.ob-center:has(> .zf-mark)::before { content: ""; position: absolute; z-index: -1; left: 50%; top: -70px; width: 300px; height: 240px; margin-left: -150px; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(var(--glow-rgb), .045), transparent); animation: zf-bloom-in var(--dur-base) var(--ease-out) both; }
+:root[data-theme="dark"] .ob-center:has(> .zf-mark)::before { background: radial-gradient(closest-side, rgba(var(--glow-rgb), .15), transparent); }
+.ob-center .zf-title { font-size: var(--fs-title, 28px); }
+.ob-center .zf-body { font-size: var(--fs-body, 17px); line-height: 1.45; color: var(--ink-2); }
+
+/* Words: one soft card, two columns, no rule under every word; the number quiet and tabular, the word 17/500 */
+.ob-words { margin: 24px 0 12px; padding: 12px 16px; column-gap: 16px; border-radius: var(--r-lg, 24px); background: var(--act-fill); }
+.ob-words li { padding: 8px 0; border-bottom: 0; gap: 10px; font: 500 17px/22px var(--font); }
+.ob-words i { width: 20px; font-size: 13px; }
+.ob-floor { border-top: 0; }
+
+/* The check: four soft pills on the 16 radius, pressing on the snap spring; a miss rings red and shakes (transform) */
+.ob-options { gap: 12px; margin-top: 32px; }
+.ob-option { height: 56px; border: 0; border-radius: var(--r-md, 16px); background: var(--act-fill); font: 500 17px/1 var(--font); letter-spacing: 0;
+  transition: transform var(--dur-base) var(--ease-out); }
+.ob-option:active { transform: scale(.98); transition-duration: var(--dur-fast); border: 0; }
+.ob-option.miss { border: 0; box-shadow: inset 0 0 0 1.5px var(--alert); }
+
+/* Notes after a step: soft lines on the fill, never outlined boxes */
+/* Notes after a step: one grouped section (one soft container, .5 hairlines between), never floating boxes */
+.ob-notes { gap: 0; border-radius: var(--r-md, 16px); background: var(--act-fill); padding: 0 16px; }
+.ob-notes .zf-note { position: relative; border: 0; box-shadow: none; background: none; border-radius: 0; padding: 14px 0; font-size: 15px; line-height: 20px; color: var(--ink); }
+.ob-notes .zf-note + .zf-note::before { content: ""; position: absolute; left: 0; right: 0; top: 0; border-top: .5px solid var(--line); }
+.ob-center .zf-note { border: 0; box-shadow: none; background: var(--act-fill); border-radius: var(--r-md, 16px); padding: 14px 16px; font-size: 15px; color: var(--ink-2); }
+
+/* Make your key: its two keys as one soft card (name over what it does), not a hairline table */
+.ob-keys { margin: 24px 0 0; border-top: 0; border-radius: var(--r-md, 16px); background: var(--act-fill); padding: 4px 16px; }
+.ob-keys > div { padding: 12px 0; border-bottom: .5px solid var(--line); }
+.ob-keys > div:last-child { border-bottom: 0; }
+.ob-keys dt { font: 500 16px/22px var(--font); letter-spacing: 0; }
+.ob-keys dd { font-size: 14px; }
+
+/* Opening: the three steps as a short timeline under the mark */
+.ob-steps { gap: 10px; margin-top: 24px; }
+.ob-steps li { font-size: 15px; }
+.ob-steps__mark { width: 20px; height: 20px; border: 0; box-shadow: inset 0 0 0 1.5px currentColor; }
+.ob-steps li.done .ob-steps__mark { background: var(--up); color: #fff; box-shadow: none; }
+
+/* Your account is open: the address as one soft card (network over the name), Copy a quiet disc in it */
+.ob-receive { gap: 12px; margin-top: 32px; }
+.ob-chain { height: 52px; border: 0; border-radius: var(--r-md, 16px) var(--r-md, 16px) 0 0; background: var(--act-fill); margin-bottom: -12px; font: 500 15px/1 var(--font); }
+.ob-chain__ico { width: 28px; height: 28px; }
+.ob-addr { padding: 4px 8px 12px 16px; border-radius: 0 0 var(--r-md, 16px) var(--r-md, 16px); background: var(--act-fill); font-size: 15px; }
+.ob-copy { border: 0; border-radius: 50%; background: var(--bg); box-shadow: var(--e-1); }
+@media (prefers-reduced-motion: reduce) { .ob-center:has(> .zf-mark)::before { animation: none; } .ob-option, .ob-option:active { transition: none; } }
+/* the text system: the brand word over a step's title is a quiet sub-line, not a second heading */
+.ob-center > .zf-label { font: 500 15px/20px var(--font); color: var(--mute); letter-spacing: 0; }
+.ob-center .zf-body { font-size: 17px; line-height: 22px; color: var(--mute); }
+
+/* ── the design review §4.2–4.3: set-up's text is left-aligned (the welcome's brand title alone stays centred) ─────── */
+.ob-center:not(:has(> .zf-display)):not(:has(> .zf-mark--loading)) { justify-items: start; text-align: left; }
+.ob-center:not(:has(> .zf-display)):not(:has(> .zf-mark--loading))::before { left: 0; margin-left: -110px; }
+.ob-center .zf-title { text-wrap: balance; }
+/* opening: one T5 line under the mark that changes as the core moves on */
+.ob-step-now { margin: 16px 0 0; font: 500 17px/22px var(--font); color: var(--ink); text-align: center; }
+/* the check: four rows in one inset card (52 pt, .5 hairlines between), not four floating pills */
+.ob-options { gap: 0; margin-top: 24px; padding: 0 16px; border-radius: 16px; background: var(--act-fill); }
+.ob-option { position: relative; height: 52px; border-radius: 0; background: none; padding: 0; }
+.ob-option + .ob-option::before { content: ""; position: absolute; left: 0; right: 0; top: 0; border-top: .5px solid var(--line); }
+.ob-option:active { transform: none; background: var(--marker-bg); }
+.ob-option.miss { box-shadow: none; color: var(--alert); }
+/* the passcode and lock screens follow the same rule */
+.ul-center { justify-items: start; text-align: left; }
+.ul-center::before { left: 0; margin-left: -110px; }
+/* R2 (4 Nov): the thread's label ("Step 1 of 5 · Words", thread.css) sits under the bar's segments, so the bar keeps
+   room for it and nothing under the bar ever runs into it. */
+.ob-top:has(.zf-thread) { padding-bottom: 24px; }
+/* The two keys' card spans the content width, edge to edge with the button under it (shell audit 01b: it sized to its
+   text, 11 pt short of the edge). */
+.ob-keys { justify-self: stretch; }

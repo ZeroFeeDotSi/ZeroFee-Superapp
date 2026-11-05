@@ -1,0 +1,50 @@
+{
+ "note": "A real 1Click FLEX_INPUT quote, 2 Nov 2026, no deposit (tools/fund/quote-every-coin.ts): recipient and refund from throwaway keys.",
+ "needYocto": "398000000000000000000000",
+ "real": {
+  "quote": {
+   "amountIn": "19060833",
+   "amountInFormatted": "0.019060833",
+   "amountInUsd": "1.822406243130",
+   "minAmountIn": "18870224",
+   "amountOut": "422156436052097014925373",
+   "amountOutFormatted": "0.422156436052097014925373",
+   "amountOutUsd": "1.819494239385",
+   "minAmountOut": "417934871691576044776119",
+   "timeEstimate": 22,
+   "refundFee": "104835",
+   "withdrawFee": "0",
+   "deadline": "2026-11-05T04:51:08.140Z",
+   "timeWhenInactive": "2026-11-05T04:51:08.140Z",
+   "depositAddress": "EgC8B2SwozeQQMKoXFtobdhur3NATofCXroKqJMVYSne"
+  },
+  "quoteRequest": {
+   "dry": false,
+   "depositMode": "SIMPLE",
+   "swapType": "FLEX_INPUT",
+   "slippageTolerance": 100,
+   "originAsset": "nep141:sol.omft.near",
+   "depositType": "ORIGIN_CHAIN",
+   "destinationAsset": "nep141:wrap.near",
+   "amount": "19060833",
+   "refundTo": "5ZetwSEXMur2XSa53aSZughEKxUMj3Y7SUjWEemCBjDd",
+   "refundType": "ORIGIN_CHAIN",
+   "recipient": "47f224e7e112a92370d3eb472300d57430197f28e1bdd012a699ac680e162c07",
+   "recipientType": "DESTINATION_CHAIN",
+   "deadline": "2026-11-02T04:51:08.140Z",
+   "confidentiality": "public",
+   "quoteWaitingTimeMs": 0,
+   "insured": false,
+   "appFees": [
+    {
+     "recipient": "5880ad2b362620fadf759cbceb1cd5737ce8c6ed7fb8e9942881e6731f9247dd",
+     "fee": 20,
+     "limitOrderId": null
+    }
+   ]
+  },
+  "signature": "ed25519:3TqpYiJiUUsVoTsHP6fnrp7z7fD1C1iaQFMdoRDDBVGWunn88LNk6nwgnyvaVXXWB7XtJefdk6X4CDBZqC7W7wAg",
+  "timestamp": "2026-11-02T03:51:08.887Z",
+  "correlationId": "d4431492-aa4d-456a-95fe-a31d652aaf02"
+ }
+}

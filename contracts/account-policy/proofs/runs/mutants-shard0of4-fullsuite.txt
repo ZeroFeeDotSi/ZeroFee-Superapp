@@ -1,0 +1,80 @@
+cargo-mutants 27.1.0, lib.rs, --shard 0/4 (79 of 314 mutants), test suite = cargo test (27 lib unit tests + tests/*.rs audit crates), --baseline skip, --timeout 180, -j 2; 29 Oct
+CaughtMutant  lib.rs:70 None | +
+CaughtMutant  lib.rs:70 None | /
+Timeout       lib.rs:71 None | +
+Timeout       lib.rs:71 None | /
+CaughtMutant  lib.rs:72 None | /
+CaughtMutant  lib.rs:87 None | +
+CaughtMutant  lib.rs:87 None | /
+CaughtMutant  lib.rs:118 Level::wait_ns | 0
+CaughtMutant  lib.rs:118 Level::wait_ns | 1
+CaughtMutant  lib.rs:119 Level::wait_ns | 
+CaughtMutant  lib.rs:124 Level::needs_device | true
+CaughtMutant  lib.rs:124 Level::needs_device | false
+CaughtMutant  lib.rs:128 Level::covers | true
+CaughtMutant  lib.rs:128 Level::covers | false
+CaughtMutant  lib.rs:128 Level::covers | ||
+CaughtMutant  lib.rs:128 Level::covers | <
+CaughtMutant  lib.rs:128 Level::covers | &&
+CaughtMutant  lib.rs:128 Level::covers | 
+Unviable      lib.rs:132 Level::without_device | Default::default()
+CaughtMutant  lib.rs:72 None | +
+CaughtMutant  lib.rs:193 <impl borsh::BorshSerialize for Reserved>::serialize | Ok(())
+Unviable      lib.rs:200 <impl borsh::BorshDeserialize for Reserved>::deserialize_reader | Ok(Default::default())
+Unviable      lib.rs:207 <impl near_sdk::serde::Serialize for Reserved>::serialize | Ok(Default::default())
+Unviable      lib.rs:214 <impl near_sdk::serde::Deserialize<'de> for Reserved>::deserialize | Ok(Default::default())
+Timeout       lib.rs:140 Level::with_device | Default::default()
+CaughtMutant  lib.rs:254 Change::is_module | false
+Timeout       lib.rs:254 Change::is_module | true
+CaughtMutant  lib.rs:263 is_setup_step | false
+CaughtMutant  lib.rs:264 is_setup_step | 
+CaughtMutant  lib.rs:263 is_setup_step | true
+Unviable      lib.rs:353 AccountPolicy::execute | Default::default()
+Failure       lib.rs:367 AccountPolicy::execute | !=
+Failure       lib.rs:265 is_setup_step | 
+Unviable      lib.rs:376 AccountPolicy::execute_many | Default::default()
+CaughtMutant  lib.rs:396 AccountPolicy::execute_many | 
+Unviable      lib.rs:421 AccountPolicy::upgrade | Default::default()
+CaughtMutant  lib.rs:433 AccountPolicy::on_group_done | ()
+Unviable      lib.rs:444 AccountPolicy::run | Default::default()
+Unviable      lib.rs:458 AccountPolicy::approve | Default::default()
+Timeout       lib.rs:414 AccountPolicy::execute_many | !=
+Timeout       lib.rs:477 AccountPolicy::approve | ||
+Timeout       lib.rs:477 AccountPolicy::approve | ||
+Timeout       lib.rs:477 AccountPolicy::approve | ||
+Timeout       lib.rs:477 AccountPolicy::approve | !=
+Timeout       lib.rs:477 AccountPolicy::approve | 
+Timeout       lib.rs:477 AccountPolicy::approve | !=
+Timeout       lib.rs:478 AccountPolicy::approve | 
+Timeout       lib.rs:478 AccountPolicy::approve | ||
+Timeout       lib.rs:479 AccountPolicy::approve | ==
+CaughtMutant  lib.rs:488 AccountPolicy::approve | &&
+CaughtMutant  lib.rs:488 AccountPolicy::approve | ||
+CaughtMutant  lib.rs:488 AccountPolicy::approve | <
+CaughtMutant  lib.rs:496 AccountPolicy::decline | ()
+Timeout       lib.rs:487 AccountPolicy::approve | &&
+CaughtMutant  lib.rs:517 AccountPolicy::decline | ||
+Timeout       lib.rs:511 AccountPolicy::decline | ||
+CaughtMutant  lib.rs:517 AccountPolicy::decline | ||
+CaughtMutant  lib.rs:525 AccountPolicy::cancel | ()
+Unviable      lib.rs:533 AccountPolicy::set_protection | Default::default()
+Unviable      lib.rs:542 AccountPolicy::add_second_device | Default::default()
+CaughtMutant  lib.rs:557 AccountPolicy::add_second_device | ||
+Unviable      lib.rs:563 AccountPolicy::remove_key | Default::default()
+Unviable      lib.rs:578 AccountPolicy::set_recovery_key | Default::default()
+CaughtMutant  lib.rs:581 AccountPolicy::set_recovery_key | !=
+CaughtMutant  lib.rs:600 AccountPolicy::start_recovery | ()
+CaughtMutant  lib.rs:619 AccountPolicy::finish_recovery | ()
+CaughtMutant  lib.rs:624 AccountPolicy::finish_recovery | ==
+Timeout       lib.rs:517 AccountPolicy::decline | 
+CaughtMutant  lib.rs:624 AccountPolicy::finish_recovery | <=
+CaughtMutant  lib.rs:624 AccountPolicy::finish_recovery | >
+CaughtMutant  lib.rs:633 AccountPolicy::finish_recovery | ==
+Unviable      lib.rs:654 AccountPolicy::cancel_recovery | Default::default()
+CaughtMutant  lib.rs:660 AccountPolicy::cancel_recovery | !=
+CaughtMutant  lib.rs:670 AccountPolicy::cancel_recovery | %
+Timeout       lib.rs:643 AccountPolicy::finish_recovery | 
+Timeout       lib.rs:670 AccountPolicy::cancel_recovery | *
+Timeout       lib.rs:670 AccountPolicy::cancel_recovery | %
+Timeout       lib.rs:670 AccountPolicy::cancel_recovery | *
+Timeout       lib.rs:678 AccountPolicy::release_version | 0

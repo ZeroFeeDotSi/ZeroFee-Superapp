@@ -1,0 +1,320 @@
+0/4 the contract's release constants (built without short-waits: a day is the least delay)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.02s
+1/4 sandbox near-sandbox (sha256 pinned) on 127.0.0.1:50415, home $TMPDIR/tmp.dZC7dMegxx/sandbox
+    node 2.13.4 (2.13.4), protocol 86, chain test-chain-9cGnP
+
+2/4 the suite before the publish
+
+1. the app's set-up before the publish (own copy), at 24 and 48 hours
+   ✓ the app's set-up (its own copy of the code, calls at 30 Tgas) runs in one transaction
+   ✓ the account runs the pinned code
+   ✓ release 9
+   ✓ a 24-hour delay, and the words-only fallback is 7 days
+   ✓ two keys (phone and words), neither with full access
+     set-up cost 0.0023503185524057 NEAR (storage and gas), storage 264055 bytes
+   ✓ the pinned release refuses a 60-second delay, as a whole (the set-up key is still there)
+   ✓ 48 hours: the app's default, the fallback 7 days
+   ✓ 48 hours: a change (an upgrade) waits the floor, 72 hours (259201 s)
+   ✓ 48 hours: the words start a recovery
+   ✓ 48 hours: the finish is allowed after 2 days (no second device), the fallback would be at 7 (432000 s between them)
+   ✓ 48 hours: no finish now
+   ✓ 1b. the short-waits build (never mainnet) for the timed flows below: a 60-second delay
+
+2. a set-up by hash while nothing is published
+   ✓ it does not run
+   ✓ no code installed
+   ✓ the set-up key is still there (all or nothing: the app can retry)
+
+3. limits and waits
+   ✓ 0.001 NEAR runs at Face ID
+   ✓ 0.15 NEAR (over the 0.1 NEAR band) waits
+   ✓ the phone cancels it
+   ✓ nothing left waiting
+
+4. the words' fee allowance (FB-5, measured)
+   ✓ the words' key starts with 0.25 NEAR of allowance (0.25)
+   ✓ the words start a recovery
+   ✓ a start is paid from that allowance (0.0002743549730982 NEAR a start: about 911 starts in 0.25 NEAR)
+
+5. recovery and the freeze
+   ✓ while the recovery waits, the phone's Face ID payment doesn't run
+   ✓ the phone (no second device) stops it at once
+   ✓ everyday spending is frozen (until 2026-11-01T08:31:24.693Z)
+   ✓ while frozen, the phone's Face ID payment doesn't run
+   ✓ the words start again
+   ✓ the words finish after the delay
+   ✓ the old phone's key is gone
+   ✓ the freeze ended with the finish
+   ✓ the new phone pays at Face ID
+
+6. a second device
+   ✓ the phone adds a second device (done)
+   ✓ its key can only approve or decline, with 1 NEAR of allowance
+   ✓ the contract counts one second device
+   ✓ 6a: the phone's setting to a Device band waits (until 2026-11-01T08:32:59.966Z)
+   ✓ 6a: the second device's yes runs the setting at its gas (15 Tgas)
+   ✓ 6a: 0.15 NEAR waits for the second device
+   ✓ 6a: its no at 10 Tgas
+   ✓ 6a: its yes runs a transfer at its gas (15 Tgas)
+   ✓ 6a: its yes runs a chain of 4 groups x 10 transfers at its gas (95 Tgas)
+   ✓ 6a: a flat 300 Tgas yes still fits this allowance (0.9966587562032342 NEAR left)
+
+6b. a second device whose fee allowance has burnt down to 0.2 NEAR (below a 300 Tgas answer's 0.30)
+   ✓ 6b release 8 (FB-3): add_second_device ran; only its add-key receipt failed (the key was there) (security.send.partly)
+   ✓ 6b release 8 (FB-3): so the contract does not count it (its callback unrecorded it), and the key that was there is left alone
+   ✓ 6b on release 7's build: the contract counts the second device
+   ✓ its key holds 0.2 NEAR of allowance
+   ✓ 6b: the phone's setting to a Device band waits (until 2026-11-01T08:36:03.683Z)
+   ✓ 6b: the second device's yes runs the setting at its gas (15 Tgas)
+   ✓ 6b: 0.15 NEAR waits for the second device
+   ✓ 6b: its no at 10 Tgas
+   ✓ 6b: its yes runs a transfer at its gas (15 Tgas)
+   ✓ 6b: its yes runs a chain of 4 groups x 10 transfers at its gas (95 Tgas)
+   ✓ 6b: a flat 300 Tgas yes is refused for the allowance, and says so (security.key.allowance)
+   ✓ 6b: the same yes at its gas runs
+
+8. release 7: a recovery needs the second device of age (short-waits build, fallback a week)
+   ✓ the words-only fallback is 604800 s
+   ✓ the phone adds a second device at set-up (at once)
+   ✓ its key can approve, decline, approve_recovery and refuse_recovery, nothing else
+   ✓ the second device is of age
+   ✓ 8a: the words start a recovery
+   ✓ 8a: recovery_status: the device's yes is needed, none yet, so the words alone could finish only at the fallback
+   ✓ 8a: while it waits, the phone's Face ID payment doesn't run
+   ✓ 8a: after the delay, without the device's yes, the finish is refused
+   ✓ 8a: the recovery still waits
+   ✓ 8a: a yes naming another finish time is refused
+   ✓ 8a: the device's yes to this recovery, at 30 Tgas
+   ✓ 8a: recovery_status says approved, and the finish is allowed now
+   ✓ 8a: the words finish at the app's 100 Tgas (the finish and its callback)
+   ✓ 8a: the finish was paid from the words' allowance, well inside it (0.0009308003901485 NEAR)
+   ✓ 8a: the old phone's key is gone
+   ✓ 8a: the second device of age stays
+   ✓ 8a: nothing is frozen after the finish
+   ✓ 8a: the new phone pays at Face ID
+   ✓ 8b: the words start again
+   ✓ 8b: the device refuses it
+   ✓ 8b: the recovery is over
+   ✓ 8b: everyday spending is frozen for a change's wait (until 2026-11-01T08:42:29.169Z)
+   ✓ 8b: the phone's Face ID payment doesn't run while frozen
+   ✓ 8b: the phone's key is untouched
+   ✓ 8c: the words start a recovery
+   ✓ 8c: the phone can't say yes for the device
+   ✓ 8c: the words can't say yes for the device
+   ✓ 8c: after the delay, no finish without the device
+   ✓ 8c: nor on a second try
+   ✓ 8c: the recovery still waits, unapproved
+   ✓ 8c: without any yes the words alone could finish only at the fallback, a week from the start (604800 s)
+   ✓ 8c: spending stays frozen until then
+   ✓ 8c: the device refuses it
+   ✓ 8d: a 250 Tgas chain (unmeasurable calls: the strictest band) is placed
+   ✓ 8d: the run's receipt executes at a 300 Tgas run with 250 Tgas of chain attached (the cap fits the run's own work) (security.send.partly)
+   ✓ 8c: the phone's key stays and the thief's new key never arrived
+   ✓ 8c: the second device of age stays
+
+8e. release 8: a single execute's gas in all (RS-1), and a coin's call counts its gas as NEAR (RS-2, release 9's count)
+   ✓ 8e RS-1: two 200 Tgas steps in one execute are refused at the door (security.send.failed)
+   ✓ 8e RS-1: exactly 250 Tgas in all is placed (unmeasurable calls: the strictest band) (waiting)
+   ✓ 8e RS-2: a 1-unit ft_transfer_call at 240 Tgas (0.24 NEAR of gas) waits: over the 0.1 NEAR band (waiting)
+   ✓ 8e RS-2: the same call at 30 Tgas runs at Face ID (its own receipt may fail: test.near is no coin) (security.send.partly)
+   ✓ 8e RS-2: its 30 Tgas count as 0.03 NEAR against the band (30000000000000000000001 yocto)
+   ✓ 8e RS-2: the fourth (0.12 NEAR of gas in a day) waits: a thief's gas burn is held to the band (waiting)
+
+11a. release 8 (FB-3): a second device whose add NEAR refuses (a low balance) is forgotten
+     spent down (problem, done): 0.0433435928826051 NEAR above storage
+     11a: margin 44 milliNEAR: add_second_device security.send.partly, key on NEAR: false
+   ✓ 11a: an add_second_device that ran (recorded the device) and whose add-key receipt NEAR refused for the balance
+   ✓ 11a: the contract does not count it (the callback forgot it)
+   ✓ 11a: topped up, the same device is added, on NEAR and in the contract (done)
+
+13. release 9 (R8-RS1): a recovery's finish on an account at its storage edge changes nothing; topped up, it finishes
+     spent down (problem, done): 0.0793437524826051 NEAR above storage
+   ✓ 13: the words start a recovery (done)
+     13: 0.0594619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0614619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0634619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0654619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0674619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0694619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0714619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0734619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0754619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0774619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0794619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0814619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0834619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0854619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0874619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0894619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0914619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0934619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0954619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0974619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.0994619872656948 NEAR above storage: finish security.balance.low; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1011625085432367 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1028630298207786 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1045635510983205 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1062640723758624 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1079645936534043 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1096651149309462 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1113656362084881 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.11306615748603 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1147666787635719 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1164672000411138 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1181677213186557 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1198682425961976 NEAR above storage: finish security.send.failed; new key on NEAR false, old phone's true, recovery waits true
+     13: 0.1412557214075688 NEAR above storage: finish done; new key on NEAR true, old phone's false, recovery waits false
+   ✓ 13: every finish NEAR refused or that failed left the old phone's key on NEAR and the recovery waiting (21 at the door, 12 as a whole, 0 only its add)
+     13: the add alone never failed here (the finish's own record no longer fit first, as the comment above says)
+   ✓ 13: topped up, the words finish it: the new key on NEAR, the old one gone
+   ✓ 13: the recovery is over
+
+14. release 9 (I-2): a laptop of age refills the words' fee allowance
+   ✓ 14: the phone adds a laptop at set-up
+   ✓ 14: its key has release 9's five methods, refill_recovery_key among them (approve,decline,approve_recovery,refuse_recovery,refill_recovery_key)
+   ✓ 14: the words' allowance is below 0.25 NEAR (0.2496369645256696 NEAR)
+   ✓ 14: the young laptop's refill is refused
+   ✓ 14: the phone can't call it (not its key's method)
+   ✓ 14: the words can't call it
+   ✓ 14: so the allowance is unchanged
+   ✓ 14: the laptop is of age
+   ✓ 14: the laptop of age refills it (done)
+   ✓ 14: the words' key is back to 0.25 NEAR, its two methods only (0.25 NEAR)
+
+pre: 113 of 113 checks hold
+
+3/4 the test run, against the sandbox
+    | REHEARSAL on the local sandbox (port 50415, a REHEARSAL): nothing here touches mainnet.
+    | Release 9, pinned: 259,249 bytes, sha256 75af028ee153d7c341bc4f96b9ba10a4b2fada5b2170e5e07d3d13b7be735e70, code hash 8vPUrwYWp5cPDJGEuMg73d5tCJM29YkhytTsJR33AAyu.
+    | Not yet published on the local sandbox (port 50415, a REHEARSAL).
+    | Publishing burns 25.9249 NEAR (0.0001 NEAR a byte). With gas room and 2 throwaway accounts of 0.3 NEAR: send 26.7 NEAR.
+    | 
+    | The publisher's key is made and saved privately ($TMPDIR/tmp.dZC7dMegxx/release/release.json).
+    | Send 26.7 NEAR on the local sandbox (port 50415, a REHEARSAL) to the publisher's address:
+    | 
+    |   9dae9c0b2a2902543567bae6eb45c0e098296cceef3ba0b00adc7cbabaf1f404
+    | 
+    | Then run the same command again.
+funded 9dae9c0b… with 26.7 NEAR from test.near
+    | REHEARSAL on the local sandbox (port 50415, a REHEARSAL): nothing here touches mainnet.
+    | Release 9, pinned: 259,249 bytes, sha256 75af028ee153d7c341bc4f96b9ba10a4b2fada5b2170e5e07d3d13b7be735e70, code hash 8vPUrwYWp5cPDJGEuMg73d5tCJM29YkhytTsJR33AAyu.
+    | Not yet published on the local sandbox (port 50415, a REHEARSAL).
+    | Publishing burns 25.9249 NEAR (0.0001 NEAR a byte). With gas room and 2 throwaway accounts of 0.3 NEAR: send 26.7 NEAR.
+    | 
+    | The account to send everything left to (typed): 
+    | The publisher 9dae9c0b2a2902543567bae6eb45c0e098296cceef3ba0b00adc7cbabaf1f404 holds 26.7 NEAR. The run:
+    |   a) publish the pinned release as a global contract by hash, burning 25.9249 NEAR
+    |   b) read it back from two nodes; c) 2 throwaway accounts of 0.3 NEAR each, checked live
+    |   d) everything left to test.near, a move to a new phone started on the first (left waiting), and the publisher account deleted into it
+    | 
+    | Type go to sign these on the local sandbox (port 50415, a REHEARSAL):    a) published: JC59gx8oB2iyTVJwtWhntiFggwcGrGKonK9ubs31zJji
+    |    ✓ b) two nodes give back the pinned code by its hash
+    | 
+    | c1) throwaway 1a2faee243769fd7baab058ce098a945bd9f0b43e1f9bdef0a959f361f6efd9c
+    |    set up as the app does: 8tYac6G5MUju7uZLgSGPE11J85dMjfcmJ6AuU31DMCHk
+    |    ✓ it runs the pinned release, by its hash
+    |    ✓ release 9
+    |    ✓ two keys (phone and words), neither with full access
+    |    ✓ 0.001 NEAR to the refund account runs at Face ID
+    |    ✓ 0.15 NEAR (over the 0.1 NEAR Face ID band) waits
+    |    ✓ the phone cancels it
+    | 
+    | c2) throwaway 86d3edff90a733d02c1076193eddcc372771caba5fd09634f3f12f310d0ae4c7
+    |    set up as the app does: AfNDP3MB7FeHsUi644m6dPksLrovXMfjGxnJ2Zw62A72
+    |    ✓ it runs the pinned release, by its hash
+    |    ✓ release 9
+    |    ✓ two keys (phone and words), neither with full access
+    |    ✓ 0.001 NEAR to the refund account runs at Face ID
+    |    ✓ 0.15 NEAR (over the 0.1 NEAR Face ID band) waits
+    |    ✓ the phone cancels it
+    | 
+    | d) everything left to test.near
+    |    ✓ 1a2faee2… sends 0.099052195000571 NEAR (its storage, 0.04878 NEAR, stays locked)
+    |    ✓ 86d3edff… sends 0.199052195000571 NEAR (its storage, 0.04878 NEAR, stays locked)
+    | 
+    | d) 1a2faee243769fd7baab058ce098a945bd9f0b43e1f9bdef0a959f361f6efd9c: the words start a move to a new phone (a day's delay, left waiting)
+    |    ✓ the words start the move
+    |    ✓ while it waits, the old phone's Face ID payment doesn't run
+    |    ✓ recovery_status: no second device, so the words alone may finish after the day
+    |    the publisher deleted into test.near: 8jP5KoPgoMz1U1KhqaADqjdX7op5sksa53SNTcDukK7t
+    | 
+    | DONE: release 9 (8vPUrwYWp5cPDJGEuMg73d5tCJM29YkhytTsJR33AAyu) is published on the local sandbox (port 50415, a REHEARSAL) and checked live. Keys erased from $TMPDIR/tmp.dZC7dMegxx/release/release.json.
+    the release run finished (its key file says done)
+
+4/4 the suite after the publish
+
+10. release 8 to 9 with a recovery waiting: the laptop's yes given on release 8 still counts
+   ✓ a release-8 account (its short-waits build, a 60 s delay)
+   ✓ its phone adds a laptop at set-up
+   ✓ the laptop is of age
+   ✓ the upgrade to release 9 waits the floor (waiting)
+   ✓ the laptop co-signs it (waiting)
+   ✓ the words start a recovery (release 8)
+   ✓ the laptop says yes to it on release 8
+   ✓ the co-signed upgrade survived the start
+   ✓ the co-signed upgrade runs while the recovery waits (switch and upgrade_check(8) in one batch)
+   ✓ the account runs release 9 by its hash
+   ✓ release 8 names no release: the list of releases is empty
+   ✓ upgrade_check renewed the laptop's key: five methods, 1 NEAR (approve,decline,approve_recovery,refuse_recovery,refill_recovery_key)
+   ✓ release 9 reads the waiting recovery and the laptop's yes from release 8: approved, finish at the delay's end
+   ✓ the fallback is unchanged (7 days)
+   ✓ the words finish on release 9 with the yes given on release 8
+   ✓ the new phone's key is on, the old phone's gone
+
+11b. release 7 to 9 (FB-3): a second device release 7 recorded but NEAR never added is repaired by the refill
+     spent down (problem, done): 0.0433494010284701 NEAR above storage
+     11b: margin 44 milliNEAR: add_second_device security.send.partly, key on NEAR: false
+   ✓ 11b: on release 7, an add_second_device that ran and whose add-key receipt NEAR refused for the balance
+   ✓ release 7: the laptop is recorded but not on NEAR (the FB-3 gap)
+   ✓ the upgrade to release 9 runs (done)
+   ✓ release 7 names no release: the list of releases is empty
+     refill: done (its delete-and-add fails on the missing key; the callback adds it alone)
+   ✓ release 9: the refill put the laptop's key on NEAR, with its five methods and 1 NEAR
+
+9. release 6 to 9: the upgrade renews the laptop's key, which then says yes to a recovery
+   ✓ a release-6 account is set up
+   ✓ its phone adds a laptop at set-up
+   ✓ release 6: the laptop's key knows only approve and decline
+   ✓ the upgrade to release 9 waits the floor (waiting)
+   ✓ the upgrade runs (the switch and upgrade_check in one batch)
+   ✓ the account runs release 9 by its hash
+   ✓ release 6 names no release: the list of releases is empty
+   ✓ upgrade_check stored the fallback (7 days)
+   ✓ the laptop's key now has approve, decline, approve_recovery, refuse_recovery and refill_recovery_key, with 1 NEAR of allowance (approve,decline,approve_recovery,refuse_recovery,refill_recovery_key 1 NEAR)
+   ✓ the laptop is of age
+   ✓ the words start a recovery
+   ✓ recovery_status: the laptop's yes is needed
+   ✓ the laptop's approve_recovery runs from the node
+   ✓ the recovery is approved
+
+12. release 9's list of releases: an AllowRelease, co-signed, then the upgrade
+   ✓ 12: a new account's list of releases is empty
+   ✓ 12: the phone adds a laptop at set-up
+   ✓ 12: the laptop is of age
+   ✓ 12: an upgrade to a release not on the list places an AllowRelease
+   ✓ 12: asked again while that waits, the upgrade itself is placed
+   ✓ 12: the AllowRelease waits the floor (2 x the delay here) (2026-11-01T09:15:20.490Z)
+     12: the laptop's no to the other release's AllowRelease: security.send.failed
+   ✓ 12: the AllowRelease can't run before its wait
+   ✓ 12: after the floor, the phone alone can't run it (no co-sign, before the words-only fallback)
+   ✓ 12: nor the upgrade: its release is not on the list yet
+   ✓ 12: the laptop's yes runs the AllowRelease (done)
+   ✓ 12: the release is on the list
+   ✓ 12: the upgrade to a release never listed never runs
+   ✓ 12: the upgrade runs: the account runs the published release by its hash (done)
+   ✓ 12: upgrade_check made the list exactly that release
+
+7. after the publish (FI-2)
+   ✓ the core's two-node read gives the pinned code for the pinned hash
+   ✓ the app's set-up (by the published hash, calls at 30 Tgas) runs in one transaction
+   ✓ the account runs the pinned code (global hash 8vPUrwYWp5cPDJGEuMg73d5tCJM29YkhytTsJR33AAyu)
+   ✓ release 9
+   ✓ a 24-hour delay, and the words-only fallback is 7 days
+   ✓ two keys (phone and words), neither with full access
+     set-up cost 0.0005013099537426 NEAR (storage and gas), storage 4838 bytes
+     by hash 0.0005013099537426 NEAR vs own copy 0.0023512761524057 NEAR (storage 4838 vs 264055 bytes)
+
+post: 55 of 55 checks hold
+
+REHEARSAL GREEN: the test run (node tools/mainnet/release.ts --run) is ready for mainnet.
+exit 0

@@ -1,0 +1,26 @@
+#!/bin/sh
+# Refuses a commit that could leak who or where the author is, or a secret (audit NF-11: versioned here; installed by
+# `npm run hooks`, which points git's core.hooksPath at this folder). Who and where: patterns in .git/info/leak-patterns,
+# private to each clone and never committed. Secrets: key shapes, tools/hooks/secret-shapes.mjs.
+fail=0
+P="$(cd "$(git rev-parse --git-common-dir)" && pwd)/info/leak-patterns"
+pats=$( [ -f "$P" ] && grep -v '^#' "$P" | grep -v '^$' || true )
+# 1. Commit time must be UTC, so the timestamp offset reveals nothing.
+off=$(git var GIT_AUTHOR_IDENT | awk '{print $NF}'); coff=$(git var GIT_COMMITTER_IDENT | awk '{print $NF}')
+if [ "$off" != "+0000" ] || [ "$coff" != "+0000" ]; then echo "leak-guard: commit with TZ=UTC (author $off, committer $coff)"; fail=1; fi
+# 2. Identity must be the neutral one.
+case "$(git var GIT_AUTHOR_IDENT)$(git var GIT_COMMITTER_IDENT)" in *"ZeroFee <dev@zerofee.si>"*"ZeroFee <dev@zerofee.si>"*) ;; *) echo "leak-guard: author/committer is not 'ZeroFee <dev@zerofee.si>'"; fail=1;; esac
+# 3. Staged content and staged file names against the private patterns.
+if [ -n "$pats" ]; then
+  echo "$pats" | while IFS= read -r p; do
+    if git diff --cached --name-only | grep -Eiq -- "$p"; then echo "leak-guard: a staged FILE NAME matches a private pattern"; exit 1; fi
+    if git diff --cached -U0 --no-color | grep -E '^\+' | grep -Eiq -- "$p"; then echo "leak-guard: staged content matches a private pattern"; exit 1; fi
+  done || fail=1
+fi
+# 4. Image metadata (EXIF/GPS) and Xcode per-user / signing files.
+if git diff --cached --name-only | grep -Eiv '(^|/)\.env\.example$' | grep -Eiq '(xcuserdata|\.xcuserstate$|\.mobileprovision$|\.p12$|Local\.xcconfig$|\.env)'; then echo "leak-guard: a per-user, signing or env file is staged"; fail=1; fi
+if git diff --cached --name-only | grep -Eiq '\.(jpe?g|heic|tiff?)$'; then echo "leak-guard: photo staged — strip EXIF first (exiftool -all= FILE), then add an allow note"; fail=1; fi
+if git diff --cached -U0 | grep -Eq '^\+.*DEVELOPMENT_TEAM *= *[A-Z0-9]{10}'; then echo "leak-guard: an Apple team ID is staged (keep it in Local.xcconfig)"; fail=1; fi
+# 5. Secrets by their shape (keys, tokens, private keys, backup words).
+node "$(dirname "$0")/secret-shapes.mjs" || fail=1
+exit $fail

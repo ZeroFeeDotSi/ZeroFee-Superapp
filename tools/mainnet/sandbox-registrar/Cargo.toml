@@ -1,0 +1,23 @@
+[package]
+name = "sandbox-registrar"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# The sandbox's stand-in for mainnet's `near` registrar (its create_account), for the flows rehearsal only
+# (tools/mainnet/flows-rehearse.sh): never deployed anywhere but a local near-sandbox.
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+near-sys = "=0.2.14"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+
+[workspace]

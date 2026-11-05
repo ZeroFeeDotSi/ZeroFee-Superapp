@@ -1,0 +1,367 @@
+/* Social trading, on @zerofee/design's tokens ("Monument"): hairlines, spaced capitals, air. Every colour from tokens.css. */
+.st-page { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 6px; }
+.st-tray-logo { display: block; width: 24px; height: 24px; border-radius: 7px; object-fit: cover; opacity: .55; filter: grayscale(.4); transition: opacity var(--dur-base), filter var(--dur-base); }
+.af-tray button.on .st-tray-logo { opacity: 1; filter: none; box-shadow: 0 0 0 1px var(--line); }
+
+/* Social trading's title block (S17): the name, and under it one quiet line naming the sites inside it */
+.st-title { display: grid; justify-items: center; gap: 4px; }
+.st-title__line { font: 400 13px/16px var(--font); color: var(--mute); }
+
+/* The social wallet, above every tab */
+.st-strip { margin-top: 10px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 22px; }
+.st-balance { font: 500 34px/1.1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; color: var(--ink); margin-top: 6px; }
+.st-sol { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.st-sol img { border-radius: 50%; }
+.st-add { width: auto; padding: 0 20px; flex: none; }
+.st-make { margin-top: 2px; }
+.st-arriving { margin-top: 10px; }
+.st-ready { margin-top: 12px; }
+.st-done { margin-top: 12px; }
+
+/* The site's card */
+.st-card { margin-top: 18px; padding: 20px 18px 18px; border: 1px solid var(--line); border-radius: 22px; }
+.st-card-head { display: flex; align-items: center; gap: 14px; }
+.st-card-logo { width: 56px; height: 56px; border-radius: 15px; object-fit: cover; box-shadow: 0 0 0 1px var(--line); }
+.st-card-name { font: 400 24px/1.1 var(--font); letter-spacing: -.02em; color: var(--ink); }
+.st-card-host { margin-top: 4px; }
+.st-steps { margin: 18px 0 18px; padding: 0 0 0 20px; display: grid; gap: 8px; color: var(--ink-2); font: 400 15px/1.4 var(--font); }
+.st-steps li::marker { color: var(--mute); }
+.st-web-note { margin-top: 12px; }
+.st-card .zf-more .st-steps { margin: 2px 0 6px; }
+.st-line-btn { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--hair); }
+
+.st-trouble { margin-top: 18px; }
+.st-trouble summary { cursor: pointer; list-style: none; padding: 0; min-height: 44px; display: flex; align-items: center; }
+.st-trouble summary::-webkit-details-marker { display: none; }
+.st-row { appearance: none; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; width: 100%; text-align: left; font: inherit; cursor: pointer; grid-template-columns: 1fr; }
+.st-row:focus-visible, .st-trouble summary:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* Sheets */
+.st-big { text-align: center; font: 500 56px/1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; padding: 6px 0 4px; color: var(--ink); }
+.st-center { text-align: center; }
+.st-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0 10px; }
+.st-presets button { appearance: none; height: 44px; border-radius: 13px; border: 1px solid var(--line); background: none; color: var(--ink); font: 400 14px/1 var(--font); cursor: pointer; }
+.st-presets button.on { border-color: var(--ink); box-shadow: inset 0 0 0 .5px var(--ink); }
+.st-from { margin-bottom: 14px; }
+
+/* The ZeroFee App Store: the catalog's rows and an app's page */
+.st-list-label { margin-top: 26px; }
+.st-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.st-app-row { appearance: none; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; font: inherit; width: 100%; text-align: left; cursor: pointer; display: grid; grid-template-columns: 52px 1fr 20px; gap: 14px; align-items: center; padding: 14px 0; min-height: 80px; -webkit-tap-highlight-color: transparent; }
+.st-app-row:active { opacity: .6; }
+.st-app-row:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.st-app-logo { display: block; object-fit: cover; box-shadow: 0 0 0 .5px var(--line); flex: none; }
+@supports (corner-shape: squircle) { .st-app-logo { corner-shape: squircle; } } /* v2: continuous corners where the browser draws them */
+.st-app-text { display: grid; gap: 3px; min-width: 0; }
+.st-app-name { font: 400 18px/1.2 var(--font); letter-spacing: -.01em; color: var(--ink); }
+.st-app-what { font: 400 14px/1.35 var(--font); color: var(--ink-2); }
+.st-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.st-tag { font: 400 12px/1 var(--font); letter-spacing: .02em; color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px; }
+.st-chev { color: var(--mute); display: grid; place-items: center; }
+.st-foot { margin: 18px 0 8px; }
+
+.st-head { display: grid; grid-template-columns: 72px 1fr; gap: 16px; align-items: center; margin-top: 14px; }
+.st-head-text { display: grid; gap: 3px; min-width: 0; }
+.st-head-name { font: 400 28px/1.1 var(--font); letter-spacing: -.02em; color: var(--ink); }
+.st-head-what { grid-column: 1 / -1; margin-top: 4px; }
+.st-presets button:disabled { opacity: .45; cursor: default; }
+.st-card .zf-label { margin-bottom: -6px; }
+.st-chev svg { transform: rotate(-90deg); }
+.st-tags:empty { display: none; }
+
+/* A site's own app (Job 3): its window. Our bar on top (Back, the site's name over its real host, Settings, Close), the
+   site below; in a browser, the page that says it opens here in the phone app. */
+.st-window-bar { flex: none; height: 52px; margin-top: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 6px); padding: 0 calc(var(--gutter, 24px) - 12px); display: grid; grid-template-columns: 44px 1fr 44px 44px; align-items: center; border-bottom: 1px solid var(--line); }
+.st-window-title { display: grid; justify-items: center; min-width: 0; padding-left: 44px; }
+.st-window-name { font: 500 16px/1.2 var(--font); color: var(--ink); }
+.st-window-host { font: 400 11px/1.3 var(--font); color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.st-window-body { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 0 32px calc(var(--zf-safe-bottom, 0px) + 18px); }
+.st-window-body .zf-btn { width: auto; padding: 0 22px; }
+/* the settings' plain rows: a name and its value on one line */
+.st-detail { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 44px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.st-detail .t { font: 400 16px/1.3 var(--font); color: var(--ink); }
+.st-detail--action { align-items: center; border-bottom: 0; padding: 0; }
+.st-detail--action > span { display: grid; gap: 2px; }
+
+/* Social Trading (product decision, 2 Nov): the site wallets on top, each with its dollars and Add; the sites as tiles below. */
+.sh-label { margin-top: 22px; }
+.sh-wallets { list-style: none; margin: 6px 0 0; padding: 0; }
+.sh-wallet { display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; align-items: center; min-height: 72px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.sh-wallet-text { display: grid; gap: 2px; min-width: 0; }
+.sh-wallet-name { font: 400 15px/1.25 var(--font); color: var(--ink-2); }
+.sh-wallet-usd { font: 500 24px/1.1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.02em; color: var(--ink); }
+.sh-wallet-acts { display: flex; align-items: center; gap: 14px; }
+.sh-add { width: auto; min-width: 72px; height: 40px; padding: 0 18px; }
+.sh-back { font-size: 14px; }
+.sh-note { margin-top: 10px; }
+.sh-tiles { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 8px; }
+.sh-tile { appearance: none; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; width: 100%; display: grid; justify-items: center; gap: 8px; padding: 4px 0; -webkit-tap-highlight-color: transparent; }
+.sh-tile { transition: transform var(--dur-base) var(--ease-out); }
+.sh-tile:active { transform: scale(.98); transition-duration: var(--dur-fast); } /* v2: it gives under the finger, as the round actions do */
+.sh-tile:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); border-radius: 12px; }
+.sh-tile-name { font: 500 12px/16px var(--font); color: var(--ink-2); text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-back { display: block; margin: 12px auto 0; }
+.sh-wallets { margin-top: 14px; }
+.sh-wallet-open { appearance: none; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: center; text-align: left; padding: 0; min-height: 48px; -webkit-tap-highlight-color: transparent; }
+.sh-wallet { grid-template-columns: 1fr auto; }
+.sh-wallet-open:active { opacity: .6; }
+.sh-add { min-width: 64px; height: 44px; padding: 0 16px; font-size: 15px; }
+.sh-tiles { margin-top: 28px; }
+.sh-tile-what { font: 400 11.5px/1.2 var(--font); color: var(--mute); margin-top: -4px; }
+.sh-sheet-usd { text-align: center; font: 500 48px/1.1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; color: var(--ink); margin: 6px 0 16px; }
+.sh-sheet-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sh-address { font-family: var(--mono, ui-monospace, monospace); word-break: break-all; }
+.sh-sheet-note { margin-top: 14px; }
+.sh-export { display: block; margin: 14px 0 4px; color: var(--danger, #c62828); }
+
+/* ST1 (product decision, 2 Nov): one grid of tiles, each the site and its money; nothing above it. */
+.sh-grid { margin-top: 18px; grid-template-columns: repeat(3, 1fr); gap: 22px 8px; }
+.sh-tile[aria-disabled="true"] { opacity: .55; }
+.sh-tile-usd { font: 400 15px/1.2 var(--font); letter-spacing: -.01em; color: var(--ink); margin-top: -4px; font-variant-numeric: tabular-nums; text-align: center; }
+.sh-tile { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.sh-line { min-height: 18px; margin: 6px 0 0; text-align: center; color: var(--ink); }
+/* ST13: "Which coins will you trade?": big logos, the last pick first and marked (only when two or more networks fill). */
+.sh-pick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 6px; }
+.sh-pick-coin { appearance: none; border: 1px solid var(--hair); background: none; color: inherit; font: 400 15px/1.2 var(--font); border-radius: 16px; padding: 16px 8px; display: grid; justify-items: center; gap: 10px; cursor: pointer; min-height: 112px; }
+.sh-pick-coin img { width: 56px; height: 56px; border-radius: 50%; }
+.sh-pick-coin.is-picked { border-color: var(--ink); }
+/* the Browser tab's address bar (D118) */
+/* v2: the address bar is the screen's one soft pill (Trade's search, Safari's bar): a filled track, no outline; focus draws an ink ring */
+.sh-address-bar { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin: 4px 0 16px; padding: 0 8px 0 16px; border: 0; border-radius: var(--r-pill, 24px); min-height: 48px; background: var(--act-fill); transition: box-shadow var(--dur-fast) var(--ease-out); }
+.sh-address-bar:focus-within { box-shadow: inset 0 0 0 1px var(--ink); }
+.sh-address-bar button { color: var(--ink); font-weight: 500; }
+.sh-address-bar input { font: inherit; font-size: 16px; background: none; border: 0; color: var(--ink); min-height: 44px; outline: none; }
+.sh-address-bar button { min-height: 44px; min-width: 44px; }
+/* D118 follow-up: the History row on the start page, and its page (the old Browser page's history) */
+.sh-history-row { appearance: none; border: 0; border-top: .5px solid var(--line); border-bottom: .5px solid var(--line); background: none; color: inherit; width: 100%; text-align: left; font: inherit; cursor: pointer; grid-template-columns: 1fr auto; margin-top: 22px; }
+.sh-history-row .t, .sh-history-row .d { display: block; }
+.sh-history-row .v { font-size: 20px; }
+.sh-history { list-style: none; margin: 0; padding: 0; }
+.sh-history-visit { appearance: none; border: 0; border-bottom: .5px solid var(--line); background: none; color: inherit; width: 100%; text-align: left; font: inherit; cursor: pointer; }
+.sh-history-logo { display: inline-grid; place-items: center; font-size: 14px; color: var(--ink-2); width: 30px; height: 30px; border-radius: var(--r-xs, 8px); overflow: hidden; background: var(--raise); }
+.sh-history-logo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.sh-history-note { color: var(--mute); margin: 4px 0 6px; }
+.sh-history-empty { color: var(--mute); text-align: center; margin-top: 38%; }
+.sh-history-clear { align-self: center; margin-top: 18px; min-height: 44px; }
+.sh-history-row:focus-visible, .sh-history-visit:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+/* D131: the Privacy row and screen, favourites, History's star */
+.sh-privacy-row { margin-top: 0; border-top: 0; }
+.sh-privacy { display: flex; flex-direction: column; gap: 10px; }
+.sh-privacy-switch { appearance: none; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; width: 100%; text-align: left; font: inherit; cursor: pointer; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
+.sh-privacy-switch .t, .sh-privacy-switch .d { display: block; }
+.sh-toggle { flex: none; width: 44px; height: 26px; border-radius: 13px; background: var(--line); position: relative; transition: background var(--dur-base); }
+.sh-toggle > span { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--bg); box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform var(--dur-base); }
+.sh-toggle.on { background: var(--ink); }
+.sh-toggle.on > span { transform: translateX(18px); }
+@media (prefers-reduced-motion: reduce) { .sh-toggle, .sh-toggle > span { transition: none; } }
+.sh-privacy-head { margin-top: 14px; }
+.sh-privacy-site { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
+.sh-privacy-acts { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 18px; }
+.sh-privacy-acts .zf-link, .sh-privacy-site .zf-link { padding-left: 0; padding-right: 0; }
+.sh-privacy-note, .sh-privacy-fact { color: var(--mute); margin: 0; }
+.sh-privacy-ask { margin: 0 0 16px; }
+.sh-favs { margin-top: 22px; }
+.sh-favs-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.sh-favs-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 8px; }
+.sh-fav { appearance: none; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; min-width: 0; }
+.sh-fav-logo { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); display: grid; place-items: center; font-weight: 600; overflow: hidden; }
+.sh-fav-logo img { width: 44px; height: 44px; }
+.sh-fav-name { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-fav-x { position: absolute; top: -6px; right: 8px; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--bg); font-size: 14px; line-height: 20px; text-align: center; }
+.sh-history-item { display: grid; grid-template-columns: 1fr auto; align-items: center; border-bottom: 1px solid var(--line); }
+.sh-history-item .sh-history-visit { border-bottom: 0; }
+.sh-star { appearance: none; border: 0; background: none; color: var(--mute); cursor: pointer; padding: 10px; }
+.sh-star svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.sh-star.on { color: var(--ink); }
+.sh-star.on svg path { fill: currentColor; }
+.sh-fav:focus-visible, .sh-star:focus-visible, .sh-privacy-switch:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* D131: the open pages (phone tabs), a strip of chips above the tiles */
+.sh-open { margin: 4px 0 12px; }
+.sh-open-head { margin: 0 2px 6px; }
+.sh-open-strip { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: none; list-style: none; margin: 0; padding: 0 0 4px; scrollbar-width: none; }
+.sh-open-page { display: flex; align-items: center; flex: 0 0 auto; max-width: 70%; border: 1px solid var(--zf-line, rgba(127,127,127,.3)); border-radius: 999px; }
+.sh-open-show { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px 0 14px; background: none; border: 0; color: inherit; font: inherit; min-width: 0; }
+.sh-open-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-open-mark { font-size: 11px; opacity: .6; }
+.sh-open-x { min-width: 44px; min-height: 44px; background: none; border: 0; color: inherit; font-size: 18px; opacity: .6; }
+
+/* A site's own app (product decision, 3 Nov): its wallet page in Home's look (HOME-VISUAL): one big number, two soft round actions,
+   plain rows on one grid (40-pt logo, name 16/500, sub-line 13 mute, amount 16/500 right), section heads 13/500 grey, no
+   frames; the one primary action, "Open <site>", stays at the bottom of the screen. 8-pt spacing. */
+.sw-page { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 8px; }
+.sw-top { display: grid; justify-items: center; text-align: center; padding-top: 16px; }
+.sw-logo { width: 56px; height: 56px; border-radius: 16px; }
+.sw-big { margin: 16px 0 0; font: 500 52px/1.05 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.sw-sub { margin: 8px 0 0; }
+.sw-acts { display: flex; justify-content: center; gap: 32px; margin-top: 24px; }
+.sw-act { appearance: none; background: none; border: 0; padding: 0; color: var(--ink); display: grid; justify-items: center; gap: 8px; cursor: pointer; font: inherit; -webkit-tap-highlight-color: transparent; }
+.sw-act__dot { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--ink) 7%, transparent); transition: transform var(--dur-fast) var(--ease-out); }
+.sw-act:active .sw-act__dot { transform: scale(.98); }
+.sw-act__word { font: 500 13px/16px var(--font); }
+.sw-act:disabled { opacity: .4; cursor: default; }
+.sw-h { margin: 32px 0 0; padding-bottom: 8px; font: 500 13px/18px var(--font); color: var(--mute); letter-spacing: 0; text-transform: none; }
+.sw-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; min-height: 64px; position: relative; }
+.sw-row::after { content: ""; position: absolute; left: 52px; right: 0; bottom: 0; border-bottom: 1px solid var(--line); }
+.sw-row:last-of-type::after { content: none; }
+.sw-row__logo { width: 40px; height: 40px; border-radius: 50%; }
+.sw-row .t { font: 500 16px/20px var(--font); color: var(--ink); }
+.sw-row .d { font: 400 13px/18px var(--font); color: var(--mute); margin-top: 2px; }
+.sw-row .v { font: 500 16px/20px var(--font); color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+.sw-row__btns { display: flex; gap: 4px; }
+.sw-mono { font-family: ui-monospace, "SF Mono", Menlo, monospace !important; letter-spacing: .02em; }
+.sw-row--move { grid-template-columns: 40px 1fr; }
+.sw-row--move::after { left: 52px; }
+.sw-dot { justify-self: center; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); }
+.sw-dot--moving { background: none; box-shadow: inset 0 0 0 1.5px var(--mute); }
+.sw-dot--failed { background: var(--danger, #c62828); }
+.sw-empty { margin: 8px 0 0; }
+.sw-proof { appearance: none; align-self: flex-start; margin-top: 8px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 22px; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); font: 500 15px/20px var(--font); cursor: pointer; }
+.sw-line { margin: 16px 0 0; text-align: center; }
+.sw-open { position: sticky; bottom: 0; margin-top: auto; padding: 24px 0 8px; background: linear-gradient(to bottom, transparent, var(--bg) 24px); }
+.sw-open-btn { width: 100%; height: 56px; border-radius: 28px; font-size: 17px; }
+.sw-qr { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 8px; }
+.sw-qr__code { margin-top: 24px; padding: 12px; border-radius: 30px; background: #fff; line-height: 0; box-shadow: 0 0 0 1px var(--line); }
+.sw-qr__code svg { display: block; width: min(256px, 66vw); height: auto; }
+.sw-qr__addr { margin: 24px 0 0; max-width: 14.6em; color: var(--ink); font: 400 16px/1.65 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .05em; word-spacing: .18em; }
+.sw-qr__copy { margin-top: 24px; width: 100%; max-width: 240px; height: 50px; border-radius: 25px; }
+.sw-qr__only { margin-top: 16px; }
+.sw-row--move { grid-template-columns: 40px 1fr auto; }
+.sw-view { appearance: none; min-height: 44px; padding: 0 12px; border: 0; background: none; color: var(--ink); font: 500 15px/20px var(--font); cursor: pointer; }
+/* v2: the History and Privacy rows share one hairline between them, never two */
+.sh-history-row + .sh-history-row { border-top: 0; margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .sh-tile, .sh-tile:active { transition: none; transform: none; } }
+
+/* ── REVAMP v2 (3 Nov): a site's own wallet page on Home's v2 look ─────────────────────────────────────────────────
+   The same bloom behind the one number as Home (a gradient on its own layer, two breaths, then still), the number at
+   Home's 52/200 tracked, the round actions on the shared soft fill pressing on the snap spring, .5 hairlines, the logo a
+   continuous-corner tile with a .5 ring, and the QR tile and Copy on the v2 radii. Transform and opacity only. */
+.sw-top { position: relative; isolation: isolate; }
+.sw-top::before { content: ""; position: absolute; z-index: -1; left: 50%; top: 24px; width: 340px; height: 180px; margin-left: -170px; pointer-events: none; background: var(--bloom); animation: zf-bloom-in var(--dur-base) var(--ease-out) both; }
+.sw-logo { box-shadow: 0 0 0 .5px var(--line); }
+@supports (corner-shape: squircle) { .sw-logo { border-radius: 20px; corner-shape: squircle; } }
+.sw-big { font-weight: 500; letter-spacing: var(--tr-hero, -.035em); }
+.sw-act__dot { background: var(--act-fill); transition: transform var(--dur-base) var(--ease-out); }
+.sw-act:active .sw-act__dot { transition-duration: var(--dur-fast); }
+.sw-row::after { border-bottom-width: .5px; }
+.sw-proof { background: var(--act-fill); }
+.sw-qr__code { border-radius: var(--r-lg, 24px); padding: 16px; }
+.sw-qr__copy { height: 48px; border-radius: var(--r-pill, 24px); }
+@media (prefers-reduced-motion: reduce) { .sw-top::before { animation: none; } .sw-act__dot { transition: none; } }
+
+/* ── REVAMP phase 2 (3 Nov): the Browser's start page (the review's go; its components, restyled) ──────────────
+   Favourites and Recent share one tile: a 56 pt continuous-corner tile (the site's own logo, or its first letter on the
+   soft fill, never a network favicon), its name 12/16 under it, pressing on the snap spring. Favourites is a 4-across
+   grid; Recent is one row that scrolls sideways and snaps, so the page reads top to bottom: what's open, what you keep,
+   where you've been, then History and Privacy. Open pages are soft pills. Empty sections render nothing. */
+.sh-favs { margin-top: var(--sp-6, 24px); }
+.sh-favs-head { align-items: center; margin-bottom: var(--sp-3, 12px); min-height: 32px; }
+.sh-favs-head .zf-link { min-height: 44px; padding: 0; margin: -6px 0; color: var(--ink); font-weight: 500; font-size: 15px; }
+.sh-favs-grid { gap: var(--sp-5, 20px) var(--sp-2, 8px); }
+.sh-fav { gap: 8px; position: relative; transition: transform var(--dur-base) var(--ease-out); }
+.sh-fav:active { transform: scale(.98); transition-duration: var(--dur-fast); }
+.sh-fav-logo { width: 56px; height: 56px; border: 0; border-radius: var(--r-md, 16px); background: var(--act-fill); box-shadow: inset 0 0 0 .5px var(--line); color: var(--ink); font: 600 22px/1 var(--font); }
+.sh-fav-logo img { width: 56px; height: 56px; object-fit: cover; }
+@supports (corner-shape: squircle) { .sh-fav-logo { border-radius: 20px; corner-shape: squircle; } }
+.sh-fav-name { font: 500 12px/16px var(--font); color: var(--ink-2); }
+.sh-fav-x { top: -6px; right: 4px; width: 22px; height: 22px; line-height: 22px; box-shadow: 0 0 0 2px var(--bg); }
+/* Recent: one row, sideways, snapping tile by tile; the page's gutter is its first edge */
+.sh-favs[aria-label="Recent"] .sh-favs-grid { display: flex; gap: var(--sp-2, 8px); overflow-x: auto; overscroll-behavior-x: none; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 calc(-1 * var(--gutter, 24px)); padding: 0 var(--gutter, 24px); scroll-padding: 0 var(--gutter, 24px); }
+.sh-favs[aria-label="Recent"] .sh-favs-grid::-webkit-scrollbar { display: none; }
+.sh-favs[aria-label="Recent"] .sh-favs-grid > li { flex: 0 0 76px; scroll-snap-align: start; }
+/* Open pages: soft pills, the private one marked by its half-moon */
+.sh-open { margin: var(--sp-2, 8px) 0 var(--sp-2, 8px); }
+.sh-open-head { margin: 0 0 var(--sp-2, 8px); }
+.sh-open-page { border: 0; background: var(--act-fill); border-radius: var(--r-pill, 999px); }
+.sh-open-show { font-size: 15px; }
+.sh-open-x { color: var(--mute); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .sh-fav, .sh-fav:active { transition: none; transform: none; } }
+
+.sw-total-note { margin: -4px 0 8px; color: var(--muted, inherit); }
+/* ── The button system: the wallet page's Open is B1 (50 pt, radius 14); its Copy is a B4 chip */
+.sw-open-btn { height: 50px; border-radius: 14px; }
+.sw-qr__copy.zf-btn, .sw-qr__copy { width: auto; max-width: none; height: 32px; padding: 0 14px; border-radius: 16px; background: var(--act-fill); color: var(--ink); font: 600 15px/20px var(--font); }
+
+/* ── Your wallets (the Browser thesis, part 3): every site wallet on one whole-screen sheet (D135). The total on Home's
+   number, then a card per wallet: its logo tile (a listed site's own, else its first letter on the soft fill), name and
+   dollars on one line, its coins under it, any plain note, and Move back to Safe as a soft pill. .5 hairlines. */
+.yw-page { display: flex; flex-direction: column; padding-bottom: 16px; }
+.yw-top { display: grid; justify-items: center; text-align: center; padding-top: 8px; }
+.yw-big { margin: 8px 0 0; font: 500 44px/1.05 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: var(--tr-hero, -.035em); color: var(--ink); font-variant-numeric: tabular-nums; }
+.yw-sub { margin: 6px 0 0; color: var(--mute); text-align: center; }
+.yw-all { margin-top: 20px; }
+.yw-all .zf-btn { height: 50px; border-radius: 14px; }
+.yw-line { margin: 8px 0 0; min-height: 0; text-align: center; }
+.yw-line:empty { display: none; }
+.yw-note { margin: 6px 0 0; color: var(--mute); }
+.yw-list { list-style: none; margin: 16px 0 0; padding: 0; }
+.yw-list--empty { margin-top: 0; }
+.yw-card { padding: 14px 0; border-bottom: .5px solid var(--line); }
+.yw-card:last-child { border-bottom: 0; }
+.yw-head { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; min-height: 44px; }
+.yw-logo { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; overflow: hidden; background: var(--act-fill); box-shadow: inset 0 0 0 .5px var(--line); color: var(--ink); font: 600 17px/1 var(--font); }
+.yw-logo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+@supports (corner-shape: squircle) { .yw-logo { border-radius: 14px; corner-shape: squircle; } }
+.yw-name { font: 500 16px/20px var(--font); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.yw-usd { font: 500 16px/20px var(--font); color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+.yw-coins { list-style: none; margin: 6px 0 0 52px; padding: 0; }
+.yw-coins li { display: flex; justify-content: space-between; gap: 12px; font: 400 14px/22px var(--font); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.yw-coins li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.yw-card .yw-note { margin-left: 52px; }
+.yw-back { appearance: none; margin: 10px 0 0 52px; min-height: 40px; padding: 0 16px; border: 0; border-radius: var(--r-pill, 20px); background: var(--act-fill); color: var(--ink); font: 500 15px/20px var(--font); cursor: pointer; transition: transform var(--dur-base) var(--ease-out); }
+.yw-back:active { transform: scale(.98); transition-duration: var(--dur-fast); }
+.yw-back:focus-visible, .yw-toggle:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.yw-toggle { align-self: center; margin-top: 8px; color: var(--ink); font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { .yw-back, .yw-back:active { transition: none; transform: none; } }
+
+/* R2 (4 Nov, UI lead, note sent to the Browser's build): "See every move on Solscan" was a grey pill cut by the floor.
+   It is a plain row under Moves (T5 ink, a chevron, a hairline above), the way every other list ends; the floor keeps
+   its 24 pt fade and room under the last row, so nothing reads as cut off. */
+.sw-proof { align-self: stretch; display: flex; justify-content: space-between; align-items: center; margin-top: 0; min-height: 52px; padding: 0; border-radius: 0; background: none; border-top: .5px solid var(--line); color: var(--ink); font: 400 17px/22px var(--font); text-align: left; }
+.sw-proof::after { content: ""; width: 7px; height: 7px; margin-right: 4px; border-right: 1.5px solid var(--mute); border-bottom: 1.5px solid var(--mute); transform: rotate(-45deg); }
+.sw-proof:active { opacity: .6; }
+.sw-page { padding-bottom: 0; }
+.sw-open { margin-top: auto; padding-top: 32px; }
+/* the floor sticks above the scroll area's bottom padding: paint the page colour under it too, so no row shows below it */
+.sw-open { z-index: 1; box-shadow: 0 48px 0 var(--bg); }
+/* Rebrand §3.6: "Open pump.fun" is the one mint primary, 56 on a 16 radius (zf-btn), not a white slab. */
+.sw-open-btn { height: 56px; border-radius: 16px; }
+
+/* ── concept v3.1 (5 Nov): the start page as cards. Recent is a grouped card of rows (the signed-in sites with their
+   wallet's dollars, then pages opened lately); Your wallets · History · Privacy are one card under it. The rows keep
+   zf-row's columns; the card's own hairlines split them (zf-group), so the rows' borders go. */
+.sh-recent { margin-top: var(--sp-6, 24px); }
+.sh-group { padding: 0 var(--sp-4, 16px); }
+.sh-group > li { list-style: none; }
+.sh-group .zf-row, .sh-group .sh-history-row { border-top: 0; border-bottom: 0; margin-top: 0; padding-left: 0; padding-right: 0; }
+.sh-group--pages { margin-top: var(--sp-6, 24px); }
+.sh-recent-row { appearance: none; border: 0; background: none; color: inherit; width: 100%; text-align: left; font: inherit; cursor: pointer; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-3, 12px); min-height: 64px; }
+.sh-recent-row .t, .sh-recent-row .d { display: block; }
+.sh-recent-row .t { font: 500 var(--fs-body, 16px)/22px var(--font); color: var(--ink); }
+.sh-recent-row .d { font: 400 13px/18px var(--font); color: var(--mute); margin-top: 1px; }
+.sh-recent-row .v { font-size: 20px; color: var(--mute); }
+.sh-recent-logo { width: 40px; height: 40px; border-radius: var(--r-sm, 12px); background: var(--fill); box-shadow: inset 0 0 0 .5px var(--line); display: grid; place-items: center; overflow: hidden; font: 600 16px/1 var(--font); color: var(--ink); }
+.sh-recent-logo img { width: 40px; height: 40px; object-fit: cover; display: block; }
+@supports (corner-shape: squircle) { .sh-recent-logo { border-radius: 14px; corner-shape: squircle; } }
+.sh-recent-row:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.sh-recent-row:active { opacity: .7; }
+
+/* ── UI audit (5 Nov, Browser): every screen read as a user on the phone, light and dark ───────────────────────────
+   - The one-line status under the address bar takes no room while it is empty (a 42-pt empty band sat above Recent).
+   - The pages card's first row sat 22 pt below the card's top (an empty band inside the card).
+   - A site's mark: its letter, with its logo laid over it once loaded (never an empty box while a logo loads).
+   - History's star and the site wallet's Copy and QR are 44-pt targets; Privacy's links line up with its text.
+   - Moves' empty line keeps air above the Solscan row's hairline; a disabled Go reads as disabled. */
+.sh-line:empty { min-height: 0; margin: 0; }
+.sh-group .sh-history-row:first-child { margin-top: 0; }
+.sh-recent-logo, .sh-fav-logo, .sh-history-logo, .yw-logo { position: relative; }
+.sh-mark-img { position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; display: block; background: inherit; }
+.sh-star { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; }
+.sw-row__btns .zf-icon-btn { min-width: 44px; min-height: 44px; }
+.sw-row__letter { display: grid; place-items: center; background: var(--act-fill); box-shadow: inset 0 0 0 .5px var(--line); color: var(--ink); font: 600 16px/1 var(--font); }
+.sh-privacy-acts .zf-link { padding-left: 0; padding-right: 0; }
+.sw-empty + .sw-proof { margin-top: 16px; }
+.sh-address-bar button:disabled { color: var(--mute); cursor: default; }
+.sh-fav { padding: 0; }
+/* the bar's ring only while its field has the caret, never left on after Go is tapped */
+.sh-address-bar:focus-within:not(:has(input:focus)) { box-shadow: none; }

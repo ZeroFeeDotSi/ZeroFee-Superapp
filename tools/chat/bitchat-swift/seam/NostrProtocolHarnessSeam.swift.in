@@ -1,0 +1,31 @@
+
+// ---------------------------------------------------------------------------
+// ZeroFee harness seam, appended by tools/chat/bitchat-swift/fetch.sh.
+// Not BitChat code. It only forwards to NostrProtocol's private helpers above
+// (an extension in the same file may reach them); it changes no behaviour.
+// ---------------------------------------------------------------------------
+extension NostrProtocol {
+    static func harnessDeriveSharedSecret(privateKey: P256K.Schnorr.PrivateKey, publicKey: Data) throws -> Data {
+        try deriveSharedSecret(privateKey: privateKey, publicKey: publicKey)
+    }
+
+    static func harnessDerivePrivateEnvelopeKey(from sharedSecret: Data) throws -> Data {
+        try derivePrivateEnvelopeKey(from: sharedSecret)
+    }
+
+    static func harnessEncrypt(plaintext: String, recipientPubkey: String, senderKey: P256K.Schnorr.PrivateKey) throws -> String {
+        try encrypt(plaintext: plaintext, recipientPubkey: recipientPubkey, senderKey: senderKey)
+    }
+
+    static func harnessDecrypt(ciphertext: String, senderPubkey: String, recipientKey: P256K.Schnorr.PrivateKey) throws -> String {
+        try decrypt(ciphertext: ciphertext, senderPubkey: senderPubkey, recipientKey: recipientKey)
+    }
+
+    static func harnessCreateSeal(rumor: NostrEvent, recipientPubkey: String, senderKey: P256K.Schnorr.PrivateKey) throws -> NostrEvent {
+        try createSeal(rumor: rumor, recipientPubkey: recipientPubkey, senderKey: senderKey)
+    }
+
+    static func harnessCreateGiftWrap(seal: NostrEvent, recipientPubkey: String) throws -> NostrEvent {
+        try createGiftWrap(seal: seal, recipientPubkey: recipientPubkey)
+    }
+}

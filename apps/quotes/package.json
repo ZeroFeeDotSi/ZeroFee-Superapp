@@ -1,0 +1,13 @@
+{
+  "name": "@zerofee/quotes",
+  "license": "Apache-2.0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0",
+    "@fastnear/ml-dsa-65": "2.5.0",
+    "@noble/curves": "2.0.1",
+    "@noble/hashes": "2.0.1"
+  }
+}

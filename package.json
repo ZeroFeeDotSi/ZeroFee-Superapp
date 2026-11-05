@@ -1,0 +1,41 @@
+{
+  "name": "zerofee-wallet",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "npm run -w @zerofee/web dev",
+    "selfhost": "bash tools/selfhost/run.sh",
+    "verify": "npm ci --ignore-scripts && npm run typecheck && npm test && npm run -w @zerofee/web build",
+    "test": "node --import ./tools/test/no-network.ts --test 'packages/**/*.test.ts' 'tools/**/*.test.ts' 'apps/extension/src/**/*.test.ts' 'apps/web/src/**/*.test.ts' 'apps/quotes/**/*.test.ts' 'apps/mail/**/*.test.ts' 'apps/tray/**/*.test.ts'",
+    "typecheck": "npm run -s typecheck -w @zerofee/web",
+    "verify-recipes": "node tools/pay/verify-recipes.mjs",
+    "build:contracts": "for c in recovery-policy; do (cd contracts/$c && cargo near build non-reproducible-wasm --env \"RUSTFLAGS=-C link-arg=-s --remap-path-prefix=$HOME=/home --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo\" && mkdir -p res && cp \"${CARGO_TARGET_DIR:-target}/near/$(echo $c | tr - _).wasm\" res/) || exit 1; done && npm run -s build:account-policy",
+    "build:account-policy": "cd contracts/account-policy && cargo near build non-reproducible-wasm --no-abi --no-default-features --features agent --env \"RUSTFLAGS=-C link-arg=-s --remap-path-prefix=$HOME=/home --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$PWD=/src --remap-path-prefix=${CARGO_TARGET_DIR:-$PWD/target}=/build\" && mkdir -p res release && wasm-opt -Oz --enable-bulk-memory --enable-sign-ext --enable-mutable-globals --strip-debug --strip-producers \"${CARGO_TARGET_DIR:-target}/near/account_policy.wasm\" -o release/account_policy-10.wasm && npm run -s build:account-policy:short-waits && (cd release && shasum -a 256 account_policy-10.wasm account_policy-10-short-waits.wasm > SHA256SUMS-10)",
+    "test:contract": "cd contracts/account-policy && cargo test && cargo test --no-default-features --features agent --lib r7_release_minimum",
+    "build:account-policy:short-waits": "cd contracts/account-policy && cargo near build non-reproducible-wasm --no-abi --features short-waits,agent --env \"RUSTFLAGS=-C link-arg=-s --remap-path-prefix=$HOME=/home --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$PWD=/src --remap-path-prefix=${CARGO_TARGET_DIR:-$PWD/target}=/build\" && wasm-opt -Oz --enable-bulk-memory --enable-sign-ext --enable-mutable-globals --strip-debug --strip-producers \"${CARGO_TARGET_DIR:-target}/near/account_policy.wasm\" -o release/account_policy-10-short-waits.wasm",
+    "hooks": "git config core.hooksPath tools/hooks && echo 'Commit hooks: tools/hooks (UTC, ZeroFee identity, .git/info/leak-patterns, signing and env files, secret shapes).'"
+  },
+  "dependencies": {
+    "@fastnear/api": "2.5.0",
+    "@fastnear/ml-dsa-65": "2.5.0",
+    "@fastnear/utils": "2.5.0",
+    "@nktkas/hyperliquid": "0.33.3",
+    "@noble/curves": "2.0.1",
+    "@noble/hashes": "2.0.1",
+    "@scure/bip39": "2.4.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "devDependencies": {
+    "rolldown": "1.2.15"
+  },
+  "overrides": {
+    "valibot": "1.4.2"
+  }
+}

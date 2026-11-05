@@ -1,0 +1,37 @@
+/* D119 perps: the Perps tab and its order sheet. Monument: hairlines, air, dollars first. Loaded with the tab only. */
+.pp { padding-bottom: 24px; }
+.pp-top { margin-top: 18px; display: grid; gap: 6px; }
+.pp-balance { font-variant-numeric: tabular-nums; }
+.pp-note { margin-top: 18px; display: grid; gap: 12px; }
+.pp-btn { height: 48px; }
+.pp-warn { margin-top: 10px; }
+.pp-row { appearance: none; border: 0; background: none; color: inherit; font: inherit; text-align: left; width: 100%; display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); min-height: 56px; }
+.pp-market { grid-template-columns: 1fr auto; cursor: pointer; }
+.pp-market:disabled { cursor: default; opacity: .55; }
+.pp-main { display: grid; gap: 3px; min-width: 0; }
+.pp-main .t { font: var(--t-body); color: var(--ink); }
+.pp-main .d { font: var(--t-small); color: var(--mute); overflow-wrap: anywhere; }
+.pp-pnl, .pp-price { font: var(--t-body); font-variant-numeric: tabular-nums; color: var(--ink); }
+.pp-pnl.up { color: var(--tr-up); }
+.pp-pnl.down { color: var(--tr-down); }
+.pp-close { appearance: none; border: 1px solid var(--line); background: none; color: var(--ink); border-radius: 18px; padding: 0 14px; height: 36px; font: 400 14px/1 var(--font); cursor: pointer; }
+.pp-close:disabled { color: var(--mute); cursor: default; }
+.pp-all { display: block; margin: 6px auto 0; }
+.pp-offlink { display: block; margin: 24px auto 0; color: var(--mute); }
+.pp-sheet { display: grid; gap: 10px; padding-bottom: 8px; min-width: 0; }
+.pp-sheet > * { min-width: 0; }
+.pp-hint { margin-top: -2px; }
+.pp-sub { margin-top: 8px; }
+.pp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pp-chips button { appearance: none; border: 1px solid var(--line); background: none; color: var(--ink-2); border-radius: 18px; min-width: 52px; height: 36px; padding: 0 12px; font: 400 14px/1 var(--font); cursor: pointer; }
+.pp-chips button.on { border-color: var(--hair); color: var(--ink); }
+.pp-kind { margin-top: 6px; }
+.pp-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.pp-field { display: grid; gap: 4px; min-width: 0; }
+.pp-field .tr-field { margin-top: 0; min-width: 0; }
+.pp-field input { width: 100%; }
+.pp-size { margin-top: 4px; }
+.pp-risk { color: var(--ink-2); }
+/* landing 3: Put money in / Take out, side by side under the balance */
+.pp-money { display: flex; gap: 8px; margin: 12px 0 4px; }
+.pp-money .pp-btn { flex: 1; margin-top: 0; }

@@ -1,0 +1,41 @@
+{
+  "recordedAtIso": "2026-10-25T14:13:20.017Z",
+  "note": "Operator-run through the partner key: a real 1-USDC quote paid from a throwaway Private pocket (never funded) to a sample Solana address, then 1Click generate-intent. Nothing was signed or submitted. Public data only.",
+  "pocket": "9304118792d11f6df8819e8d6259594e3246ce2018ccad6358c330fb581df89b",
+  "quoteRequest": {
+    "dry": false,
+    "swapType": "EXACT_INPUT",
+    "slippageTolerance": 100,
+    "originAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+    "amount": "1000000",
+    "depositType": "CONFIDENTIAL_INTENTS",
+    "destinationAsset": "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
+    "refundTo": "9304118792d11f6df8819e8d6259594e3246ce2018ccad6358c330fb581df89b",
+    "refundType": "CONFIDENTIAL_INTENTS",
+    "recipient": "13QkxhNMrTPxoCkRdYdJ65tFuwXPhL5gLS2Z5Nr6gjRK",
+    "recipientType": "DESTINATION_CHAIN",
+    "deadline": "2026-10-25T14:23:17.723Z",
+    "confidentiality": "basic"
+  },
+  "quote": {
+    "status": 201,
+    "depositAddress": "818473a0072ed5084b4ec9f665b47d7c244546ca9a0ebc76d71fe1e6274ef8ba",
+    "amountIn": "1000000",
+    "amountOut": "731586",
+    "deadline": "2026-10-28T14:23:17.723Z"
+  },
+  "generateIntent": {
+    "status": 201,
+    "response": {
+      "intent": {
+        "standard": "nep413",
+        "payload": {
+          "message": "{\"deadline\":\"2026-10-28T14:23:17.723Z\",\"intents\":[{\"intent\":\"transfer\",\"receiver_id\":\"818473a0072ed5084b4ec9f665b47d7c244546ca9a0ebc76d71fe1e6274ef8ba\",\"tokens\":{\"imt:51e8f94d77b5e90dc9852ca6113771e11e8382ce69473a75e313e41665de7cbe:nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1\":\"1000000\"}}],\"signer_id\":\"9304118792d11f6df8819e8d6259594e3246ce2018ccad6358c330fb581df89b\"}",
+          "nonce": "Vij2xgDhEPMXwCxvT4i34hhtdhcm5docNFPcDCQmd3g=",
+          "recipient": "intents.far"
+        }
+      },
+      "correlationId": "8edd5ecd-099d-4acd-b3b0-17a3429482f5"
+    }
+  }
+}

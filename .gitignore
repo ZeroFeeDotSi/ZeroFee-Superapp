@@ -1,0 +1,47 @@
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+.build/
+target/
+node_modules/
+.env
+.env.*
+*.p12
+*.mobileprovision
+Local.xcconfig
+*.log
+contracts/*/res/
+
+# Xcode per-user state and the web build output (never committed)
+apps/ios/ZeroFee.xcodeproj/project.xcworkspace/
+apps/ios/ZeroFee.xcodeproj/xcuserdata/
+apps/web/dist/
+apps/web/dist-second-device/
+
+# Local tools and scratch, never in the public tree (product decision, 2 Nov: the repo goes public)
+.claude/
+dl/
+
+# Tor for the Browser's Private browsing (D130): built from signed sources by tools/ios/build-tor.sh, never committed
+apps/ios/ZeroFee/Tor.xcframework
+
+# The extension zip (tools/extension/build-zip.sh), hosted by the website, never committed
+/dist/
+# D157: the extension load check's sample build (apps/extension/tools/app-load-check.ts), never committed
+apps/extension/build-check/
+
+# Signing, deploy and key files: never in the public tree
+.vercel/
+*.p8
+*.pem
+*.key
+*.cer
+*.keypair.json
+.npmrc
+*.map
+ExportOptions.plist
+
+# The self-host settings template is committed; your filled .env never is.
+!.env.example

@@ -1,0 +1,14 @@
+{
+ "recordedAtIso": "2026-10-25T08:36:53.413Z",
+ "response": {
+  "id": "zf",
+  "jsonrpc": "2.0",
+  "result": {
+   "deposits": [],
+   "total": 0,
+   "hasMore": false,
+   "limit": 20,
+   "offset": 0
+  }
+ }
+}

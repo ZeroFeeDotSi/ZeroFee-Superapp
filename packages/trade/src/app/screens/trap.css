@@ -1,0 +1,5 @@
+/* A coin people couldn't sell back (UX audit 4 Nov): the warning leads, under the name, in --down ink with a "!" disc;
+   the 24-hour change under the price goes quiet (never green). Owned here; coinpage.css is the revamp lead's. */
+.cp-trap { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--down); }
+.cp-trap-mark { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--down); color: var(--bg, #fff); font-size: 12px; font-weight: 700; }
+.cp-change--trap, .cp-change--trap * { color: var(--mute, var(--ink-3)) !important; }

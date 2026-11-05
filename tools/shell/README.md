@@ -1,0 +1,1 @@
+`node tools/shell/connects.mjs http://127.0.0.1:5180` walks every cross-app hand-off in `?demo` (light and dark, headless Chrome, taps counted, zero console errors) and exits non-zero if one lands on the wrong app, tab or state; it reports a broken one with the words on its screen and never fixes it.

@@ -1,0 +1,48 @@
+/* The Safe update (the design review's spec): U1 the card under Safe | Hot, SU8 the quiet line, U3/U4 the held
+   and done screens. Tokens only. */
+.su-card {
+  display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center;
+  margin: 16px 0 0; padding: 14px 12px 14px 16px; border-radius: 16px;
+  background: var(--surface); box-shadow: var(--e-1);
+}
+.su-glyph { color: var(--ink); display: block; }
+.su-card__text { min-width: 0; }
+.su-card__title { font: 600 15px/20px var(--font); color: var(--ink); }
+.su-card__line { margin: 0; font: 400 13px/18px var(--font); color: var(--mute); text-wrap: pretty; }
+.su-chip {
+  position: relative; appearance: none; border: 0; height: 32px; padding: 0 14px; border-radius: 16px;
+  background: var(--fill); color: var(--ink); font: 600 15px/20px var(--font); cursor: pointer;
+}
+.su-chip::before { content: ""; position: absolute; inset: -6px; }
+.su-chip:disabled { opacity: .5; }
+/* SU8: one quiet line in the card's place while it waits; red for unknown code (MUST 1) */
+.su-line {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin: 16px 0 0; padding: 12px 0; min-height: 44px;
+  appearance: none; border: 0; background: none; text-align: left; cursor: pointer;
+  font: 400 13px/18px var(--font); color: var(--mute);
+}
+.su-line--bad { color: var(--alert); }
+.su-line--bad b { font-weight: 600; }
+.su-dot { flex: none; width: 6px; height: 6px; border-radius: 3px; background: var(--mute); animation: none; }
+.su-dot--bad { background: var(--alert); animation: none; }
+@keyframes su-pulse { 50% { opacity: .35; } }
+
+/* U3/U4: full screen; Close top-left (D135); the time and who can stop it; the floor holds Finish / Cancel / Done */
+.su-held { display: flex; flex-direction: column; min-height: 100dvh; padding: 0 24px 44px; box-sizing: border-box; background: var(--bg); }
+.su-held__close { align-self: flex-start; margin: 8px 0 0 -10px; }
+.su-held__body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding-bottom: 48px; }
+.su-ring {
+  position: relative; width: 104px; height: 104px; border-radius: 52px; box-shadow: inset 0 0 0 1px var(--line);
+  display: grid; place-items: center; color: var(--ink);
+}
+.su-ring--live::after {
+  content: ""; position: absolute; inset: 0; border-radius: 52px; box-shadow: 0 0 0 1px var(--mute);
+  animation: none; display: none; }
+@keyframes su-ring { from { transform: scale(1); opacity: .8; } to { transform: scale(1.02); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .su-ring--live::after, .su-dot { animation: none; } .su-ring--live::after { display: none; } }
+.su-ring--bad { color: var(--alert); box-shadow: inset 0 0 0 1px var(--alert); }
+.su-held__title { margin: 24px 0 0; font: 600 28px/34px var(--font); letter-spacing: -.02em; color: var(--ink); }
+.su-held--bad .su-held__title { color: var(--alert); }
+.su-held__when { margin: 8px 0 0; font: 500 17px/22px var(--font); color: var(--ink); }
+.su-held__sub { margin: 4px 0 0; font: 400 15px/20px var(--font); color: var(--mute); max-width: 320px; text-wrap: pretty; }
+.su-held__floor { display: flex; flex-direction: column; align-items: center; gap: 4px; }

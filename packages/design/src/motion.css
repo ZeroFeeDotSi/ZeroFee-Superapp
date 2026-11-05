@@ -1,0 +1,131 @@
+/* ZeroFee motion and light: one language for every app (Trade first, Home moves onto it; D126). Black and white stays
+   the ground; light is the accent: a soft glow on what is live, a coin's own colour behind its logo, a sweep on the one
+   action. Every effect is CSS on the GPU (transform, opacity, box-shadow on small elements), and every one stops under
+   the system's Reduce Motion. Classes only: nothing here changes an existing selector. */
+:root {
+  --glow-rgb: 11, 11, 12;
+  --halo: .22;                    /* how strong a coin's own light is behind its logo */
+  /* --up / --down are tokens.css's (THEME.md): this file used to redefine them (#14894f, #3ddc8a), and as it loads after
+     tokens.css its greens won, so Black's gains were never the concept's mint. */
+  --up-wash: color-mix(in srgb, var(--up) 11%, transparent);
+  --down-wash: color-mix(in srgb, var(--down) 11%, transparent);
+  --lift: 0 10px 30px -12px rgba(var(--glow-rgb), .32);
+  --card-glow: 0 0 0 1px var(--line), 0 30px 80px -24px rgba(var(--glow-rgb), .3);
+  --stagger: 45ms;
+}
+:root[data-theme="dark"] {
+  --glow-rgb: 242, 242, 243;
+  --halo: .42;
+  --lift: 0 10px 30px -12px rgba(var(--glow-rgb), .45);
+  --card-glow: 0 0 0 1px var(--line), 0 30px 80px -24px rgba(var(--glow-rgb), .22);
+}
+
+/* Rise: a list's rows settle in one after another. Set --i on each row (0, 1, 2…); the first 12 are staggered. */
+.zf-rise { animation: zf-rise var(--dur-base) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * var(--stagger-v2, 30ms)); }
+@keyframes zf-rise { from { opacity: 0; transform: translateY(8px); } }
+
+/* Pop: a card or an amount arrives with weight, never a bounce (settle's timing: the snap spring, from .94). */
+.zf-pop { animation: zf-pop var(--dur-base) var(--ease-out) both; }
+@keyframes zf-pop { from { opacity: 0; transform: scale(.98); } }
+
+/* Live: a small dot that pings outward, for anything that is updating as you look. */
+.zf-live { position: relative; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--up); flex: none; }
+/* v2: the ping is a ring on its own layer that grows and fades (transform + opacity), not an animated box-shadow */
+.zf-live::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--up); animation: none; display: none; }
+@keyframes zf-ping { from { transform: scale(1); opacity: .5; } to { transform: scale(1.02); opacity: 0; } }
+.zf-live-word { display: inline-flex; align-items: center; gap: 6px; font: 500 10px/1 var(--font); letter-spacing: .18em; color: var(--up); text-transform: uppercase; }
+
+/* Tick: a price that just changed. A soft light passes under it once; the digits never roll. */
+.zf-tick-up, .zf-tick-down { position: relative; }
+.zf-tick-up::after, .zf-tick-down::after { content: ""; position: absolute; inset: -4px -6px -4px -10px; border-radius: 8px; pointer-events: none; animation: zf-tick var(--dur-base) var(--ease-out) both; }
+.zf-tick-up::after { background: color-mix(in srgb, var(--up) 16%, transparent); }
+.zf-tick-down::after { background: color-mix(in srgb, var(--down) 16%, transparent); }
+@keyframes zf-tick { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Change: "+5.9%" in a quiet wash of its colour. */
+.zf-chg { display: inline-block; font: 500 12px/1 var(--font); font-variant-numeric: tabular-nums; padding: 4px 7px; border-radius: 7px; color: var(--mute); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.zf-chg.up { color: var(--up); background: var(--up-wash); }
+.zf-chg.down { color: var(--down); background: var(--down-wash); }
+
+/* Halo: a coin's own light. The logo's image drawn again behind it, blurred and saturated. Markup:
+   <span class="zf-halo"><img class="zf-halo__light" src=…><img src=…></span>. Add .is-on to show it (hot coins, a coin page). */
+.zf-halo { position: relative; display: inline-grid; place-items: center; isolation: isolate; }
+.zf-halo > :not(.zf-halo__light) { position: relative; z-index: 1; }
+.zf-halo__light { position: absolute; inset: -22%; width: 144%; height: 144%; border-radius: 50%; filter: blur(14px) saturate(1.7); opacity: 0; z-index: 0; pointer-events: none; transition: opacity var(--dur-base) var(--ease-out); }
+.zf-halo.is-on > .zf-halo__light { opacity: var(--halo); will-change: opacity; }
+.zf-halo--big > .zf-halo__light { inset: -34%; width: 168%; height: 168%; filter: blur(24px) saturate(1.8); }
+@keyframes zf-breathe { 50% { opacity: calc(var(--halo) * .5); } }
+
+/* Sweep: a slow band of light across the one ink action, every few seconds. */
+.zf-sweep { position: relative; overflow: hidden; box-shadow: var(--lift); }
+.zf-sweep::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--bg) 30%, transparent) 50%, transparent 70%); animation: none; display: none; }
+@keyframes zf-sweep { 0% { transform: translateX(-120%); } 35%, 100% { transform: translateX(120%); } }
+
+/* Filament: a button at work (signing, sending). A thread of light runs through it until it's done. */
+.zf-filament { position: relative; overflow: hidden; }
+.zf-filament::before { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: 0; pointer-events: none; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg) 32%, transparent), transparent); transform: translateX(-100%); animation: none; display: none; }
+@keyframes zf-filament { to { transform: translateX(250%); } }
+
+/* Draw: a check (or any stroked path, pathLength="1") that draws itself. */
+.zf-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: zf-draw var(--dur-base) .2s var(--ease-out) forwards; }
+@keyframes zf-draw { to { stroke-dashoffset: 0; } }
+
+/* Glow-on: a chosen chip, tab or amount, lit from within. */
+.zf-lit { box-shadow: inset 0 0 0 1.5px var(--ink), 0 0 18px -6px rgba(var(--glow-rgb), .6); }
+
+/* Skeleton: where a number or row is coming, a band of light passes. */
+.zf-shimmer { position: relative; overflow: hidden; background: color-mix(in srgb, var(--ink) 6%, transparent); border-radius: 8px; }
+.zf-shimmer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 8%, transparent), transparent); transform: translateX(-100%); animation: none; display: none; }
+@keyframes zf-shimmer { to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .zf-rise, .zf-pop, .zf-live::after, .zf-tick-up::after, .zf-tick-down::after, .zf-halo.is-on > .zf-halo__light, .zf-sweep::after,
+  .zf-filament::before, .zf-shimmer::after { animation: none; }
+  .zf-draw { animation: none; stroke-dashoffset: 0; }
+  .zf-tick-up::after, .zf-tick-down::after { opacity: 0; }
+}
+
+/* ── v2 light and motion (REVAMP-2026-11-03, study.md L13–L27). Compositor-only: each effect is a gradient on its own
+   layer that moves by transform and fades by opacity. No filter, no animated box-shadow, nothing that lays out. ──── */
+
+/* Bloom: a soft light behind the one hero (Home's number, a coin page's price). A pseudo-element under the content; it
+   breathes in opacity only. Put .zf-bloom on the hero's box; the box must not clip (overflow visible). */
+.zf-bloom { position: relative; isolation: isolate; }
+.zf-bloom::before { content: ""; position: absolute; z-index: -1; left: 50%; top: 50%; width: 340px; height: 220px; margin: -110px 0 0 -170px; pointer-events: none; background: var(--bloom); animation: zf-bloom-in var(--dur-base) var(--ease-out) both; }
+@keyframes zf-bloom-in { from { opacity: 0; transform: scale(.98); } }
+@keyframes zf-bloom { 50% { opacity: .55; } }
+
+/* Flare: one thin line of light along the top edge of a raised surface (a sheet, a tray, a card in Black). */
+.zf-flare { position: relative; }
+.zf-flare::after { content: ""; position: absolute; left: 12%; right: 12%; top: 0; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(var(--glow-rgb), .35), transparent); opacity: .0; }
+:root[data-theme="dark"] .zf-flare::after { opacity: 1; }
+
+/* Glow press: a target lights from within as it is pressed; the light is a gradient layer fading in, never a shadow. */
+.zf-glowpress { position: relative; }
+.zf-glowpress::after { content: ""; position: absolute; inset: -6px; border-radius: inherit; pointer-events: none; background: radial-gradient(closest-side, rgba(var(--glow-rgb), .14), transparent); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
+.zf-glowpress:active::after { opacity: 1; transition-duration: var(--dur-fast); }
+
+/* Arrive: content comes in top to bottom (hero, actions, rows): a short rise on the snap spring. --i orders it. */
+.zf-arrive { animation: zf-arrive var(--dur-base) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * var(--stagger-v2, 30ms)); }
+@keyframes zf-arrive { from { opacity: 0; transform: translateY(8px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .zf-bloom::before, .zf-arrive { animation: none; }
+  .zf-glowpress::after { transition: none; }
+}
+.zf-live-word { font: 600 13px/18px var(--font); letter-spacing: 0; text-transform: none; } /* the text system: no spaced capitals */
+
+/* ── The eight named motions (ACTIVITY-MOTION, 4 Nov). Transform and opacity only; 80–600 ms except the two loops; at
+   most 8 px of travel; scale between .94 and 1; nothing that frames overshoots. Where each lives:
+   press   .zf-press (ui.css) and the row wash (liverow.css)        arrive  .zf-arrive / .zf-rise (above)
+   rise/fall  the sheet (sheet.css, data-closing)                  fill    .zf-lrow__fill (liverow.css)
+   flow    .zf-lrow__flow (liverow.css), .zf-filament (above)      count   a held amount's digits (the app's own roll)
+   settle  .zf-settle (here), a row's badge (liverow.css)           live    .zf-live (above) ── */
+
+/* Settle: something that just finished takes its place (a badge, a tick): from .6, on the snap spring, never past 1. */
+.zf-settle { animation: zf-settle var(--dur-base) var(--ease-out) both; }
+@keyframes zf-settle { from { opacity: 0; transform: scale(.98); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .zf-settle { animation: none; }
+}

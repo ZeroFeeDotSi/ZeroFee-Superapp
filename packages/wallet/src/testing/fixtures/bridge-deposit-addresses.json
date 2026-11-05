@@ -1,0 +1,89 @@
+{
+ "recordedAtIso": "2026-10-25T08:36:53.413Z",
+ "account": "intents.near",
+ "addresses": {
+  "sol:mainnet SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "result": {
+    "address": "2feEsLREnagKLAYP72PBPxAGwAGXYEU2F2EE2zNKFHpJ",
+    "chain": "sol:mainnet"
+   }
+  },
+  "eth:8453 SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "result": {
+    "address": "0x1A1eb2Ac53a500e2429366f53dF6FB53Dc0b53a8",
+    "chain": "eth:8453"
+   }
+  },
+  "eth:4663 SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "result": {
+    "address": "0x1A1eb2Ac53a500e2429366f53dF6FB53Dc0b53a8",
+    "chain": "eth:4663"
+   }
+  },
+  "eth:56 SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "result": {
+    "address": "0x1A1eb2Ac53a500e2429366f53dF6FB53Dc0b53a8",
+    "chain": "eth:56"
+   }
+  },
+  "btc:mainnet SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "result": {
+    "address": "bc1qlcwnxxf6q3ppkhkfl069e609h6ly3uzs0epyx3",
+    "chain": "btc:mainnet"
+   }
+  },
+  "tron:mainnet SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "result": {
+    "address": "TEnmc8AmQEAyCzfZGTsxb7MNQG2yaU3pkH",
+    "chain": "tron:mainnet"
+   }
+  },
+  "xrp:mainnet SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "result": {
+    "address": "rU5kdnTYveMv5yTSizKHdgYhzDrwUednbu",
+    "chain": "xrp:mainnet"
+   }
+  },
+  "ton:mainnet SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "result": {
+    "address": "UQDS56quzV6RNg7aw8bglp4vzULdaaZ9xsx34dhiEVxthyGh",
+    "chain": "ton:mainnet"
+   }
+  },
+  "stellar:mainnet SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "error": "Deposit mode MEMO is required for this chain"
+  },
+  "stellar:mainnet MEMO": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "result": {
+    "address": "GDJ4JZXZELZD737NVFORH4PSSQDWFDZTKW3AIDKHYQG23ZXBPDGGQBJK",
+    "chain": "stellar:mainnet",
+    "memo": "100474995"
+   }
+  },
+  "no-such-chain SIMPLE": {
+   "id": "zf",
+   "jsonrpc": "2.0",
+   "error": "Network not supported"
+  }
+ }
+}

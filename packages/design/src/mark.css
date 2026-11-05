@@ -1,0 +1,25 @@
+.zf-mark svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.zf-ring  { fill: none; stroke: var(--ink); stroke-width: var(--zf-stroke); stroke-linecap: round;
+            stroke-dasharray: 51.52; transform: rotate(-90deg); transform-origin: 12px 12px; }
+.zf-knock { stroke: var(--bg); stroke-width: var(--zf-knock); stroke-linecap: round; stroke-dasharray: 16.41; }
+.zf-slash { stroke: var(--ink); stroke-width: var(--zf-stroke); stroke-linecap: round; stroke-dasharray: 16.41; }
+
+/* Draw once, then breathe very slowly. */
+.zf-mark--once .zf-ring { stroke-dashoffset: 51.52; animation: zf-draw var(--dur-base) var(--ease-out) 0ms forwards; }
+.zf-mark--once .zf-knock, .zf-mark--once .zf-slash { stroke-dashoffset: 16.41; animation: zf-draw var(--dur-base) var(--ease-out) 0ms forwards; }
+/* v2: its own keyframes (motion.css's zf-breathe, a coin's halo, shared the name and the later file won for both), and
+   three slow breaths, then still: an idle mark costs nothing (speed worker, 3 Nov) */
+.zf-mark--once { animation: zf-mark-breathe var(--dur-base) var(--ease-out) 0ms 3; }
+
+/* Loading: draw, hold, let go, redraw — a calm 2.8 s cycle. */
+.zf-mark--loading .zf-ring { animation: none; }
+.zf-mark--loading .zf-knock, .zf-mark--loading .zf-slash { animation: none; }
+
+@keyframes zf-draw { to { stroke-dashoffset: 0; } }
+@keyframes zf-mark-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .82; } }
+@keyframes zf-loop-ring  { 0% { stroke-dashoffset: 51.52; } 40%, 78% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes zf-loop-slash { 0%, 30% { stroke-dashoffset: 16.41; } 55%, 78% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .zf-mark, .zf-ring, .zf-knock, .zf-slash { animation: none !important; stroke-dashoffset: 0 !important; opacity: 1 !important; }
+}

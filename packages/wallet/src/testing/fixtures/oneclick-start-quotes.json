@@ -1,0 +1,100 @@
+{
+  "recordedAtIso": "2026-10-25T16:12:09.853Z",
+  "note": "Free dry 1Click quotes (no key): exactly 3.9 NEAR (nep141:wrap.near, delivered on NEAR) to a fresh 64-hex implicit account that didn't exist. Whether delivery creates the account as native NEAR is the test dust run (m7/start-proof.mjs).",
+  "freshAccountExisted": false,
+  "byOrigin": {
+    "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near": {
+      "name": "USDC on Solana",
+      "status": 201,
+      "request": {
+        "dry": true,
+        "swapType": "EXACT_OUTPUT",
+        "slippageTolerance": 100,
+        "originAsset": "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
+        "depositType": "ORIGIN_CHAIN",
+        "destinationAsset": "nep141:wrap.near",
+        "amount": "3900000000000000000000000",
+        "refundTo": "13QkxhNMrTPxoCkRdYdJ65tFuwXPhL5gLS2Z5Nr6gjRK",
+        "refundType": "ORIGIN_CHAIN",
+        "recipient": "6e696e767c99e2af662b3993ca01ab39dbb8f6d226a660a34b1436fcaea82249",
+        "recipientType": "DESTINATION_CHAIN",
+        "deadline": "2026-10-25T16:42:09.854Z"
+      },
+      "quote": {
+        "amountIn": "17909926",
+        "amountInFormatted": "17.909926",
+        "amountInUsd": "17.902672479970",
+        "minAmountIn": "17730826",
+        "amountOut": "3900000000000000000000000",
+        "amountOutFormatted": "3.9",
+        "amountOutUsd": "17.667000000000",
+        "minAmountOut": "3900000000000000000000000",
+        "timeEstimate": 22,
+        "refundFee": "270530",
+        "withdrawFee": "0"
+      }
+    },
+    "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near": {
+      "name": "USDC on Base",
+      "status": 201,
+      "request": {
+        "dry": true,
+        "swapType": "EXACT_OUTPUT",
+        "slippageTolerance": 100,
+        "originAsset": "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+        "depositType": "ORIGIN_CHAIN",
+        "destinationAsset": "nep141:wrap.near",
+        "amount": "3900000000000000000000000",
+        "refundTo": "0x5a3e000000000000000000000000000000005a3e",
+        "refundType": "ORIGIN_CHAIN",
+        "recipient": "6e696e767c99e2af662b3993ca01ab39dbb8f6d226a660a34b1436fcaea82249",
+        "recipientType": "DESTINATION_CHAIN",
+        "deadline": "2026-10-25T16:42:11.894Z"
+      },
+      "quote": {
+        "amountIn": "17909926",
+        "amountInFormatted": "17.909926",
+        "amountInUsd": "17.902672479970",
+        "minAmountIn": "17730826",
+        "amountOut": "3900000000000000000000000",
+        "amountOutFormatted": "3.9",
+        "amountOutUsd": "17.667000000000",
+        "minAmountOut": "3900000000000000000000000",
+        "timeEstimate": 37,
+        "refundFee": "2400",
+        "withdrawFee": "0"
+      }
+    },
+    "nep141:btc.omft.near": {
+      "name": "Bitcoin",
+      "status": 201,
+      "request": {
+        "dry": true,
+        "swapType": "EXACT_OUTPUT",
+        "slippageTolerance": 100,
+        "originAsset": "nep141:btc.omft.near",
+        "depositType": "ORIGIN_CHAIN",
+        "destinationAsset": "nep141:wrap.near",
+        "amount": "3900000000000000000000000",
+        "refundTo": "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+        "refundType": "ORIGIN_CHAIN",
+        "recipient": "6e696e767c99e2af662b3993ca01ab39dbb8f6d226a660a34b1436fcaea82249",
+        "recipientType": "DESTINATION_CHAIN",
+        "deadline": "2026-10-25T19:14:12.537Z"
+      },
+      "quote": {
+        "amountIn": "22273",
+        "amountInFormatted": "0.00022273",
+        "amountInUsd": "17.935110520000",
+        "minAmountIn": "22050",
+        "amountOut": "3900000000000000000000000",
+        "amountOutFormatted": "3.9",
+        "amountOutUsd": "17.628000000000",
+        "minAmountOut": "3900000000000000000000000",
+        "timeEstimate": 805,
+        "refundFee": "1900",
+        "withdrawFee": "0"
+      }
+    }
+  }
+}

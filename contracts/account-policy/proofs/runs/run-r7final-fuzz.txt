@@ -1,0 +1,309 @@
+Release 7 final (lib.rs c3bdaee8…b75a). cargo +nightly-2026-08-21 fuzz run, libFuzzer, one process per target. Contract event log lines (EVENT_JSON, printed by the mock) and libFuzzer NEW/REDUCE/pulse lines removed.
+
+=== recovery_seq: -max_total_time=2700 -max_len=193 -len_control=0, 8 seeds
+    Updating crates.io index
+ Downloading crates ...
+  Downloaded crypto-common v0.1.6
+  Downloaded near-sys v0.4.0
+  Downloaded generic-array v0.14.9
+  Downloaded near-sdk-env v0.1.8
+  Downloaded libfuzzer-sys v0.4.13
+  Downloaded rustix v1.1.6
+   Compiling account-policy-proofs v0.1.0 ($WORKDIR/wt-proofs-r7/contracts/account-policy/proofs)
+   Compiling account-policy-proofs-fuzz v0.0.0 ($WORKDIR/wt-proofs-r7/contracts/account-policy/proofs/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 37.21s
+warning: the following packages contain code that will be rejected by a future version of Rust: primitive-types v0.10.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.34s
+warning: the following packages contain code that will be rejected by a future version of Rust: primitive-types v0.10.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running `$WORKDIR/target-proofs/fuzz/aarch64-apple-darwin/release/recovery_seq -artifact_prefix=fuzz/artifacts/recovery_seq/ -max_total_time=2700 -max_len=193 -len_control=0 -print_final_stats=1 -rss_limit_mb=4096 $WORKDIR/target-proofs/corpus-recovery_seq`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 79430697
+INFO: Loaded 1 modules   (282258 inline 8-bit counters): 282258 [0x105baf040, 0x105bf3ed2), 
+INFO: Loaded 1 PC tables (282258 PCs): 282258 [0x105bf3ed8,0x1060427f8), 
+INFO:      762 files found in $WORKDIR/target-proofs/corpus-recovery_seq
+INFO: seed corpus: files: 762 min: 1b max: 193b total: 69527b rss: 53Mb
+#978	INITED cov: 5733 ft: 16424 corp: 507/42Kb exec/s: 489 rss: 501Mb
+#958935	DONE   cov: 5745 ft: 18283 corp: 755/63Kb lim: 193 exec/s: 355 rss: 570Mb
+###### Recommended dictionary. ######
+")\000\000\000\000\000\000\000" # Uses: 1297
+"\000\021" # Uses: 1248
+"|\000" # Uses: 1264
+"\005\000" # Uses: 1214
+"\037puk" # Uses: 1201
+"\252\252\252\252\252\252\252\012" # Uses: 1143
+"\377\377\000\377\000\000\377\377" # Uses: 1107
+"\000\000\000\000\000\000\000\000" # Uses: 1143
+"z\000\000\000" # Uses: 1157
+"\001\000\000\000\000\000\000\000" # Uses: 1136
+"\377\377\377d" # Uses: 1265
+"\002\000\000\000\000\000\000\000" # Uses: 1095
+"\001\000\000o" # Uses: 1181
+"\377\377\377_" # Uses: 1169
+"dlla" # Uses: 1155
+"\003\000" # Uses: 1143
+"\000\000\000`" # Uses: 1111
+"`c e" # Uses: 1084
+"\220\304\003\000 `\000\000" # Uses: 932
+"d\000\000\000" # Uses: 1050
+"\017\000\000\000\000\000\000\000" # Uses: 1012
+"d\000" # Uses: 1072
+"\000\006" # Uses: 1086
+"\000o" # Uses: 1067
+"\014\000" # Uses: 1030
+"\262\007\000\000" # Uses: 1003
+"c\000" # Uses: 1044
+"\315\000\000\000\000\000\000\000" # Uses: 989
+"\001\000\000\000\000\000\000\010" # Uses: 957
+"\377l" # Uses: 979
+"stem" # Uses: 1021
+"a\000" # Uses: 1020
+"\374\377\377\377" # Uses: 974
+"\377\377\377\375" # Uses: 983
+"\377\377\377\377\377\377\377\001" # Uses: 883
+"\003\000\000\000\000\000\000\000" # Uses: 873
+"lup " # Uses: 943
+"\000\000\000\000\000\000\000\314" # Uses: 868
+"\377\377\377\377\377\377\377/" # Uses: 926
+"k\000" # Uses: 984
+"\007\000\000\000\000\000\000\000" # Uses: 863
+"~\377\377\377\377\377\377\371" # Uses: 850
+"r\000" # Uses: 955
+"\200\000\000\000\000\000\000\003" # Uses: 846
+"\000\000\000a" # Uses: 900
+"\377\377aN\224\346\037\233" # Uses: 887
+"\377\377\377\377\377\377\006\241" # Uses: 882
+"\201\000\000\000\000\000\000\003" # Uses: 872
+"\000\000\000\013" # Uses: 799
+"b\000" # Uses: 835
+"\020\000" # Uses: 877
+"\377\377\377\377\377\377\377\000" # Uses: 773
+"e\000" # Uses: 853
+"\001\000\000\000\000\000\000\002" # Uses: 768
+"\217\3043\226\016b\000\000" # Uses: 752
+"\000\000\000\000\000\000\000\002" # Uses: 706
+"\377\377\377\377\377\377\377\015" # Uses: 691
+"o\000" # Uses: 789
+"o\000\000\000" # Uses: 740
+"\007\263" # Uses: 742
+"\014\000\000\000" # Uses: 732
+"\240\007\000\000\000\000\000\000" # Uses: 713
+"\377\377" # Uses: 674
+"{\000" # Uses: 695
+"\001\000\000\006" # Uses: 642
+"\000b" # Uses: 678
+"\377\377\377\377" # Uses: 631
+"\004\000\000\000\000\000\000\000" # Uses: 590
+"\371\377\377\377\377\377\377\177" # Uses: 613
+"\000\000\000\000" # Uses: 595
+"\013\252\252\252\252\252\252\252" # Uses: 540
+"\001\000\000m" # Uses: 567
+"_\000\000\000" # Uses: 607
+"\377k" # Uses: 591
+"\264\007\000\000\000\000\000\000" # Uses: 535
+"flla" # Uses: 566
+"\314\000\000\000\000\000\000\000" # Uses: 527
+"\000\000\000\000\000\000\000G" # Uses: 511
+"VUUUUUU\005" # Uses: 461
+"\007fffffff" # Uses: 452
+"\001\013" # Uses: 460
+"\000l" # Uses: 492
+"\313\000\000\000\000\000\000\000" # Uses: 419
+"\377b" # Uses: 356
+"\377\377\377\377\377\377\377\377" # Uses: 287
+"\000\000\000\000\000\000\007\241" # Uses: 301
+"\001\000\000{" # Uses: 310
+"\000\000\000\000\000\000\000\024" # Uses: 274
+"\000\000\000l" # Uses: 280
+"\001\000" # Uses: 275
+"\000\000" # Uses: 261
+"`\000\000\000" # Uses: 220
+"\263\007\000\000\000\000\000\000" # Uses: 223
+"\377\377\377m" # Uses: 194
+"\000\000\000{" # Uses: 212
+"\006\000\000\000" # Uses: 232
+"\377\377\377\377\377\377\377\023" # Uses: 204
+"\177\000\000\000\000\000\000\017" # Uses: 168
+"a\000\000\000" # Uses: 128
+"\000\000\007\263" # Uses: 162
+"z\000" # Uses: 123
+"\377\377\377l" # Uses: 130
+"\355\273\010\225Nb\000\000" # Uses: 125
+"\377\377\377\377\377\377\377F" # Uses: 95
+"\000a" # Uses: 80
+"\270\007\000\000\000\000\000\000" # Uses: 73
+"(\000\000\000\000\000\000\000" # Uses: 73
+"1\000\000\000" # Uses: 64
+###### End of recommended dictionary. ######
+Done 958935 runs in 2701 second(s)
+stat::number_of_executed_units: 958935
+stat::average_exec_per_sec:     355
+stat::new_units_added:          1989
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              570
+
+=== contract: -max_total_time=1200
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.25s
+warning: the following packages contain code that will be rejected by a future version of Rust: primitive-types v0.10.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.08s
+warning: the following packages contain code that will be rejected by a future version of Rust: primitive-types v0.10.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running `$WORKDIR/target-proofs/fuzz/aarch64-apple-darwin/release/contract -artifact_prefix=fuzz/artifacts/contract/ -max_total_time=1200 -print_final_stats=1 -rss_limit_mb=4096 $WORKDIR/target-proofs/corpus-contract-r7`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 394194631
+INFO: Loaded 1 modules   (283283 inline 8-bit counters): 283283 [0x103b8c4b0, 0x103bd1743), 
+INFO: Loaded 1 PC tables (283283 PCs): 283283 [0x103bd1748,0x104024078), 
+INFO:     1328 files found in $WORKDIR/target-proofs/corpus-contract-r7
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: seed corpus: files: 1328 min: 1b max: 1321b total: 93400b rss: 53Mb
+#1410	INITED cov: 6653 ft: 11576 corp: 951/74Kb exec/s: 0 rss: 184Mb
+	NEW_FUNC[1/2]: 0x0001037125a8 in _RINvNtCsk2huj1aWh2i_10serde_json4read20parse_unicode_escapeNtB2_9SliceReadEB4_+0x0 (contract:arm64+0x1011525a8)
+	NEW_FUNC[2/2]: 0x00010371413c in _RINvNtCsk2huj1aWh2i_10serde_json4read5errorNtB2_9SliceReadtEB4_+0x0 (contract:arm64+0x10115413c)
+	NEW_FUNC[1/1]: 0x0001035ba154 in _RNvNtCsk2huj1aWh2i_10serde_json4read19push_wtf8_codepoint+0x0 (contract:arm64+0x100ffa154)
+	NEW_FUNC[1/1]: 0x000102789fe4 in _RNvMs0_NtNtCsdzkpBoLOYV1_14near_vm_runner5logic11gas_counterNtB5_10GasCounter8pay_base+0x0 (contract:arm64+0x1001c9fe4)
+	NEW_FUNC[1/3]: 0x00010268648c in _RNvMs2_NtCs9dQht2zwync_8indexmap3mapINtB5_8IndexMapNtNtCsf228hWWFbBP_5alloc6string6StringNtNtCsk2huj1aWh2i_10serde_json5value5ValueE11insert_fullCs8KrDMZiu54K_21account_policy_proofs+0x0 (contract:arm64+0x1000c648c)
+	NEW_FUNC[2/3]: 0x0001037109d0 in _RINvMs6_NtCs5qgJFTIRvvF_9hashbrown3rawINtB6_8RawTablejE14reserve_rehashNCINvNtCs9dQht2zwync_8indexmap5inner8get_hashNtNtCsf228hWWFbBP_5alloc6string6StringNtNtCsk2huj1aWh2i_10serde_json5value5ValueE0EB2w_+0x0 (contract:arm64+0x1011509d0)
+	NEW_FUNC[1/2]: 0x0001036f2170 in _RNvMs4_NtCsf228hWWFbBP_5alloc7raw_vecINtB5_6RawVecINtNtB7_3vec3VecNtNtCsclxaf4T1n7b_20near_primitives_core5types7ShardIdEE8grow_oneCsapdXmNf8X7u_15near_primitives+0x0 (contract:arm64+0x101132170)
+	NEW_FUNC[2/2]: 0x0001036f4104 in _RNvMs5_NtCsf228hWWFbBP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsapdXmNf8X7u_15near_primitives+0x0 (contract:arm64+0x101134104)
+	NEW_FUNC[1/1]: 0x0001036a5014 in _RNvMs4_NtCsf228hWWFbBP_5alloc7raw_vecINtB5_6RawVecNtNtCs8KrDMZiu54K_21account_policy_proofs8contract5SpentE8grow_oneBQ_+0x0 (contract:arm64+0x1010e5014)
+#8058325	DONE   cov: 6898 ft: 13333 corp: 1560/194Kb lim: 4096 exec/s: 6709 rss: 203Mb
+###### Recommended dictionary. ######
+"\237\017\000\000" # Uses: 10723
+"\000\000\000\000\000\000\000\000" # Uses: 10537
+"\001\000\000\242\035\004\301\010" # Uses: 10520
+"r\000\000\000" # Uses: 10219
+"\000\000" # Uses: 10380
+"\376\377\377\377\377\377\377\377" # Uses: 9997
+"\011\000" # Uses: 10150
+"_\000\000\010" # Uses: 10288
+"\374\"A\010" # Uses: 10142
+"\017\000\000\000\000\000\000\000" # Uses: 9918
+"\001\000`\036\374\2246\020" # Uses: 9498
+"`\000" # Uses: 9623
+"455\275" # Uses: 9395
+"\004\000\000\000\000\000\000\000" # Uses: 9163
+"\013\016\016\016" # Uses: 9167
+"\377\377\377\001" # Uses: 9160
+"\000\004\000\013" # Uses: 9266
+"\377\377\377\377" # Uses: 9019
+"\377\377\377\377\377\377\377\377" # Uses: 8972
+"0\000\0000" # Uses: 9146
+"o\000\000\000" # Uses: 9126
+"c\000" # Uses: 8953
+"\000\275" # Uses: 9059
+"\001\000\000\000\000\000\000\024" # Uses: 8541
+"\005\000\000\000\000\000\000\000" # Uses: 8504
+"D\000\000\000\000\000\000\000" # Uses: 8359
+"\001\000\002\321\215\367[\362" # Uses: 8335
+"{\000" # Uses: 8365
+"|\000" # Uses: 8013
+"\000\000\000F" # Uses: 7974
+"\000\000\020\000\000\000\000\000" # Uses: 7776
+"\203\001\000\000\000\000\000\000" # Uses: 7798
+"\377\377\377\377\377\377\377\004" # Uses: 7910
+"\001\000\000\000" # Uses: 7840
+"\003\000" # Uses: 7849
+"}\003\000\000" # Uses: 7833
+"\001\000\000\000\000\000\000\001" # Uses: 7504
+"\237\017" # Uses: 7709
+"|\000\000\000" # Uses: 7626
+"\017\005" # Uses: 7423
+"\003\000\000\000" # Uses: 7213
+"m\000" # Uses: 7401
+"\002\000\000\000\000\000\000\000" # Uses: 7097
+"\001\231\231\231\231\231\231\231" # Uses: 7219
+"J\000\000\000\000\000\000\000" # Uses: 7257
+"\001\000\000\000\000\000\000\010" # Uses: 7147
+"\000\000\000m" # Uses: 7009
+"\003\000\000\000\000\000\000\000" # Uses: 6674
+"z\000\000\000" # Uses: 6756
+"\000\000\000{" # Uses: 6674
+"\000l" # Uses: 6777
+"\000\000\000\000" # Uses: 6602
+"\010\000\000\000\000\000\000\200" # Uses: 6596
+"\001b" # Uses: 6669
+"\004UUUUUUU" # Uses: 6266
+"\264\263\263\377" # Uses: 6473
+"\001\000?\000" # Uses: 6331
+"a\000" # Uses: 6388
+"z\000" # Uses: 6294
+"\001e" # Uses: 6327
+"\000\000\000e" # Uses: 5919
+"\016\016\014\016" # Uses: 6128
+"\3779" # Uses: 6081
+"\001\000\000\000\000\000\000\000" # Uses: 5780
+"\376\377\377\377" # Uses: 5787
+"\001\000\000\000\000\000\000\011" # Uses: 5623
+"\377\262\001\006" # Uses: 5711
+"\001\000" # Uses: 5834
+"\000\000\000\000\000\000\000\004" # Uses: 5553
+"\020\240" # Uses: 5895
+"UVV\001" # Uses: 5733
+"\001\000\000\000\000\000\000\003" # Uses: 5506
+"kh__" # Uses: 5686
+"\215s\232/\202\000\000\000" # Uses: 5411
+"\016\016\016\016" # Uses: 5124
+"\001`" # Uses: 5111
+"\0033333333" # Uses: 4727
+"\014\000\000\000\000\000\000\000" # Uses: 4759
+"\006\000" # Uses: 4654
+"\000\374\000-" # Uses: 4504
+"\332IT\363\260\000\000\000" # Uses: 4388
+"\\\000" # Uses: 4303
+"_\000" # Uses: 4495
+"{\000\000\000" # Uses: 4349
+"`\000\000\000" # Uses: 4231
+"\001\000\000\000\000\000\000\033" # Uses: 4014
+"\377\377\377\377\377\377\377\376" # Uses: 3977
+"\001\014" # Uses: 3827
+"\206r\245a\251\214\003\000" # Uses: 3573
+"\021\377\377\377" # Uses: 3619
+"\007\000\000\000\000\000\000\000" # Uses: 3617
+"\000`" # Uses: 3479
+"\000\000\017\240" # Uses: 3433
+"2333333\003" # Uses: 3233
+"\377\377\377_" # Uses: 3160
+"\366\367[\003" # Uses: 3183
+".\000\000\000\000\000\000\000" # Uses: 3047
+"\377\377`.\222\204\205\323" # Uses: 3038
+"\001\000\000e" # Uses: 2739
+"\377_" # Uses: 2860
+"\016\377\377\377" # Uses: 2863
+"\007\001\263\000" # Uses: 2813
+"a\000\000\000" # Uses: 2769
+"\000\000\000\000\000\000\000{" # Uses: 2574
+"\001\000\000\000\000\000\000H" # Uses: 2454
+"\000\353" # Uses: 2348
+"/\000\000\000" # Uses: 2359
+"b\000" # Uses: 2194
+"\377z" # Uses: 2181
+"\001\000\000c" # Uses: 2204
+"\000\000\001\255b\262\334\023" # Uses: 2086
+"m\000\000\000" # Uses: 2121
+"h\000\000\000" # Uses: 2027
+"\3610\205\222\256`\000\000" # Uses: 1705
+"\035\000\000\000\000\000\000\000" # Uses: 1479
+"\011\012z\000" # Uses: 1304
+"\364TI\332" # Uses: 1345
+"\001\000\000\000\000\000\000\016" # Uses: 1075
+"\001\000\000\000\000\000\001w" # Uses: 629
+"\000\000\000`" # Uses: 578
+"\031\000\000\000\000\000\000\000" # Uses: 526
+"\377z\001\312" # Uses: 424
+"\255\255\322\012" # Uses: 89
+###### End of recommended dictionary. ######
+Done 8058325 runs in 1201 second(s)
+stat::number_of_executed_units: 8058325
+stat::average_exec_per_sec:     6709
+stat::new_units_added:          5395
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              203
+
+=== planted-bug controls (scratch copy, PROOFS_SKIP_PIN, same seeds, -max_total_time 90-120 s each)
+C1 finish_recovery ignores the device of age -> R7 state machine: finished before the fallback with no yes from the device of age
+C2 plain refuse_recovery without freeze -> R7 state machine: a plain refusal did not freeze for the floor: None
+C3 cancel_recovery forgets stop_asked -> R7 state machine: a second stop of one recovery
+C4 approve_recovery ignores ready_at -> R7 state machine: approve_recovery accepted: key 9, wrong key/time bits 2
+C5 device removal waits only the floor -> R7 state machine: a removal waits 259200000000000 < 604800000000000 (device of age: true)

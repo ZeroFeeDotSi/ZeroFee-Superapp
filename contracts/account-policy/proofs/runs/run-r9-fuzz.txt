@@ -1,0 +1,333 @@
+Release 9 FUZZ ROUND, 1 Nov 2026 (times are the machine clock). THE SOURCE OF RECORD is tag r9-frozen-3 (commit 5eab317d): lib.rs
+e83ec614796ce334b1f8ce6515c9aaf80b8d70531d7a642d651762f2fc8eec5e, tests.rs fffb90b4924ee673873618d5c1631d4feb2c4fafa9d4bc5880c4c24ecb5a7956,
+both pinned in proofs/build.rs and checked by the build (no PROOFS_SKIP_PIN) of every counted binary. Three frozen tags passed
+through this round:
+  r9-frozen   (lib 1e8736ad…10f1, tests 0831c959…8a07)  -> r9-frozen-2 (508ab66d: tests.rs comment only, lib unchanged)
+  -> r9-frozen-3 (5eab317d: lib e83ec614…ec5e, the fixes of RT3 (red team) and RT3-b (this round's oracle), section 6).
+Sections 4, 5 and 7 ran on r9-frozen-3; section 7 is the counted campaign. Nothing on r9-frozen / r9-frozen-2 counts
+(section 3).
+cargo +nightly-2026-08-21 fuzz {build,run}, libFuzzer, target dirs in a scratch directory (never the worktree's), the frozen
+source archived from the tag (git archive) into that scratch directory, with the harness files of this round put in
+(proofs/src/fuzz_api.rs, proofs/fuzz/fuzz_targets/*.rs: harness code; src/lib.rs and src/tests.rs never edited). One fuzz
+process at a time (the box was shared with Kani, mutants, the checker and the sandbox red team; exec/s figures are under
+that load). Contract EVENT_JSON lines and libFuzzer NEW/REDUCE lines are left out: summaries and stat lines only.
+
+Commands (from contracts/account-policy/proofs/fuzz):
+  cargo +nightly-2026-08-21 fuzz build --target-dir <scratch>/target-fuzz3
+  …/release/recovery_seq_wide -max_total_time=5460 -max_len=259 -len_control=0 -print_final_stats=1 -rss_limit_mb=4096 <corpus>
+  …/release/contract -max_total_time=<s> -print_final_stats=1 -rss_limit_mb=4096 <corpus>
+  …/release/recovery_seq -max_total_time=<s> -print_final_stats=1 -rss_limit_mb=4096 <corpus>
+Controls: a scratch copy per control, PROOFS_SKIP_PIN=1, a control-only target dir, -max_total_time=300 (section 5).
+
+=== 1. What changed in the harness (release 9)
+
+All three targets compile and are correct on release 9:
+- fuzz_api: upgrade_check takes (from_version, code_hash); the RS-2 literal gas price is 1_000_000_000 yocto/gas (W_GAS_PRICE
+  in fuzz_api, the literal in contract.rs sub-target 0; was 2e8); SEQ_KEYS carries the finishing marker and the release list.
+- recovery_seq (release 7's target, its oracle unchanged): finish_recovery now only adds the new key, so the target delivers
+  its callback on_recovery_key(new_key, ready_at_ns, asked_at_ns) at once with the add Successful (release 7's one-step
+  world); its oracle then checks the finished state exactly as before.
+- contract: the gas price literal; drive_upgrade_migration calls upgrade_check(6, None).
+- recovery_seq_wide (drive_recovery_wide), widened. Input: 3 config bytes, then up to 64 operations of 4 bytes (kind, signer,
+  argument, extra); max_len 259. New in the start state: an UNSEALED phone list (an older account: keys learned as phones),
+  release 0 on the account's list or not, device 9's key missing on NEAR (a release-7 account, FB-3's repair case).
+  Signers: 10 (round 8's 9 plus the waiting or finishing recovery's new key). Operations: 18 kinds (round 8's 17, with:
+   4 finish_recovery: its add's outcome is the op's top bit (the storage edge) or NEAR's own rule (an add of a key that
+     exists fails); the callback is scheduled, not run;
+  14 a callback, delivered at any later moment, after any other calls (the phone's stop, a device's refusal, a co-signed
+     removal of the yes-device, new words, another finish...): FB-3's on_second_device_key or release 9's on_recovery_key,
+     with the outcome its receipt had; or (extra bit 6) a finish's callback LOST (it ran out of its reserved gas: nothing it
+     does happens). Any callback may come next, but one key's callbacks come in the order made;
+  15 upgrade of a listed / unlisted / asked-for release (three hashes), or upgrade_check(6/7/8/9, with or without a hash);
+  17 refill_recovery_key from any signer; AllowRelease and Upgrade run / approve / decline / cancel through ops 5-8.)
+- A model of NEAR's access keys: every receipt of every accepted call is replayed in the order made, all or nothing (a
+  delete of a missing key or an add of a present key fails the receipt), a callback's receipt with the outcome the fuzzer
+  chose; each key carries its method set (phone / second device / words, read from the literal method names).
+
+The shadow oracle's NEW rules (literals only, never the contract's helpers), on top of every release-7/8 rule (kept):
+- R8-RS1: finish_recovery deletes nothing but its own new key (RT3's fix) and a stale finish's key (RT3-b's fix), adds the
+  new key with the phone's methods, schedules exactly one callback for (key, ready_at, now), and changes no state; the
+  shadow's phone, devices, list, recovery and freeze do not move until the callback; old phone keys deleted by anything but
+  a callback that saw the add succeed = "the phone's key was deleted while it is the phone"; after a failed add the
+  callback makes no receipt and changes nothing (the old phone still acts, the recovery still waits); the callback
+  completes the recovery iff the add succeeded AND the same recovery (key, ready_at) still waits AND it may finish by the
+  oracle's own rule (delay, fallback, a device of age's yes); a succeeded add for a recovery that did not finish deletes
+  exactly the new key, unless a role holds it; a callback whose finish was superseded (another asked_at on record) does
+  nothing at all; a second finish within the hour is refused, and liveness: the words' finish of a due recovery (no finish
+  asked less than an hour ago) succeeds;
+- RT3: a finish's add fails only at the storage edge, never because its key is already on NEAR;
+- NEAR's keys follow the records (receipts replayed): the account always keeps a phone key on NEAR with the phone's
+  methods; the words' key is on NEAR with the words' methods; every recorded device's key is on NEAR as a device (but one
+  whose add's callback is still on its way); a role's key never carries another role's methods; and a key on NEAR with no
+  role (a lost finish's key, an unrecorded device's: O-r9-2) must be refused by the contract's own gate for its methods
+  (device_gate / second_device_gate / words_gate, probed after every call);
+- the new key never acts as the phone before its recovery completed: an owner method accepted from it is a violation, and
+  after every call the device gate is PROBED (on a copy) with the waiting / finishing recovery's key (must refuse) and with
+  the current phone (must accept, also while finishing and after a failed add);
+- allowlist: upgrade(h) places AllowRelease{h, now} unless h is listed or an AllowRelease for h waits (then Upgrade); the
+  list only grows when an AllowRelease runs co-signed by a device of age or at >= asked + max(fallback, floor), keeps at
+  most 4 (oldest out), and is set to [h] / [] by upgrade_check; an Upgrade runs only for a listed hash; a switch
+  (UseGlobalContract) is emitted only by an Upgrade's run, only for a listed hash, with upgrade_check's arguments
+  {"from_version": 9, "code_hash": h}; the contract's list cell equals the shadow's after every call;
+- upgrade_check(from, h): never refused, changes no policy state, renews every recorded device's key (delete-and-add) iff
+  from < 9, makes no receipt from 9;
+- refill_recovery_key: accepted only from a recorded second device of age while words exist, and then exactly one receipt
+  that deletes and re-adds the words' key with the words' methods, no state change; liveness: such a device's refill succeeds;
+- an unsealed list learns a phone exactly when the contract's gate would (not a device, not the words, not the recovery's
+  or finishing key, fewer than 8 keys), and the finish seals it.
+
+=== 2. Seeds
+28 hand-written scenario seeds (s01-s27, s02b): the finish with a yes and a successful add; a failed add then the old phone
+acting and a retry; the phone's stop, a device's refusal, new words, a co-signed removal of the yes-device, each between a
+finish and its callback; two finishes (retry after the hour); a lost callback then a retry (RT3) and a lost callback, a
+stop, a new recovery and its finish (RT3-b); an unsealed list with the finishing key trying to act; AllowRelease co-signed /
+alone after the fallback / an Upgrade asked before its release is listed; upgrade_check variants; refills from every signer;
+FB-3 adds failed / refilled / missing; the RK sequence; spends on mixed bands; a young yes then a start; round 8's R8-F1
+probe re-encoded. The counted campaign's corpus: these 28 plus the units the earlier (uncounted) runs added.
+
+=== 3. Runs that do NOT count (earlier sources, harness faults, external stops); the harness was fixed, never the contract
+
+- 10:09 smoke, recovery_seq_wide 2 min on r9-frozen (lib 1e8736ad…): 19,919 sequences, 164/s, cov 9,428, no violation.
+- 10:11:37-10:13:01 first wide campaign on r9-frozen-2, stopped after 84 s (11,196 sequences) by the oracle:
+  "no phone key on NEAR: phones [7, 12, 5], NEAR {4: Words}". H-r9-1 (HARNESS): on an unsealed list the harness let keys
+  that were never on NEAR sign and be learned as phones (the contract can't tell), then the legitimate run of a removal of
+  key 1 left the model with no phone key. Fixed: a key learned as a phone stands for an older phone key on NEAR (put on the
+  model when learned); a key that was on NEAR and is gone signs nothing (the op is skipped).
+- 10:16:13-10:16:18 second attempt (750 sequences): "key 5 is on NEAR as Phone with no such role". H-r9-1, second form: the
+  model learned the key AFTER replaying the call's receipts, so a learned key that ran its own removal came back. Fixed:
+  learned before the receipts.
+- 10:20 the lead stopped the campaign on r9-frozen-2 (RT3, section 6); nothing of this round was running. The harness gained
+  the lost-callback operation, the RT3 rule and the orphan-key gate probe (section 1); on r9-frozen-2 the RT3 seed
+  reproduces RT3, and the RT3-b seed found RT3-b (section 6).
+- 10:38 H-r9-2 (HARNESS), seen on a replay against the in-progress r9-frozen-3 lib: the mock numbers a callback's
+  dependency by promise index, not by its place in the receipt list; once the finish chained its add after a delete the
+  mapping was one off and the model treated the add as an ordinary receipt. Fixed: a callback's own receipt is the one the
+  contract made just before it (every callback here is made right after the receipt it waits on); a callback with more than
+  one dependency is reported.
+- 10:40-10:43 smoke, 150 s on that lib (byte-identical to r9-frozen-3's, e83ec614…, built with PROOFS_SKIP_PIN before the tag
+  existed): 27,994 sequences, cov 9,892, no violation.
+- EXTERNAL STOP: the session stopped at the account's usage limit after 10:47 (the pinned r9-frozen-3 build had just
+  finished) and resumed at 14:51. No fuzz process was running during it, and nothing before 14:52 counts.
+
+=== 4. On r9-frozen-3, STOPPED and NOT counted: the first wide campaign (14:52:00-15:45:18, 53 min)
+One process, -max_total_time=5460, corpus 2,050 units (the 28 seeds plus earlier runs' units):
+#2702	INITED cov: 9890 ft: 41287 corp: 1337/174Kb exec/s: 87 rss: 634Mb
+stat::number_of_executed_units: 566337
+stat::average_exec_per_sec:     177
+stat::new_units_added:          3965
+stat::peak_rss_mb:              1053
+Stopped after 3,198 s (566,337 sequences) by the oracle: "key 10 is on NEAR as Dev with no such role (role None)". The rule
+that fired is stricter than the security property, so it was relaxed and the 90 minutes restarted (section 7).
+Decoded (all at one moment, in the setup window, no second device at the start):
+  device 10 added at once, its add failing at the storage edge (callback C1 waits); the phone refills 10 while it is still
+  recorded (the batch's delete fails: the key is missing; callback C2, a failed refill, waits); C1 runs and unrecords 10;
+  the phone adds 10 again, failing (C3), and refills it (C4); the OLD C2 runs now: 10 is recorded again, so it adds the
+  key alone; C3 unrecords 10. Key 10 is left on NEAR with the second device's method list and no record.
+O-r9-2 (Informational, no defect): FB-3's refill callback can't tell a re-recorded device from the one it was made for.
+The orphan key holds only the second-device method list (NEAR lets it call nothing else), and second_device_gate refuses
+it, so it can approve or refuse nothing; it costs storage only. It needs the phone's own calls to land between callbacks
+of one key. Harness change: a key on NEAR with no role is allowed only while the contract's gate for its methods refuses it
+(device_gate for the phone's methods, second_device_gate for a device's, words_gate for the words'), probed after every call.
+
+=== 5. Planted-bug controls on r9-frozen-3 (the oracle can fail for the reasons that matter)
+
+Each control: a scratch COPY of the r9-frozen-3 crate (src, proofs/{Cargo.toml, build.rs, src}, proofs/fuzz/{Cargo.toml,
+fuzz_targets}) with ONE planted bug in its src/lib.rs (every replacement asserted to match exactly once), PROOFS_SKIP_PIN=1,
+built into a control-only target dir with the FINAL harness (section 1, after O-r9-2's change), fuzzed with the campaign's
+flags, cap 300 s, (a) from the 28 seeds; (b) the release-9 controls also from NO seeds (as time allowed, section 5b).
+(A first pass of all 26 + 2 on the harness before O-r9-2's change, 15:45-15:47, caught every one too, with the same
+messages but W1's; it is superseded by this pass, 16:13-16:14.)
+
+| ctl      | planted bug (lib.rs copy)                                                         | (a) from the 28 seeds |
+|----------|-----------------------------------------------------------------------------------|-----------------------|
+| RT3rev   | finish_recovery's add is a plain add again (no delete first: RT3's fix reverted)    | caught, 2 s, on a seed |
+| RT3b     | a finish over a stale record of another key no longer deletes that key (RT3-b's fix) | caught, 1 s, on a seed |
+| ASKED    | the callback no longer checks asked_at_ns (any callback for the key acts)           | caught, 1 s, on a seed |
+| RS1rev   | finish_recovery completes at once again (release 8's one-receipt finish: the old    | caught, 1 s, on a seed |
+|          | keys deleted and the list sealed regardless of the add)                            |                       |
+| CBres    | the callback ignores the add's result (`if same && …`)                              | caught, 2 s, on a seed |
+| CBsame   | the callback skips the same-recovery check (`if added && …`)                        | caught, 2 s, on a seed |
+| CBblock  | the callback skips the finish_blocker re-check (`if added && same`)                 | caught, 1 s, on a seed |
+| GATEfin  | device_gate lets the finishing key act (the finishing_key_is check removed)         | caught, 3 s, on a seed |
+| ALLOW    | finish(AllowRelease) without the co-sign / fallback check                           | caught, 1 s, on a seed |
+| UPGlist  | finish(Upgrade) without release_allowed                                             | caught, 2 s, on a seed |
+| REFage   | refill_recovery_key without the age check                                           | caught, 1 s, on a seed |
+| FINretry | a second finish within the hour allowed                                              | caught, 2 s, on a seed |
+| KIUfin   | key_in_use without the finishing key                                                 | caught, 1 s, 229 execs (mutation) |
+| C1       | finish_blocker ignores the device of age                                             | caught, 2 s, on a seed |
+| C2       | a plain refuse_recovery ends with end_recovery(false): no freeze                     | caught, 1 s, on a seed |
+| C3       | cancel_recovery no longer stores stop_asked                                           | caught, 2 s, on a seed |
+| C4       | approve_recovery checks the key only, not the finish time                            | caught, 2 s, on a seed |
+| C5       | a device of age's removal waits only the floor                                       | caught, 2 s, on a seed |
+| RK       | RemoveKey's run-time backup-key re-check deleted                                     | caught, 1 s, on a seed |
+| RS1      | execute's 250 Tgas total check deleted                                               | caught, 2 s, on a seed |
+| RS2      | gas counted as NEAR only for non-standard methods (the release-7 rule)              | caught, 5 s, on a seed |
+| FB3a     | the FB-3 callback forgets the device on a failed REFILL                              | caught, 3 s, on a seed |
+| FB3b     | the FB-3 callback does nothing on a failed add                                       | caught, 1 s, on a seed |
+| FB3c     | the FB-3 callback deletes the key on a failed add                                    | caught, 3 s, on a seed |
+| W1       | a YOUNG device's yes recorded as its co-sign                                         | caught, 14 s, 4,131 execs (mutation) |
+| F1       | R8-F1's fix removed (the finish's drop of removals of the new key, and RemoveKey's   | caught, 2 s, on a seed (the R8-F1 probe) |
+|          | refusal of the recovery's new key and of the only phone key)                       |                       |
+| RS1/contract | as RS1, on `contract` (sub-target 5), from no seeds                              | caught, 13 s, 29,800 execs |
+| RS2/contract | as RS2, on `contract` (sub-target 0, shaped coin calls), from no seeds           | caught, 3 s, 737 execs |
+So 28 of 28 planted bugs are caught by the oracle on r9-frozen-3 copies, all within 15 s.
+Messages as reported (wide target):
+ RT3rev   "RT3: the finish's add of key 5 fails (the key is already on NEAR: Some(Phone)), so this recovery can never complete"
+ RT3b     "RT3-b: a finish over a stale one (key 5) did not delete the stale key"
+ ASKED    "a superseded finish callback (key 5, asked 950400) acted: [… Del(1) …]"   (a late callback finished under a retry)
+ RS1rev   "finish_recovery deleted a key other than its new one (or a stale finish's) before its add was seen"
+ CBres    "the finish's callback (add ok false, same true) changed the state with no finish"
+ CBsame   "the finish's callback for an unfinished recovery deleted [1] (key 5, role false)"   (finished a stopped recovery)
+ CBblock  "the finish's callback (add ok true, same true) changed the state with no finish"   (the yes-device removed meanwhile)
+ GATEfin  "the new key 5 passes the device gate before its recovery completed"   (unsealed list, the stop while finishing)
+ ALLOW    "the release list grew by 2 with no co-sign, 172800 s after it was asked (owed 604800 s)"
+ UPGlist  "an upgrade to release 2, which is not on the list [], ran"
+ REFage   "refill_recovery_key accepted from key 10 (device true, aged false)"
+ FINretry "a second finish 0 s after the first, under the hour"
+ KIUfin   "a recovery to key 5, already on the account (or finishing)"
+ C1 "finished before the fallback with no yes from a device of age"; C2 "freeze differs after op 2: contract None, oracle
+ Some(1296000000000000)"; C3 "stop_asked differs after op 3: oracle true"; C4 "approve_recovery accepted: key 9 (aged true),
+ wrong key/time bits 2"; C5 "RemoveKey(9) waits 172800000000000 < 604800000000000 (…)"; RK "RK: the removal of key 12 ran
+ while it is the backup key"; RS1 "RS-1: execute accepted steps with gas [200000000000000, 200000000000000]"; RS2 "a spend
+ ran at once below its band: Wait { seconds: U64(7200) } (near 2e23+1, usdc 1)" (the 1-unit ft_transfer_call at 200 Tgas
+ is now 0.2 NEAR of gas at 1e9); FB3a "FB-3: a failed refill removed device 9"; FB3b "FB-3: device 9 is still recorded
+ after its add failed"; FB3c "FB-3: the callback (failed true, refill false) deleted a key"; W1 "the release list grew by 1
+ with no co-sign, 259200 s after it was asked (owed 604800 s)" (a young device's yes counted as the co-sign of an
+ AllowRelease); F1 "waiting requests differ after op 14: contract [1], oracle []" (the finish's callback kept the removal).
+
+--- 5b. The release-9 controls from NO seeds (empty corpus, cap 300 s, the second process beside the campaign,
+    run while time allowed, in this order)
+ RT3rev: NOT caught in 302 s (57351 execs)
+ RT3b: NOT caught in 301 s (44907 execs)
+ ASKED: NOT caught in 302 s (59954 execs)
+ RS1rev: NOT caught in 301 s (56360 execs)
+ CBres: NOT caught in 302 s (57279 execs)
+ CBsame: NOT caught in 301 s (63520 execs)
+ CBblock: NOT caught in 302 s (69929 execs)
+ GATEfin: CAUGHT 214 s, #56465 execs: R9 wide state machine: key 13 is on NEAR as Dev with no such role (role Some(Phone))
+ ALLOW: CAUGHT 57 s, #19083 execs: R9 wide state machine: the release list grew by 0 with no co-sign, 457218 s after it was asked (owed 777600 s)
+ UPGlist: NOT caught in 301 s (79519 execs)
+ REFage: CAUGHT 12 s, #6120 execs: R9 wide state machine: refill_recovery_key accepted from key 10 (device true, aged false)
+ FINretry: NOT caught in 301 s (79586 execs)
+ KIUfin: CAUGHT 255 s, #66974 execs: R9 wide state machine: set_recovery_key(5) accepted for a key in use
+ Reading: ALLOW, REFage and KIUfin are found from nothing (their inputs run CLEAN on the real r9-frozen-3 build).
+ GATEfin's catch from nothing is NOT a catch of its bug: the same input fails on the real build too. It is harness
+ fault H-r9-3 (found 17:09, NOT fixed in this round): on an unsealed list, an unrecorded device key left on NEAR by an
+ FB-3 interleaving (O-r9-2) signs an owner method and is learned as a phone; on NEAR that key holds only the second
+ device's methods, none of which reaches the device gate, so the input is impossible. The counted campaign did not
+ stop on it until 87 min 31 s (section 7). The finish / callback / allowlist-run controls need 5-12-call sequences (a recovery, its delay,
+ a finish, a callback after a stop or a lost one...) that random search does not reach in 5 min from nothing; the
+ campaign's power on them rests on the 28 seeds in its corpus (they are, and each such control is caught on them).
+
+=== 6. Findings on the earlier release-9 sources (both FIXED in r9-frozen-3)
+
+RT3 (the sandbox red team's; reproduced independently by this oracle on r9-frozen-2, seed s25). Low/Medium, liveness. A
+finish whose add of the new key succeeded but whose callback never ran (it can run out of its reserved gas) leaves the key
+on NEAR; the words' retry an hour later adds it again, NEAR refuses an add of a key that exists, and the recovery can never
+complete. Sequence: words start_recovery(K5); the delay; finish_recovery (K5 added); the callback is lost; finish again
+(refused under the hour); +1 h; finish again. The oracle: "RT3: the finish's add of key 5 fails (the key is already on
+NEAR: Some(Phone)), so this recovery can never complete". Input (hex, seed s25):
+  000010 00010000 10000700 04010000 0e000040 04010000 10000100 04010000 0e000000 0d000000
+Fixed in r9-frozen-3: the finish deletes the new key in a receipt of its own, then adds it in a receipt chained after the
+delete (add_after_delete), then the callback; the callback carries asked_at_ns and acts only for the finish on record.
+
+RT3-b (found by THIS round's widened oracle on r9-frozen-2, from a hand-written seed written while reading RT3, not by a
+fuzzing run; reported to the lead 10:22). Low, theoretical (needs a callback that runs out of its 30 Tgas, and an UNSEALED
+phone list, i.e. an account that has never finished a recovery). Sequence (seed s26):
+  unsealed list, no second device, words 4.
+  1 words: start_recovery(K5); the delay; finish_recovery -> K5 added to NEAR with the phone's methods
+  2 the callback is lost: the finishing record (K5) stays
+  3 phone: cancel_recovery -> with no device of age the recovery ends at once
+  4 words: start_recovery(K6); the delay + 1 h; finish_recovery -> the record is replaced by K6's
+  5 K5 now holds no role and is no recovery's key, but it is on NEAR with the phone's methods, and the device gate of an
+    unsealed list LEARNS it as a phone: "key 5, on NEAR with the phone's methods from a finish whose callback never ran,
+    passes the device gate though no recovery to it completed".
+  So whoever chose K5 (the words' holder) gets a phone after the phone stopped that recovery. On a sealed list the gate
+  refuses it (an orphan key only). Input (hex, seed s26):
+  002010 00010000 10000700 04010000 0e000040 03000000 00010100 10000700 10000100 04010000 0e000000 0d090000 0d050000
+Fixed in r9-frozen-3: a finish that replaces a stale record of ANOTHER key deletes that key first (its own receipt).
+On r9-frozen-3 both seeds run clean (the stale key is deleted; the retry's delete-then-add succeeds and its callback
+completes the recovery), and the controls RT3rev / RT3b / ASKED (section 5) put each fix back out.
+
+Observation O-r9-1 (comment only, no defect): src/lib.rs line 1753, in `moves`, still says gas counts "at twice NEAR's
+lowest gas price"; the constant GAS_PRICE_COUNTED (line 141) and its doc and the header say ten times (1e9), which is what
+the code does and what the oracle checks.
+
+=== 7. THE COUNTED CAMPAIGN: recovery_seq_wide on r9-frozen-3 (the final harness, pin checked by the build)
+
+--- 15:47:14-17:14:45, ONE process, -max_total_time=5460, corpus: the 28 seeds plus every unit earlier runs added
+    (4,816 units given, merged at start)
+#6441	INITED cov: 10171 ft: 45646 corp: 2140/274Kb exec/s: 222 rss: 727Mb
+stat::number_of_executed_units: 928508
+stat::average_exec_per_sec:     176
+stat::new_units_added:          3297
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              1025
+wall 5251 s; maximum resident set size 1025 MB (/usr/bin/time -l)
+last pulse before the stop: #524288 cov: 10227 ft: 46851 corp: 2441/311Kb exec/s: 161 rss: 969Mb
+STOPPED at 5,251 s (87 min 31 s, 928,508 sequences) by: R9 wide state machine: key 9 is on NEAR as Dev with no such role (role Some(Phone))
+This is harness fault H-r9-3 (section 5b), not a contract defect: the config (cfg[1] = 0xa4) is an UNSEALED list; an FB-3
+interleaving left device key 9 on NEAR unrecorded (O-r9-2), and at op 51 key 9 signed remove_key, an owner method, and
+the gate learned it as a phone. On NEAR key 9 holds only the second device's methods (approve, decline,
+approve_recovery, refuse_recovery, refill_recovery_key), so it cannot call remove_key at all: the input is impossible.
+Result: 87 min 31 s, 928,508 sequences (each up to 64 calls), 176/s, peak 1,025 MB: no violation of any contract rule, no
+crash, no timeout, no OOM, then the stop above. HONESTLY: this is SHORT of the 90 minutes asked (the stop came at 17:14;
+the hand-back is 17:30, so neither a fix of H-r9-3 nor a fresh 90 minutes fitted). The 53 minutes of section 4 (same
+source, the stricter orphan rule) were also clean of every contract rule; neither run is a full 90-minute run.
+
+--- contract on r9-frozen-3 (15:47:13-16:02:15, the second process beside the campaign; from an EMPTY corpus: round 8's
+    corpus was deleted at its clean-up)
+#2	INITED cov: 4238 ft: 4237 corp: 1/1b exec/s: 0 rss: 115Mb
+#5202829	DONE   cov: 7325 ft: 15891 corp: 2063/357Kb lim: 4096 exec/s: 5774 rss: 378Mb
+stat::number_of_executed_units: 5202829
+stat::average_exec_per_sec:     5774
+stat::new_units_added:          8809
+stat::peak_rss_mb:              378
+Result: 15 min 01 s, 5,202,829 executions, 5,774/s, 7,325 coverage edges, corpus 2,063, peak 378 MB: no crash, no RS-1 /
+RS-2 (at 1e9 yocto a gas) / check_steps / decode / migration (upgrade_check(6, None)) failure. Six sub-targets share it.
+
+--- recovery_seq (release 7's target; its oracle unchanged, the finish's callback delivered at once) on r9-frozen-3
+    (16:02:15-16:12:17, second process, from an EMPTY corpus)
+#2	INITED cov: 166 ft: 166 corp: 1/1b exec/s: 0 rss: 53Mb
+#305078	DONE   cov: 6617 ft: 20139 corp: 1056/61Kb lim: 652 exec/s: 507 rss: 585Mb
+stat::number_of_executed_units: 305078
+stat::average_exec_per_sec:     507
+stat::new_units_added:          1623
+stat::peak_rss_mb:              585
+Result: 10 min 02 s, 305,078 sequences, 507/s, 6,617 edges, corpus 1,056, peak 585 MB: no violation (release 7's space
+still clean on release 9).
+
+=== 8. Verdict
+On the release-9 source of record (r9-frozen-3, lib e83ec614…ec5e): the widened recovery / approval / spending / upgrade
+state machine ran 87 min 31 s (928,508 sequences) in the counted campaign before harness fault H-r9-3 stopped it
+(short of the 90 minutes asked; plus 53 min, 566,337 sequences, in the stopped first run), plus 15 min of `contract` (5,202,829 executions) and 10 min of release 7's `recovery_seq`
+(305,078 sequences): no violation of any contract rule, no crash. The oracle has teeth on this source: 28 of 28 planted bugs caught (26 on the
+wide target, 2 on `contract`), every one within 15 s from the seeds, among them RS1-revert (release 8's one-receipt finish),
+RT3-revert, RT3-b-revert and the callback's asked_at check removed.
+Findings of this round on the earlier release-9 sources, both fixed in r9-frozen-3 and held there (seeds clean, controls
+caught): RT3 (the red team's; reproduced independently by this oracle) and RT3-b (this oracle's, from a hand-written seed,
+Low / theoretical). Harness faults: H-r9-1 (fixed) (learned phones in an unsealed list must be keys on NEAR; two
+forms), H-r9-2 (the mock's callback dependency numbering); H-r9-3 (an impossible input: an unrecorded device's key
+learned as a phone on an unsealed list; found by a control's run at 17:09 and it then stopped the counted campaign at
+87 min 31 s; NOT fixed: the fix is to let a key act as the phone in the model only if NEAR holds it with the phone's methods). Observations: O-r9-1 (a stale comment on the gas price),
+O-r9-2 (an FB-3 interleaving can leave an unrecorded device key on NEAR that no gate lets act: storage only).
+
+Limits of the oracle, honestly:
+- the space is preset-driven: 5 band presets, 11 spend presets, keys 1-13, three release hashes, delays of 1/2/3/7/30 days;
+  the 24-hour spending history only gives a lower bound on a spend's level;
+- NEAR is a model: each call's receipts run right after it, in the order made, all or nothing; an add fails at the storage
+  edge only when the fuzzer says so (one bit), and otherwise only by NEAR's own rule (the key exists); balances, gas and
+  storage are not modelled; a lost callback is modelled only for the finish's callback (FB-3's never run out of gas here);
+- callbacks may arrive at any later moment and in any order across keys (wider than NEAR's next-block delivery), but in
+  order for one key; a key that can sign is assumed to be on NEAR only in the unsealed-list world (H-r9-1); on a sealed list
+  any signer may call anything, a superset that tests the contract's own gates;
+- the device gate is probed (on a copy) for the phone, the recovery's new key and every key without a role, after every
+  call; a role's method set is read from the literal method names (phone: "execute"; device: "approve_recovery"; words:
+  "finish_recovery"), not the exact lists;
+- upgrade_check is driven directly at any moment (as a release's batch would call it, and more); the new code a switch would
+  install is not run, so the switch is checked by its receipt (the hash, the batch's upgrade_check arguments) only;
+- reach: from an empty corpus the release-9 controls are found within 5 min only where section 5b says; the campaign's power
+  on the deeper paths rests on the 28 seeds in its corpus.
+
+Clean-up: the target dirs, the control copies, the corpora, the raw fuzz logs and the scratch copies of the source were
+deleted after this log was written; the reproducers that matter are in hex in section 6.

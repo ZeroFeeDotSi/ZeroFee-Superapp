@@ -1,0 +1,23 @@
+.gal { overflow-y: auto; overscroll-behavior: none; }
+.gal__head { display: grid; justify-items: center; text-align: center; padding: calc(env(safe-area-inset-top, 0px) + 48px) 0 18px; }
+.gal__head a { color: var(--ink); }
+.gal__group { margin: 26px 0 4px; }
+.gal__item {
+  appearance: none; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 15px 0;
+  border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font: 400 16px/1.3 var(--font); text-align: left; cursor: pointer;
+}
+.gal__item span:last-child { color: var(--mute); }
+.gal__list { padding-bottom: 60px; }
+.gal__back {
+  position: absolute; z-index: 100; top: calc(env(safe-area-inset-top, 0px) + 10px); right: 12px; appearance: none; border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 88%, transparent); color: var(--ink); border-color: var(--ink); border-radius: 999px; height: 30px; padding: 0 12px;
+  font: 600 10px var(--font); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; backdrop-filter: blur(8px);
+}
+.sample-marker {
+  position: absolute; z-index: 120; top: calc(env(safe-area-inset-top, 0px) + 10px); height: 22px; padding: 0 9px; border-radius: 999px;
+  display: grid; place-items: center; font: 600 9.5px/1 var(--font); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink); background: color-mix(in srgb, var(--bg) 85%, transparent); border: 1px solid var(--ink); pointer-events: none;
+}
+/* Demo.tsx: a screen over the apps (Waiting, a Problem, the words, the new phone, the laptop); the apps keep their place under it. */
+.demo-over { position: absolute; inset: 0; z-index: 47; background: var(--bg); } /* over every sheet (45) and an app's Problem (46): a screen over the apps covers what they had open; the approval sheet (50) over it */
+.demo-over > * { animation: ah-in var(--dur-base) var(--ease-out) both; }

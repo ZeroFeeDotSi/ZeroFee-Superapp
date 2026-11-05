@@ -1,0 +1,48 @@
+/* NEAR Intents (the design review's look, 5 Nov; concept v3.1): Trenches' own rows, coin page, sheet and receipt, plus the
+   few pieces they add. Tokens only: no colour, shadow or font of its own. */
+
+/* the Trenches | NEAR Intents switch: Home's Safe | Hot track (a filled capsule, the chosen one on the raised thumb),
+   on the page's own gutter, its names 15/600 as Home's */
+.tr-native-seg { margin: 4px 0 16px; }
+.tr-native-seg .zf-seg__item { font: 600 15px/20px var(--font); letter-spacing: -.01em; }
+
+/* the list's one quiet line over the field */
+.nc-best { margin: 0 0 12px; font: 400 13px/18px var(--font); color: var(--mute); }
+
+/* the held row's result since bought, in its colour */
+.nc-result--up { color: var(--up); }
+.nc-result--down { color: var(--down); }
+.nc-page .cp-hold .cp-hold-v { font-family: var(--font-money, var(--font)); }
+.nc-page .cp-stat b { font-family: var(--font-money, var(--font)); }
+.nc-page .tr-why { margin: 0; text-align: center; color: var(--mute); }
+
+/* the sheet: under the amount, the floor's one promise, where the money comes from, then who can see it, quiet */
+.nc-sheet .nc-least { margin: 2px 0 0; min-height: 18px; text-align: center; color: var(--mute); font-variant-numeric: tabular-nums; }
+.nc-sheet .nc-pay { margin: 10px 0 0; color: var(--mute); }
+.nc-sheet .nc-who { margin: 12px 4px 4px; text-align: center; color: var(--mute); line-height: 1.4; }
+
+/* the receipt: the shared object, then two rows (who swaps it, what ZeroFee takes) on the hairline system */
+.nc-job { width: 100%; }
+.nc-receipt-kvs { width: 100%; margin-top: 24px; text-align: left; border-top: 1px solid var(--line); }
+.nc-gone { padding: 24px 16px; }
+
+/* a row's second line: the chain in words is short and is the point, so it never gives way; the worth follows it */
+/* a-nine (5 Nov; QA's re-check): a coin with a long price (BLACKDRAGON, $0.000000008808) left the middle
+   cell no width and cut its name and its worth mid-letter. The middle cell may now be narrower than its text
+   (minmax(0,1fr)); the name ends in an ellipsis at the cell's edge, the worth drops under it whole (the gap sits after
+   the name, so a wrapped worth starts flush), and a long price is set a size smaller in the money face */
+.nc-row.zf-lrow { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.nc-row .dc-sym { display: block; }
+.nc-row .zf-lrow__d { white-space: normal; overflow: visible; }
+.nc-row .dc-name { flex: 0 1 auto; }
+.nc-row .dc-cap { flex: none; min-width: 0; overflow: visible; text-overflow: clip; }
+.nc-row .dc-name { margin-right: .7em; }
+.nc-row .dc-cap::before { margin-left: 0; }
+.nc-row .dc-px--long { font-size: 13px; }
+.nc-row .dc-px, .nc-row .dc-chg { font-family: var(--font-money, var(--font)); }
+
+/* the line under the amount is a sentence here (a refusal can be two lines): centred, as the button it is in Trenches */
+.nc-sheet .tp-get { display: block; max-width: 320px; margin-left: auto; margin-right: auto; text-align: center; }
+/* a row with no chip (a coin the Safe can't buy yet) gives the chip's room back to its name */
+/* "Send this coin ›" (the copy review's ruling, 5 Nov): a quiet row under the figures, the key-value row's own look, as a button */
+.nc-send { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; font-size: 14.5px; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }

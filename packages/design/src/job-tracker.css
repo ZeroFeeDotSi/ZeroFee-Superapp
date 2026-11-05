@@ -1,0 +1,35 @@
+/* The one tracker for every job (JobTracker.tsx; JOB-TRACKER-SPEC 5 Nov): one object on top (the Receipt's mark), the
+   steps as hairline rows, one status line, the end line, the lit verb at the foot only when there is one. No card, no
+   box, no bar inside a bar. Transform and opacity only; still under Reduce Motion (the live dot is motion.css's). */
+.zf-job { display: flex; flex-direction: column; gap: 18px; }
+.zf-job--page { align-items: center; text-align: center; padding: 8px 0 24px; }
+.zf-job--page .zf-job__head { flex-direction: column; align-items: center; gap: 14px; }
+.zf-job__head { display: flex; align-items: center; gap: 14px; }
+.zf-job__words { display: grid; gap: 4px; min-width: 0; }
+.zf-job__title { margin: 0; font: 600 17px/22px var(--font); color: var(--ink); letter-spacing: -.01em; }
+.zf-job--page .zf-job__title { font: 500 28px/34px var(--font-money, var(--font)); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.zf-job__line { display: inline-flex; align-items: center; justify-content: inherit; gap: 8px; margin: 0; font: 400 15px/20px var(--font); color: var(--mute); font-variant-numeric: tabular-nums; }
+.zf-job__line .zf-live { background: var(--mint); }
+.zf-job__line .zf-live::after { background: var(--mint); }
+/* the steps: 24 px mark column, the label, the time at the right; a hairline under each */
+.zf-job__steps { list-style: none; margin: 0; padding: 0; display: grid; width: 100%; text-align: left; }
+.zf-job__step { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); font: 400 17px/22px var(--font); color: var(--ink); }
+.zf-job__step.is-waiting .zf-job__label { color: var(--mute); }
+.zf-job__step.is-failed .zf-job__label { color: var(--down); }
+.zf-job__time { font: 400 15px/20px var(--font); color: var(--mute); font-variant-numeric: tabular-nums; }
+.zf-job__mark { width: 20px; height: 20px; display: grid; place-items: center; margin: 0 auto; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.zf-job__mark.is-done { stroke: var(--up); }
+.zf-job__mark.is-failed { stroke: var(--down); }
+.zf-job__mark.is-waiting { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--ink) 25%, transparent); }
+.zf-job__mark.is-doing .zf-live { background: var(--mint); }
+.zf-job__mark.is-doing .zf-live::after { background: var(--mint); }
+.zf-job__end { margin: 0; font: 400 15px/22px var(--font); color: var(--ink); text-wrap: pretty; }
+.zf-job__end.is-bad { color: var(--down); }
+.zf-job__proof { display: flex; gap: 18px; justify-content: inherit; }
+.zf-job__proof-row { display: inline-flex; gap: 18px; }
+.zf-job__floor { display: grid; gap: 10px; width: 100%; margin-top: 6px; }
+.zf-job__floor .zf-btn { margin-top: 0; }
+/* the row size: the head is the row (mark 48, words beside it); the steps follow at the body size */
+.zf-job--row { gap: 12px; }
+.zf-job--row .zf-job__step { padding: 10px 0; font: 400 15px/20px var(--font); }
+.zf-job--row .zf-job__time { font-size: 13px; }

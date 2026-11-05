@@ -1,0 +1,17 @@
+npm test (the repo root's test script: node --test over packages, tools, apps/extension, apps/web, apps/quotes), 2026-11-01 07:55 UTC,
+on the r9-frozen-3 wasms (account_policy.wasm 75af028e…5e70, code hash 8vPUrwYW…; short-waits 03a474c3…9985, FDfoE6vB…).
+
+ℹ tests 2427
+ℹ suites 84
+ℹ pass 2426
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+
+Failing:
+✖ the notices file is what the lockfile says ships today: every imported package, its version and licence
+
+That one is the worktree's install, not release 9: the worktree has no node_modules of its own (only @zerofee links to its
+packages), so tools/shell/notices.mjs reads licence texts from the main checkout's node_modules, which differ from this
+lockfile's notices file. No release-9 file touches it.

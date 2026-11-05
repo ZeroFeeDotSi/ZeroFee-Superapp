@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>si.zerofee.app.alerts</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>si.zerofee.return</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>zerofee</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>ZeroFee uses the camera only to read a payment code you point it at.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Face ID approves every payment before this phone signs it.</string>
+	<key>ZFStartQuery</key>
+	<string>$(ZF_START_QUERY)</string>
+</dict>
+</plist>

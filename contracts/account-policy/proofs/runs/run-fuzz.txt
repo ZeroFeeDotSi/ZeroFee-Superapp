@@ -1,0 +1,389 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2314533332
+INFO: Loaded 1 modules   (277948 inline 8-bit counters): 277948 [0x105b622c0, 0x105ba607c), 
+INFO: Loaded 1 PC tables (277948 PCs): 277948 [0x105ba6080,0x105fe3c40), 
+INFO:        0 files found in corpus/contract
+INFO: A corpus is not provided, starting from an empty corpus
+	NEW_FUNC[1/15]: 0x00010463970c in _RINvNtCsefrATa4uVkj_5borsh2de10from_sliceINtNtCsf228hWWFbBP_5alloc3vec3VecTIBE_hEyEEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x10004570c)
+	NEW_FUNC[2/15]: 0x00010463a294 in _RINvNtCsefrATa4uVkj_5borsh2de10from_sliceINtNtCsf228hWWFbBP_5alloc3vec3VecTyIBE_hEEEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x100046294)
+	NEW_FUNC[1/1]: 0x00010464bd4c in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueNtNtCsbDKisNzoMs3_21account_policy_proofs8contract6ChangeEBF_+0x0 (contract:arm64+0x100057d4c)
+	NEW_FUNC[1/7]: 0x0001045f4d50 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtB4_6option6OptionINtNtCsf228hWWFbBP_5alloc3vec3VecTNtNtB12_6string6StringoEEEECsgSRgGowaEmU_8contract mod.rs:848
+	NEW_FUNC[2/7]: 0x0001046b3908 in _RNvNtCsbDKisNzoMs3_21account_policy_proofs8contract5moves+0x0 (contract:arm64+0x1000bf908)
+	NEW_FUNC[1/3]: 0x000104658ca8 in _RINvXs0_NtCs6UhK6gWAU9T_15near_account_id5borshNtNtB8_10account_id9AccountIdNtNtCsefrATa4uVkj_5borsh2de16BorshDeserialize18deserialize_readerRShECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x100064ca8)
+	NEW_FUNC[2/3]: 0x00010465ac38 in _RINvXs4_NtCsefrATa4uVkj_5borsh2deNtNtCsf228hWWFbBP_5alloc6string6StringNtB6_16BorshDeserialize18deserialize_readerRShECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x100066c38)
+	NEW_FUNC[1/3]: 0x0001046c14a4 in _RNvXsU_NtNtCsi1m3wc5tJCh_4core3fmt3numhNtB7_5Debug3fmt+0x0 (contract:arm64+0x1000cd4a4)
+	NEW_FUNC[2/3]: 0x000104ec8ccc in _RINvMNtNtCsf228hWWFbBP_5alloc2io5errorNtNtNtCsi1m3wc5tJCh_4core2io5error5Error3newNtNtB7_6string6StringECskDYrCOFOE1i_4zstd+0x0 (contract:arm64+0x1008d4ccc)
+	NEW_FUNC[1/3]: 0x0001045f8fb8 in _RNCNvXNvCsgSRgGowaEmU_8contract1__NtB6_5FStepNtCs1lodI7ebOXJ_9arbitrary9Arbitrary9arbitrary0B6_ contract.rs:13
+	NEW_FUNC[2/3]: 0x00010555a254 in _RNvXs4_NtNtNtCs1lodI7ebOXJ_9arbitrary7foreign4core3numyNtBb_9Arbitrary9arbitrary+0x0 (contract:arm64+0x100f66254)
+	NEW_FUNC[1/3]: 0x00010569818c in _RNvMs4_NtCsf228hWWFbBP_5alloc7raw_vecINtB5_6RawVecTNtNtB7_6string6StringNtNtNtCsjWcZr7F40DP_13near_sdk_core10json_types8integers4U128EE8grow_oneCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1010a418c)
+	NEW_FUNC[2/3]: 0x000105698334 in _RNvMs5_NtCsf228hWWFbBP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1010a4334)
+	NEW_FUNC[1/8]: 0x0001046464c0 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecTNtNtBG_6string6StringoEEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1000524c0)
+	NEW_FUNC[2/8]: 0x00010464dfe8 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueNtNtCsk2huj1aWh2i_10serde_json5error9ErrorCodeECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x100059fe8)
+	NEW_FUNC[1/4]: 0x00010463fdc8 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecIBC_hEEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x10004bdc8)
+	NEW_FUNC[2/4]: 0x0001046422a8 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract7PendingEEB1c_+0x0 (contract:arm64+0x10004e2a8)
+	NEW_FUNC[1/2]: 0x000104640c68 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract4BandEEB1c_+0x0 (contract:arm64+0x10004cc68)
+	NEW_FUNC[2/2]: 0x00010465bbf8 in _RINvXs5_NtCsefrATa4uVkj_5borsh2deINtNtCsf228hWWFbBP_5alloc3vec3VecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract4BandENtB6_16BorshDeserialize18deserialize_readerRShEB16_+0x0 (contract:arm64+0x100067bf8)
+	NEW_FUNC[1/1]: 0x000104641648 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract5GroupEEB1c_+0x0 (contract:arm64+0x10004d648)
+	NEW_FUNC[1/1]: 0x000105695ee0 in _RINvMs0_NtCsk2huj1aWh2i_10serde_json5errorNtB6_5Error12fix_positionNCNvMs3_NtB8_2deINtB1b_12DeserializerNtNtB8_4read9SliceReadE12fix_position0ECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1010a1ee0)
+	NEW_FUNC[1/5]: 0x00010570c8dc in _RINvNvMs2_NtCsf228hWWFbBP_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECs6UhK6gWAU9T_15near_account_id+0x0 (contract:arm64+0x1011188dc)
+	NEW_FUNC[2/5]: 0x00010570cac0 in _RNvMs5_NtCsf228hWWFbBP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs6UhK6gWAU9T_15near_account_id+0x0 (contract:arm64+0x101118ac0)
+	NEW_FUNC[1/1]: 0x000104651bf8 in _RINvNvXs9_NtCsk2huj1aWh2i_10serde_json2deINtB8_9MapAccesspENtNtCse1f5gc4Jqvr_10serde_core2de9MapAccess13next_key_seed12has_next_keyNtNtBa_4read9SliceReadECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x10005dbf8)
+	NEW_FUNC[1/2]: 0x000105695fe8 in _RINvNvMs2_NtCsf228hWWFbBP_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1010a1fe8)
+	NEW_FUNC[2/2]: 0x0001046c1e20 in _RNvXsZ_NtCsf228hWWFbBP_5alloc6stringNtB5_6StringNtNtCsi1m3wc5tJCh_4core3fmt5Write9write_str+0x0 (contract:arm64+0x1000cde20)
+	NEW_FUNC[1/1]: 0x000104644e24 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecNtNtCsk2huj1aWh2i_10serde_json5value5ValueEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x100050e24)
+	NEW_FUNC[1/1]: 0x000105642c54 in _RNvXsZ_NtCsf228hWWFbBP_5alloc6stringNtB5_6StringNtNtCsi1m3wc5tJCh_4core3fmt5Write10write_char+0x0 (contract:arm64+0x10104ec54)
+	NEW_FUNC[1/1]: 0x000104645e08 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecTNtNtBG_6string6StringNtNtNtCsjWcZr7F40DP_13near_sdk_core10json_types8integers4U128EEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x100051e08)
+	NEW_FUNC[1/2]: 0x00010463dbec in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtB4_6option6OptionINtNtCsf228hWWFbBP_5alloc3vec3VechEEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x100049bec)
+	NEW_FUNC[2/2]: 0x00010463df1c in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtB4_6option6OptionNtNtCsbDKisNzoMs3_21account_policy_proofs8contract15PendingRecoveryEEB11_+0x0 (contract:arm64+0x100049f1c)
+	NEW_FUNC[1/2]: 0x000105694468 in _RINvNvMs2_NtCsf228hWWFbBP_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECsgSRgGowaEmU_8contract mod.rs:658
+	NEW_FUNC[2/2]: 0x00010569476c in _RNvMs5_NtCsf228hWWFbBP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsgSRgGowaEmU_8contract mod.rs:544
+	NEW_FUNC[1/2]: 0x00010464e434 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueNtNtCsk2huj1aWh2i_10serde_json5value5ValueECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x10005a434)
+	NEW_FUNC[2/2]: 0x00010469bd94 in _RNvMs3_NtCsk2huj1aWh2i_10serde_json2deINtB5_12DeserializerNtNtB7_4read9SliceReadE13parse_integerCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1000a7d94)
+	NEW_FUNC[1/1]: 0x000104641c14 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract5SpentEEB1c_+0x0 (contract:arm64+0x10004dc14)
+	NEW_FUNC[1/1]: 0x000104670740 in _RINvXst_NtCsefrATa4uVkj_5borsh2deyNtB6_16BorshDeserialize18deserialize_readerRShECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x10007c740)
+	NEW_FUNC[1/1]: 0x0001046bb364 in _RNvNtNtCsbDKisNzoMs3_21account_policy_proofs8contract8fuzz_api13share_ppm_pub+0x0 (contract:arm64+0x1000c7364)
+	NEW_FUNC[1/2]: 0x0001056978b0 in _RNvMs3_NtCsk2huj1aWh2i_10serde_json2deINtB5_12DeserializerNtNtB7_4read9SliceReadE5errorCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1010a38b0)
+	NEW_FUNC[2/2]: 0x0001055bd770 in _RNvXs5_NtCsk2huj1aWh2i_10serde_json4readNtB5_9SliceReadNtB5_4Read8position+0x0 (contract:arm64+0x100fc9770)
+	NEW_FUNC[1/1]: 0x00010464aad4 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueNtNtCsbDKisNzoMs3_21account_policy_proofs8contract13AccountPolicyEBF_+0x0 (contract:arm64+0x100056ad4)
+	NEW_FUNC[1/4]: 0x00010466a13c in _RINvXs9_NtCsefrATa4uVkj_5borsh3serINtNtCsf228hWWFbBP_5alloc3vec3VecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract4BandENtB6_14BorshSerialize9serializeIBx_hEEB17_+0x0 (contract:arm64+0x10007613c)
+	NEW_FUNC[2/4]: 0x00010466c7a4 in _RINvXs9_NtCsefrATa4uVkj_5borsh3serINtNtCsf228hWWFbBP_5alloc3vec3VecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract5SpentENtB6_14BorshSerialize9serializeIBx_hEEB17_+0x0 (contract:arm64+0x1000787a4)
+	NEW_FUNC[1/3]: 0x000104641198 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract4StepEEB1c_+0x0 (contract:arm64+0x10004d198)
+	NEW_FUNC[2/3]: 0x00010464827c in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc5boxed3BoxeEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x10005427c)
+	NEW_FUNC[1/1]: 0x00010464b344 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueNtNtCsbDKisNzoMs3_21account_policy_proofs8contract4StepEBF_+0x0 (contract:arm64+0x100057344)
+	NEW_FUNC[1/3]: 0x000104640480 in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsf228hWWFbBP_5alloc3vec3VecINtCs9dQht2zwync_8indexmap6BucketNtNtBG_6string6StringNtNtCsk2huj1aWh2i_10serde_json5value5ValueEEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x10004c480)
+	NEW_FUNC[2/3]: 0x000105705dc8 in _RNvMs4_NtCsf228hWWFbBP_5alloc7raw_vecINtB5_6RawVecNtNtCsk2huj1aWh2i_10serde_json5value5ValueE8grow_oneBQ_+0x0 (contract:arm64+0x101111dc8)
+	NEW_FUNC[1/1]: 0x000104661c70 in _RINvXs6_NtCsefrATa4uVkj_5borsh3serShNtB6_14BorshSerialize9serializeINtNtCsf228hWWFbBP_5alloc3vec3VechEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x10006dc70)
+	NEW_FUNC[1/3]: 0x0001057016b0 in _RINvNtCsk2huj1aWh2i_10serde_json4read5errorNtB2_9SliceReadINtB2_9ReferenceShEEB4_+0x0 (contract:arm64+0x10110d6b0)
+	NEW_FUNC[2/3]: 0x0001055a95a8 in _RNvMs3_NtCsk2huj1aWh2i_10serde_json4readNtB5_9SliceRead14skip_to_escape+0x0 (contract:arm64+0x100fb55a8)
+	NEW_FUNC[1/1]: 0x000105696290 in _RNvMs3_NtCsk2huj1aWh2i_10serde_json2deINtB5_12DeserializerNtNtB7_4read9SliceReadE18parse_long_integerCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1010a2290)
+	NEW_FUNC[1/1]: 0x000105705984 in _RNvMs3_NtCsk2huj1aWh2i_10serde_json4readNtB5_9SliceRead19skip_to_escape_slow+0x0 (contract:arm64+0x101111984)
+	NEW_FUNC[1/2]: 0x00010469b07c in _RNvMs3_NtCsk2huj1aWh2i_10serde_json2deINtB5_12DeserializerNtNtB7_4read9SliceReadE13parse_decimalCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1000a707c)
+	NEW_FUNC[2/2]: 0x000105696af4 in _RNvMs3_NtCsk2huj1aWh2i_10serde_json2deINtB5_12DeserializerNtNtB7_4read9SliceReadE22parse_decimal_overflowCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1010a2af4)
+	NEW_FUNC[1/1]: 0x00010469d264 in _RNvMs3_NtCsk2huj1aWh2i_10serde_json2deINtB5_12DeserializerNtNtB7_4read9SliceReadE14parse_exponentCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1000a9264)
+	NEW_FUNC[1/2]: 0x0001046490ac in _RINvNtCsi1m3wc5tJCh_4core3ptr9drop_glueINtNtCsk2huj1aWh2i_10serde_json3map3MapNtNtCsf228hWWFbBP_5alloc6string6StringNtNtBG_5value5ValueEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1000550ac)
+	NEW_FUNC[2/2]: 0x00010466e360 in _RINvXs9_NtCsk2huj1aWh2i_10serde_json2deINtB6_9MapAccessNtNtB8_4read9SliceReadENtNtCse1f5gc4Jqvr_10serde_core2de9MapAccess15next_value_seedINtNtCsi1m3wc5tJCh_4core6marker11PhantomDataNtNtB8_5value5ValueEECsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x10007a360)
+	NEW_FUNC[1/1]: 0x000105697398 in _RNvMs3_NtCsk2huj1aWh2i_10serde_json2deINtB5_12DeserializerNtNtB7_4read9SliceReadE23parse_exponent_overflowCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1010a3398)
+	NEW_FUNC[1/3]: 0x000105593628 in _RINvNtCsk2huj1aWh2i_10serde_json4read12parse_escapeNtB2_9SliceReadEB4_+0x0 (contract:arm64+0x100f9f628)
+	NEW_FUNC[2/3]: 0x0001057018a0 in _RINvNtCsk2huj1aWh2i_10serde_json4read5errorNtB2_9SliceReadhEB4_+0x0 (contract:arm64+0x10110d8a0)
+	NEW_FUNC[1/1]: 0x000105697944 in _RNvMs4_NtCsf228hWWFbBP_5alloc7raw_vecINtB5_6RawVecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract4BandE8grow_oneBQ_+0x0 (contract:arm64+0x1010a3944)
+	NEW_FUNC[1/1]: 0x000105701cdc in _RINvNtCsk2huj1aWh2i_10serde_json4read5errorNtB2_9SliceReaduEB4_+0x0 (contract:arm64+0x10110dcdc)
+	NEW_FUNC[1/5]: 0x000104699038 in _RNvMs2_NtCs9dQht2zwync_8indexmap3mapINtB5_8IndexMapNtNtCsf228hWWFbBP_5alloc6string6StringNtNtCsk2huj1aWh2i_10serde_json5value5ValueE11insert_fullCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1000a5038)
+	NEW_FUNC[2/5]: 0x0001046be77c in _RNvXs3_NtNtCsi1m3wc5tJCh_4core4hash3sipINtB5_6HasherNtB5_11Sip13RoundsENtB7_6Hasher5writeCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1000ca77c)
+	NEW_FUNC[1/1]: 0x000105697aec in _RNvMs4_NtCsf228hWWFbBP_5alloc7raw_vecINtB5_6RawVecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract4StepE8grow_oneBQ_+0x0 (contract:arm64+0x1010a3aec)
+	NEW_FUNC[1/2]: 0x0001056fff28 in _RINvNtCsk2huj1aWh2i_10serde_json4read20parse_unicode_escapeNtB2_9SliceReadEB4_+0x0 (contract:arm64+0x10110bf28)
+	NEW_FUNC[2/2]: 0x000105701abc in _RINvNtCsk2huj1aWh2i_10serde_json4read5errorNtB2_9SliceReadtEB4_+0x0 (contract:arm64+0x10110dabc)
+	NEW_FUNC[1/1]: 0x0001055b1054 in _RNvNtCsk2huj1aWh2i_10serde_json4read19push_wtf8_codepoint+0x0 (contract:arm64+0x100fbd054)
+	NEW_FUNC[1/1]: 0x0001046aeef0 in _RNvMsa_NtCs5qgJFTIRvvF_9hashbrown3rawNtB5_13RawTableInner4ctrl+0x0 (contract:arm64+0x1000baef0)
+	NEW_FUNC[1/2]: 0x0001055adad8 in _RNvMsa_NtCs5qgJFTIRvvF_9hashbrown3rawNtB5_13RawTableInner15allocation_info+0x0 (contract:arm64+0x100fb9ad8)
+	NEW_FUNC[2/2]: 0x0001055af88c in _RNvMsa_NtCs5qgJFTIRvvF_9hashbrown3rawNtB5_13RawTableInner16fix_insert_index+0x0 (contract:arm64+0x100fbb88c)
+	NEW_FUNC[1/2]: 0x0001056dfab0 in _RNvMs4_NtCsf228hWWFbBP_5alloc7raw_vecINtB5_6RawVecINtNtB7_3vec3VecNtNtCs9DGZQv0VRV0_20near_primitives_core5types7ShardIdEE8grow_oneCs7FGb4W4905E_15near_primitives+0x0 (contract:arm64+0x1010ebab0)
+	NEW_FUNC[2/2]: 0x0001056e1a44 in _RNvMs5_NtCsf228hWWFbBP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs7FGb4W4905E_15near_primitives+0x0 (contract:arm64+0x1010eda44)
+	NEW_FUNC[1/1]: 0x000105697fe4 in _RNvMs4_NtCsf228hWWFbBP_5alloc7raw_vecINtB5_6RawVecTINtNtB7_3vec3VechEyEE8grow_oneCsbDKisNzoMs3_21account_policy_proofs+0x0 (contract:arm64+0x1010a3fe4)
+	NEW_FUNC[1/1]: 0x000105697c94 in _RNvMs4_NtCsf228hWWFbBP_5alloc7raw_vecINtB5_6RawVecNtNtCsbDKisNzoMs3_21account_policy_proofs8contract5SpentE8grow_oneBQ_+0x0 (contract:arm64+0x1010a3c94)
+#11635818	DONE   cov: 2026 ft: 7256 corp: 1932/330Kb lim: 4096 exec/s: 6460 rss: 153Mb
+###### Recommended dictionary. ######
+"\377\377" # Uses: 5639
+"\377\377\377\377" # Uses: 5424
+"\000\000\000\000" # Uses: 5396
+"\001\000\000\000\000\000\000\000" # Uses: 5144
+"\001\000\000\000" # Uses: 5287
+"\377\377\377\377\377\377\377\007" # Uses: 5083
+"\365{{{" # Uses: 5201
+"\000\000\000\000\000\000\0008" # Uses: 5038
+"\000\000\000\000\377\000\000\001" # Uses: 5197
+"\001\000\000\000\000\000\000\004" # Uses: 5001
+"\000\000\000\000\000\000\000\000" # Uses: 5000
+"\377\377\377\377\377\377\000\001" # Uses: 5131
+"\005\000\000\000\000\000\000\000" # Uses: 5114
+"\000\001\000\015" # Uses: 5203
+"\001[\000\013" # Uses: 5212
+"\010\000\000\000\000\000\000\000" # Uses: 5017
+"\230\323\206\224.`\000\000" # Uses: 5114
+"A\356\217\224>`\000\000" # Uses: 5144
+"\377$\276\002" # Uses: 5006
+"V\034\214\224.`\000\000" # Uses: 5034
+"\314\000\001\000" # Uses: 5055
+"\000\000\000\361" # Uses: 5130
+"\003\000\000\000\000\000\000\000" # Uses: 4996
+"\376\377\000\020" # Uses: 5056
+"\012\000\000\000\000\000\000\000" # Uses: 5204
+" \000\000\020" # Uses: 5170
+"\030\000" # Uses: 5194
+"0\000\000\000\000\000\000\000" # Uses: 5036
+"\002\032\000\000" # Uses: 5198
+"\377\377\377\377\037\011\377\011" # Uses: 4962
+"\007\000\000\000\000\000\000\000" # Uses: 5059
+"\001\000" # Uses: 5051
+"\004\000\000\000\000\000\000\000" # Uses: 4887
+"\377\377\377\377\377\377\377\003" # Uses: 4975
+"<\001\015(" # Uses: 5031
+"\000\000\0000" # Uses: 4918
+"tuut" # Uses: 4915
+"|{{\000" # Uses: 5010
+"z\000\000\000" # Uses: 4873
+"\322\206\224;" # Uses: 4993
+"\000%\001\000" # Uses: 4861
+"'\000\000\000\000\000\000\000" # Uses: 4903
+"+\000\000\000" # Uses: 4973
+"\001\000\000{" # Uses: 4942
+"\000\000" # Uses: 4808
+"uuut" # Uses: 4928
+"\\\000\000\000\000\000\000\000" # Uses: 4913
+"\000\004" # Uses: 4960
+"u\000" # Uses: 5077
+"\000\231\231\231\231\231\231\231" # Uses: 4753
+"=\000" # Uses: 4877
+"/\000\000\000" # Uses: 4837
+"8\001\000\000" # Uses: 4903
+"&555" # Uses: 4826
+"0\000" # Uses: 4922
+"(\015\001<" # Uses: 4798
+"\377\"" # Uses: 4784
+"opp\000" # Uses: 4892
+"/\000q-" # Uses: 4733
+"\0019" # Uses: 4941
+"\001\315\315\376" # Uses: 4772
+"t\000\000\000" # Uses: 4753
+"\377z" # Uses: 4858
+"_\000\000\000" # Uses: 4650
+"\001\000\000\000\000\000\000\010" # Uses: 4711
+"\377\377_\316\224\177\272q" # Uses: 4671
+"\001\000\000\366" # Uses: 4827
+"|\012{[" # Uses: 4731
+"\001\000\000\000\000\000\000z" # Uses: 4661
+"\377\377\377\377\377\377\001&" # Uses: 4720
+"\000\010" # Uses: 4708
+"9\000" # Uses: 4732
+",\002\001\000" # Uses: 4742
+"\011\000\000\000\000\000\000\000" # Uses: 4552
+"L\000\000\000\000\000\000\000" # Uses: 4715
+"z\000\000\000\000\000\000\000" # Uses: 4638
+"\253\252\252\252\252\252\252\002" # Uses: 4741
+"\000\000\000\000\000\000\000\004" # Uses: 4577
+"\312\314\314\014" # Uses: 4641
+"\376\377\377\377" # Uses: 4611
+"eeee\000\000\000\000" # Uses: 4701
+"\372\256\177\224\256`\000\000" # Uses: 4646
+"\001\000`\356\224\177t\364" # Uses: 4540
+"\316\377\377\377" # Uses: 4726
+"tuuu" # Uses: 4658
+"\274\273\273\273" # Uses: 4625
+"\000\000\000\000\000\000\000l" # Uses: 4558
+"0\000\000\000" # Uses: 4680
+"\001\351" # Uses: 4593
+"\360\243\215\372\036`\000\000" # Uses: 4553
+"\001\000\000\000\000\000\000\001" # Uses: 4666
+"}\000\000\000\000\000\000\000" # Uses: 4552
+"j\000\000\000\000\000\000\000" # Uses: 4535
+"\377\377\377\377\377\377\377\377" # Uses: 4576
+"\354\247\203\224\036`\000\000" # Uses: 4623
+"\023\000\010\000" # Uses: 4526
+"7777" # Uses: 4577
+"\000\000\000\000\000\000\000\007" # Uses: 4445
+"\377\377\3779" # Uses: 4405
+"\273\000 \000" # Uses: 4440
+"\004\2168\343\2168\343\216" # Uses: 4542
+"g\000\000\000\000\000\000\000" # Uses: 4496
+"\000\000\000\000\000\000\000\001" # Uses: 4645
+"\000\000\000\271" # Uses: 4553
+"\000\000`~\350\252\3501" # Uses: 4499
+"|\000\000\000\000\000\000\000" # Uses: 4430
+"\377\377\377\377\377\377\377<" # Uses: 4560
+"f\000\000\000\000\000\000\000" # Uses: 4392
+"\001\001\324\000" # Uses: 4477
+".\377\000\000" # Uses: 4585
+"\000\000\000\377" # Uses: 4453
+"\012{\377[" # Uses: 4491
+"\001\000\000\010" # Uses: 4495
+"6555" # Uses: 4484
+"\377\377\377\377\377\377\377\023" # Uses: 4396
+"\360\357\357\357" # Uses: 4448
+"\031..." # Uses: 4464
+".\000\000\000" # Uses: 4369
+"\377\377\377." # Uses: 4477
+"\000\002" # Uses: 4154
+"`\000" # Uses: 4450
+"l\002\001\000" # Uses: 4310
+"\000\000`\036\372\214a\260" # Uses: 4195
+"\233\377\377\377" # Uses: 4425
+"\343\227\011\000" # Uses: 4396
+"+*\201*" # Uses: 4317
+"\377v" # Uses: 4147
+"\013\314\314\313" # Uses: 4157
+"\311\252\177\224\276`\000\000" # Uses: 4173
+"\000\000\000\000\000\000\000\031" # Uses: 4110
+"\325\300\000\000" # Uses: 4267
+"\000\000\000\000\000\000\000\032" # Uses: 4233
+"\0015" # Uses: 4217
+"\000\231\231\231\231\231\231\232" # Uses: 4197
+"\000\000\000-" # Uses: 4200
+"\377+\0003" # Uses: 4162
+"jiii" # Uses: 4155
+":\000" # Uses: 4122
+"3333333\003" # Uses: 4119
+"GFFF" # Uses: 4195
+"\000=" # Uses: 4149
+"\035\015\377\014" # Uses: 4083
+"\002\000\000\000\000\000\000\000" # Uses: 4111
+"`\036\000\000" # Uses: 4106
+"\023\000\000\000" # Uses: 4054
+"\004\000\377\000" # Uses: 4091
+"\017\000\000\000\000\000\000\000" # Uses: 4071
+"\230\231\000," # Uses: 4054
+"\377\377_>\224\212\301\201" # Uses: 4063
+"\002\000\000\000" # Uses: 4127
+"\001\000\000&" # Uses: 4072
+"a\000" # Uses: 3905
+"\300\252\204\224\376`\000\000" # Uses: 3928
+"<\000" # Uses: 4000
+"!\000\000\000\000\000\000\000" # Uses: 3963
+"\000\377\000\327" # Uses: 3968
+"\000\000`\036\224\203\354q" # Uses: 3844
+"U\000\000\000" # Uses: 3906
+"\004\000\200\000" # Uses: 3849
+"\000\000\000\000\000\000\000\023" # Uses: 3876
+"G\230X\350\036a\000\000" # Uses: 3794
+"\001\000\0000" # Uses: 3933
+"\230\231\231\231\231\231\231\001" # Uses: 4000
+"\211G\230X" # Uses: 3951
+"\377_\276\224" # Uses: 3761
+"=\000\200\000" # Uses: 3880
+"\007\000\000\000" # Uses: 3688
+"\005\001\016\002" # Uses: 3804
+"\000\000\000\000\000\000\000\010" # Uses: 3622
+"\001\000\000\000\000\000\000\006" # Uses: 3904
+"\0043333333" # Uses: 3642
+"\013\000\000\000" # Uses: 3803
+"\377\377\377\255" # Uses: 3670
+"\233>$\352>`\000\000" # Uses: 3747
+"\000\000\000\000\000\000\000\011" # Uses: 3550
+"\376\001\3156" # Uses: 3733
+"4333333\003" # Uses: 3628
+"\000\000\000\357" # Uses: 3669
+"\006\000\000\000\000\000\000\000" # Uses: 3556
+"\\\017\023 " # Uses: 3550
+"\330\000\373]" # Uses: 3636
+"|v\202\224\016a\000\000" # Uses: 3602
+"\001V" # Uses: 3623
+"\000{" # Uses: 3525
+"\001\000\000\002" # Uses: 3581
+"\313\000\000\000\000\000\000\000" # Uses: 3450
+"\232\231\231\231\231\231\231\001" # Uses: 3438
+"\001\000\000\000\000\000\000\005" # Uses: 3339
+"\005\000\000\000" # Uses: 3464
+"\000\275\000\005" # Uses: 3471
+"2\000" # Uses: 3356
+"\376\003\003\327" # Uses: 3412
+"\376\377\377\377\377\377\377\377" # Uses: 3372
+"\000\000\000\000\000\000\000s" # Uses: 3366
+"\000\000\000\200" # Uses: 3404
+"\375\377\377\377" # Uses: 3478
+"\217n\213\372\036`\000\000" # Uses: 3325
+"\000\000\000\000\000\000\000\022" # Uses: 3357
+"/\000" # Uses: 3486
+"\032\231\231\231\231\231\231\230" # Uses: 3335
+"\0025" # Uses: 3214
+"\377\377\377\377\377\377\377\004" # Uses: 3256
+"\3777" # Uses: 3309
+"0\015(\015" # Uses: 3248
+"\311\000" # Uses: 3321
+"u\265" # Uses: 3347
+"\254\377\377\377" # Uses: 3201
+"\001\000`.\224\221\346\241" # Uses: 3199
+"\000\000\377\370" # Uses: 3136
+"A\000\000\000\000\000\000\000" # Uses: 3168
+"\271\000\000\000\000\000\000\000" # Uses: 3031
+"\000\010\016\251" # Uses: 3062
+"\3770" # Uses: 3081
+"\000\033\033\033" # Uses: 3118
+"\337\015\365\365" # Uses: 2997
+"\377\377\377\377\377\377\377\001" # Uses: 3125
+" \000\000\000" # Uses: 3106
+"\001\000\000'" # Uses: 3122
+"\000'" # Uses: 2941
+"\000\000\000\000\000\000\000\014" # Uses: 2978
+"\000\000`n\224\202\002\202" # Uses: 3019
+"\000\000\000\000\000\000\001\214" # Uses: 2927
+")\000\000\000" # Uses: 2952
+"\036\000\000\000" # Uses: 2825
+"\000\000\000\256" # Uses: 2786
+"\000\000\000\005" # Uses: 2851
+"\377." # Uses: 2806
+"\011\002\012\000" # Uses: 2743
+"\377\377\377\377\377\377\377\376" # Uses: 2677
+"9\377\377\000" # Uses: 2664
+"\037\000\000\363" # Uses: 2715
+")\000" # Uses: 2810
+"\3779" # Uses: 2608
+"\377\377\377\377\377\377\377\017" # Uses: 2511
+"\002\001\000\000\000\000\000\000" # Uses: 2477
+"\343\343\343\343" # Uses: 2502
+"uu(u" # Uses: 2505
+"\260\377\377\377" # Uses: 2531
+"\001\000\000\000\000\000\000\031" # Uses: 2453
+"\255\377\377\377" # Uses: 2310
+"2333" # Uses: 2424
+"\001\000\000\024" # Uses: 2292
+"\000\000\000\000\000\000\001<" # Uses: 2241
+"9999" # Uses: 2301
+"~\000\000\000" # Uses: 2208
+"\001\016" # Uses: 2209
+"\001u" # Uses: 2110
+":\000\000\000\000\000\000\000" # Uses: 2160
+"G\000" # Uses: 2051
+"\377\377\377\377\377\377\3777" # Uses: 2124
+"\001\000a^\224\177\234\004" # Uses: 2090
+"\344?\205\224^`\000\000" # Uses: 2001
+"\000\000\000\213" # Uses: 2042
+"(\0012\000" # Uses: 1956
+"2333333\003" # Uses: 1751
+"\177\000\000\000\000\000\000\011" # Uses: 1857
+"\000\000\000m" # Uses: 1779
+"\001\000\000\000\000\000\000\014" # Uses: 1693
+"\000\000\000\000\000\000\000\005" # Uses: 1756
+"\013A\000\000" # Uses: 1738
+"\375\316*\376" # Uses: 1616
+"\000\000\000e" # Uses: 1657
+"\001\000`\036\372\211\302\020" # Uses: 1672
+"\001\000\000\000\000\000\0012" # Uses: 1587
+"%\276\021%" # Uses: 1520
+"t\000" # Uses: 1545
+"/\000\000\000\000\000\000\000" # Uses: 1552
+"\003\000#\001" # Uses: 1500
+"\013\000\000\000\000\000\000\000" # Uses: 1498
+"\"[\000," # Uses: 1408
+"%\000\000\000\000\000\000\000" # Uses: 1346
+"\010\000" # Uses: 1370
+"\331\015\000\000\000\000\000\000" # Uses: 1358
+"\001\000`\036\372\213k\020" # Uses: 1294
+"4\000\000\000" # Uses: 1244
+"\377\177" # Uses: 1134
+"\001\000\000\375" # Uses: 1135
+"\3772" # Uses: 1150
+"\011\000\000\000" # Uses: 1097
+"'\000\000\000" # Uses: 1039
+"\"\320\320\320" # Uses: 923
+"{\000" # Uses: 961
+"\000\000\000w" # Uses: 840
+"\274\000\012\251" # Uses: 781
+"\225\000" # Uses: 740
+"\001\000\000\000\000\000\000\002" # Uses: 721
+"\001\001\262\262" # Uses: 730
+"\177\000\000\000" # Uses: 549
+"\231\231\231\232" # Uses: 519
+"\360\000\000\000" # Uses: 546
+"\377\377\377v" # Uses: 490
+"\000\004\000;" # Uses: 492
+"\001{" # Uses: 383
+"\000\000\000\007" # Uses: 335
+"\000\000\000{" # Uses: 228
+"X\000\000\000" # Uses: 211
+"\000\000\000\000\000\000\001\017" # Uses: 125
+###### End of recommended dictionary. ######
+Done 11635818 runs in 1801 second(s)
+stat::number_of_executed_units: 11635818
+stat::average_exec_per_sec:     6460
+stat::new_units_added:          11406
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              153
+exit=0 ALLDONE 13:40:40

@@ -1,0 +1,25 @@
+{
+ "recordedAtIso": "2026-10-25T08:36:53.413Z",
+ "response": {
+  "id": "zf",
+  "jsonrpc": "2.0",
+  "result": {
+   "tokenAddress": "sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
+   "userAddress": "13QkxhNMrTPxoCkRdYdJ65tFuwXPhL5gLS2Z5Nr6gjRK",
+   "withdrawalFee": "30000",
+   "withdrawalFeeDecimals": 6,
+   "token": {
+    "defuse_asset_identifier": "sol:mainnet:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "origin_chain_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "near_token_id": "sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
+    "decimals": 6,
+    "asset_name": "USDC",
+    "min_deposit_amount": "1000",
+    "min_withdrawal_amount": "1",
+    "withdrawal_fee": "30000",
+    "standard": "nep141",
+    "intents_token_id": "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near"
+   }
+  }
+ }
+}

@@ -1,0 +1,102 @@
+.approval { position: absolute; inset: 0; z-index: 50; }
+.approval__scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 70%, transparent); animation: appr-fade var(--dur-base) var(--ease-out) both; }
+/* D135 (product decision, 3 Nov): the whole screen, locked at that size: the words scroll inside it and the buttons stay on the
+   floor, always visible; nothing grows, shrinks or jumps as the words change. */
+.approval__sheet {
+  position: absolute; inset: 0; height: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; background: var(--bg);
+  padding: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 14px) 0 calc(env(safe-area-inset-bottom, 0px) + 22px);
+  animation: appr-rise var(--dur-sheet) var(--ease-out) both;
+}
+.approval__grab { flex: none; height: 8px; }  /* D135: a full screen has nothing to grab; the space stays */
+/* Every word breaks rather than runs off the edge: a long address or an unbroken `With: {…}` wraps. */
+.approval__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding: 0 var(--gutter); overflow-wrap: anywhere; word-break: break-word; }
+.approval__foot { flex: none; padding: 0 var(--gutter); background: var(--bg); }
+.approval__foot.scrolls { box-shadow: 0 -1px 0 var(--line); padding-top: 12px; margin-top: 4px; }
+.approval__more { font-size: 12.5px; color: var(--mute); text-align: center; margin: 0 0 8px; }
+.approval__title { font-size: 24px; font-weight: 400; letter-spacing: -.02em; line-height: 1.25; margin: 12px 0 6px; text-wrap: balance; }
+.approval__amount { font-size: 17px; color: var(--ink); margin: 2px 0 6px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.approval__line { font-size: 15px; color: var(--ink-2); margin: 2px 0; line-height: 1.45; }
+.approval__warn { display: flex; gap: 10px; align-items: baseline; font-size: 14px; color: var(--alert); margin: 14px 0 0; line-height: 1.4; }
+.approval__warn span { width: 7px; height: 7px; border-radius: 50%; background: var(--alert); flex: none; transform: translateY(-1px); }
+.approval__effects { margin-top: 14px; }
+.approval__kv { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.approval__kv span:first-child { color: var(--mute); flex: none; }
+.approval__kv span:last-child { text-align: right; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
+.approval__protect { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.45; color: var(--ink); margin: 14px 0 0; }
+.approval__protect svg { flex: none; margin-top: 2px; }
+.approval__hint { font-size: 12.5px; color: var(--mute); margin: 14px 0 0; }
+.approval__actions { display: grid; gap: 6px; margin-top: 18px; text-align: center; }
+/* Approve arms visibly: a line fills under its label over its first moments (ARM_MS), so it never looks ready before it
+   is; a tap before then lands on the guard and the button gives a small pulse instead of a yes. */
+.approval__approve { position: relative; display: grid; }
+.approval__arming { position: relative; overflow: hidden; }
+.approval__arming::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: currentColor; transform-origin: left; animation: appr-arm var(--arm-ms, .7s) linear both; }
+.approval__guard { position: absolute; inset: 0; }
+.approval__nudge { animation: appr-nudge var(--dur-base) var(--ease-out); }
+@keyframes appr-arm { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes appr-nudge { 50% { transform: scale(.98); } }
+.approval__demo { font-size: 12px; color: var(--mute); text-align: center; margin: 6px 0 0; }
+@keyframes appr-rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes appr-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .approval__sheet, .approval__scrim { animation: none; } }
+
+/* The web demo's simulated Face ID moment (ApprovalSheet.tsx): the phone's own glyph, then a tick, about a second. */
+.approval__faceid {
+  position: absolute; z-index: 5; left: 50%; top: 42%; transform: translate(-50%, -50%);
+  width: 150px; height: 150px; border-radius: 32px; display: grid; place-items: center; align-content: center; gap: 10px;
+  background: var(--bg);
+  box-shadow: 0 20px 60px -20px rgba(0, 0, 0, .35); color: var(--ink); font: 500 13px/1 var(--font);
+  animation: appr-faceid-in var(--dur-fast) var(--ease-out);
+}
+.approval__faceid.scan svg { animation: none; }
+.approval__faceid.done svg { animation: appr-faceid-done var(--dur-base) var(--ease-out); }
+@keyframes appr-faceid-in { from { opacity: 0; transform: translate(-50%, -50%) scale(.98); } }
+@keyframes appr-faceid-scan { from { opacity: .45; } to { opacity: 1; } }
+@keyframes appr-faceid-done { from { transform: scale(.98); opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .approval__faceid, .approval__faceid svg { animation: none !important; } }
+
+/* ── REVAMP phase 2 (3 Nov): the trust screen ──────────────────────────────────────────────────────────────────────
+   What leaves and what stays is the thing a person checks, so it reads as one card: the money's changes on a soft
+   filled card on the 16 radius, each row 16/500 tabular on the right, .5 hairlines inside. The title is the v2 title (28/500,
+   tracked). A warning is its own soft alert-tinted block, never a red line lost among grey ones. The sheet rises on the
+   glide spring like every sheet; Approve's arming line and the guard are untouched. */
+.approval__sheet { animation: appr-rise var(--dur-sheet) var(--ease-out) both; }
+.approval__title { font-size: var(--fs-title, 28px); font-weight: 500; letter-spacing: var(--tr-title, -.022em); line-height: 1.2; margin: 12px 0 8px; }
+.approval__amount { font-size: 17px; font-weight: 500; }
+.approval__line { color: var(--ink-2); }
+.approval__warn { margin: 16px 0 0; padding: 12px 16px; border-radius: var(--r-sm, 12px); background: color-mix(in srgb, var(--alert) 9%, transparent); align-items: center; }
+.approval__warn span { transform: none; }
+.approval__effects { margin-top: 16px; padding: 4px 16px; border-radius: var(--r-md, 16px); background: var(--act-fill); }
+
+.approval__kv { padding: 14px 0; border-bottom: .5px solid var(--line); font-size: 15px; align-items: baseline; }
+.approval__kv:last-child { border-bottom: 0; }
+.approval__kv span:last-child { font: 500 16px/1.3 var(--font); color: var(--ink); }
+.approval__protect { margin: 16px 0 0; }
+.approval__foot.scrolls { box-shadow: 0 -.5px 0 var(--line); }
+/* the text system on the trust screen (the design review §4.8): "Check this" is the sheet's bar title (T3, centred in a
+   44 pt bar), not a second heading over the title; the facts under the title are T6 sub-lines; Approve is B1 */
+.approval__body > .zf-label:first-child, .approval .zf-label { display: flex; align-items: center; justify-content: center; min-height: 44px; margin: 0 0 8px; font: 600 17px/22px var(--font); letter-spacing: -.01em; color: var(--ink); text-align: center; }
+.approval__test { color: var(--mute); font-weight: 500; }
+.approval__title { margin-top: 8px; }
+.approval__line { font: 400 15px/20px var(--font); color: var(--mute); margin: 4px 0 0; }
+.approval__hint { font: 400 13px/18px var(--font); margin: 8px 16px 0; }
+/* The web wallet's password (approval-password.ts): one field above Approve. */
+.approval__password { display: grid; gap: 8px; margin-bottom: 12px; }
+.approval__pw { font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+/* Close (D135), in the corner of the "Check this" bar: centred on its 44 pt row (the sheet's top padding, then the grab) */
+/* drawn here, not by sheet.css (Home's first load, speed-budget.test.ts): the same 44 pt target and 30 pt disc */
+.approval .approval__close { position: absolute; top: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 22px); right: calc(var(--gutter) - 12px); z-index: 2;
+  width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 22px; background: none; color: var(--ink); cursor: pointer; }
+.approval__close::before { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: var(--act-fill); }
+.approval__close svg { position: relative; width: 14px; height: 14px; }
+
+/* Every outside sheet's full address (the copy review's rules, 5 Nov): "To" a 12 px caption, the address mono in groups of 4 (thin
+   spaces), 15 px ink, wrapping freely, never ellipsised; the line saying where it lands quiet under it; tap to copy */
+.approval__to { margin: 6px 0 2px; }
+.approval__to-cap { display: block; font-size: 12px; line-height: 16px; color: var(--mute); }
+.approval__addr { display: block; width: 100%; margin: 2px 0 6px; padding: 0; border: 0; background: none; text-align: left; color: var(--ink); font: inherit; font-family: var(--zf-mono, ui-monospace, "SF Mono", Menlo, monospace); font-size: 15px; line-height: 22px; font-variant-numeric: tabular-nums; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; cursor: pointer; }
+.approval__addr-copied { font-family: var(--font); color: var(--mute); }
+.approval__lands { color: var(--mute); }
+/* a Send fill sheet's first leg, what they get (the UI lead's ruling, 5 Nov): ink; the Safe's and Private's legs quiet */
+.approval__line.approval__lead { color: var(--ink); }

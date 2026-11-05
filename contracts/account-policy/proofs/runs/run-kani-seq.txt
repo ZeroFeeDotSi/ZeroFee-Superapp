@@ -1,0 +1,55 @@
+=== p2_level_order 04:38:23
+VERIFICATION RESULT:
+VERIFICATION:- SUCCESSFUL
+Verification Time: 102.51704s
+=== p3_floor 04:40:09
+VERIFICATION RESULT:
+VERIFICATION:- SUCCESSFUL
+Verification Time: 12.697419s
+=== p4_unless_frozen 04:40:27
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p7_moves_transfer_and_gas 04:45:33
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p7b_unknown_call_unmeasured 04:50:41
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p7c_add_move_saturates 04:55:53
+VERIFICATION RESULT:
+Failed Checks: unwinding assertion loop 0
+ File: "<builtin-library-memcmp>", line 25, in memcmp
+VERIFICATION:- FAILED
+Verification Time: 0.6126046s
+=== p10b_key_shape 04:56:04
+VERIFICATION RESULT:
+VERIFICATION:- SUCCESSFUL
+Verification Time: 0.5815482s
+=== p10_check_steps_bounds 04:56:09
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p1c_share_ppm_u64_range 05:01:42
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p1b_share_ppm_monotone 05:06:49
+error: Failed to get cargo metadata.: `cargo metadata` exited with an error:     Updating crates.io index
+error: failed to get `near-sdk` as a dependency of package `account-policy-proofs v0.1.0 ($WORKDIR/wt-proofs/contracts/account-policy/proofs)`
+=== p1_share_ppm_total 05:07:12
+error: Failed to get cargo metadata.: `cargo metadata` exited with an error:     Updating crates.io index
+error: failed to get `near-sdk` as a dependency of package `account-policy-proofs v0.1.0 ($WORKDIR/wt-proofs/contracts/account-policy/proofs)`
+=== p6b_unlisted_coin_is_strictest 05:07:33
+error: Failed to get cargo metadata.: `cargo metadata` exited with an error:     Updating crates.io index
+error: failed to get `near-sdk` as a dependency of package `account-policy-proofs v0.1.0 ($WORKDIR/wt-proofs/contracts/account-policy/proofs)`
+=== p6_level_for_moves_budget 05:07:56
+error: Failed to get cargo metadata.: `cargo metadata` exited with an error:     Updating crates.io index
+error: failed to get `near-sdk` as a dependency of package `account-policy-proofs v0.1.0 ($WORKDIR/wt-proofs/contracts/account-policy/proofs)`
+=== p5_check_bands_monotone 05:08:18
+error: Failed to get cargo metadata.: `cargo metadata` exited with an error:     Updating crates.io index
+error: failed to get `near-sdk` as a dependency of package `account-policy-proofs v0.1.0 ($WORKDIR/wt-proofs/contracts/account-policy/proofs)`
+=== p8_spent_rows_bounded 05:08:40
+error: Failed to get cargo metadata.: `cargo metadata` exited with an error:     Updating crates.io index
+error: failed to get `near-sdk` as a dependency of package `account-policy-proofs v0.1.0 ($WORKDIR/wt-proofs/contracts/account-policy/proofs)`
+=== p9_place_waits 05:09:02
+error: Failed to get cargo metadata.: `cargo metadata` exited with an error:     Updating crates.io index
+error: failed to get `near-sdk` as a dependency of package `account-policy-proofs v0.1.0 ($WORKDIR/wt-proofs/contracts/account-policy/proofs)`
+ALLDONE 05:09:25

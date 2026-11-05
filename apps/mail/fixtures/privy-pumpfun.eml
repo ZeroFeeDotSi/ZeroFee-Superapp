@@ -1,0 +1,33 @@
+From: "pump.fun" <no-reply@privy.io>
+To: lena.river@zerofee.si
+Subject: Your login code for pump.fun
+Date: Mon, 02 Nov 2026 15:04:11 +0000
+Message-ID: <a1b2c3d4e5@privy.io>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="b1_privy"
+
+--b1_privy
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+Welcome back to pump.fun!
+
+Enter this code to log in:
+
+482913
+
+This code expires in 10 minutes. If you didn=E2=80=99t request it, you can =
+ignore this email.
+
+Protected by Privy =C2=B7 https://privy.io/?ref=3D1093847
+--b1_privy
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+<html><head><style>.c{color:#101010}</style></head><body>
+<p>Welcome back to pump.fun!</p><p>Enter this code to log in:</p>
+<p style=3D"font-size:32px"><b>482913</b></p>
+<p>This code expires in 10 minutes.</p>
+<a href=3D"https://privy.io/?ref=3D1093847">Protected by Privy</a>
+</body></html>
+--b1_privy--

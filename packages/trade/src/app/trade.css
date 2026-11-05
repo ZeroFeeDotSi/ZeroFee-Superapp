@@ -1,0 +1,277 @@
+/* The Trade app, on @zerofee/design's tokens ("Monument"): hairlines, spaced capitals, light big numbers with tabular
+   figures, one solid ink pill per screen. Every colour comes from tokens.css. */
+.tr-app { position: absolute; inset: 0; --tr-faint: color-mix(in srgb, var(--ink) 5%, transparent); font-variant-numeric: tabular-nums; }
+
+.tr-field { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--r-sm, 12px); color: var(--mute); margin-top: 8px; }
+.tr-field input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--ink); font: 400 15px/1 var(--font); }
+.tr-field input::placeholder { color: var(--mute); }
+.tr-field:focus-within { border-color: transparent; box-shadow: inset 0 0 0 1.5px var(--ink); }
+
+.tr-tabs { display: flex; gap: 22px; margin-top: 16px; }
+.tr-tabs button { appearance: none; border: 0; background: none; padding: 0 0 5px; font: 400 14px/1.2 var(--font); color: var(--mute); cursor: pointer; }
+.tr-tabs button.on { color: var(--ink); box-shadow: 0 1px 0 var(--ink); }
+.tr-ranges { justify-content: space-between; gap: 0; padding: 0 4px; margin-top: 12px; }  /* six 44 pt ranges fit the phone; ALL was cut off */
+
+.tr-head { margin-top: 22px; }
+.tr-center { display: grid; place-items: center; padding: 32px 0; }
+.tr-tall { min-height: 60%; }
+/* a job made inside a row (ShortChain, Move more): its two lines are the row's small lines, one size, one colour */
+.tr-inline [data-testid="short-move-made"] { display: grid; gap: 2px; justify-items: center; }
+.tr-inline .zf-receipt__line { font: 400 13px/18px var(--font); color: var(--mute); }
+.tr-inline { display: grid; gap: 6px; justify-items: center; text-align: center; padding: 18px 0; }
+.tr-none { text-align: center; margin-top: 40px; }
+.tr-note { margin-top: 14px; }
+
+.tr-row { appearance: none; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); font: inherit; text-align: left; cursor: pointer; padding: 11px 0; }
+.tr-row .t, .tr-act .t { display: block; font-size: 16px; letter-spacing: -.01em; }
+.tr-row .d, .tr-act .d { display: block; font-size: 12.5px; color: var(--mute); margin-top: 2px; }
+.tr-right { display: grid; justify-items: end; gap: 2px; }
+.tr-v { font-size: 15px; letter-spacing: -.01em; }
+.tr-vd { font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+
+/* minmax(0, 1fr): the chart sizes itself to the column, never the column to the chart (it grew the page past the phone, round 2 walk) */
+.tr-coin { display: grid; grid-template-columns: minmax(0, 1fr); padding-bottom: 8px; }
+.tr-coin-head { display: flex; gap: 12px; align-items: center; margin-top: 4px; }
+.tr-sym { font-size: 16px; }
+.tr-price { font: var(--t-display); font-size: 44px; font-weight: 500; font-family: var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; line-height: 1.05; margin-top: 18px; overflow-wrap: anywhere; }
+.tr-change { margin-top: 8px; color: var(--ink-2); }
+.tr-mute { color: var(--mute); }
+.tr-chart-box { margin: 18px -4px 0; min-width: 0; overflow: hidden; }
+.tr-chart { display: block; overflow: visible; cursor: crosshair; }
+.tr-mode { appearance: none; border: 0; background: none; padding: 0 0 4px; color: var(--mute); cursor: pointer; display: inline-grid; place-items: center; }
+.tr-mode:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.tr-sec { margin: 22px 0 4px; }
+.tr-copy { font: inherit; padding: 0; }
+
+.tr-kvs { display: grid; margin-top: 14px; }
+.tr-kv { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+.tr-kv > span:first-child { color: var(--mute); }
+.tr-kv-r { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.tr-kv > span:first-child > small { display: block; margin-top: 2px; font-size: 12.5px; } /* a part's own why, under its name */
+.tr-kv-r small { font-size: 12.5px; color: var(--mute); }
+.tr-details { justify-self: center; margin-top: 4px; font-size: 13.5px; }
+
+.tr-floor { display: grid; gap: 10px; text-align: center; margin-top: 26px; }
+.tr-why { padding: 0 12px; }
+.tr-empty { display: grid; gap: 8px; text-align: center; padding-top: 40%; }
+
+.tr-big { appearance: none; border: 0; background: none; color: var(--ink); width: 100%; display: grid; gap: 8px; justify-items: center; padding: 14px 0 4px; cursor: pointer; }
+.tr-big-n { font-size: 64px; font-weight: 500; font-family: var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; line-height: 1; }
+.tr-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 18px; }
+.tr-presets button { appearance: none; height: 44px; border-radius: var(--r-sm, 12px); border: 1px solid var(--line); background: none; color: var(--ink); font: 400 14px/1 var(--font); cursor: pointer; }
+.tr-presets button.on { border-color: var(--ink); box-shadow: inset 0 0 0 .5px var(--ink); }
+.tr-kvs--sheet { margin-top: 10px; }
+.tr-sheet-floor { display: grid; gap: 10px; text-align: center; margin-top: 18px; }
+
+.tr-total { margin-top: 12px; }
+.tr-natives { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+.tr-natives > span { display: flex; gap: 12px; align-items: center; }
+.tr-natives > span > span { display: inline-flex; gap: 5px; align-items: center; }
+.tr-fund { display: inline-flex; align-items: center; gap: 2px; color: var(--ink); padding: 4px; }
+
+
+.tr-done { display: grid; justify-items: center; text-align: center; gap: 6px; padding-top: 8%; }
+.tr-done-mark { margin-bottom: 18px; }
+.tr-done-n { font-size: 38px; margin-top: 10px; }
+.tr-done .tr-kvs, .tr-done .tr-floor { width: 100%; }
+
+.tr-receive { display: grid; gap: 8px; padding-top: 6px; }
+.tr-addr { margin: 0; font: 400 15px/1.5 ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; color: var(--ink); }
+.tr-qr { justify-self: center; display: grid; place-items: center; padding: 14px; margin-top: 24px; border: 1px solid var(--line); border-radius: var(--r-md, 16px); }
+.tr-receive-note { text-align: center; margin: 10px 0 0; }
+.tr-fund-other { display: block; margin: 6px auto 0; }
+
+/* the first-run journey (D21): the words in the middle, the pill at the floor */
+.tr-setup { display: flex; flex-direction: column; min-height: 100%; text-align: center; }
+.tr-setup-fill { flex: 1; min-height: 24px; }
+.tr-setup-mid { display: grid; gap: 14px; justify-items: center; }
+.tr-setup--top { text-align: left; }
+.tr-setup-head { display: grid; gap: 10px; margin-top: 8px; }
+.tr-setup-rows { margin-top: 18px; }
+.tr-setup .tr-floor { margin-top: 18px; }
+
+.tr-row:focus-visible, .tr-presets button:focus-visible, .tr-tabs button:focus-visible, .tr-big:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* The coin page's Buy (and Sell) bar holds to the bottom of the screen while the page scrolls. The pushed screen's scroll
+   area keeps 18px + the safe area free at its foot, and a sticky bar stops there: it is pulled down by as much, to the edge. */
+.tr-coin-floor { position: sticky; bottom: calc(-18px - var(--zf-end, env(safe-area-inset-bottom, 0px))); z-index: 2; margin-top: 18px; padding: 12px 0 calc(12px + var(--zf-end, env(safe-area-inset-bottom, 0px))); background: var(--bg); box-shadow: 0 -1px 0 var(--line); }
+.tr-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* A second action beside the one pill: the same shape, outlined, never filled. */
+.tr-btn2 {
+  appearance: none; width: 100%; height: 56px; border-radius: 28px; border: 1px solid var(--ink); background: transparent; color: var(--ink);
+  font: 500 16px/1 var(--font); letter-spacing: -.01em; cursor: pointer; transition: transform var(--dur-base) var(--ease-out); -webkit-tap-highlight-color: transparent;
+}
+.tr-btn2:active { transform: scale(.98); transition-duration: var(--dur-fast); }
+.tr-main { margin-top: 2px; }
+/* the coin's own checks (BNB Chain, Robinhood Chain): a note per row, a warning in the ink's full weight */
+.tr-check > span:last-child { text-align: right; max-width: 70%; }
+.tr-check--warn > span:last-child { color: var(--ink); font-weight: 600; }
+
+/* One balance (TRADE-FLOAT.md §1): the top line, the sliders, Trading wallets, the moves. Hairlines and air; no cards. */
+.tr-line { appearance: none; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font: 400 13.5px/1.3 var(--font); letter-spacing: -.01em; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 0; margin-top: 10px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.tr-line > span { overflow: hidden; text-overflow: ellipsis; }
+.tr-line:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+
+.tr-sliders { display: grid; margin-top: 6px; }
+.tr-slider { display: grid; gap: 6px; padding: 14px 0 12px; border-bottom: 1px solid var(--line); }
+.tr-slider-top { display: flex; justify-content: space-between; align-items: baseline; }
+.tr-slider .t { font-size: 16px; letter-spacing: -.01em; }
+.tr-slider .d { font-size: 12.5px; color: var(--mute); }
+.tr-slider input[type="range"] { appearance: none; -webkit-appearance: none; width: 100%; height: 28px; margin: 0; background: none; cursor: pointer; }
+.tr-slider input[type="range"]::-webkit-slider-runnable-track { height: 1px; background: var(--line); }
+.tr-slider input[type="range"]::-moz-range-track { height: 1px; background: var(--line); }
+.tr-slider input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -10.5px; border-radius: 50%; background: var(--bg); border: 1px solid var(--ink); box-shadow: inset 0 0 0 .5px var(--ink); }
+.tr-slider input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--bg); border: 1px solid var(--ink); }
+.tr-slider input[type="range"]:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+
+.tr-wallets { padding-top: 6px; }
+.tr-wallets-total { margin-top: 10px; }
+.tr-wallets-sub { margin-top: 8px; }
+.tr-chain { display: grid; }
+.tr-chain .tr-sec { margin-bottom: 0; }
+.tr-chain > .zf-small { margin: 4px 0 2px; }
+.tr-fresh { justify-self: start; padding: 10px 0; }
+.tr-ready { width: 100%; text-align: left; }
+.tr-presets--2 { grid-template-columns: 1fr 1fr; }
+.tr-now { padding: 0; font: inherit; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+/* Trading wallets: Add and Take out right under the total */
+.tr-wallets-act { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 16px; }
+.tr-wallets-act .zf-btn { width: 100%; }
+/* Positions' chain row is a button to Trading wallets: no button look, and it wraps on a narrow phone */
+button.tr-natives { width: 100%; background: none; border: 0; padding: 12px 0 0; color: inherit; font: inherit; text-align: left; cursor: pointer; gap: 8px; }
+button.tr-natives > span { flex-wrap: wrap; row-gap: 6px; }
+/* a row that explains itself when tapped: a row's look, no button's */
+button.tr-why { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; font-size: 14.5px; text-align: left; cursor: pointer; padding: 11px 0; }
+button.tr-why > span:last-child { text-align: right; max-width: 70%; }
+.tr-why-text { margin: 8px 0 4px; color: var(--mute); }
+/* the Buy and Sell sheets' "Getting … ready" line: the mark beside the words */
+.tr-getready { display: flex; align-items: center; gap: 8px; }
+/* the chart's rise and fall (V1's green and red), readable on both grounds */
+.tr-app { --tr-up: #12925a; --tr-down: #d93c3c; }
+:root[data-theme="dark"] .tr-app { --tr-up: #2fc27c; --tr-down: #ff5a52; }
+.tr-chart { width: 100%; }
+/* Home (V1's): the action row, the moving strip, each chain's group, and the trending list */
+.tr-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0 6px; }
+.tr-actions button { display: grid; justify-items: center; gap: 6px; padding: 12px 0; border: 1px solid var(--line); border-radius: 16px; background: none; color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; }
+.tr-act-ic { font-size: 18px; line-height: 1; }
+.tr-strip { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--r-sm, 12px); background: none; color: var(--ink); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+.tr-groups { display: block; margin-top: 18px; }
+.tr-group + .tr-group { margin-top: 4px; }
+.tr-chainrow .tr-v { font-weight: 500; }
+.tr-chainic { width: 30px; text-align: center; font-size: 18px; color: var(--mute); }
+.tr-seeall { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; }
+.tr-movechoose { display: grid; gap: 4px; }
+/* Settings (V1's short groups) and Home's settings mark */
+.tr-homehead { display: flex; justify-content: space-between; align-items: center; }
+.tr-gear { background: none; border: 0; padding: 10px; margin: -10px; min-width: 44px; min-height: 44px; display: grid; place-items: center; color: var(--ink); cursor: pointer; }
+.tr-setrow { width: 100%; }
+.tr-toggle { flex: none; width: 44px; height: 26px; border-radius: 13px; background: var(--line); position: relative; transition: background var(--dur-base); }
+.tr-toggle > span { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--bg); box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform var(--dur-base) var(--ease-out); }
+.tr-toggle.on { background: var(--ink); }
+.tr-toggle.on > span { transform: translateX(18px); }
+/* the coin page (V1 port slice 4): the price's freshness, the chips (orders' steps), Latest trades / Whales, the bar's market cap */
+.tr-age, .tr-lbadge { margin-left: 10px; color: var(--mute); }
+.tr-lbadge { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; line-height: 16px; white-space: nowrap; flex: none; }
+.tr-chips { display: flex; flex-wrap: wrap; gap: 12px 8px; padding: 6px 0 4px; }
+.tr-chip { position: relative; appearance: none; min-height: 44px; display: inline-flex; align-items: center; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--ink); font: 400 13.5px/1.2 var(--font); cursor: pointer; }
+/* a 44 pt hit area round each chip, the chip itself stays small (Apple HIG: the target, not the drawing) */
+.tr-chip::after { content: ""; position: absolute; inset: -6px -4px; }
+/* T-3 Coin safety: the line that counts, then a row per check (its name, its sentence); something to know in full ink,
+   a check not run yet in the quiet colour */
+.tr-safety-sum { margin: 4px 0 4px; font-size: 15px; line-height: 1.35; color: var(--ink); }
+.tr-safety-row { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; line-height: 1.35; }
+.tr-safety-row > span:first-child { color: var(--mute); }
+.tr-safety-row--know > span:last-child { color: var(--ink); font-weight: 600; }
+.tr-safety-row--unread > span:last-child { color: var(--mute); }
+.tr-trades-head { display: flex; align-items: flex-end; justify-content: space-between; }
+.tr-sizes { display: flex; gap: 16px; margin: 0 0 4px; }
+.tr-sizes button { appearance: none; border: 0; background: none; padding: 0 0 5px; font: 400 14px/1.2 var(--font); color: var(--mute); cursor: pointer; }
+.tr-sizes button.on { color: var(--ink); box-shadow: 0 1px 0 var(--ink); }
+.tr-trades .tr-none { margin-top: 14px; }
+.tr-coin-floor { display: flex; align-items: center; gap: 14px; }
+.tr-coin-floor > :not(.tr-mc) { flex: 1; }
+.tr-mc { display: grid; text-align: left; line-height: 1.2; flex: 0 0 auto; }
+.tr-mc b { font: 600 15px/1.2 var(--font); color: var(--ink); }
+.tr-mc .zf-small { color: var(--mute); }
+/* the trade sheet's pill (V1 slice 5): it squishes under the finger and a ring spreads from it, once per press */
+.tr-press { position: relative; overflow: hidden; transition: transform var(--dur-fast) var(--ease-out); }
+.tr-press:active:not(:disabled) { transform: scale(.98); }
+.tr-ripple { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; background: var(--bg); opacity: 0; pointer-events: none; animation: tr-ripple var(--dur-base) var(--ease-out); }
+@keyframes tr-ripple { from { transform: scale(.98); opacity: 0.12; } to { transform: scale(1.02); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .tr-press { transition: none; } .tr-press:active:not(:disabled) { transform: none; } .tr-ripple { animation: none; } }
+/* the search field's Paste pill (V1's): only while the field is empty */
+.tr-paste { appearance: none; flex: 0 0 auto; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--ink); font: 400 13px/1.2 var(--font); cursor: pointer; }
+/* offline (A10): one plain line at the top of the screen that is up */
+.tr-offline { margin: 6px 0 10px; padding: 10px 14px; border-radius: 12px; background: var(--ink); color: var(--bg); font: 400 13.5px/1.35 var(--font); text-align: center; }
+/* a Solana socket swap the chain hasn't confirmed yet (Security, 28 Oct, B): faded, "confirming", solid once it is */
+.tr-trades .tr-confirming { opacity: 0.45; }
+/* Trading wallets (slice 6): each wallet's full address, Copy, and Move all */
+.tr-wallet { display: grid; gap: 4px; padding-bottom: 6px; }
+.tr-addr { display: flex; align-items: baseline; gap: 10px; }
+.tr-addr code { flex: 1; min-width: 0; overflow-wrap: anywhere; font: 400 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--mute); user-select: all; }
+.tr-moveall { justify-self: start; padding: 2px 0 4px; }
+/* Activity as V1's job cards (slice 7): a header that opens, a badge, the steps as a timeline that fills */
+.tr-oldwords { display: block; font-size: 12.5px; color: var(--mute); }
+/* Add to Trading: what it's paid with (slice 6: any coin the main balance holds) */
+.tr-paywith { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.tr-paycoin { appearance: none; display: inline-grid; padding: 6px 12px; border: 1px solid var(--line); border-radius: 12px; background: none; color: var(--ink); font: 500 14px/1.2 var(--font); cursor: pointer; text-align: left; }
+.tr-paycoin small { font: 400 12px/1.2 var(--font); color: var(--mute); }
+.tr-paycoin.on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.tr-paynote { margin-top: 8px; }
+/* a row that is a button (Home's chain rows, the Move chooser, Settings; re-walk.2 / 8.3 / 9.4 / 24.2): a row's look,
+   never the button's grey box; and a row with no icon (two children) gives its words the first column, not the icon's 30 px */
+.tr-app button.zf-row { appearance: none; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.tr-app .zf-row:has(> :nth-child(2):last-child) { grid-template-columns: 1fr auto; }
+.tr-app .zf-row > span:not(.tr-right) { min-width: 0; }
+.tr-app .zf-row .t, .tr-app .zf-row .d { display: block; }
+/* the Trade tab's movers windows (V1's 5m · 1h · 6h · 24h) */
+.tr-wins { display: flex; gap: 8px; margin-top: 14px; overflow-x: auto; overscroll-behavior-x: none; }
+.tr-wins button { appearance: none; flex: 0 0 auto; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--mute); font: 400 13px/1.2 var(--font); cursor: pointer; }
+.tr-wins button.on { color: var(--ink); border-color: var(--ink); }
+/* Trade opening: its frame at once, with quiet rows where the list comes (never a blank screen with a logo) */
+.tr-skel { display: grid; gap: 18px; padding: 24px 0; }
+.tr-skel-row { display: flex; align-items: center; gap: 14px; }
+.tr-skel-bar, .tr-skel-dot { display: block; background: var(--line); border-radius: 8px; animation: none; }
+.tr-skel-bar { height: 14px; flex: 1; }
+.tr-skel-big { height: 40px; width: 60%; flex: none; margin-bottom: 10px; }
+.tr-skel-dot { width: 36px; height: 36px; border-radius: 50%; flex: none; }
+@keyframes tr-skel { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .tr-skel-bar, .tr-skel-dot { animation: none; } }
+/* the chart ranges and the line/candle switch: 44 pt targets, the chosen one underlined at the text */
+.tr-ranges button { min-height: 44px; min-width: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.tr-ranges button.on { box-shadow: none; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 7px; }
+.tr-rowline { margin: 0 0 8px; color: var(--mute); font-variant-numeric: tabular-nums; }
+/* T-5 Your coins: a long symbol ends in … rather than running over the value (review L3) */
+.tr-yours .zf-row > span:nth-child(2) { min-width: 0; }
+.tr-yours .t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-yours-total { margin: 6px 0 2px; color: var(--ink-2); }
+/* T-1 price orders */
+.tr-orders { margin-top: 18px; }
+.tr-order { border-bottom: 1px solid var(--line); padding: 2px 0 8px; }
+/* one hairline per order (e2e walk 3 Nov: the row's own line and the order's sat 8 px apart, two hairlines) */
+.tr-order > .tr-kv { border-bottom: 0; }
+.tr-order .zf-link { padding: 6px 12px 6px 0; min-height: 36px; }
+.tr-order .tr-order-new { grid-template-columns: 1fr auto; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); font: inherit; cursor: pointer; }
+.tr-order .tr-order-new:disabled { opacity: .5; }
+.tr-order-sheet { display: grid; gap: 12px; }
+.tr-chip.on { box-shadow: inset 0 0 0 1px var(--hair); color: var(--ink); }
+.tr-missed { display: grid; gap: 10px; margin-top: 12px; }
+.tr-missed-acts { display: flex; gap: 8px; }
+
+
+
+/* The coin page's own rules: app/coinpage.css; Buy, Sell and the moment: screens/sheet.css; Discover: discover.css; Activity: activity.css (design review 2026-11-03). */
+
+/* ── The button system (the design review §2.1; CSS only, class names kept): the second action is B2 on the soft fill,
+   never an outline; Paste, the list windows and chips are B4 chips (32 pt, radius 16, 15/600). */
+.tr-btn2 { height: 50px; border: 0; border-radius: 14px; background: var(--act-fill); color: var(--ink); font: 600 17px/22px var(--font); }
+.tr-paste, .tr-wins button { height: 32px; padding: 0 12px; border: 0; border-radius: 16px; background: var(--act-fill); color: var(--ink); font: 600 15px/20px var(--font); }
+.tr-chip { min-height: 32px; padding: 6px 12px; border: 0; border-radius: 16px; background: var(--act-fill); font-weight: 600; }
+.tr-chip.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+/* audit 5 Nov: amount and limit presets are the B4 chips of the button system (soft fill, the chosen one ink), never
+   outlined boxes; Settings' five limits sit on one row (20% wrapped alone onto a second, touching the line under it) */
+.tr-presets { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); grid-auto-flow: column; }
+.tr-presets--2 { grid-auto-flow: row; }
+.tr-presets button { border: 0; background: var(--act-fill); font: 600 15px/20px var(--font); }
+.tr-presets button.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+.tr-settings .tr-presets + .zf-small { margin-top: 10px; }

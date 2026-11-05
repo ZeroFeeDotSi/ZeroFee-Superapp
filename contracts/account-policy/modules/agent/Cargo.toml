@@ -1,0 +1,28 @@
+[package]
+name = "agent-limits"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# A small contract around the limits, to prove them on testnet before S1 merges them into the account contract.
+harness = []
+
+[dependencies]
+near-sdk = "5"
+# The raw runtime calls, for reading the signing key and deleting ML-DSA-65 keys (near-sdk's PublicKey type predates them).
+near-sys = "=0.2.14"
+
+[dev-dependencies]
+near-sdk = { version = "5", features = ["unit-testing"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true

@@ -1,0 +1,59 @@
+Kani Rust Verifier 0.68.0 (cargo plugin)
+CBMC 6.11.0
+warning: Found the following unsupported constructs:
+             - call to LLVM intrinsic `llvm.aarch64.neon.umaxp.v16i8` (1)
+             - caller_location (1)
+             - foreign function (2)
+             - simd_cast (1)
+         
+         Verification will fail if one or more of these constructs is reachable.
+         See https://model-checking.github.io/kani/rust-feature-support.html for more details.
+warning: Kani currently does not support concurrency. The following constructs will be treated as sequential operations:
+             - atomic_load (3)
+             - atomic_store (3)
+             - thread local (replaced by static variable) (1)
+         
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.63s
+warning: the following packages contain code that will be rejected by a future version of Rust: account-policy-proofs v0.1.0 ($WORKDIR/wt-proofs/contracts/account-policy/proofs), primitive-types v0.10.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+Checking harness contract::kani_proofs::p12_chain_gas_sum_overflow_witness...
+  - Stub: near_sdk :: env :: log_str -> log_stub
+  - Stub: near_sdk :: env :: current_account_id -> me_stub
+  - Stub: near_sdk :: env :: panic_str -> panic_fail
+VERIFICATION RESULT:
+ ** 1 of 3820 failed (3819 undetermined)
+Failed Checks: unwinding assertion loop 0
+ File: "~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/near-account-id-2.6.0/src/validation.rs", line 65, in near_sdk::near_account_id::validation::validate
+VERIFICATION:- FAILED
+[Kani] info: Verification output shows one or more unwinding failures.
+[Kani] tip: Consider increasing the unwinding value or disabling `--unwinding-assertions`.
+Verification Time: 1.5073428s
+Checking harness contract::kani_proofs::p11_aged_hash...
+  - Stub: near_sdk :: env :: storage_read -> ages_read_stub
+  - Stub: near_sdk :: env :: block_timestamp -> now_stub
+CBMC failed
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+Checking harness contract::kani_proofs::p10b_key_shape...
+VERIFICATION RESULT:
+ ** 0 of 190 failed (2 unreachable)
+VERIFICATION:- SUCCESSFUL
+Verification Time: 0.35690767s
+Checking harness contract::kani_proofs::p10_check_steps_bounds...
+  - Stub: near_sdk :: env :: panic_str -> panic_prune
+VERIFICATION RESULT:
+ ** 3 of 525 failed (522 undetermined)
+Failed Checks: "{}", msg
+ File: "src/../generated/contract.rs", line 1222, in contract::check_steps
+Failed Checks: "{}", msg
+ File: "src/../generated/contract.rs", line 1226, in contract::check_steps
+Failed Checks: unwinding assertion loop 0
+ File: "<builtin-library-memcmp>", line 25, in memcmp
+VERIFICATION:- FAILED
+[Kani] info: Verification output shows one or more unwinding failures.
+[Kani] tip: Consider increasing the unwinding value or disabling `--unwinding-assertions`.
+Verification Time: 10.640227s
+Checking harness contract::kani_proofs::p9_place_waits...
+  - Stub: near_sdk :: env :: panic_str -> panic_prune
+  - Stub: near_sdk :: env :: log_str -> log_stub
+  - Stub: near_sdk :: env :: storage_read -> storage_read_stub

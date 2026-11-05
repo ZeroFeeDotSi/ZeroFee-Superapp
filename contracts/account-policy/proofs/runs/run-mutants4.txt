@@ -1,0 +1,151 @@
+Found 314 mutants to test
+ok       Unmutated baseline in 81s build + 0s test
+MISSED   src/lib.rs:71:39: replace * with + in 1s build + 0s test
+MISSED   src/lib.rs:71:39: replace * with / in 1s build + 0s test
+MISSED   src/lib.rs:72:29: replace * with + in 1s build + 0s test
+MISSED   src/lib.rs:140:9: replace Level::with_device -> Level with Default::default() in 2s build + 0s test
+MISSED   src/lib.rs:254:9: replace Change::is_module -> bool with true in 1s build + 0s test
+MISSED   src/lib.rs:263:5: replace is_setup_step -> bool with true in 2s build + 0s test
+MISSED   src/lib.rs:265:9: delete match arm Change::KidsSet{..} | Change::KidsOff in is_setup_step in 2s build + 0s test
+MISSED   src/lib.rs:367:38: replace == with != in AccountPolicy::execute in 2s build + 0s test
+MISSED   src/lib.rs:414:38: replace == with != in AccountPolicy::execute_many in 2s build + 1s test
+MISSED   src/lib.rs:477:145: replace && with || in AccountPolicy::approve in 2s build + 0s test
+MISSED   src/lib.rs:477:85: replace && with || in AccountPolicy::approve in 1s build + 1s test
+MISSED   src/lib.rs:477:68: replace && with || in AccountPolicy::approve in 1s build + 0s test
+MISSED   src/lib.rs:477:58: replace == with != in AccountPolicy::approve in 2s build + 0s test
+MISSED   src/lib.rs:477:71: delete ! in AccountPolicy::approve in 1s build + 0s test
+MISSED   src/lib.rs:477:138: replace == with != in AccountPolicy::approve in 1s build + 0s test
+MISSED   src/lib.rs:478:12: delete ! in AccountPolicy::approve in 1s build + 0s test
+MISSED   src/lib.rs:478:32: replace && with || in AccountPolicy::approve in 2s build + 0s test
+MISSED   src/lib.rs:479:35: replace != with == in AccountPolicy::approve in 2s build + 0s test
+MISSED   src/lib.rs:487:47: replace || with && in AccountPolicy::approve in 1s build + 0s test
+MISSED   src/lib.rs:488:29: replace || with && in AccountPolicy::approve in 1s build + 0s test
+MISSED   src/lib.rs:511:27: replace && with || in AccountPolicy::decline in 1s build + 0s test
+MISSED   src/lib.rs:517:76: replace && with || in AccountPolicy::decline in 1s build + 0s test
+MISSED   src/lib.rs:517:48: replace && with || in AccountPolicy::decline in 1s build + 0s test
+MISSED   src/lib.rs:517:79: delete ! in AccountPolicy::decline in 1s build + 0s test
+MISSED   src/lib.rs:624:16: replace < with > in AccountPolicy::finish_recovery in 1s build + 0s test
+MISSED   src/lib.rs:633:55: replace != with == in AccountPolicy::finish_recovery in 2s build + 1s test
+MISSED   src/lib.rs:643:73: delete ! in AccountPolicy::finish_recovery in 2s build + 0s test
+MISSED   src/lib.rs:670:59: replace / with % in AccountPolicy::cancel_recovery in 1s build + 0s test
+MISSED   src/lib.rs:670:59: replace / with * in AccountPolicy::cancel_recovery in 1s build + 0s test
+MISSED   src/lib.rs:670:54: replace / with % in AccountPolicy::cancel_recovery in 1s build + 0s test
+MISSED   src/lib.rs:670:54: replace / with * in AccountPolicy::cancel_recovery in 2s build + 0s test
+MISSED   src/lib.rs:678:9: replace AccountPolicy::release_version -> u32 with 0 in 1s build + 0s test
+MISSED   src/lib.rs:678:9: replace AccountPolicy::release_version -> u32 with 1 in 2s build + 1s test
+MISSED   src/lib.rs:700:9: replace AccountPolicy::frozen_until -> Option<U64> with None in 2s build + 0s test
+MISSED   src/lib.rs:700:9: replace AccountPolicy::frozen_until -> Option<U64> with Some(Default::default()) in 2s build + 0s test
+MISSED   src/lib.rs:703:34: replace || with && in AccountPolicy::frozen_until in 1s build + 0s test
+MISSED   src/lib.rs:703:60: replace < with == in AccountPolicy::frozen_until in 1s build + 0s test
+MISSED   src/lib.rs:703:60: replace < with > in AccountPolicy::frozen_until in 1s build + 0s test
+MISSED   src/lib.rs:703:60: replace < with <= in AccountPolicy::frozen_until in 1s build + 0s test
+MISSED   src/lib.rs:707:9: replace AccountPolicy::waiting_requests -> Vec<Pending> with vec![] in 2s build + 0s test
+MISSED   src/lib.rs:749:9: replace AccountPolicy::spent_today -> Vec<(String, U128)> with vec![] in 2s build + 0s test
+MISSED   src/lib.rs:763:9: replace AccountPolicy::second_devices_of_age -> u32 with 0 in 2s build + 1s test
+MISSED   src/lib.rs:763:9: replace AccountPolicy::second_devices_of_age -> u32 with 1 in 1s build + 0s test
+MISSED   src/lib.rs:769:9: replace AccountPolicy::second_device_ages -> Vec<(Base64VecU8, U64)> with vec![] in 1s build + 0s test
+MISSED   src/lib.rs:775:55: replace == with != in AccountPolicy::second_device_ages in 1s build + 0s test
+MISSED   src/lib.rs:776:53: replace >= with < in AccountPolicy::second_device_ages in 1s build + 0s test
+MISSED   src/lib.rs:783:9: replace AccountPolicy::pending -> Option<PendingRecovery> with None in 2s build + 0s test
+MISSED   src/lib.rs:787:9: replace AccountPolicy::delay_seconds -> U64 with Default::default() in 2s build + 0s test
+MISSED   src/lib.rs:787:36: replace / with % in AccountPolicy::delay_seconds in 1s build + 0s test
+MISSED   src/lib.rs:787:36: replace / with * in AccountPolicy::delay_seconds in 2s build + 1s test
+MISSED   src/lib.rs:820:26: replace > with >= in AccountPolicy::counts in 1s build + 0s test
+MISSED   src/lib.rs:820:89: replace == with != in AccountPolicy::counts in 1s build + 1s test
+MISSED   src/lib.rs:831:81: replace && with || in AccountPolicy::level_for_moves in 2s build + 0s test
+MISSED   src/lib.rs:831:77: replace > with >= in AccountPolicy::level_for_moves in 2s build + 0s test
+MISSED   src/lib.rs:831:117: replace && with || in AccountPolicy::level_for_moves in 1s build + 0s test
+MISSED   src/lib.rs:831:112: replace == with != in AccountPolicy::level_for_moves in 1s build + 0s test
+MISSED   src/lib.rs:831:123: replace > with >= in AccountPolicy::level_for_moves in 2s build + 0s test
+MISSED   src/lib.rs:863:49: replace && with || in AccountPolicy::place in 1s build + 0s test
+MISSED   src/lib.rs:888:111: replace && with || in AccountPolicy::waiting in 2s build + 1s test
+MISSED   src/lib.rs:896:9: replace AccountPolicy::key_in_use -> bool with false in 2s build + 0s test
+MISSED   src/lib.rs:899:13: replace || with && in AccountPolicy::key_in_use in 2s build + 1s test
+MISSED   src/lib.rs:898:13: replace || with && in AccountPolicy::key_in_use in 2s build + 1s test
+MISSED   src/lib.rs:897:13: replace || with && in AccountPolicy::key_in_use in 3s build + 0s test
+MISSED   src/lib.rs:896:58: replace == with != in AccountPolicy::key_in_use in 2s build + 1s test
+MISSED   src/lib.rs:899:67: replace == with != in AccountPolicy::key_in_use in 2s build + 1s test
+MISSED   src/lib.rs:901:27: replace || with && in AccountPolicy::key_in_use in 2s build + 1s test
+MISSED   src/lib.rs:907:77: replace < with <= in AccountPolicy::in_setup_window in 2s build + 1s test
+MISSED   src/lib.rs:934:9: replace AccountPolicy::drop_unapproved with () in 4s build + 1s test
+MISSED   src/lib.rs:934:60: delete ! in AccountPolicy::drop_unapproved in 2s build + 1s test
+MISSED   src/lib.rs:944:9: replace AccountPolicy::forget_second_device with () in 2s build + 1s test
+MISSED   src/lib.rs:944:42: replace != with == in AccountPolicy::forget_second_device in 2s build + 1s test
+MISSED   src/lib.rs:947:33: replace != with == in AccountPolicy::forget_second_device in 3s build + 1s test
+MISSED   src/lib.rs:951:43: replace / with % in AccountPolicy::forget_second_device in 2s build + 1s test
+MISSED   src/lib.rs:951:43: replace / with * in AccountPolicy::forget_second_device in 1s build + 0s test
+MISSED   src/lib.rs:962:9: replace AccountPolicy::co_signed -> bool with true in 1s build + 1s test
+MISSED   src/lib.rs:962:9: replace AccountPolicy::co_signed -> bool with false in 1s build + 1s test
+MISSED   src/lib.rs:963:20: replace && with || in AccountPolicy::co_signed in 2s build + 1s test
+MISSED   src/lib.rs:963:50: replace == with != in AccountPolicy::co_signed in 1s build + 1s test
+MISSED   src/lib.rs:963:140: replace && with || in AccountPolicy::co_signed in 2s build + 1s test
+MISSED   src/lib.rs:963:133: replace == with != in AccountPolicy::co_signed in 3s build + 1s test
+MISSED   src/lib.rs:968:9: replace AccountPolicy::floor_ns -> u64 with 0 in 2s build + 1s test
+MISSED   src/lib.rs:968:9: replace AccountPolicy::floor_ns -> u64 with 1 in 2s build + 1s test
+MISSED   src/lib.rs:968:32: replace + with - in AccountPolicy::floor_ns in 2s build + 1s test
+MISSED   src/lib.rs:973:9: replace AccountPolicy::aged -> bool with true in 3s build + 1s test
+MISSED   src/lib.rs:973:9: replace AccountPolicy::aged -> bool with false in 2s build + 1s test
+MISSED   src/lib.rs:977:9: replace AccountPolicy::aged_hash -> bool with true in 2s build + 1s test
+MISSED   src/lib.rs:977:9: replace AccountPolicy::aged_hash -> bool with false in 2s build + 1s test
+MISSED   src/lib.rs:978:48: replace == with != in AccountPolicy::aged_hash in 2s build + 1s test
+MISSED   src/lib.rs:978:103: replace >= with < in AccountPolicy::aged_hash in 2s build + 1s test
+MISSED   src/lib.rs:983:9: replace AccountPolicy::aged_second_devices -> usize with 0 in 2s build + 1s test
+MISSED   src/lib.rs:991:9: replace AccountPolicy::restart_young_ages with () in 2s build + 1s test
+MISSED   src/lib.rs:994:61: replace < with == in AccountPolicy::restart_young_ages in 2s build + 1s test
+MISSED   src/lib.rs:994:61: replace < with > in AccountPolicy::restart_young_ages in 2s build + 1s test
+MISSED   src/lib.rs:994:61: replace < with <= in AccountPolicy::restart_young_ages in 2s build + 1s test
+MISSED   src/lib.rs:1011:36: replace && with || in AccountPolicy::unless_frozen in 3s build + 1s test
+MISSED   src/lib.rs:1014:41: replace / with % in AccountPolicy::unless_frozen in 2s build + 1s test
+MISSED   src/lib.rs:1014:41: replace / with * in AccountPolicy::unless_frozen in 2s build + 1s test
+MISSED   src/lib.rs:1030:9: replace AccountPolicy::owner_active with () in 2s build + 1s test
+MISSED   src/lib.rs:1034:9: replace AccountPolicy::device_gate with () in 2s build + 1s test
+MISSED   src/lib.rs:1035:50: replace || with && in AccountPolicy::device_gate in 2s build + 1s test
+MISSED   src/lib.rs:1035:80: replace == with != in AccountPolicy::device_gate in 2s build + 1s test
+MISSED   src/lib.rs:1049:9: replace AccountPolicy::index -> usize with 0 in 2s build + 1s test
+MISSED   src/lib.rs:1058:9: replace AccountPolicy::drop_waiting with () in 2s build + 1s test
+MISSED   src/lib.rs:1078:56: replace == with != in AccountPolicy::finish in 2s build + 1s test
+MISSED   src/lib.rs:1140:57: delete ! in AccountPolicy::finish in 3s build + 1s test
+MISSED   src/lib.rs:1143:44: replace != with == in AccountPolicy::finish in 3s build + 1s test
+MISSED   src/lib.rs:1170:9: replace AccountPolicy::prune with () in 3s build + 1s test
+MISSED   src/lib.rs:1213:5: replace dispatch_chain with () in 3s build + 1s test
+MISSED   src/lib.rs:1217:171: replace + with - in dispatch_chain in 3s build + 1s test
+MISSED   src/lib.rs:1217:140: replace + with * in dispatch_chain in 3s build + 1s test
+MISSED   src/lib.rs:1257:5: replace moves_nothing_more -> bool with true in 3s build + 1s test
+MISSED   src/lib.rs:1260:65: replace == with != in moves_nothing_more in 3s build + 1s test
+MISSED   src/lib.rs:1308:30: replace != with == in moves in 2s build + 1s test
+MISSED   src/lib.rs:1322:30: replace != with == in moves in 2s build + 1s test
+MISSED   src/lib.rs:1341:5: replace parties -> Option<Vec<AccountId>> with None in 3s build + 1s test
+MISSED   src/lib.rs:1341:5: replace parties -> Option<Vec<AccountId>> with Some(vec![]) in 3s build + 1s test
+MISSED   src/lib.rs:1341:5: replace parties -> Option<Vec<AccountId>> with Some(vec![Default::default()]) in 2s build + 1s test
+MISSED   src/lib.rs:1345:13: replace || with && in parties in 3s build + 1s test
+MISSED   src/lib.rs:1345:37: replace && with || in parties in 3s build + 1s test
+MISSED   src/lib.rs:1345:26: replace == with != in parties in 2s build + 1s test
+MISSED   src/lib.rs:1345:52: replace == with != in parties in 3s build + 1s test
+MISSED   src/lib.rs:1346:12: delete ! in parties in 3s build + 1s test
+MISSED   src/lib.rs:1354:55: replace || with && in parties in 3s build + 1s test
+MISSED   src/lib.rs:1354:88: replace && with || in parties in 3s build + 1s test
+MISSED   src/lib.rs:1354:71: replace == with != in parties in 3s build + 1s test
+MISSED   src/lib.rs:1354:91: delete ! in parties in 3s build + 1s test
+MISSED   src/lib.rs:1355:53: replace && with || in parties in 2s build + 1s test
+MISSED   src/lib.rs:1355:42: replace == with != in parties in 2s build + 1s test
+MISSED   src/lib.rs:1356:21: replace && with || in parties in 2s build + 1s test
+MISSED   src/lib.rs:1356:24: delete ! in parties in 2s build + 1s test
+MISSED   src/lib.rs:1359:12: delete ! in parties in 2s build + 1s test
+MISSED   src/lib.rs:1372:5: replace is_ml_dsa_65_key -> bool with true in 3s build + 1s test
+MISSED   src/lib.rs:1372:49: replace && with || in is_ml_dsa_65_key in 2s build + 1s test
+MISSED   src/lib.rs:1395:5: replace load_key -> Option<T> with None in 4s build + 1s test
+MISSED   src/lib.rs:1399:5: replace store_key with () in 2s build + 1s test
+MISSED   src/lib.rs:1403:5: replace forget_approver with () in 3s build + 1s test
+MISSED   src/lib.rs:1405:27: replace != with == in forget_approver in 3s build + 1s test
+MISSED   src/lib.rs:1406:17: replace != with == in forget_approver in 4s build + 1s test
+MISSED   src/lib.rs:1414:5: replace read_all_state with () in 3s build + 1s test
+MISSED   src/lib.rs:1452:19: replace || with && in share_ppm in 3s build + 1s test
+MISSED   src/lib.rs:1458:43: replace / with % in share_ppm in 4s build + 1s test
+MISSED   src/lib.rs:1458:43: replace / with * in share_ppm in 3s build + 1s test
+MISSED   src/lib.rs:1464:5: replace is_setting -> bool with false in 4s build + 1s test
+MISSED   src/lib.rs:1468:36: replace - with / in signer_key in 3s build + 1s test
+MISSED   src/lib.rs:1480:5: replace add_function_call_key with () in 3s build + 1s test
+MISSED   src/lib.rs:1500:5: replace renew_function_call_key with () in 3s build + 1s test
+MISSED   src/lib.rs:1520:5: replace delete_key with () in 4s build + 1s test
+314 mutants tested in 20m: 147 missed, 136 caught, 31 unviable
+exit=2 ALLDONE 14:25:54

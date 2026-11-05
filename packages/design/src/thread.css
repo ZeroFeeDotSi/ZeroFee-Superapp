@@ -1,0 +1,44 @@
+/* The one thread (Thread.tsx): five hairline segments with their names, one line under them. No box in a box: a hairline
+   above and below. The step under way has the brand mint; done steps the ink; the rest the hairline colour. */
+.zf-thread {
+  appearance: none; display: grid; gap: 12px; width: 100%; margin: 0; padding: 16px 0 4px; border: 0; background: none;
+  border-bottom: .5px solid var(--line); color: var(--ink); text-align: left; font: inherit; cursor: default;
+}
+button.zf-thread { cursor: pointer; }
+.zf-thread__steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; list-style: none; margin: 0; padding: 0; }
+.zf-thread__step { display: grid; gap: 6px; align-content: start; }
+.zf-thread__seg { height: 3px; border-radius: 2px; background: var(--line); }
+.zf-thread__step--done .zf-thread__seg { background: var(--ink); }
+.zf-thread__step--now .zf-thread__seg { position: relative; overflow: hidden; background: var(--up); }
+/* flow (motion.css): the step under way carries the light that runs along a live row's line, then rests */
+.zf-thread__step--now .zf-thread__seg::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent 42%, var(--flow-light, rgba(255, 255, 255, .5)) 50%, transparent 58%); transform: translateX(-50%); animation: none; display: none; }
+@keyframes zf-flow { 0% { transform: translateX(-50%); } 60%, 100% { transform: translateX(50%); } }
+@media (prefers-reduced-motion: reduce) { .zf-thread__step--now .zf-thread__seg::after { animation: none; opacity: 0; } }
+/* v2 (HOME-VISUAL §3.5): the five 10 px names wrapped ("Second device") and said again what the line under them says;
+   they stay for screen readers, out of sight */
+.zf-thread__name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.zf-thread__step--now .zf-thread__name, .zf-thread__step--done .zf-thread__name { color: var(--ink); }
+.zf-thread__line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font: 400 16px/22px var(--font); letter-spacing: 0; }
+.zf-thread__line svg { flex: none; color: var(--mute); }
+.zf-thread .zf-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* v2: a thread with no line to say is progress only (set-up's steps): five short segments, centred, 132 wide, with no
+   rule under it. It was a full-width bar floating in empty space with a stray hairline (product decision, 3 Nov). */
+div.zf-thread:has(> .zf-thread__line > span:empty:only-child) { width: 132px; margin: 12px auto 0; padding: 0; gap: 0; border: 0; }
+div.zf-thread:has(> .zf-thread__line > span:empty:only-child) > .zf-thread__line { display: none; }
+div.zf-thread:has(> .zf-thread__line > span:empty:only-child) .zf-thread__seg { height: 4px; }
+/* R2 (4 Nov, the design review §2.4): the thread is never drawn without its label. A T6 line under the five segments says
+   where you are, counted by CSS (no JS): "Step 4 of 5" where a line under it names the step (Home's card), and
+   "Step 1 of 5 · Words" where it is progress only (set-up). */
+.zf-thread__steps { position: relative; counter-reset: zf-step; }
+.zf-thread__step { counter-increment: zf-step; }
+.zf-thread__step--now .zf-thread__name { position: absolute; top: calc(100% + 8px); left: 0; width: auto; height: auto; overflow: visible; clip: auto;
+  color: var(--mute); font: 400 15px/20px var(--font); letter-spacing: 0; white-space: nowrap; pointer-events: none; }
+.zf-thread__step--now .zf-thread__name::before { content: "Step " counter(zf-step) " of 5 · "; }
+button.zf-thread .zf-thread__steps { margin-bottom: 28px; }
+button.zf-thread .zf-thread__step--now .zf-thread__name { font-size: 0; }
+button.zf-thread .zf-thread__step--now .zf-thread__name::before { content: "Step " counter(zf-step) " of 5"; font-size: 15px; }
+button.zf-thread .zf-thread__line { font-size: 17px; }
+div.zf-thread:has(> .zf-thread__line > span:empty:only-child) { margin-bottom: 28px; }
+div.zf-thread:has(> .zf-thread__line > span:empty:only-child) .zf-thread__step--now .zf-thread__name { left: 50%; transform: translateX(-50%); }
+div.zf-thread:has(> .zf-thread__line > span:empty:only-child) .zf-thread__steps { position: static; }
+:where(div.zf-thread:has(> .zf-thread__line > span:empty:only-child)) { position: relative; } /* zero weight: a bar that places the thread (set-up's .ob-top) keeps its own position */

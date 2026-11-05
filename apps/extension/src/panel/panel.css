@@ -1,0 +1,53 @@
+/* The panel, on @zerofee/design's tokens ("Monument") and Trade's own classes (tr-*), so it reads as the same product:
+   hairlines, spaced capitals, light big numbers, one solid ink pill per screen. Only the panel's frame is new here. */
+html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+#root { position: relative; overflow: hidden; }
+
+.p-screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font-variant-numeric: tabular-nums; }
+.p-wait { display: grid; place-items: center; }
+.p-top { position: relative; flex: none; height: 52px; display: grid; place-items: center; }
+.p-top-l { position: absolute; left: 22px; top: 12px; }
+.p-top-r { position: absolute; right: 22px; top: 14px; }
+.p-title { color: var(--ink); }
+.p-main { position: relative; flex: 1; min-height: 0; overflow-y: auto; padding: 0 24px 18px; display: flex; flex-direction: column; overscroll-behavior: contain; }
+.p-main--pushed { padding-bottom: 24px; }
+.p-slot { position: relative; flex: 1; margin: 0 -24px -18px; }
+
+.p-tray { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line); padding: 8px 6px 12px; }
+.p-tray button { appearance: none; border: 0; background: none; color: var(--mute); display: grid; justify-items: center; gap: 5px; font: 400 10.5px/1 var(--font); letter-spacing: .04em; padding: 6px 0; cursor: pointer; }
+.p-tray button.on { color: var(--ink); }
+.p-tray button:focus-visible, .p-row:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+
+.p-trade { display: flex; flex-direction: column; min-height: 100%; }
+.p-trade .tr-coin-head { margin-top: 4px; }
+.p-here { margin-left: auto; }
+.p-price { font-size: 40px; margin-top: 16px; }
+.p-sides { margin-top: 20px; }
+.p-amount { appearance: none; border: 0; background: none; color: var(--ink); text-align: center; width: 100%; padding: 0; font-family: var(--font); font-size: 56px; outline: none; }
+.p-floor { display: grid; gap: 10px; text-align: center; padding: 18px 0 6px; }
+.p-hint { margin-top: 4px; }
+
+.p-center { display: flex; flex-direction: column; min-height: 100%; box-sizing: border-box; padding-bottom: 18px; }
+.p-intro { display: grid; gap: 14px; justify-items: center; text-align: center; }
+.p-intro .zf-mark { margin-bottom: 14px; }
+.p-intro--top { margin-top: 18px; }
+.p-left { text-align: left; }
+.p-head { display: grid; gap: 10px; margin-top: 18px; }
+.p-rows { margin-top: 22px; border-top: 1px solid var(--line); }
+.p-pass { display: grid; gap: 8px; margin-bottom: 8px; text-align: left; }
+.p-field { display: block; width: 100%; box-sizing: border-box; height: 48px; padding: 0 16px; border: 1px solid var(--line); border-radius: 14px; background: none; color: var(--ink); font: 400 16px/1 var(--font); outline: none; }
+.p-field:focus { border-color: var(--hair); }
+.p-field--small { width: 90px; height: 36px; padding: 0 10px; }
+.p-inline { display: inline-flex; align-items: center; gap: 4px; }
+.p-row { grid-template-columns: 1fr auto; }
+.p-row .t { font-size: 15px; }
+
+.p-qr { display: grid; place-items: center; margin: 0 auto; padding: 14px; border: 1px solid var(--line); border-radius: 18px; }
+.p-field--code { text-transform: uppercase; letter-spacing: .14em; }
+.p-blur { filter: blur(9px); opacity: .45; transition: filter var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out); user-select: none; }
+.p-blur.show { filter: none; opacity: 1; }
+.p-addr { margin: 8px 0 0; font: 400 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; color: var(--ink); }
+.p-qr--address { margin-top: 22px; }
+.p-confirm { display: grid; gap: 14px; padding-bottom: 8px; }
+
+@media (prefers-reduced-motion: reduce) { .p-blur { transition: none; } }

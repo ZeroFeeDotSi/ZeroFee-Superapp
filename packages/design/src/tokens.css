@@ -1,0 +1,176 @@
+/* ZeroFee design tokens. The brand is the title screen ("Monument"): a solid ground, hairline lines, spaced capitals,
+   and a lot of air. White (light) is the default; black (dark) only when the user picks it in Settings, which sets
+   data-theme="dark" on <html>. Both are built and tested. */
+:root {
+  --bg: #ffffff;
+  --ink: #0b0b0c;
+  --ink-2: rgba(11, 11, 12, 0.72);
+  --mute: rgba(11, 11, 12, 0.58);
+  --line: rgba(11, 11, 12, 0.12);
+  --hair: rgba(11, 11, 12, 0.9);
+  --raise: #f6f6f7;
+  --alert: #c4302b;
+  --desk: #ececee;  /* the table the phone frame sits on, on a laptop */
+  color-scheme: light;
+
+  --font: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --t-label: 500 12px/1.2 var(--font);      /* spaced capitals: add letter-spacing .18em + uppercase */
+  --t-small: 400 13px/1.45 var(--font);
+  --t-body: 400 16px/1.5 var(--font);
+  --t-title: 500 22px/1.25 var(--font);
+  --t-display: 300 34px/1.1 var(--font);
+
+  --gutter: 28px;
+  --radius: 16px;                    /* v2: on the radius family below (was 18, off any family) */
+  /* Motion, toned down (decided 5 Nov: no swoosh, it felt too showy and a little anxious; keep things
+     subtle). One easing, ease-out, no overshoot: every control point sits inside 0..1. Three durations: 160 ms for a
+     press or a fade, 200 ms for most things arriving, 240 ms for a sheet. Moves are 16 px or less (a sheet 24 px), scale
+     moves 2 % or less, and nothing loops but the All-apps hint and a spinner. Reduce Motion still snaps everything. */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 160ms;
+  --dur-base: 200ms;
+  --dur-sheet: 240ms;
+
+  --bar-h: 58px;                     /* the app bar's own height, above the phone's home indicator */
+  --bar-gap: max(8px, calc(env(safe-area-inset-bottom, 0px) - 4px)); /* the capsule's lift off the screen's foot */
+  --bar-reach: 38px;                 /* how far the All-apps handle (appbar.css .zf-appbar__grab) stands above the capsule */
+  --press-scale: .98;                /* a target pressed: it gives under the finger */
+  --marker-bg: rgba(11, 11, 12, 0.055);
+  --glow: 0 0 0 1px rgba(11, 11, 12, 0.06), 0 6px 22px -6px rgba(11, 11, 12, 0.22);
+  --veil: color-mix(in srgb, var(--bg) 82%, transparent);
+  /* What the bottom of a screen keeps clear: the phone's home indicator, and, inside the apps, the app bar too
+     (AppHost sets it). Floors and scroll ends add it, never env() directly. */
+  --zf-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* One rhythm for every app (Home's visual spec HOME-VISUAL-2026-11-03 §5, accepted for all): spacing on a 4-pt grid
+     (4 · 8 · 12 · 16 · 24 · 32 · 48), three more type sizes (the hero number, a row's name and amount, its sub-line; the
+     sizes above stay), one hairline, and the fill a round action sits on. Additive: nothing above changes, and --gutter
+     stays 28 (an app that wants 24 sets its own). */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --sp-8: 32px; --sp-12: 48px;
+  --t-hero: 200 52px/60px var(--font);
+  --t-row: 500 16px/22px var(--font);
+  --t-sub: 400 13px/18px var(--font);
+  --hairline: .5px solid var(--line);
+  --act-fill: color-mix(in srgb, var(--ink) 5%, transparent);
+
+  /* ── Design system v2 (REVAMP-2026-11-03, study.md L1–L30). Additive: every token above keeps its name. ───────────
+     Shape: one radius family, concentric (inner = outer − padding). Nothing else is drawn. */
+  --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 24px; --r-pill: 999px;
+  --sp-5: 20px; --sp-10: 40px; --sp-16: 64px;
+  /* Type: the system font at seven sizes; tracking tightens as size grows (SF's own optical rule). */
+  --fs-hero: 56px; --fs-title: 28px; --fs-head: 20px; --fs-body: 17px; --fs-ctl: 15px; --fs-cap: 13px; --fs-tab: 11px;
+  --tr-hero: -.035em; --tr-title: -.022em; --tr-head: -.014em; --tr-body: -.006em; --tr-caps: .12em;
+  --faint: rgba(11, 11, 12, 0.34);
+  /* Light: glows are gradients on their own layer (never box-shadow in motion, never a blur filter). --bloom is the hero's
+     light, --sheen the top edge of a raised surface, --e-* static elevation (never animated). */
+  --bloom: radial-gradient(60% 55% at 50% 42%, rgba(var(--glow-rgb, 11, 11, 12), .045), transparent 70%);
+  --sheen: linear-gradient(to bottom, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0));
+  --e-1: 0 1px 2px rgba(11, 11, 12, .06), 0 0 0 .5px var(--line);
+  --e-2: 0 1px 2px rgba(11, 11, 12, .05), 0 12px 32px -12px rgba(11, 11, 12, .22), 0 0 0 .5px var(--line);
+  --surface: var(--bg);              /* a raised surface: White stays white, Black lifts a step */
+  --stagger-v2: 20ms;
+  /* The named motions (motion.css) take their timing from --dur-* and --ease-out above. --m-hold-ms is not a motion: it is
+     how long a Hold button must be held. */
+  --m-hold-ms: 2500ms; --flow-light: rgba(255, 255, 255, .5);
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --ink: #f2f2f3; --ink-2: rgba(242, 242, 243, 0.74); --mute: rgba(242, 242, 243, 0.58);
+  --line: rgba(242, 242, 243, 0.14); --hair: rgba(242, 242, 243, 0.92); --raise: #0e0e0f; --alert: #ff5a52; --desk: #141416;
+  --marker-bg: rgba(242, 242, 243, 0.09); --glow: 0 0 0 1px rgba(242, 242, 243, 0.08), 0 0 22px -2px rgba(242, 242, 243, 0.2);
+  --act-fill: color-mix(in srgb, var(--ink) 10%, transparent);
+  --faint: rgba(242, 242, 243, 0.34);
+  --bloom: radial-gradient(60% 55% at 50% 42%, rgba(var(--glow-rgb, 242, 242, 243), .11), transparent 70%);
+  --sheen: linear-gradient(to bottom, rgba(255, 255, 255, .07), rgba(255, 255, 255, 0));
+  --e-1: inset 0 .5px 0 rgba(255, 255, 255, .08), 0 0 0 .5px var(--line);
+  --e-2: inset 0 .5px 0 rgba(255, 255, 255, .1), 0 0 0 .5px var(--line), 0 16px 40px -16px rgba(0, 0, 0, .8);
+  --surface: #0c0c0d;
+  color-scheme: dark;
+}
+
+/* ══ Rebrand (product decision, 4 Nov; DESIGN-REBRAND §1) ═════════════════════════════
+   One brand colour doing one job (mint, the brand's #2EE6A6, on the one action), one money face (Geist 500, tabular),
+   solid greys with tested contrast (WCAG 2.x: --mute 5.2:1 on White, 7.5:1 on Black), and a glow only Black has: dim,
+   tight, still. White replaces it with a plinth shadow; it is never inverted. Every earlier token keeps its name;
+   --act-fill and --marker-bg become the one --fill. Weights under 400 are gone. */
+@font-face { font-family: "Geist"; src: url("./fonts/geist.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+:root {
+  --bg: #ffffff; --surface: #ffffff; --fill: #f2f2f4; --fill-2: #e8e8eb; --thumb: #ffffff;
+  --ink: #0b0b0c; --mute: #6c6c72; --faint: #a3a3a9; --line: rgba(11, 11, 12, .10);
+  --mint: #2ee6a6; --on-mint: #0b0b0c; --up: #0a7a54; --down: #c4302b; --alert: var(--down);
+  --act-fill: var(--fill); --marker-bg: var(--fill); --raise: var(--fill);
+  --glow-coin: 0; --glow-size: 200px; --glow-blur: 40px; --halo: 0; --bloom: none;
+  --glow-go: 0 1px 2px rgba(11, 11, 12, .10), 0 8px 20px -12px rgba(11, 11, 12, .28);
+  --plinth: 0 0 0 .5px rgba(11, 11, 12, .08), 0 6px 16px -8px rgba(11, 11, 12, .22);
+  --e-thumb: 0 0 0 .5px rgba(11, 11, 12, .06), 0 2px 6px -1px rgba(11, 11, 12, .14);
+  --font-money: "Geist", -apple-system, "SF Pro Display", system-ui, sans-serif;
+  --t-display: 600 34px/1.1 var(--font);
+  --t-hero: 500 52px/60px var(--font-money);
+  --gutter: 24px; --press-go: .98; --press-chip: .98; --press-key: .98;
+  /* The app bar's capsule (product decision, 4 Nov, YouTube's bar): White is near-white with its hairline and a soft lift, never a
+     grey slab; the pill a solid step darker. --bar-solid is the capsule without its blur (pages moving under it). */
+  --bar-bg: rgba(255, 255, 255, .84); --bar-solid: #ffffff; --bar-edge: rgba(11, 11, 12, .10); --bar-pill: #ececef;
+  --bar-shadow: 0 1px 2px rgba(11, 11, 12, .06), 0 8px 26px -10px rgba(11, 11, 12, .22);
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --surface: #0e0e10; --fill: #1c1c1f; --fill-2: #26262a; --thumb: #2c2c30;
+  --ink: #f2f2f3; --mute: #9a9aa0; --faint: #5c5c62; --line: rgba(242, 242, 243, .12);
+  --on-mint: #04140e; --up: #2ee6a6; --down: #ff6a60;
+  --glow-coin: .30; --halo: .22;
+  --bloom: radial-gradient(60% 55% at 50% 42%, rgba(242, 242, 243, .06), transparent 70%);
+  --glow-go: 0 10px 28px -14px rgba(46, 230, 166, .45);
+  --plinth: 0 0 0 .5px rgba(255, 255, 255, .10);
+  --e-thumb: inset 0 .5px 0 rgba(255, 255, 255, .10);
+  --bar-bg: rgba(30, 30, 33, .78); --bar-solid: #1e1e21; --bar-edge: rgba(255, 255, 255, .10); --bar-pill: #3a3a3f;
+  --bar-shadow: 0 10px 30px -10px rgba(0, 0, 0, .7);
+}
+/* The coin halo's strength is a token here, not in motion.css (which loads after this file and set .22/.42): the doubled
+   :root wins whatever the order. White has no halo; Black a dim one. */
+:root:root { --halo: 0; }
+:root:root[data-theme="dark"] { --halo: .22; }
+
+/* ══ The tap and the receipt's geometry (UI concept v3.1, product decision, 5 Nov;
+   "do some geometry research, see how shapes come together"). Additive: every token above keeps its name. ═══════════════
+   Material: the one lit action is lit from above (a top highlight, a darker foot, a glow only Black has), never flat.
+   Geometry: one object on one axis. A coin is 64; when its trade lands it grows one step on the scale, ×φ, to 104; the
+   ring around it is the coin plus one 12-pt gap each side, 128; the tick is a 34-pt badge ON the coin, never a second
+   circle. Concentric radii everywhere (inner = outer − gap). The tap: the button gives for 80 ms and a ring leaves it. */
+:root {
+  --lit: linear-gradient(180deg, #7df6cf 0%, var(--mint) 46%, #1ccf90 100%);
+  --lit-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), inset 0 -1px 0 rgba(0, 0, 0, .10), 0 1px 2px rgba(11, 11, 12, .12), 0 10px 24px -10px rgba(31, 207, 146, .5);
+  --disc: linear-gradient(180deg, #ffffff, #eeeef1);
+  --disc-shadow: inset 0 1px 0 #ffffff, 0 0 0 .5px rgba(11, 11, 12, .08), 0 5px 12px -5px rgba(11, 11, 12, .2);
+  --coin: 64px; --coin-big: 104px; --ring: 128px; --ring-gap: 12px; --badge: 34px;
+  --m-badge-delay: 0ms;
+}
+:root[data-theme="dark"] {
+  --lit-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -1px 0 rgba(0, 0, 0, .22), 0 2px 6px rgba(0, 0, 0, .45), 0 16px 40px -10px rgba(46, 230, 166, .55);
+  --disc: linear-gradient(180deg, #2a2a30, #17171a);
+  --disc-shadow: inset 0 .5px 0 rgba(255, 255, 255, .14), 0 0 0 .5px rgba(255, 255, 255, .05), 0 8px 16px -6px rgba(0, 0, 0, .85);
+}
+
+/* ══ Theme v3.1 materials (THEME.md, product decision, 5 Nov). Additive. ═══════════
+   The concept's names, so an app reaches for one token, never its own colour: the soft gain/loss fills, the card, the bar's
+   glass, a logo's gloss, the choice thumb, and the radius of each meaning (circle = a thing, capsule = a choice, 18 = a
+   command, 22 = a card, 34 = a sheet: concentric, 34 − 16 = 18). Black's loss red is the concept's #ff5a52. */
+:root {
+  --up-soft: rgba(46, 230, 166, .16); --down-soft: rgba(196, 48, 43, .12);
+  --e-card: 0 0 0 .5px rgba(11, 11, 12, .06), 0 1px 2px rgba(11, 11, 12, .05), 0 14px 36px -18px rgba(11, 11, 12, .26);
+  --glass: rgba(255, 255, 255, .76);
+  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), 0 0 0 .5px rgba(11, 11, 12, .08), 0 16px 36px -16px rgba(11, 11, 12, .32);
+  --logo-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 0 0 .5px rgba(11, 11, 12, .08), 0 4px 10px -4px rgba(11, 11, 12, .35);
+  --thumb-shadow: inset 0 1px 0 #ffffff, 0 0 0 .5px rgba(11, 11, 12, .06), 0 2px 5px -1px rgba(11, 11, 12, .16);
+  --thumb: linear-gradient(180deg, #ffffff, #f7f7f9); --e-thumb: var(--thumb-shadow);
+  --edge-hi: rgba(255, 255, 255, .7);   /* the 1 px top highlight of a raised fill: box-shadow inset 0 1px 0 var(--edge-hi) */
+  --r-cmd: 18px; --r-card: 22px; --r-sheet: 34px; --r-field: 16px;
+}
+:root[data-theme="dark"] {
+  --down: #ff5a52;
+  --up-soft: rgba(46, 230, 166, .14); --down-soft: rgba(255, 90, 82, .14);
+  --e-card: inset 0 .5px 0 rgba(255, 255, 255, .08), 0 0 0 .5px rgba(255, 255, 255, .05), 0 18px 44px -22px rgba(0, 0, 0, .95);
+  --glass: rgba(22, 22, 26, .66);
+  --glass-shadow: inset 0 .5px 0 rgba(255, 255, 255, .14), 0 0 0 .5px rgba(255, 255, 255, .06), 0 22px 50px -20px rgba(0, 0, 0, .95);
+  --logo-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 0 0 .5px rgba(255, 255, 255, .06), 0 6px 14px -6px rgba(0, 0, 0, .9);
+  --thumb: linear-gradient(180deg, #3a3a41, #2b2b31);
+  --thumb-shadow: inset 0 .5px 0 rgba(255, 255, 255, .14), 0 2px 6px rgba(0, 0, 0, .6); --e-thumb: var(--thumb-shadow);
+  --edge-hi: rgba(255, 255, 255, .09);
+}

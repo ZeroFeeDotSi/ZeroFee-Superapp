@@ -1,0 +1,34 @@
+/* The web wallet's Send (WebSendSheet.tsx), on the phone Send's grid (send.css, D135): every row the sheet's full width,
+   the soft fill, 16 px corners; Hold pinned at the bottom (send.css .wl-send2 > .wl-hold). Loads with the sheet only.
+   QA, 4 Nov: its fields were the browser's own, half the width, and nothing said the amount in dollars. */
+.wl-websend { width: 100%; }
+.wl-websend__from { display: grid; gap: 8px; }
+.wl-websend__wallets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wl-websend__wallet.wl-chip { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; width: 100%; min-height: 56px; padding: 8px 16px; border-radius: var(--r-md, 16px); text-align: left; }
+.wl-websend__wallet b { font-weight: 500; }
+.wl-websend__wallet .zf-small { color: inherit; opacity: .72; font-variant-numeric: tabular-nums; }
+.wl-websend__field { display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; min-height: 56px; margin: 0; padding: 0 16px; border-radius: var(--r-md, 16px); background: var(--act-fill); transition: box-shadow var(--dur-fast) var(--ease-out); }
+.wl-websend__field:focus-within { box-shadow: inset 0 0 0 1px var(--ink); }
+.wl-websend__field .wl-send2__label { flex: none; }
+.wl-websend__field input { flex: 1; min-width: 0; width: 100%; min-height: 44px; border: 0; background: none; outline: none; color: var(--ink); font: 400 16px/1 var(--font); }
+.wl-websend__field input::placeholder { color: var(--mute); }
+.wl-websend__amount input { font-size: 20px; font-variant-numeric: tabular-nums; }
+.wl-websend__usd { flex: none; color: var(--mute); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wl-websend__line, .wl-websend__public { margin: 0; }
+.wl-websend__public { color: var(--mute); }
+
+/* Sent: the receipt, centred; Done pinned at the bottom as Hold was */
+.wl-websend__done { align-items: center; text-align: center; padding-top: 32px; }
+.wl-websend__tick { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--act-fill); }
+.wl-websend__tick svg { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.wl-websend__sent { margin: 0; font: 600 20px/26px var(--font); color: var(--ink); }
+.wl-websend__sentusd { margin: -8px 0 0; color: var(--mute); font-variant-numeric: tabular-nums; }
+.wl-websend__proof { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 0; }
+.wl-websend__proof__id { font: 400 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink-2, var(--ink)); }
+.wl-websend__ok.zf-btn { width: 100%; margin-top: auto; position: sticky; bottom: 0; }
+/* the app's own input look (a border, a focus ring) stays off: the field is the box (QA's 390 px shot) */
+.wl-websend__field input, .wl-websend__field input:focus, .wl-websend__field input:focus-visible { appearance: none; padding: 0; border: 0; border-radius: 0; box-shadow: none; outline: none; background: none; }
+/* Max (webd-money2 crawl, 4 Nov): one tap fills the whole wallet less its fee */
+.wl-websend__max { flex: none; height: 32px; padding: 0 12px; border: 0; border-radius: var(--r-pill, 999px); background: var(--act-fill); color: var(--ink); font: 600 14px/1 var(--font); cursor: pointer; }
+/* decision A: the password for an outside address, above Hold */
+.wl-websend__pwwhy { margin: 0; }

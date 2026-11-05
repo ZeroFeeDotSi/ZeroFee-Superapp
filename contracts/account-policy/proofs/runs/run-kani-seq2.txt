@@ -1,0 +1,35 @@
+=== p4_unless_frozen 10:59:20
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p1d_share_ppm_u32_range 11:04:27
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p7_moves_transfer_and_gas 11:09:30
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p7b_unknown_call_unmeasured 11:14:42
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p7c_add_move_saturates 11:19:55
+VERIFICATION:- SUCCESSFUL
+Verification Time: 0.46862715s
+=== p10_check_steps_bounds 11:20:05
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p9_place_waits 11:25:07
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p5_check_bands_monotone 11:30:22
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p6b_unlisted_coin_is_strictest 11:35:27
+VERIFICATION:- SUCCESSFUL
+Verification Time: 23.812061s
+=== p6_level_for_moves_budget 11:35:56
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p8_spent_rows_bounded 11:41:00
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== p1b_share_ppm_monotone 11:46:06
+error: Broken pipe (os error 32)

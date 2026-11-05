@@ -1,0 +1,31 @@
+/* The mode mark (ModeMark.tsx; style: the revamp lead, 3 Nov). One pill at the top centre: Real's "BETA · Use dust
+   amounts only." with a small ×, Sim's dashed "SIM". Tokens flip with the theme (4.5:1 or better in both). Over every
+   sheet, so Sim is never out of sight. On the phone it sits just under the status bar (bug report, 4 Nov: on the status
+   bar it ran under the clock and the signal), and every screen's top moves down by its row: --zf-top is the top every
+   screen, sheet head and bar starts from (it falls back to the safe area where there is no mark, or a browser's strip). */
+html:has(.zf-mode-mark:not(.zf-mode-mark--strip)) { --zf-top: calc(env(safe-area-inset-top, 0px) + 30px); }
+.zf-mode-mark { position: absolute; z-index: 120; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 3px); transform: translateX(-50%);
+  height: 24px; padding: 0 4px 0 12px; display: inline-flex; align-items: center; gap: 6px; max-width: calc(100% - 120px); box-sizing: border-box;
+  border-radius: var(--r-pill, 999px); background: var(--bg); border: .5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  font: 400 11px/1 var(--font); color: var(--mute); white-space: nowrap; pointer-events: none; }
+.zf-mode-mark b { font: 600 9.5px/1 var(--font); letter-spacing: var(--tr-caps, .12em); text-transform: uppercase; color: var(--ink); }
+.zf-mode-mark__line { overflow: hidden; text-overflow: ellipsis; }
+.zf-mode-mark__x { position: relative; pointer-events: auto; flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--act-fill); color: var(--mute); font: 400 12px/20px var(--font); text-align: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.zf-mode-mark__x::before { content: ""; position: absolute; inset: -12px; }   /* 44 pt target, 20 pt drawn */
+.zf-mode-mark--sim, .zf-mode-mark--alone { padding-right: 12px; }
+.zf-mode-mark--sim { border-style: dashed; }
+/* A browser has no status bar: the mark gets its own 30px strip at the top and the app sits under it (full-app.tsx), so
+   no app bar, sheet head or title is ever under the mark. */
+/* The strip takes the safe area too (a web test, 4 Nov: a home-screen web app has a status bar, so the pill sat under the
+   clock and every header had the status bar's band again under the strip): the pill sits under the status bar, the app
+   under the pill, and nothing inside adds the status bar a second time (--zf-top 0). In a browser tab the safe area is 0. */
+html:has(.zf-mode-mark--strip) { --zf-top: 0px; }
+.zf-under-mark { position: absolute; inset: calc(env(safe-area-inset-top, 0px) + 30px) 0 0 0; }
+.zf-mode-mark--strip { top: calc(env(safe-area-inset-top, 0px) + 4px); }
+/* Under the public site's Sim | Real switch on a phone (app.css): the switch's row already sits under the status bar, so the
+   mark's row follows it straight away (a web test, 4 Nov: one band, never the status bar's height twice). */
+@media (max-width: 599.98px) {
+  html[data-site-switch] .zf-under-mark { inset: 30px 0 0 0; }
+  html[data-site-switch] .zf-mode-mark--strip { top: 4px; }
+}

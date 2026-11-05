@@ -1,0 +1,54 @@
+.rc-head { text-align: center; margin-top: 10px; }
+/* the web wallet's words check, inside its full-screen Sheet (WebWalletRows): a column, not a screen of its own */
+.rc-in-sheet { display: flex; flex-direction: column; min-height: 100%; }
+.rc-grid { list-style: none; margin: 22px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 14px; }
+.rc-grid li { border-bottom: 1px solid var(--line); min-width: 0; }
+.rc-grid .rc-cell {
+  display: flex; gap: 8px; align-items: center; width: 100%; min-height: 44px; padding: 0 2px; font: inherit; font-size: 14px;
+  color: inherit; background: none; border: 0; text-align: left; overflow: hidden; white-space: nowrap; cursor: pointer;
+}
+.rc-grid .rc-cell:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.rc-grid li i { font-style: normal; font-size: 12px; color: var(--mute); width: 16px; text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+.rc-grid li.at { border-bottom-color: var(--ink); }
+.rc-grid li.bad { color: var(--alert); border-bottom-color: var(--alert); }
+.rc-entry { margin-top: 22px; display: grid; gap: 10px; }
+.rc-entry input {
+  height: 56px; border: 1px solid var(--line); border-radius: 18px; background: var(--bg); color: var(--ink); padding: 0 18px;
+  font: 400 20px/1 var(--font); letter-spacing: -.01em; outline: none;
+}
+.rc-entry input:focus { border-color: var(--ink); }
+.rc-suggest { display: flex; gap: 8px; min-height: 44px; }
+.rc-suggest button {
+  appearance: none; border: 1px solid var(--line); background: none; color: var(--ink); border-radius: 14px; height: 44px; padding: 0 14px;
+  font: 400 15px var(--font); cursor: pointer;
+}
+.rc-center { display: grid; justify-items: center; text-align: center; }
+.rc-count { font-size: 48px; font-weight: 500; font-family: var(--font-money, var(--font)); font-feature-settings: "tnum" 1; margin-top: 18px; font-variant-numeric: tabular-nums; }
+.rc-alert-note { margin-top: 30px; }
+.rc-alert-note b { color: var(--ink); font-weight: 500; }
+
+/* The second device's answer on the Waiting screen (the web demo): one quiet row, as the laptop's own sheet would ask. */
+.held-device { display: flex; gap: 18px; align-items: center; justify-content: center; margin-top: 4px; }
+
+/* Set-up's recovery wait: one line on Make your key, its choices on a sheet (WaitLine). */
+.rc-waitline { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 14px; font-size: 14px; color: var(--ink-2); }
+.rc-waitline b { font-weight: 500; color: var(--ink); }
+.rc-change { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; padding: 10px 6px; font-size: 14px; }
+.rc-choices { display: grid; margin-top: 12px; }
+.rc-choice {
+  appearance: none; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); cursor: pointer; text-align: left;
+  display: grid; grid-template-columns: 30px 1fr; gap: 10px; padding: 16px 0; font: inherit;
+}
+.rc-choice .t { display: block; font-size: 17px; letter-spacing: -.01em; }
+.rc-choice .d { display: block; font-size: 13px; color: var(--mute); margin-top: 3px; line-height: 1.45; }
+.rc-radio { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--mute); margin-top: 2px; box-sizing: border-box; }
+.rc-choice.on .rc-radio { border: 6px solid var(--ink); }
+.rc-fallback { margin-top: 14px; max-width: 320px; }
+.rc-more { margin-top: 22px; width: 100%; max-width: 340px; }
+.rc-ends { margin-top: 6px; }
+/* What a held request is, in short, under a hairline; long parts in a disclosure (UI-SIMPLICITY-RULES 9). */
+.held-what { justify-self: stretch; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); text-align: left; }
+.held-what > .zf-small + .zf-small { margin-top: 6px; }
+/* the text system: Change is a B3 text button (ink, 500), never underlined */
+.rc-change { text-decoration: none; font: 500 15px/20px var(--font); }
+.rc-head { text-align: left; }

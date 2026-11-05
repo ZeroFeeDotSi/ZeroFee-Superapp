@@ -1,0 +1,17 @@
+.title { position: absolute; inset: 0; background: var(--bg); cursor: default; -webkit-tap-highlight-color: transparent; }
+.title__mark { position: absolute; left: 50%; top: 43%; transform: translate(-50%, -50%); }
+.title__words { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 60px); text-align: center; }
+.title__name {
+  font: var(--t-label); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; margin-right: -.14em;
+  opacity: 0; animation: title-rise var(--dur-base) var(--ease-out) 0ms forwards;
+}
+.title__promise { margin-top: 10px; font: var(--t-small); color: var(--mute); opacity: 0; animation: title-rise var(--dur-base) var(--ease-out) 0ms forwards; }
+@keyframes title-rise { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .title__name, .title__promise { animation: none; opacity: 1; } }
+/* Under a second in all: the mark draws fast and the words come up with it (the splash leaves when the core answers: no floor, D134). */
+.title .zf-mark--once .zf-ring { animation: zf-draw var(--dur-base) var(--ease-out) 0s forwards; }
+.title .zf-mark--once .zf-knock, .title .zf-mark--once .zf-slash { animation: zf-draw var(--dur-base) var(--ease-out) 0ms forwards; }
+.title .title__name { animation-duration: var(--dur-base); animation-delay: .35s; }
+.title .title__promise { animation-duration: var(--dur-base); animation-delay: .45s; }
+@media (prefers-reduced-motion: reduce) { .title .title__name, .title .title__promise { animation: none; opacity: 1; } }
+.title__name { font: 600 17px/22px var(--font); letter-spacing: -.01em; text-transform: none; margin-right: 0; } /* the text system: no spaced capitals */

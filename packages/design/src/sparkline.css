@@ -1,0 +1,12 @@
+/* The sparkline (Sparkline.tsx): one hairline, its end dot; draws once. Colour from the tokens only. */
+.zf-spark { display: block; overflow: visible; }
+.zf-spark path { fill: none; stroke: var(--up); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; animation: zf-spark-draw var(--dur-base) var(--ease-out) forwards; }
+.zf-spark circle { fill: var(--up); opacity: 0; animation: zf-spark-dot var(--dur-base) 0ms var(--ease-out) forwards; }
+.zf-spark.is-down path { stroke: var(--down); }
+.zf-spark.is-down circle { fill: var(--down); }
+@keyframes zf-spark-draw { to { stroke-dashoffset: 0; } }
+@keyframes zf-spark-dot { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .zf-spark path { animation: none; stroke-dashoffset: 0; }
+  .zf-spark circle { animation: none; opacity: 1; }
+}

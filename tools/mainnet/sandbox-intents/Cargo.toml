@@ -1,0 +1,23 @@
+[package]
+name = "sandbox-intents"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# The sandbox's stand-in for intents.near's reads (an account holding nothing there), for the release-4 rehearsal only
+# (tools/mainnet/v4-rehearse.sh): never deployed anywhere but a local near-sandbox.
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+near-sys = "=0.2.14"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+
+[workspace]

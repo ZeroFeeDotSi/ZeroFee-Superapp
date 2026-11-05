@@ -1,0 +1,42 @@
+/* The one money sheet (MoneySheet.tsx) and its "it went" line. Monument: one figure large, hairlines, one button. */
+.zf-money { display: contents; }
+/* While the core's Approve sheet is up this sheet steps aside: one sheet at a time, kept as it was for a No. */
+.zf-money__where { text-align: center; color: var(--mute); font: 400 13px/1.4 var(--font); margin: -6px 0 14px; font-variant-numeric: tabular-nums; }
+.zf-money__where b { font-weight: 500; color: var(--ink); }
+.zf-money__amount { display: grid; justify-items: center; gap: 4px; margin: 6px 0 12px; }
+.zf-money__field { display: flex; align-items: baseline; justify-content: center; gap: 2px; font: 500 46px/1.1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.zf-money__sign { font-size: .6em; color: var(--mute); }
+.zf-money__field input { width: 6ch; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; padding: 0; outline: none; }
+.zf-money__coin { margin: 0; color: var(--mute); }
+/* B28: a service that failed, said on the sheet itself, quietly, over the button. */
+/* A sheet's notice (bug report, 4 Nov: centred text wrapped with its link floating): a full-width card, its words from
+   the left, the status link at its end on the same line, never floating on a wrapped one. */
+.zf-money__line { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 12px; padding: 10px 14px; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); text-align: left; }
+.zf-money__line-text { flex: 1; min-width: 0; }
+.zf-money__line-link { flex: none; white-space: nowrap; }
+
+/* The line: a slim pill at the top of the screen, over the app the person is on, for a few seconds. */
+.zf-went {
+  position: absolute; left: 16px; right: 16px; top: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 8px); z-index: 44;
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 16px; border-radius: 22px;
+  background: var(--veil, var(--bg)); -webkit-backdrop-filter: saturate(1.6) blur(22px); backdrop-filter: saturate(1.6) blur(22px);
+  box-shadow: var(--e-card); color: var(--ink); font: 400 14.5px/1.3 var(--font);
+  animation: zf-went-in var(--dur-base) var(--ease-out) both; pointer-events: none;
+}
+.zf-went__tick { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-size: 11px; flex: none; }
+.zf-went__dot { flex: none; } /* the live dot (motion.css .zf-live) */
+@keyframes zf-went-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .zf-went { animation: none; } }
+/* v2 (REVAMP phase 2): the amount is a hero figure (52/200, tracked like Home's number) and sits truly centred: where the
+   browser can size a field to its text, the field is as wide as the digits, so "$20" is centred as one figure, not a
+   sign beside a six-digit box. The service line is a raised surface on the 12 radius. */
+.zf-money__field { font: 500 52px/1.1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: var(--tr-hero, -.035em); }
+.zf-money__sign { font-size: .5em; letter-spacing: 0; margin-right: 2px; }
+@supports (field-sizing: content) { .zf-money__field input { field-sizing: content; width: auto; min-width: 1ch; } }
+.zf-money__line { border-radius: var(--r-sm, 12px); box-shadow: var(--e-1); }
+/* the pots line sits below the sheet's head, never pulled up into it (it drew over SEND on the iPhone, 4 Nov) */
+.zf-money__where { margin: 4px 0 16px; }
+/* Rebrand (DESIGN-REBRAND §2.2, step 6): the typed figure is the money face (Geist 500, tabular, A0); the service line is
+   the soft fill with no outline. */
+.zf-money__field { font: 500 52px/1.1 var(--font-money, var(--font)); letter-spacing: -.045em; font-feature-settings: "tnum" 1; }
+.zf-money__line { background: var(--fill); box-shadow: none; }

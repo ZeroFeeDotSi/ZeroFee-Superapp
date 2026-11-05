@@ -1,0 +1,141 @@
+Release 8 Kani round, 30 Oct 2026. Kani 0.68.0 / CBMC 6.11.0. Every run: cargo kani --no-default-features (the release wasm's features: a day is the least delay) -Z stubbing -Z unstable-options --harness-timeout 10m --cbmc-args --unwindset memcmp.0:16|24, one harness per call. "[nomem]" = also --no-memory-safety-checks (pointer/bounds checks off; assertions, overflow and unwinding checks stay on). From 21:16 on also --exact (earlier, a name that is a prefix of another harness's ran both; the result recorded is the named one's). Cap: 10 min per harness (Kani's harness timeout), 12 min outer alarm. Box load average ~63-79 on 10 cores throughout (fuzzing, mutants, a NEAR sandbox running alongside): CBMC got ~70% of a core, so every time below is inflated.
+
+SOURCE. lib.rs changed twice during this round (by the lead, not by this run). Final release-8 source = lib e951e00a…b23a (wasm per lead). Every result marked FINAL was run on it (runs started after 21:09:36, when build.rs was re-pinned). Older runs are kept below as SUPERSEDED: lib 5a39e768…084c (20:16-21:07) and lib 913d0f7e…ab62 (before 20:16).
+
+Raw CBMC output: not kept here (summaries only).
+
+=====================================================================================================================
+A. FINAL SOURCE (lib e951e00a…b23a): results
+=====================================================================================================================
+
+--- RS-1: a single execute carries at most 250 Tgas in all ---
+r8_rs1a_gas_fold_is_exact | PROVEN | 66.5 s
+  Statement: for every 1-10 steps (transfer or call, any u64 gas), steps.map(step_gas).fold(0, saturating_add) <= 250 Tgas  <=>  the exact u128 sum <= 250 Tgas. (Saturation never lets an over-cap request through.)
+  Stubs: none.
+r8_rs1d_two_calls_over_cap_refused | PROVEN [nomem] | 8.7 s
+  Statement: execute(receiver "rr", two call steps with any u64 gases g1, g2): if it returns, g1 + g2 <= 250 Tgas (exact, u128), and place was called once.
+  Stubs: panic_str -> prune; predecessor/current_account_id -> "mm"; block_timestamp; storage_read -> None; owner_active -> no-op (the phone gate is its own rule); place -> recorder; moves -> None (measuring has its own harnesses).
+r8_rs1e_two_calls_within_cap_accepted | PROVEN [nomem] | 7.5 s
+  Statement (converse): two call steps with g1 + g2 <= 250 Tgas => execute never refuses (panic = proof failure) and places the request once.
+  Stubs: as rs1d, panic_str -> fail.
+r8_rs1b_execute_refuses_over_cap | TIMEOUT [nomem] | 10 min (also 10 min with memory checks, on lib 5a39)
+  Statement: as rs1d with 1-3 steps of symbolic kind (transfer/call). Bound used instead: rs1d/rs1e (exactly two calls) + rs1a (the expression for 1-10 steps).
+r8_rs1c_execute_accepts_within_cap | TIMEOUT [nomem] | 10 min. Converse of rs1b.
+
+--- RS-2: every call step's gas counts as NEAR (gas x 2e8 yocto) ---
+r8_rs2a0_zero_deposit_call_counts_gas | PROVEN | 486.7 s
+  Statement: moves("wrap.near", [near_deposit, no args, deposit 0, any gas <= 300 Tgas]) = Some, and its "near" = gas * 2e8 exactly.
+  Stubs: panic_str -> fail.
+r8_rs2a64_allowlisted_call_counts_gas | PROVEN | 493.7 s
+  Statement: the same with any deposit < 2^64 yocto: "near" = deposit + gas * 2e8 exactly. (Bit-width bound for the solver: 2^64 yocto = 1.8e-5 NEAR.)
+  Stubs: panic_str -> fail.
+r8_rs2a_allowlisted_call_counts_gas | TIMEOUT | 10 min. Full u128 deposit (saturating). 128-bit symbolic arithmetic is the cost.
+r8_rs2c_unknown_call_unmeasured | PROVEN | 3.5 s
+  Statement: a non-allowlisted, non-standard method ("foo") on a non-Intents receiver => moves = None (strictest band), any deposit, gas <= 300 Tgas.
+r8_rs2f_standard_call_bad_args_unmeasured | PROVEN | 9.3 s
+  Statement: ft_transfer_call with unreadable (empty) args => moves = None (strictest band), never Some with the gas left out.
+r8_rs2b0_every_call_step_counts_zero_deposit | TIMEOUT [nomem] | 10 min. Two zero-deposit allowlisted calls: near = (g1 + g2) * 2e8.
+r8_rs2b_every_call_step_counts | STOPPED by me after 5.5 min (u128 deposits; same shape as rs2a).
+NOT PROVEN, standard-method case (the RS-2 attack itself: ft_transfer_call of "1" with JSON args): see SUPERSEDED rs2d (unsupported construct: serde_json's map hashing seeds from CCRandomGenerateBytes, which Kani cannot run) and rs2g (seed stubbed: TIMEOUT 10 min, on lib 5a39; moves() is identical in the final source). The gas line in moves() runs before the method branch for every call step, so rs2a0/rs2a64 exercise the same line; the standard branch's own JSON reading is not proven by Kani.
+
+--- RK: a removal never deletes the current backup key (and, R8-F1, never the waiting recovery's new key or the only phone) ---
+Common stubs (rk_*q, rk_d*): block_timestamp; storage_read -> None (or the device list as a value: load_devices -> load_devices_shape); storage_write -> no-op / device-count recorder; sha256 -> sha256_short (no loop; injective on <= 2-byte inputs, all keys here are 1-2 bytes); event -> no-op; delete_key -> recorder. finish's OTHER match arms are cut at their first call with assume(false): group_promise, dispatch_chain, std::fmt::format (only the Upgrade arm formats), then_check_second_device_key, add_function_call_key (rk_*q only). Reason: CBMC loses the waiting request's enum variant once moved out of the queue and otherwise explores every arm's promise-building code; the cut paths are paths these harnesses never take (the change is a RemoveKey), so "if finish returns, then ..." is unaffected.
+r8_rk_a1q_backup_removal_never_finishes | PROVEN [nomem] | 26.5 s
+  Statement: backup key 4, a waiting RemoveKey(4), approved or not: finish never returns (the assert(false) after it is UNREACHABLE, as reported), and the panic stub's check "no delete of the backup key was issued before the refusal" is reached and holds (SUCCESS).
+  Panic stub: panic_prune_no_backup_delete.
+r8_rk_bq_other_key_removal_runs | PROVEN [nomem] | 173.1 s
+  Statement (control/liveness): every 1-byte k, every backup (none or 1 byte), k != backup: finish(RemoveKey(k)) never refuses (panic = failure), issues exactly one delete, of k, keeps the backup key, drops k from the second devices (device 9 present).
+r8_rk_d1_new_phone_key_removal_never_finishes | PROVEN [nomem] | 69.6 s
+  Statement (R8-F1): k = 5 = the waiting recovery's new key, backup 4, device list [5, 7]: finish never returns (assert(false) after it UNREACHABLE).
+r8_rk_d2_only_phone_removal_never_finishes | PROVEN [nomem] | 81.9 s
+  Statement (R8-F1): device list [5] (k = 5 is the only phone key), backup 4, no recovery: finish never returns (assert(false) UNREACHABLE).
+r8_rk_d3_phone_removal_with_another_phone_runs | TIMEOUT [nomem] | 10 min
+  Statement (control for d1/d2, panic = failure): k = 5, list [5, 7], recovery new key 6, backup 4: finish runs, stores a one-key list, deletes key 5 only. d1 and d3 differ only in the recovery's new key, d2 and d3 only in the list (and no recovery), so the refusal pruned in d1/d2 would be the new R8-F1 check; d3 itself did not finish in the cap, see d1n/d2n below for the non-vacuity evidence actually obtained.
+r8_rk_d1n_new_phone_key_removal_refusal_reached | PROVEN [nomem] | 102.5 s
+r8_rk_d2n_only_phone_removal_refusal_reached | PROVEN [nomem] | 105.9 s
+  Non-vacuity of d1/d2: the same harnesses with the panic stub that asserts "no delete of the backup key before the refusal": that assertion is REACHED (SUCCESS) in both, and the assert(false) after finish is again UNREACHABLE. So in d1/d2 a refusal is actually reached on a feasible path (the change is concretely a RemoveKey of a non-backup key, so it is the RemoveKey arm's), and finish never returns.
+r8_rk_c_removal_keeps_backup_new_phone_and_only_phone | TIMEOUT [nomem] | 10 min (symbolic k, backup, new key and list shape; list decoded from borsh)
+r8_rk_c2_removal_keeps_backup_new_phone_and_only_phone | TIMEOUT [nomem] | 10 min (same, list handed over as a value). The lead's requested all-symbolic statement is therefore covered only by the concrete cases a1q/bq/d1/d2(/d3) above.
+
+--- FB-3: on_second_device_key (lib e951e00a: a failed add only UNRECORDS the device; no key is deleted) ---
+Common stubs: promise_result_checked -> chosen result (0 Ok, 1 Failed, 2 TooLong = success); state_read -> a freshly built AccountPolicy (one second device 9, one Face ID band), handed over by transmute_copy (asserted size_of T == size_of AccountPolicy; the only T the contract uses) and counted; state_write -> records the written second-device list and whether any band needs a device; delete_key / add_function_call_key -> recorders; event -> no-op; panic_str -> FAIL (never refuses). fb3b also: storage_read -> None, storage_write -> no-op, sha256 -> sha256_short.
+r8_fb3a_success_touches_nothing | PROVEN | 3.1 s
+  Statement: Ok or TooLong (every k, refill): no state read, no write, no add, no delete.
+r8_fb3b_failed_add_unrecords_only | PROVEN | 6.8 s
+  Statement: Failed, refill = false, k = 9 (a second device): state read once; the written state lists no second device and no band needs one; NO key deleted, NO key added.
+r8_fb3c_failed_refill_readds | PROVEN | 2.0 s
+  Statement: Failed, refill = true, k = 9: nothing written (list unchanged), exactly one add, of key 9; no delete.
+r8_fb3d_failed_unknown_key_untouched | PROVEN | 2.9 s
+  Statement: Failed, every k != 9 (no longer a second device), every refill: state read, nothing written, added or deleted.
+(r8_fb3_second_device_key_callback, the four cases in one harness with symbolic result/k/refill: TIMEOUT, see SUPERSEDED.)
+
+--- R7-1 retry: removing an aged second device waits max(floor, fallback) ---
+r8_r71a_floor_for_removal | PROVEN | 17.8 s
+  Statement: floor_for(RemoveKey(k)), every delay 1-30 d, every block time, every stored fallback cell (absent, or any value in [default(delay), 30 d]), every 1-byte k, one second device 9 of age, outside the setup window: k = 9 => floor_for = max(floor, fallback), >= floor, >= fallback, >= 7 d; any other k => = floor exactly.
+  Stubs: panic_str -> fail; block_timestamp; storage_read -> the fallback cell only; sha256 -> sha256_short.
+r8_r71b_floor_for_settings | PROVEN | 20.5 s
+  Statement: outside the setup window, floor_for >= floor for SetProtection, AddSecondDevice, RemoveKey, SetRecoveryKey (backup words already set), Upgrade (every 1-byte key); = 0 for CancelRecovery and Spend.
+  Stubs: panic_str -> fail; block_timestamp; storage_read -> None; sha256 -> sha256_short.
+r8_r71c2_place_ready_at_no_encoding_u2 | PROVEN [nomem] | 468.0 s (unwind 2)
+  Statement: place(1, RemoveKey(9), level) for every level (any kind, wait <= 31 d), every block time, every floor F <= 31 d returned by floor_for: Face ID with F = 0 runs at once (finish called once with id 1); otherwise out.ready_at = now + max(level.wait_ns(), F), and the queued entry carries that ready_at and the level's needs_device; finish not called.
+  Stubs: floor_for -> fresh symbolic F (recorded); finish -> recorder; borsh::to_vec -> empty encoding (only the MAX_PENDING_BYTES refusal reads it: the claim is proven on MORE paths than the contract allows, never fewer); panic_str -> prune; block_timestamp; event -> no-op. Unwind 2: every loop it meets runs at most once on these one-element lists; an unwinding assertion would fail the proof otherwise.
+  Composition r71a + r71c2: a removal of an aged second device is ready no earlier than now + max(floor, fallback, level wait) >= now + 7 d.
+(r8_r71c_place_ready_at, the same without the encoding stub, and r8_r71c2 at unwind 4: TIMEOUT, see SUPERSEDED.)
+
+--- R7-3 retry: one phone stop per recovery ---
+r8_r73a_one_stop_per_recovery | PROVEN | 412.3 s
+  Statement: cancel_recovery, every delay 1-30 d, every block time, stop_asked set or not, a stop already waiting or not, a second device of age (key 9) or none: if it returns, (i) no stop was already waiting; (ii) with the device of age: stop_asked was NOT set, the call writes STOP_ASKED_KEY, calls place exactly once, with Change::CancelRecovery and Level::Wait{ min(1 d, delay/2) / 1 s }, does not end the recovery, out.done = false; (iii) with none: it calls end_recovery(freeze = true) once, places nothing, out.done = true.
+  Stubs: place -> recorder; end_recovery -> recorder; owner_active -> no-op; only_this_account -> no-op; panic_str -> prune; block_timestamp; storage_read -> None; storage_write -> cell recorder; storage_has_key -> stop_asked flag; sha256 -> sha256_short; event -> no-op.
+r8_r73b_first_stop_is_accepted | PROVEN | 5.9 s
+  Statement (liveness): device of age, stop not asked, none waiting => cancel_recovery never refuses and calls place once. Stubs as r73a, panic_str -> fail.
+
+--- R7-6c retry: a plain refusal while the phone's stop waits ---
+r8_r76c2_freezing_end_writes_freeze | PROVEN | 19.4 s
+  Statement: end_recovery(true) itself, every delay, every block time, with a recovery and the phone's stop waiting: the recovery is gone, the freeze cell written = now + floor, drop_unapproved called once; never refuses.
+  Stubs: drop_unapproved -> recorder; panic_str -> fail; block_timestamp; storage_read -> None; storage_write -> cell recorder; storage_remove -> no-op; event -> no-op.
+r8_r76c3_plain_refusal_calls_freezing_end_cut | TIMEOUT [nomem] | 10 min
+  Statement: refuse_recovery(None | Some(false)) by the device of age, every delay and time, with the stop (id 1) waiting: end_recovery(true) called once, finish never called, the stop stays unapproved. Stubs: end_recovery, finish -> recorders; index, store_key -> assume(false) (only the confirmed branch calls them here); panic_str -> prune; only_this_account -> no-op; signer_key -> 9; block_timestamp; storage_read -> None; sha256 -> sha256_short; event -> no-op.
+r8_r76c1_plain_refusal_calls_freezing_end | TIMEOUT (10 min; also [nomem] 10 min and the unwind-2 copy 10 min x2; on lib 5a39, refuse_recovery unchanged in e951e00a by the lead's description).
+r8_r76c_plain_refusal_with_stop_waiting (end_recovery real, drop_unapproved/finish stubbed) | TIMEOUT 10 min (lib 5a39).
+r8_r76d_confirmed_refusal_approves_the_stop (Some(true) branch: finish called once with the stop's id, the stop approved, no freeze) | TIMEOUT 10 min (lib 5a39); not retried.
+
+--- C. Release-7 harnesses re-run on the final source (unchanged harnesses; sha256_any stub as written in r7) ---
+r7_0_release_minimum_delay | PROVEN | 0.011 s  (MIN_RECOVERY_DELAY_NS = 86,400 s on the release features)
+r7_1_fallback_default | PROVEN | 0.60 s
+r7_4_step_gas_cap | PROVEN | 1.13 s
+r7_8_floor_exact | PROVEN | 2.63 s
+r7_6_yes_binds_to_this_recovery | PROVEN | 13.4 s
+r7_6b_refusal_ends_and_freezes | PROVEN | 11.1 s
+r7_2b_can_finish_device_no_yes | PROVEN | 9.57 s
+
+--- Vacuity check (all final-source PROVEN logs) ---
+Every assertion located in a harness body was REACHABLE, except the three intended ones: the assert(false) after finish in rk_a1q, rk_d1 and rk_d2 (UNREACHABLE = finish never returns there). In rk_a1q the panic stub's own assertion was reached (SUCCESS), so the refusal itself is reached; bq and d3 are the controls showing finish does return on the neighbouring inputs.
+
+=====================================================================================================================
+B. SUPERSEDED runs (older sources / heavier variants), in order
+=====================================================================================================================
+lib 913d0f7e (before 20:16): r7_0 PROVEN 0.011 s; r7_1 PROVEN 0.75 s; r7_8 PROVEN 1.04 s; r8_rs1a PROVEN 26.4 s; r8_r71a PROVEN 7.2 s (unwind 24, sha256_any);
+  r8_rs2d_standard_call_counts_gas FAILED 404 s: the only failed check is "call to foreign C function CCRandomGenerateBytes is not supported by Kani" (serde_json's preserve_order map seeds a std RandomState); 7517 checks undetermined. A HARNESS/TOOL limitation, not a contract property; no property counterexample.
+  First wave of stub harnesses failed to compile without -Z stubbing (fixed; no verdicts).
+lib 5a39e768 (20:16-21:07):
+  r8_fb3_second_device_key_callback: variant 1 (sha256_any, borsh state round-trip, unwind 24) stopped by me 20:26 after 8 min in symex; variant 2 (sha256_short, transmute stubs, unwind 12) stopped 20:29 after 3 min; variant 3 (unwind 4) TIMEOUT 10 min. Replaced by fb3a-d (PROVEN on final).
+  r8_r73a: variants 1/2 stopped (symex unrolling Change/Step drop glue 24/12 deep); variant 3 (unwind 4) PROVEN 466.3 s; re-proven on final (412.3 s).
+  r8_r73b PROVEN 12.5 s; r8_r71a FAILED 5.5 s on an UNWINDING ASSERTION in memcmp (FALLBACK_KEY "recovery_fallback" is 17 bytes, the memcmp unwindset was 16): a harness bound, fixed to 24, then PROVEN (15.7 s) and re-proven on final.
+  r8_r71b PROVEN 28.6 s; r8_r76c2 PROVEN 31.1 s; fb3a/b/c/d PROVEN 4.7/4.4/4.0/3.8 s; r7_4 PROVEN 3.9 s; r7_8 6.0 s; r7_1 1.2 s; r7_6 21.4 s; r7_6b 21.4 s; r7_2b 8.1 s; r7_0 0.009 s.
+  TIMEOUT (10 min): r8_r76c (variant 3), r8_r71c, r8_rk_a_removal_never_deletes_backup (symbolic k/backup/approved, no arm cuts), r8_r76d, r8_r76c1 (+ [nomem]), r8_r76c1_u2 (+ [nomem]), r8_rk_a1 (no arm cuts), r8_r71c2 (unwind 4), r8_rs2g (seed stubbed), r8_rs1b (memory checks on).
+  r8_r71c2_place_ready_at_no_encoding_u2 [nomem] PROVEN 285.2 s (re-proven on final, 468.0 s).
+  Stopped by me: r8_rk_b (20 s in; replaced by bq), r8_rk_a1p (arms cut at Promise::new; 8 min in symex in the Upgrade arm's format!, replaced by a1q).
+  Two runs failed to compile on a harness error of mine (a helper duplicated by a copy script); fixed, no verdict lost.
+  Runs started 21:07:51-21:09:36 failed the build.rs pin (lib changed under them); re-run after the re-pin.
+
+=====================================================================================================================
+COUNTS (final source e951e00a only, distinct harnesses)
+=====================================================================================================================
+Distinct harnesses run on the final source: 39.
+PROVEN 30: r8_rs1a, r8_rs1d, r8_rs1e, r8_rs2a0, r8_rs2a64, r8_rs2c, r8_rs2f, r8_rk_a1q, r8_rk_bq, r8_rk_d1, r8_rk_d2, r8_rk_d1n, r8_rk_d2n, r8_fb3a, r8_fb3b, r8_fb3c, r8_fb3d, r8_r71a, r8_r71b, r8_r71c2_u2, r8_r73a, r8_r73b, r8_r76c2, r7_0, r7_1, r7_4, r7_8, r7_6, r7_6b, r7_2b.
+FAILED (property counterexample) 0.
+TIMEOUT (10 min) 8: r8_rs1b, r8_rs1c, r8_rs2a (u128 deposit), r8_rs2b0, r8_rk_c, r8_rk_c2, r8_rk_d3, r8_r76c3 (rk_d3 was the control for d1/d2; d1n/d2n gave that evidence instead).
+STOPPED by me 1: r8_rs2b.
+Per rule: RS-1 proven for exactly two call steps (both directions) and for the cap expression on 1-10 steps; execute with 1-3 steps of symbolic kind timed out. RS-2 proven for an allowlisted call (deposit 0, and deposit < 2^64) and for the unmeasured paths; NOT proven by Kani for the full u128 deposit nor for the standard-method (ft_transfer_call JSON) branch. RK proven for the backup key (a1q + control bq) and, for R8-F1, on concrete cases (d1/d2 + non-vacuity d1n/d2n); the all-symbolic RK-c timed out. FB-3 proven (all four cases). R7-1 proven compositionally (r71a + r71c2_u2; r71c2_u2 with floor_for and the queue-size encoding stubbed, unwind 2, no memory-safety checks). R7-3 proven at cancel_recovery's boundary (r73a + r73b). R7-6c NOT proven end to end: end_recovery(true) writing the freeze is proven (r76c2), but refuse_recovery with the stop waiting (r76c, r76c1, r76c3) timed out every time.
+
+FINDINGS against the contract: none. No harness produced a property counterexample on any source. The only FAILED verdicts were harness-side: an unsupported construct (serde_json's random hash seed, rs2d) and one unwinding assertion of a harness bound (memcmp 16 < 17-byte key, r71a), both fixed or worked around above.

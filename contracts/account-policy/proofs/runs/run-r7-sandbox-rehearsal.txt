@@ -1,0 +1,134 @@
+Release 7, 29 Oct: bash tools/mainnet/rehearse.sh on the pinned near-sandbox 2.13.4 (292cbc73…eec), pinned wasm aea989b0…5345 and the short-waits build 0d976921…5faf.
+1/4 sandbox near-sandbox (sha256 pinned) on 127.0.0.1:61530, home <tmp>
+2/4 the suite before the publish
+1. the app's set-up before the publish (own copy), at 24 and 48 hours
+   ✓ the app's set-up (its own copy of the code, calls at 30 Tgas) runs in one transaction
+   ✓ the account runs the pinned code
+   ✓ release 7
+   ✓ a 24-hour delay, and the words-only fallback is 7 days
+   ✓ two keys (phone and words), neither with full access
+   ✓ the pinned release refuses a 60-second delay, as a whole (the set-up key is still there)
+   ✓ 48 hours: the app's default, the fallback 7 days
+   ✓ 48 hours: a change (an upgrade) waits the floor, 72 hours (259201 s)
+   ✓ 48 hours: the words start a recovery
+   ✓ 48 hours: the finish is allowed after 2 days (no second device), the fallback would be at 7 (432000 s between them)
+   ✓ 48 hours: no finish now
+   ✓ 1b. the short-waits build (never mainnet) for the timed flows below: a 60-second delay
+2. a set-up by hash while nothing is published
+   ✓ it does not run
+   ✓ no code installed
+   ✓ the set-up key is still there (all or nothing: the app can retry)
+3. limits and waits
+   ✓ 0.001 NEAR runs at Face ID
+   ✓ 0.15 NEAR (over the 0.1 NEAR band) waits
+   ✓ the phone cancels it
+   ✓ nothing left waiting
+4. the words' fee allowance (FB-5, measured)
+   ✓ the words' key starts with 0.25 NEAR of allowance (0.25)
+   ✓ the words start a recovery
+   ✓ a start is paid from that allowance (0.0002588938014471 NEAR a start: about 965 starts in 0.25 NEAR)
+5. recovery and the freeze
+   ✓ while the recovery waits, the phone's Face ID payment doesn't run
+   ✓ the phone (no second device) stops it at once
+   ✓ everyday spending is frozen (until 2026-10-29T12:19:10.968Z)
+   ✓ while frozen, the phone's Face ID payment doesn't run
+   ✓ the words start again
+   ✓ the words finish after the delay
+   ✓ the old phone's key is gone
+   ✓ the freeze ended with the finish
+   ✓ the new phone pays at Face ID
+6. a second device
+   ✓ the phone adds a second device (done)
+   ✓ its key can only approve or decline, with 1 NEAR of allowance
+   ✓ the contract counts one second device
+   ✓ 6a: the phone's setting to a Device band waits (until 2026-10-29T12:20:43.082Z)
+   ✓ 6a: the second device's yes runs the setting at its gas (15 Tgas)
+   ✓ 6a: 0.15 NEAR waits for the second device
+   ✓ 6a: its no at 10 Tgas
+   ✓ 6a: its yes runs a transfer at its gas (15 Tgas)
+   ✓ 6a: its yes runs a chain of 4 groups x 10 transfers at its gas (95 Tgas)
+   ✓ 6a: a flat 300 Tgas yes still fits this allowance (0.996675152791885 NEAR left)
+6b. a second device whose fee allowance has burnt down to 0.2 NEAR (below a 300 Tgas answer's 0.30)
+   ✓ the contract counts the second device
+   ✓ its key holds 0.2 NEAR of allowance
+   ✓ 6b: the phone's setting to a Device band waits (until 2026-10-29T12:23:31.429Z)
+   ✓ 6b: the second device's yes runs the setting at its gas (15 Tgas)
+   ✓ 6b: 0.15 NEAR waits for the second device
+   ✓ 6b: its no at 10 Tgas
+   ✓ 6b: its yes runs a transfer at its gas (15 Tgas)
+   ✓ 6b: its yes runs a chain of 4 groups x 10 transfers at its gas (95 Tgas)
+   ✓ 6b: a flat 300 Tgas yes is refused for the allowance, and says so (security.key.allowance)
+   ✓ 6b: the same yes at its gas runs
+8. release 7: a recovery needs the second device of age (short-waits build, fallback a week)
+   ✓ the words-only fallback is 604800 s
+   ✓ the phone adds a second device at set-up (at once)
+   ✓ its key can approve, decline, approve_recovery and refuse_recovery, nothing else
+   ✓ the second device is of age
+   ✓ 8a: the words start a recovery
+   ✓ 8a: recovery_status: the device's yes is needed, none yet, so the words alone could finish only at the fallback
+   ✓ 8a: while it waits, the phone's Face ID payment doesn't run
+   ✓ 8a: after the delay, without the device's yes, the finish is refused
+   ✓ 8a: the recovery still waits
+   ✓ 8a: a yes naming another finish time is refused
+   ✓ 8a: the device's yes to this recovery, at 30 Tgas
+   ✓ 8a: recovery_status says approved, and the finish is allowed now
+   ✓ 8a: the words finish at the app's 30 Tgas
+   ✓ 8a: the finish was paid from the words' allowance, well inside it (0.0004959872063512 NEAR)
+   ✓ 8a: the old phone's key is gone
+   ✓ 8a: the second device of age stays
+   ✓ 8a: nothing is frozen after the finish
+   ✓ 8a: the new phone pays at Face ID
+   ✓ 8b: the words start again
+   ✓ 8b: the device refuses it
+   ✓ 8b: the recovery is over
+   ✓ 8b: everyday spending is frozen for a change's wait (until 2026-10-29T12:29:54.860Z)
+   ✓ 8b: the phone's Face ID payment doesn't run while frozen
+   ✓ 8b: the phone's key is untouched
+   ✓ 8c: the words start a recovery
+   ✓ 8c: the phone can't say yes for the device
+   ✓ 8c: the words can't say yes for the device
+   ✓ 8c: after the delay, no finish without the device
+   ✓ 8c: nor on a second try
+   ✓ 8c: the recovery still waits, unapproved
+   ✓ 8c: without any yes the words alone could finish only at the fallback, a week from the start (604800 s)
+   ✓ 8c: spending stays frozen until then
+   ✓ 8c: the device refuses it
+   ✓ 8c: the phone's key stays and the thief's new key never arrived
+   ✓ 8c: the second device of age stays
+pre: 86 of 86 checks hold
+3/4 the test run, against the sandbox
+    | REHEARSAL on the local sandbox (port 61530, a REHEARSAL): nothing here touches mainnet.
+    | Not yet published on the local sandbox (port 61530, a REHEARSAL).
+    | Send 24.7 NEAR on the local sandbox (port 61530, a REHEARSAL) to the publisher's address:
+    | REHEARSAL on the local sandbox (port 61530, a REHEARSAL): nothing here touches mainnet.
+    | Not yet published on the local sandbox (port 61530, a REHEARSAL).
+    | Type go to sign these on the local sandbox (port 61530, a REHEARSAL):    a) published: Ak1r5vxLYjbRewFcYZwFkSJvpFf8xUWQBxVpPMdpFDTF
+    |    ✓ b) two nodes give back the pinned code by its hash
+    |    ✓ it runs the pinned release, by its hash
+    |    ✓ release 7
+    |    ✓ two keys (phone and words), neither with full access
+    |    ✓ 0.001 NEAR to the refund account runs at Face ID
+    |    ✓ 0.15 NEAR (over the 0.1 NEAR Face ID band) waits
+    |    ✓ the phone cancels it
+    |    ✓ it runs the pinned release, by its hash
+    |    ✓ release 7
+    |    ✓ two keys (phone and words), neither with full access
+    |    ✓ 0.001 NEAR to the refund account runs at Face ID
+    |    ✓ 0.15 NEAR (over the 0.1 NEAR Face ID band) waits
+    |    ✓ the phone cancels it
+    |    ✓ 97f78c13… sends 0.0990851542818561 NEAR (its storage, 0.04878 NEAR, stays locked)
+    |    ✓ 49261e01… sends 0.1990851542818561 NEAR (its storage, 0.04878 NEAR, stays locked)
+    |    ✓ the words start the move
+    |    ✓ while it waits, the old phone's Face ID payment doesn't run
+    |    ✓ recovery_status: no second device, so the words alone may finish after the day
+    | DONE: release 7 (Ckot1nBiZmgcSvQMuosrAidnZYaM3P72bXq9kUhrk8QC) is published on the local sandbox (port 61530, a REHEARSAL) and checked live. Keys erased from <tmp>
+4/4 the suite after the publish
+7. after the publish (FI-2)
+   ✓ the core's two-node read gives the pinned code for the pinned hash
+   ✓ the app's set-up (by the published hash, calls at 30 Tgas) runs in one transaction
+   ✓ the account runs the pinned code (global hash Ckot1nBiZmgcSvQMuosrAidnZYaM3P72bXq9kUhrk8QC)
+   ✓ release 7
+   ✓ a 24-hour delay, and the words-only fallback is 7 days
+   ✓ two keys (phone and words), neither with full access
+post: 6 of 6 checks hold
+REHEARSAL GREEN: the test run (node tools/mainnet/release.ts --run) is ready for mainnet.

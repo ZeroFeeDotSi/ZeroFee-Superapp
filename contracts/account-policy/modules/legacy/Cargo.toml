@@ -1,0 +1,15 @@
+[package]
+name = "legacy"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+# Types and serialisation only: this module never calls the runtime (the account contract does).
+near-sdk = "5"
+
+[dev-dependencies]
+near-sdk = { version = "5", features = ["unit-testing"] }

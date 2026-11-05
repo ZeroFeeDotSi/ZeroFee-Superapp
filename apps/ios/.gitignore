@@ -1,0 +1,9 @@
+# Built by build-web.sh from apps/web/dist; never committed.
+web/
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+# Built by core/build.mjs (the isolated core); never committed.
+core/dist/
+ZeroFee/CoreBundle/

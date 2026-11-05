@@ -1,0 +1,24 @@
+.tm-head { text-align: center; margin-top: 18px; }
+.tm-points { list-style: none; margin: 26px 0 0; padding: 0; display: grid; }
+.tm-points li { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+.tm-points li:first-child { border-top: 1px solid var(--line); }
+.tm-sum { margin: 26px 0 0; font-size: 17px; line-height: 1.45; color: var(--ink); text-align: center; }
+.tm-block--compact .tm-sum { margin-top: 16px; font-size: 15px; }
+.tm-more { margin-top: 16px; }
+.tm-more .tm-points { margin-top: 0; }
+.tm-more .tm-points li:first-child { border-top: 0; }
+.tm-agree { margin: 16px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.tm-read { display: block; padding: 10px 0; font-size: 14px; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+/* On Make your key: the same facts, smaller, so the key and its one button stay on screen. */
+.tm-block--compact .tm-points { margin-top: 18px; }
+.tm-block--compact .tm-points li { padding: 8px 0; font-size: 13px; }
+.tm-block--compact .tm-agree { margin-top: 10px; font-size: 12px; }
+.tm-block--compact .tm-read { font-size: 13px; padding: 6px 0; }
+.tm-full { display: grid; gap: 16px; }
+.tm-full h2 { margin: 0; font: var(--t-label); letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.tm-full p { margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+.tm-full h2 { font: 600 20px/25px var(--font); letter-spacing: -.012em; text-transform: none; } /* T4 */
+/* the text system: left-aligned, and no underlined links (B3 is ink at 500) */
+.tm-head, .tm-sum { text-align: left; }
+.tm-sum { font: 400 17px/22px var(--font); }
+.tm-read { text-decoration: none; font: 500 15px/20px var(--font); }

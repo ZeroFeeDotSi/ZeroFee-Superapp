@@ -1,0 +1,11 @@
+/* The web wallet's Details (WebDetails.tsx): one row per network, its short address and Copy, the whole one a tap down. */
+.wl-wdt__lead { margin: 12px 0 16px; color: var(--ink-2); }
+.wl-wdt__rows { padding: 0 16px; border-radius: 16px; background: var(--act-fill); }
+.wl-wdt__row { border-bottom: .5px solid var(--line); }
+.wl-wdt__row:last-child { border-bottom: 0; }
+.wl-wdt__line { display: flex; align-items: center; gap: 12px; min-height: 64px; }
+.wl-wdt__tap { appearance: none; flex: 1; min-width: 0; min-height: 44px; display: grid; gap: 2px; padding: 10px 0; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.wl-wdt__name { font: 400 17px/22px var(--font); }
+.wl-wdt__short { color: var(--mute); font-variant-numeric: tabular-nums; }
+.wl-wdt__copy { flex: none; min-height: 44px; color: var(--ink); }
+.wl-wdt__full { margin: 0 0 12px; font: 400 13.5px/1.45 ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; color: var(--ink); }

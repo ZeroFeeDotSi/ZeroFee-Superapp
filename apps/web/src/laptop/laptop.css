@@ -1,0 +1,25 @@
+.lp { position: relative; min-height: 100vh; background: var(--bg); color: var(--ink); display: flex; flex-direction: column; align-items: center; padding: 28px max(16px, env(safe-area-inset-left, 0px)) 48px; }
+.lp-top { display: flex; gap: 12px; align-items: center; width: 100%; max-width: 560px; }
+.lp-main { width: 100%; max-width: 800px; margin-top: 56px; }
+.lp-center { display: grid; justify-items: center; text-align: center; }
+.lp-qr { margin-top: 30px; padding: 18px; max-width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 22px; background: #fff; }
+.lp-fp { font: 500 22px/1.3 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .12em; margin-top: 8px; }
+.lp-account { font: 400 18px/1.4 ui-monospace, "SF Mono", Menlo, monospace; margin-top: 8px; word-break: break-all; }
+.lp-req { border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; margin-top: 12px; display: grid; gap: 6px; }
+.lp-req__t { font-size: 17px; letter-spacing: -.01em; }
+.lp-req__actions { display: flex; gap: 18px; align-items: center; margin-top: 10px; }
+.lp-req__actions .zf-btn { width: auto; padding: 0 28px; }
+.lp-sheet { position: fixed; inset: 0; max-width: 430px; margin: 0 auto; }
+/* Release 7: a waiting move to a new phone, answered here (RecoveryRequest.tsx). */
+.lp-rec { gap: 8px; }
+.lp-rec__count { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lp-rec__answers { display: grid; gap: 14px; margin-top: 12px; }
+.lp-rec__answer { display: grid; gap: 6px; }
+.lp-rec__answer .zf-btn { width: 100%; }
+/* The web demo's drawn laptop (LaptopWindow): the card without its frame, tighter, its buttons 44 tall. */
+.lp-rec--compact { border: 0; padding: 0; margin: 0; gap: 4px; }
+.lp-rec--compact .lp-req__t { font-size: 15px; line-height: 1.35; }
+.lp-rec--compact .lp-rec__answers { gap: 10px; margin-top: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.lp-rec--compact .zf-btn { height: 44px; font-size: 15px; }
+/* H43: a yes this device gave, until it goes */
+.lp-said { border-color: var(--ink); }

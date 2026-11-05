@@ -1,0 +1,11 @@
+/* The Buy / Sell button while its quote is checked (UX audit 4 Nov): the words stay; a 2 px line fills along the button's
+   bottom edge. Owned here, not in sheet.css (the revamp lead's file). Off under Reduce Motion: a still line. */
+.tp-go { position: relative; overflow: hidden; }
+.tp-check { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: currentColor; opacity: .55; transform-origin: left center; transform: scaleX(0); animation: tp-check-fill var(--dur-base) var(--ease-out) forwards; pointer-events: none; }
+@keyframes tp-check-fill { to { transform: scaleX(.92); } }
+@media (prefers-reduced-motion: reduce) { .tp-check { animation: none; transform: scaleX(.5); } }
+
+/* Not enough money (UX audit 4 Nov): what the wallet has, in --mute, and the one way to add to it as plain text, 44 pt tall. */
+.tp-has { color: var(--mute, var(--ink-3)); text-align: center; }
+.tp-move { display: block; width: 100%; min-height: 44px; background: none; border: 0; padding: 0; color: var(--ink, currentColor); font: inherit; font-weight: 600; text-align: center; cursor: pointer; }
+.tp-move:disabled { opacity: .5; }

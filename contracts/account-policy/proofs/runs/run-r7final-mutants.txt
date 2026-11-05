@@ -1,0 +1,113 @@
+cargo-mutants 27.1.0 on release-7 lib.rs (c3bdaee8…b75a), 87 mutants in two shards, each with its own CARGO_TARGET_DIR, -j 1, --timeout 150, test command: cargo test -- --skip fuzz_
+
+--- shard 0/2 ---
+Found 44 mutants to test
+ok       Unmutated baseline in 12s build + 53s test
+MISSED   src/lib.rs:498:38: replace == with != in AccountPolicy::execute_many in 2s build + 72s test
+MISSED   src/lib.rs:785:35: replace != with == in AccountPolicy::refuse_recovery in 1s build + 58s test
+44 mutants tested in 6m: 2 missed, 38 caught, 4 unviable
+EXIT 2
+[caught]
+src/lib.rs:480:17: delete match arm (Some(mut total), Some(m)) in AccountPolicy::execute_many
+src/lib.rs:685:9: replace AccountPolicy::start_recovery with ()
+src/lib.rs:712:9: replace AccountPolicy::finish_recovery with ()
+src/lib.rs:716:16: replace < with == in AccountPolicy::finish_recovery
+src/lib.rs:716:16: replace < with > in AccountPolicy::finish_recovery
+src/lib.rs:716:16: replace < with <= in AccountPolicy::finish_recovery
+src/lib.rs:719:43: replace && with || in AccountPolicy::finish_recovery
+src/lib.rs:719:39: replace > with == in AccountPolicy::finish_recovery
+src/lib.rs:719:39: replace > with < in AccountPolicy::finish_recovery
+src/lib.rs:719:39: replace > with >= in AccountPolicy::finish_recovery
+src/lib.rs:719:46: delete ! in AccountPolicy::finish_recovery
+src/lib.rs:721:20: replace < with == in AccountPolicy::finish_recovery
+src/lib.rs:721:20: replace < with > in AccountPolicy::finish_recovery
+src/lib.rs:721:20: replace < with <= in AccountPolicy::finish_recovery
+src/lib.rs:734:55: replace != with == in AccountPolicy::finish_recovery
+src/lib.rs:744:73: delete ! in AccountPolicy::finish_recovery
+src/lib.rs:755:9: replace AccountPolicy::approve_recovery with ()
+src/lib.rs:773:9: replace AccountPolicy::refuse_recovery with ()
+src/lib.rs:780:25: replace == with != in AccountPolicy::refuse_recovery
+src/lib.rs:808:39: replace == with != in AccountPolicy::cancel_recovery
+src/lib.rs:820:59: replace / with % in AccountPolicy::cancel_recovery
+src/lib.rs:820:59: replace / with * in AccountPolicy::cancel_recovery
+src/lib.rs:820:54: replace / with % in AccountPolicy::cancel_recovery
+src/lib.rs:820:54: replace / with * in AccountPolicy::cancel_recovery
+src/lib.rs:836:9: replace AccountPolicy::upgrade_check with ()
+src/lib.rs:842:12: delete ! in AccountPolicy::upgrade_check
+src/lib.rs:849:25: replace < with == in AccountPolicy::upgrade_check
+src/lib.rs:849:25: replace < with > in AccountPolicy::upgrade_check
+src/lib.rs:849:25: replace < with <= in AccountPolicy::upgrade_check
+src/lib.rs:874:9: replace AccountPolicy::recovery_status -> Option<RecoveryStatus> with None
+src/lib.rs:875:128: replace > with == in AccountPolicy::recovery_status
+src/lib.rs:875:128: replace > with < in AccountPolicy::recovery_status
+src/lib.rs:875:128: replace > with >= in AccountPolicy::recovery_status
+src/lib.rs:879:9: replace AccountPolicy::fallback_seconds -> U64 with Default::default()
+src/lib.rs:879:32: replace / with % in AccountPolicy::fallback_seconds
+src/lib.rs:879:32: replace / with * in AccountPolicy::fallback_seconds
+src/lib.rs:939:9: replace AccountPolicy::second_devices_of_age -> u32 with 0
+src/lib.rs:939:9: replace AccountPolicy::second_devices_of_age -> u32 with 1
+[missed]
+src/lib.rs:498:38: replace == with != in AccountPolicy::execute_many
+src/lib.rs:785:35: replace != with == in AccountPolicy::refuse_recovery
+[unviable]
+src/lib.rs:457:9: replace AccountPolicy::execute_many -> Outcome with Default::default()
+src/lib.rs:800:9: replace AccountPolicy::cancel_recovery -> Outcome with Default::default()
+src/lib.rs:874:9: replace AccountPolicy::recovery_status -> Option<RecoveryStatus> with Some(Default::default())
+src/lib.rs:1034:9: replace AccountPolicy::place -> Outcome with Default::default()
+[timeout]
+
+--- shard 1/2 ---
+Found 43 mutants to test
+ok       Unmutated baseline in 12s build + 53s test
+43 mutants tested in 5m: 42 caught, 1 unviable
+EXIT 0
+[caught]
+src/lib.rs:1039:49: replace && with || in AccountPolicy::place
+src/lib.rs:1042:63: replace && with || in AccountPolicy::place
+src/lib.rs:1042:48: replace && with || in AccountPolicy::place
+src/lib.rs:1042:51: delete ! in AccountPolicy::place
+src/lib.rs:1042:66: delete ! in AccountPolicy::place
+src/lib.rs:1053:60: replace && with || in AccountPolicy::place
+src/lib.rs:1057:35: replace && with || in AccountPolicy::place
+src/lib.rs:1057:18: replace == with != in AccountPolicy::place
+src/lib.rs:1057:44: replace == with != in AccountPolicy::place
+src/lib.rs:1102:9: replace AccountPolicy::end_recovery with ()
+src/lib.rs:1156:9: replace AccountPolicy::floor_ns -> u64 with 0
+src/lib.rs:1156:9: replace AccountPolicy::floor_ns -> u64 with 1
+src/lib.rs:1156:32: replace + with - in AccountPolicy::floor_ns
+src/lib.rs:1156:32: replace + with * in AccountPolicy::floor_ns
+src/lib.rs:1162:9: replace AccountPolicy::fallback_ns -> u64 with 0
+src/lib.rs:1162:9: replace AccountPolicy::fallback_ns -> u64 with 1
+src/lib.rs:1167:9: replace AccountPolicy::fallback_at_ns -> u64 with 0
+src/lib.rs:1167:9: replace AccountPolicy::fallback_at_ns -> u64 with 1
+src/lib.rs:1172:9: replace AccountPolicy::recovery_approved -> bool with true
+src/lib.rs:1172:9: replace AccountPolicy::recovery_approved -> bool with false
+src/lib.rs:1173:166: replace && with || in AccountPolicy::recovery_approved
+src/lib.rs:1173:93: replace && with || in AccountPolicy::recovery_approved
+src/lib.rs:1173:55: replace && with || in AccountPolicy::recovery_approved
+src/lib.rs:1173:26: replace == with != in AccountPolicy::recovery_approved
+src/lib.rs:1173:74: replace == with != in AccountPolicy::recovery_approved
+src/lib.rs:1173:146: replace == with != in AccountPolicy::recovery_approved
+src/lib.rs:1179:9: replace AccountPolicy::can_finish_at_ns -> u64 with 0
+src/lib.rs:1179:9: replace AccountPolicy::can_finish_at_ns -> u64 with 1
+src/lib.rs:1179:44: replace || with && in AccountPolicy::can_finish_at_ns
+src/lib.rs:1179:39: replace == with != in AccountPolicy::can_finish_at_ns
+src/lib.rs:1188:9: replace AccountPolicy::second_device_gate with ()
+src/lib.rs:1193:9: replace AccountPolicy::words_gate with ()
+src/lib.rs:1208:9: replace AccountPolicy::aged_second_devices -> usize with 0
+src/lib.rs:1208:9: replace AccountPolicy::aged_second_devices -> usize with 1
+src/lib.rs:1302:56: replace == with != in AccountPolicy::finish
+src/lib.rs:1367:20: delete ! in AccountPolicy::finish
+src/lib.rs:1370:35: delete ! in AccountPolicy::finish
+src/lib.rs:1374:44: replace != with == in AccountPolicy::finish
+src/lib.rs:1453:5: replace check_steps with ()
+src/lib.rs:1638:5: replace default_fallback_ns -> u64 with 0
+src/lib.rs:1638:5: replace default_fallback_ns -> u64 with 1
+src/lib.rs:1643:5: replace check_fallback with ()
+[missed]
+[unviable]
+src/lib.rs:1297:9: replace AccountPolicy::finish -> Outcome with Default::default()
+[timeout]
+
+--- the surviving refuse_recovery mutant against tests/r7_completion.rs ---
+src/lib.rs:785:35: replace != with == in AccountPolicy::refuse_recovery

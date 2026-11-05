@@ -1,0 +1,18 @@
+/* LaptopWindow.tsx: a laptop (lid, bezel, browser window, keyboard deck), in both themes. */
+.lw { --lw-bezel: #161618; --lw-metal: #d4d4d9; --lw-metal-2: #b9b9bf; --lw-bar: #ececef;
+  margin: 14px -10px 0; display: flex; flex-direction: column; flex: none; }
+:root[data-theme="dark"] .lw { --lw-bezel: #2a2a2d; --lw-metal: #4a4a4f; --lw-metal-2: #36363a; --lw-bar: #1c1c1e; }
+/* A laptop screen is wide: 4:3 at most, never as tall as a phone (round 2 grade, item 2). */
+.lw-lid { aspect-ratio: 4 / 3; min-height: 0; display: flex; background: var(--lw-bezel); border-radius: 14px 14px 4px 4px; padding: 9px 9px 12px; }
+.lw-window { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--bg); border-radius: 6px; overflow: hidden; }
+.lw-bar { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 12px; background: var(--lw-bar); border-bottom: 1px solid var(--line); flex: none; }
+.lw-dots { display: flex; gap: 6px; }
+.lw-dots i { width: 9px; height: 9px; border-radius: 50%; background: #ff5f57; }
+.lw-dots i:nth-child(2) { background: #febc2e; }
+.lw-dots i:nth-child(3) { background: #28c840; }
+.lw-title { font: 500 12px/1 var(--font); color: var(--mute); margin-right: 52px; flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lw-screen { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 16px 14px; overscroll-behavior: none; }
+/* The keyboard deck: wider than the lid, with the thumb notch in the middle. */
+.lw-deck { flex: none; height: 14px; margin: 0 -14px; background: linear-gradient(var(--lw-metal), var(--lw-metal-2)); border-radius: 2px 2px 12px 12px; display: flex; justify-content: center; }
+.lw-deck span { width: 64px; height: 5px; background: var(--lw-metal-2); border-radius: 0 0 6px 6px; }
+.lw-inner { margin-block: auto; }  /* centred when it fits, scrolls from the top when it does not */

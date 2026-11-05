@@ -1,0 +1,241 @@
+/* Home's Send (the Home plan §1.3, §6): Monument's hairlines and air; motion only in transform, opacity and a stroke, and
+   none of it under Reduce Motion (every animation snaps). Loads with the sheet, never in Home's first load. */
+.wl-send2 { display: flex; flex-direction: column; gap: 14px; }
+/* Phantom's shape (product decision, 3 Nov), as Home's other sheets (wallet.css): Hold to send is pinned to the bottom of the
+   screen, under the form, which scrolls. The sheet's content, Send's box and its form each fill what is left. */
+.zf-sheet__content:has(> .wl-send) { display: flex; flex-direction: column; }
+.zf-sheet__content:has(> .wl-send) > * { flex: none; }
+.zf-sheet__content:has(> .wl-send) > .wl-send { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.wl-send > .wl-send2 { flex: 1 1 auto; min-height: 0; }
+.wl-send2__label { font: var(--t-label); letter-spacing: .18em; text-transform: uppercase; color: var(--mute); }
+
+/* From: one small dropdown, the balance in it */
+.wl-send2__from { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; justify-items: start; }
+/* Send's From picker only. Home's, Activity's and the menu's rows are `.wl-row.wl-pick` (wallet.css), and this file loads
+   after wallet.css once the sheets preload (D145), so an unscoped rule turned every one of them into a grey pill. */
+.wl-pick:not(.wl-row) { appearance: none; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 44px; padding: 6px 12px 6px 8px; border: 0; border-radius: 22px; background: var(--raise); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); font: 400 15px/1.2 var(--font); cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent; }
+.wl-pick:not(.wl-row) b { font-weight: 500; white-space: nowrap; }
+.wl-pick:not(.wl-row) .zf-small { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.wl-pick__chev { flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: transform var(--dur-base) var(--ease-out); }
+.wl-pick[aria-expanded="true"] .wl-pick__chev { transform: rotate(180deg); }
+.wl-pick__list { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; right: 0; margin: 0; padding: 6px; list-style: none; border-radius: 18px; background: var(--bg); box-shadow: 0 0 0 1px var(--line), 0 12px 32px -12px rgba(0, 0, 0, .3); animation: wl-pick-in var(--dur-fast) var(--ease-out) both; transform-origin: top left; }
+.wl-pick__opt { appearance: none; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 10px; row-gap: 2px; width: 100%; min-height: 44px; padding: 8px 10px; border: 0; border-radius: 12px; background: none; color: var(--ink); font: 400 15px/1.2 var(--font); text-align: left; cursor: pointer; }
+.wl-pick__opt > :first-child { grid-row: 1 / 3; }
+.wl-pick__opt b { font-weight: 500; }
+.wl-pick__opt .zf-small { grid-column: 2; font-variant-numeric: tabular-nums; }
+.wl-pick__list [aria-selected="true"] .wl-pick__opt { background: var(--marker-bg); }
+@keyframes wl-pick-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* To: the field, then the full address in groups of four, small, and "New address" the first time */
+.wl-send2__to { margin-top: 0; }
+.wl-send2__to .wl-send2__label { flex: none; }
+/* W7 (copy review): AgentZero filled the address in: a quiet line right above it, no box */
+.wl-send2__agent { display: block; margin: 0 2px 2px; font-size: 13px; color: var(--mute); }
+.wl-send2__addr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -4px 2px 0; }
+.wl-send2__full { font: 400 12.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink-2); word-break: normal; overflow-wrap: anywhere; letter-spacing: .02em; }
+.wl-send2__new { font: 500 11px/1 var(--font); letter-spacing: .06em; padding: 5px 8px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); white-space: nowrap; }
+
+/* Which network? (only when a 0x address could be on several) */
+.wl-send2__nets { display: grid; gap: 8px; }
+.wl-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.wl-chip { appearance: none; min-height: 40px; padding: 0 14px; border: 0; border-radius: 20px; background: none; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); font: 400 14.5px/1 var(--font); cursor: pointer; transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.wl-chip.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+
+/* How much: dollars large, a slider over what the coin can send, Max */
+.wl-send2__amount { display: grid; gap: 6px; }
+.wl-send2__money { display: flex; align-items: baseline; gap: 2px; font: 500 40px/1.1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.wl-send2__money span { font-size: .6em; color: var(--mute); }
+.wl-send2__money input { width: 100%; min-width: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; padding: 0; outline: none; }
+.wl-send2__slide { display: flex; align-items: center; gap: 12px; }
+.wl-send2__slide input[type="range"] { flex: 1; accent-color: var(--ink); min-height: 32px; }
+
+/* The one line: how it goes, what it lands as */
+.wl-send2__route { margin: 0; font: 400 13.5px/1.45 var(--font); color: var(--ink); }
+.wl-send2__why { margin: -4px 0 0; }
+
+/* Hold to send: a ring fills while the finger stays down (the timer is the hold's; the ring only shows it) */
+.wl-hold { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.wl-hold__ring { flex: none; transform: rotate(-90deg); }
+.wl-hold__track, .wl-hold__fill { fill: none; stroke-width: 2.4; }
+.wl-hold__track { stroke: currentColor; opacity: .28; }
+.wl-hold__fill { stroke: currentColor; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset var(--dur-fast) var(--ease-out); }
+.wl-hold.is-holding { transform: scale(0.985); }
+.wl-hold.is-holding .wl-hold__fill { stroke-dashoffset: 0; transition: stroke-dashoffset .6s linear; }
+.wl-hold:disabled .wl-hold__fill { stroke-dashoffset: 100; }
+
+/* It went: the amount flies along a short arc (one span across, one up and down) into the check mark, which draws */
+.wl-sent { position: relative; display: grid; justify-items: center; gap: 14px; padding: 36px 0 28px; text-align: center; }
+.wl-sent__fly { position: absolute; left: 12%; top: 54px; animation: wl-fly-x var(--dur-base) var(--ease-out) both; }
+.wl-sent__amt { display: block; font: 500 20px/1 var(--font); font-variant-numeric: tabular-nums; color: var(--ink); animation: wl-fly-y var(--dur-base) var(--ease-out) both; }
+.wl-sent__check { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.wl-sent__check circle { stroke-dasharray: 100; stroke-dashoffset: 100; animation: wl-draw var(--dur-base) var(--ease-out) 0ms forwards; opacity: .9; }
+.wl-sent__check path { stroke-dasharray: 100; stroke-dashoffset: 100; animation: wl-draw var(--dur-base) var(--ease-out) 0ms forwards; }
+@keyframes wl-fly-x { from { opacity: 1; } to { opacity: 1; } } /* product decision, 5 Nov: nothing flies; the amount just fades */
+@keyframes wl-fly-y { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes wl-draw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-pick__list, .wl-sent__fly, .wl-sent__amt { animation: none; }
+  .wl-sent__fly { display: none; }
+  .wl-sent__check circle, .wl-sent__check path { animation: none; stroke-dashoffset: 0; }
+  .wl-pick__chev, .wl-chip, .wl-hold__fill, .wl-hold.is-holding .wl-hold__fill { transition: none; }
+  .wl-hold.is-holding { transform: none; }
+}
+
+/* ── REVAMP v2, phase 2 (3 Nov): Send drawn as one family with Swap and Request ─────────────────────────────────────
+   From and To are two soft-filled cards on the 16 radius (no outlines, no pill-beside-a-box), the labels quiet
+   capitals at v2 tracking, the dollars 48/200 tracked like every hero figure, the slider a 4 pt ink track, Max a soft
+   pill. The From card fills the width so the balance is never cut ("$14…"). Transform and opacity only in motion. */
+.wl-send2 { gap: 16px; }
+.wl-send2__label { letter-spacing: var(--tr-caps, .12em); }
+.wl-send2__from { gap: 8px; justify-items: stretch; }
+.wl-send2__from .wl-pick:not(.wl-row) { width: 100%; min-height: 56px; padding: 8px 16px 8px 12px; border-radius: var(--r-md, 16px); background: var(--act-fill); box-shadow: none; font-size: 16px; }
+/* two lines, as Home's rows: the wallet's name, and under it what it holds, never cut */
+.wl-send2__from .wl-pick:not(.wl-row) { display: grid; grid-template-columns: 28px 1fr auto; grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: center; }
+.wl-send2__from .wl-pick:not(.wl-row) > :first-child { grid-row: 1 / 3; width: 28px; height: 28px; }
+.wl-send2__from .wl-pick:not(.wl-row) > b { grid-column: 2; font: 500 16px/20px var(--font); overflow: hidden; text-overflow: ellipsis; }
+.wl-send2__from .wl-pick:not(.wl-row) > .zf-small { grid-column: 2; font-size: 13px; line-height: 18px; }
+.wl-send2__from .wl-pick:not(.wl-row) > .wl-pick__chev { grid-column: 3; grid-row: 1 / 3; }
+.wl-send2__from .wl-pick__list { border-radius: var(--r-md, 16px); box-shadow: var(--e-2); background: var(--surface, var(--bg)); }
+.wl-send2 .py-field.wl-send2__to { height: 56px; margin-top: 0; padding: 0 8px 0 16px; border: 0; border-radius: var(--r-md, 16px); background: var(--act-fill); transition: box-shadow var(--dur-fast) var(--ease-out); }
+.wl-send2 .py-field.wl-send2__to:focus-within { box-shadow: inset 0 0 0 1px var(--ink); }
+.wl-send2 .py-field.wl-send2__to input { font-size: 16px; }
+.wl-send2__amount { gap: 8px; margin-top: 8px; }
+.wl-send2__money { font: 500 48px/1.1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: var(--tr-hero, -.035em); }
+.wl-send2__money span { font-size: .5em; letter-spacing: 0; }
+.wl-send2__slide .zf-link { min-height: 32px; padding: 0 14px; border-radius: var(--r-pill, 999px); background: var(--act-fill); color: var(--ink); font: 500 13px/1 var(--font); }
+.wl-send2__slide .zf-link:disabled { opacity: .45; }
+.wl-send2__new { border-radius: var(--r-xs, 8px); }
+.wl-chip { border-radius: var(--r-pill, 999px); min-height: 44px; }
+
+/* the button system: Max is a B4 chip; the hold button is B1 (its ring stays the hold's own progress) */
+.wl-send2__slide .zf-link { height: 32px; min-height: 32px; padding: 0 12px; border-radius: 16px; font: 600 15px/20px var(--font); }
+.wl-chip { min-height: 32px; height: 32px; padding: 0 12px; border-radius: 16px; background: var(--act-fill); box-shadow: none; font: 600 15px/20px var(--font); }
+.wl-chip.on { background: var(--ink); color: var(--bg); }
+/* the text system: From and To are quiet sentence-case labels (T6), never spaced capitals */
+.wl-send2__label { font: 500 15px/20px var(--font); letter-spacing: 0; text-transform: none; color: var(--mute); }
+
+/* ── Send on the Buy pattern (the design review §4.5): the dollars are the hero, centred (T1); chips; the keypad ───── */
+.wl-send2__amount { justify-items: center; text-align: center; gap: 12px; margin-top: 16px; }
+.wl-send2__money { justify-content: center; font: 500 56px/60px var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.035em; }
+.wl-send2__money input { width: auto; min-width: 1ch; text-align: center; caret-color: transparent; }
+@supports (field-sizing: content) { .wl-send2__money input { field-sizing: content; } }
+@supports not (field-sizing: content) { .wl-send2__money input { width: 6ch; } }
+.wl-send2__chips { display: flex; justify-content: center; gap: 8px; }
+.wl-send2 .zf-keypad { width: 100%; margin-top: 4px; }
+/* QA's sd-errors crawl (016): a 50-character paste grew the dollars past the screen, pushed the keypad off it
+   and spilled out of Hold. The amount's column never grows past the sheet, the figure is cut with "…", and so is Hold's
+   label: the keypad and the button stay where they are */
+.wl-send2__amount { grid-template-columns: minmax(0, 1fr); }
+.wl-send2__money { max-width: 100%; min-width: 0; overflow: hidden; }
+.wl-send2__money input { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.wl-send2 .wl-hold { min-width: 0; max-width: 100%; }
+.wl-send2 .wl-hold > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Send's pinned Hold carries the same ground band as every pinned action (wallet.css, P0), and when it is off it is the
+   soft fill with a hairline and a mute label (the shared off look, ui.css), never see-through: on a phone the keypad scrolls under it (iPhone safe areas, 4 Nov) */
+.wl-send2__floor > .wl-hold:disabled { background: var(--fill); background-image: none; color: var(--mute); opacity: 1; box-shadow: inset 0 0 0 1px var(--line); }
+
+/* ── R3 (the design review §4.5): Send on one screen ──────────────────────────────────────────────────────────────────
+   No balances line over it; From and To are two rows of ONE inset card (a label in the mute on the left, a hairline
+   between them); the balance is said once, in From; the keypad's last row sits above Hold, never under it, on a 390 × 844
+   phone. Edges on x = 16 (the grouped gutter). Hold has no ring: its fill sweeps across while the finger stays down. */
+.zf-sheet__content:has(> .wl-send) { --gutter: 24px; padding-left: 24px; padding-right: 24px; }  /* A-home audit: one gutter with Add, Move and Swap */
+.wl-send2 { gap: 12px; }
+.wl-send2__card { border-radius: var(--r-md, 16px); background: var(--act-fill); }
+.wl-send2__card .wl-send2__from { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; column-gap: 0; padding-left: 16px; }
+.wl-send2__card .wl-send2__from .wl-pick:not(.wl-row) { min-height: 60px; padding: 10px 16px 10px 0; border-radius: 0 16px 0 0; background: none; }
+.wl-send2__card .wl-send2__from .wl-pick__list { top: calc(100% + 4px); }
+/* the part line under From spans the card (desktop audit, 5 Nov: in the label's 44 px column it read "On…") */
+.wl-send2__card .wl-send2__from > .wl-send2__part { grid-column: 1 / -1; margin: -2px 0 10px; padding: 0 16px 0 0; }
+.wl-send2__card .py-field.wl-send2__to { position: relative; height: 52px; padding: 0 8px 0 16px; border-radius: 0 0 16px 16px; background: none; }
+.wl-send2__card .py-field.wl-send2__to::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; border-top: .5px solid var(--line); pointer-events: none; }
+.wl-send2__card .wl-send2__to .wl-send2__label { width: 34px; }
+.wl-send2__card .py-field.wl-send2__to input { min-height: 0; height: 100%; padding: 0; background: none; font: 400 17px/22px var(--font); }
+/* Product decision, 5 Nov: the To field's focus drew a white square ring, tighter than the card. The ring is the theme's hairline, drawn
+   on the field itself on the field's own radius (--r-field, 16), never white, never square; the bare input draws none. */
+.wl-send2__card .py-field.wl-send2__to { border-radius: var(--r-field, 16px); }
+.wl-send2__card .py-field.wl-send2__to:focus-within { border-radius: var(--r-field, 16px); box-shadow: inset 0 0 0 1px var(--line); }
+.wl-send2 .py-field.wl-send2__to input, .wl-send2 .py-field.wl-send2__to input:focus, .wl-send2 .py-field.wl-send2__to input:focus-visible { box-shadow: none; }
+.wl-send2__amount { margin-top: 4px; gap: 10px; }
+.wl-send2__coins { margin: -2px 0 0; }
+.wl-send2 .zf-keypad { margin-top: 0; }
+.wl-send2 .wl-hold__ring { display: none; }
+/* the sweep is the pill's own background image (a light half slides in from the left), so the pill keeps no overflow
+   clip and its ::before can carry the floor's fade */
+.wl-send2__floor > .wl-hold:not(:disabled) { background-image: linear-gradient(90deg, rgba(255, 255, 255, .24) 50%, transparent 50%), var(--lit); background-size: 200% 100%, 100% 100%; background-position: 100% 0, 0 0; background-repeat: no-repeat; }
+:root[data-theme="dark"] .wl-send2__floor > .wl-hold:not(:disabled) { background-image: linear-gradient(90deg, rgba(0, 0, 0, .16) 50%, transparent 50%), var(--lit); }
+.wl-send2__floor > .wl-hold.is-holding:not(:disabled) { background-position: 0 0, 0 0; transition: background-position 600ms linear; }
+/* the line right above the button (errors sit right above their button) */
+.wl-send2__floor > :is(.wl-send2__why, .zf-money__line) { margin: 0; padding: 0 16px; text-align: left; }
+@media (prefers-reduced-motion: reduce) { .wl-send2__floor > .wl-hold.is-holding:not(:disabled) { transition: none; } }
+.wl-send2__card .wl-send2__addr { margin: -8px 0 0; padding: 0 16px 12px 60px; }
+.wl-send2__route { margin: 0 16px; font: 400 13px/18px var(--font); color: var(--mute); }
+/* a 0x address that could be on several networks: the four network chips sit on one line and the keypad's keys come
+   down to 44 pt, so the keypad still ends above Hold on a 390 × 844 phone, never half under the line above it */
+.wl-send2__nets .wl-chips { flex-wrap: nowrap; gap: 6px; overflow-x: auto; overscroll-behavior-x: none; scrollbar-width: none;
+  /* a right-edge fade says there is more; 24 px of padding keeps the last chip reachable past it */
+  padding-right: 24px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+.wl-send2__nets .wl-chip { flex: none; padding: 0 10px; }
+.wl-send2__nets { gap: 6px; }
+.wl-send2:has(.wl-send2__nets) .zf-keypad button { height: 42px; min-height: 42px; }
+.wl-send2:has(.wl-send2__nets) { gap: 8px; }
+.wl-send2:has(.wl-send2__nets) .wl-send2__money { font-size: 44px; line-height: 48px; }
+.wl-send2:has(.wl-send2__nets) .wl-send2__amount { margin-top: 0; }
+.wl-send2__card .py-field.wl-send2__to input { text-overflow: ellipsis; }
+/* A-home audit (5 Nov): Scan is a 44 pt target (was 40), the icon where it was */
+.wl-send .zf-icon-btn[aria-label="Scan a code"] { padding: 10px; margin: -10px; }
+/* From's place on its own line starts with a capital ("Your Safe", "Your SOL wallet") */
+.wl-send2__from b::first-letter { text-transform: uppercase; }
+
+/* The one quiet line under Send's From row ("Up to $120.00 can go in one send."): one line, ellipsis, never wraps the card;
+   its text starts where the From label's text does (the card's 16px inner gutter). */
+.wl-send2__part { margin: 6px 0 0; padding: 0 0 0 16px; font: 400 13px/18px var(--font); color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; box-sizing: border-box; }
+
+/* who the fee goes to, under the Send button (product decision, 5 Nov: we are zero fee): the floor's last line */
+.wl-send2__floor > .wl-zerofee { box-sizing: border-box; min-height: 52px; margin: 0; padding: 8px 0; }
+
+/* ── a16 (Sim re-walk, 5 Nov): Send is one column that can never overlap itself ─────────────────────────
+   The card, the dollars, the chips, the one sub-line and the keypad are one box that takes what is left of the screen;
+   when a payee's lines grow the card, the keypad's rows compress first (56 → 40 pt, the grid's own clamp), and only past
+   that does the box scroll. The floor (the line, the lit button, the fee line) is its own box under it, so the keypad's
+   last row ends above the button whatever the card holds. The sub-line slot keeps its height whether it says the coins,
+   the Private cap, or nothing, so a cap typed over never moves the card or scrolls it away. */
+.wl-send2__scroll { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: none; scrollbar-width: none; margin: 0 calc(-1 * var(--gutter, 24px)); padding: 0 var(--gutter, 24px); }
+.wl-send2__scroll::-webkit-scrollbar { display: none; }
+.wl-send2__scroll > * { flex: none; }
+.wl-send2__scroll > .wl-send2__amount { margin-top: 0; gap: 4px; }
+/* the hero comes down a step (44/48, as with the network chips) so the keypad keeps its rows on a 390 x 844 phone with
+   the Safe's two lines ("Up to $X can go in one send.", "The rest stays in your Safe for now.", the build's train) in the column */
+.wl-send2 .wl-send2__money { font-size: 44px; line-height: 48px; }
+.wl-send2:has(.wl-send2__nets) .wl-send2__money { font-size: 44px; line-height: 48px; }
+.wl-send2 > .wl-send2__scroll + .wl-send2__floor { margin-top: calc(-1 * 12px); }   /* the column's gap is the floor's own padding */
+/* the sheet's foot under the fee line: the floor is the ground, so only the home indicator's own room stays */
+.zf-sheet__content:has(> .wl-send) { padding-bottom: calc(var(--zf-safe-bottom, env(safe-area-inset-bottom, 0px)) + 4px); }
+.wl-send2__amount > .wl-send2__money { flex: none; }
+.wl-send2__sub { flex: none; min-height: 18px; }
+.wl-send2__sub > .wl-send2__coins { margin: 0; }
+/* the keypad's rows: 56 pt with room, down to 36 pt without (the grid shares its height out; its floor is the explicit
+   min-height, so the box above it can shrink: a minmax track would have pinned the box at the rows' full size) */
+.wl-send2 .zf-keypad { flex: 0 1 224px; min-height: 136px; grid-auto-rows: minmax(0, 1fr); }
+/* a key's press disc (56) can stand past a 34 pt row: it shows, but never counts as the box's scroll */
+.wl-send2 .zf-keypad { overflow: clip; overflow-clip-margin: 12px; }
+.wl-send2:has(.wl-send2__nets) .zf-keypad button { height: auto; min-height: 0; }
+.wl-send2__floor { position: relative; flex: none; display: flex; flex-direction: column; gap: 8px; padding-top: 4px; background: var(--bg); }
+.wl-send2__floor > .wl-zerofee { min-height: 36px; padding: 0; }   /* its two lines of 13/18, no air: the floor is tight */
+.wl-send2__floor::before { content: ""; position: absolute; left: calc(-1 * var(--gutter, 24px)); right: calc(-1 * var(--gutter, 24px)); bottom: 100%; height: 20px; background: linear-gradient(to top, var(--bg), color-mix(in srgb, var(--bg) 0%, transparent)); pointer-events: none; }
+.wl-send2__floor > .wl-hold { width: 100%; }
+/* a chip over what can go now ($50 with $20 ready): dimmed, never hidden; a tap on it still says why (the cap line) */
+.wl-send2__chips .zf-chip.is-off { opacity: .45; }
+/* the To field once an address is read: the field keeps the whole address as its value, under a span that shows it short */
+.wl-send2__card .py-field.wl-send2__to input.wl-send2__to-in--under { position: absolute; inset: 0; width: 100%; opacity: 0; pointer-events: none; }
+.wl-send2__short { flex: 1; min-width: 0; align-self: center; font: 400 17px/22px var(--font); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; }
+/* the payee line in the card: "First payment", then the network line under it, both quiet; nothing when there is nothing to say */
+.wl-send2__card .wl-send2__addr { row-gap: 2px; padding-bottom: 6px; }
+.wl-send2__card .wl-send2__addr:empty { display: none; }
+.wl-send2__card .wl-send2__addr > .wl-send2__route { margin: 0; }
+
+/* A fifteen (5 Nov): a 32 pt chip takes a 44 pt tap (6 over, 6 under, the rows are 8 apart). (The "show the whole address" switch went
+   with a16: the To field itself shows the address short, the whole of it a tap away.) */
+.wl-chip { position: relative; }
+.wl-chip::before { content: ""; position: absolute; inset: -6px 0; }

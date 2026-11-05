@@ -1,0 +1,224 @@
+/* Move's sliders and ribbon, Swap's pickers and hold (the Home plan §1.4, §1.5, §6). Loaded with the two sheets (lazy),
+   never in Home's first load. Motion is transform and opacity only; under Reduce Motion everything snaps. */
+
+/* a colour per place: the Safe is the ink, each chain its own mark's colour */
+.wl-mv-safe { --c: var(--ink); }
+.wl-mv-sol { --c: #9945ff; }
+.wl-mv-hood { --c: #00c805; }
+.wl-mv-near { --c: #00a3c4; }
+.wl-mv-bsc { --c: #f0b90b; }
+
+.wl-mv-head { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0 10px; }
+.wl-mv-total { font: var(--t-title); font-variant-numeric: tabular-nums; }
+
+/* the ribbon: one bar, a segment per place sized by where the money will sit; it flows as a slider moves */
+.wl-mv-ribbon { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; background: var(--line); }
+/* v2: the ribbon follows the finger 1:1 (no flex-grow transition: it laid the bar out every frame mid-drag) */
+.wl-mv-seg { position: relative; display: block; min-width: 0; height: 100%; background: var(--c); overflow: hidden; }
+/* while legs run, the moving part glows: a light sweeps along it (transform), and the rest dims a little (opacity) */
+.wl-mv-ribbon.is-running .wl-mv-seg:not(.is-moving) { opacity: .45; transition: opacity var(--dur-base) var(--ease-out); }
+.wl-mv-seg.is-moving::after { content: ""; position: absolute; inset: 0; width: 60%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .75), transparent); transform: translateX(-100%); animation: none; display: none; }
+.wl-mv-ribbon.is-running { box-shadow: var(--glow); }
+@keyframes wl-mv-sweep { to { transform: translateX(260%); } }
+
+.wl-mv-rows { margin-top: 6px; }
+.wl-mv-row { padding: 10px 0 4px; border-bottom: 1px solid var(--line); }
+.wl-mv-row__h { display: grid; grid-template-columns: 24px 1fr auto auto; gap: 10px; align-items: center; }
+/* today's figure, dim, before where it will be, bright (D137): both always shown */
+.wl-mv-now { color: var(--mute); font: var(--t-small); font-variant-numeric: tabular-nums; text-align: right; }
+/* the Safe's shield (Home's Safe tab), in a hairline ring the size of a coin's logo */
+.wl-mv-shield { width: 24px; height: 24px; box-sizing: border-box; border-radius: 50%; border: 1px solid var(--line); display: inline-grid; place-items: center; color: var(--ink); }
+.wl-mv-usd { font-variant-numeric: tabular-nums; min-width: 8ch; text-align: right; }
+.wl-mv-hint { color: var(--mute); margin: 0 0 6px; }
+/* the wallet Move opened from (Home's tab): its slider is marked, a soft glow in its own colour */
+.wl-mv-row.is-focus { position: relative; }
+.wl-mv-row.is-focus::before { content: ""; position: absolute; inset: 2px -10px; border-radius: 14px; background: color-mix(in srgb, var(--c) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 35%, transparent); pointer-events: none; }
+.wl-mv-why { text-align: center; color: var(--ink-2); margin: 6px 0 0; }
+
+/* each slider: its place's colour up to the thumb */
+.wl-mv-range { display: block; width: 100%; height: 44px; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; touch-action: pan-y; }
+.wl-mv-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--c) var(--p, 0%), var(--line) var(--p, 0%)); }
+.wl-mv-range::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+.wl-mv-range::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--c); }
+.wl-mv-range::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; margin-top: -11px; border-radius: 50%; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(0, 0, 0, .22); transition: transform var(--dur-fast) var(--ease-out); }
+.wl-mv-range::-moz-range-thumb { width: 28px; height: 28px; border-radius: 50%; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(0, 0, 0, .22); }
+.wl-mv-range:active::-webkit-slider-thumb { transform: scale(1.02); }
+.wl-mv-range:disabled { opacity: .6; cursor: default; }
+
+/* one line per leg; while it runs, its line fills as it travels */
+.wl-mv-legs { list-style: none; margin: 12px 0 4px; padding: 0; display: grid; gap: 6px; }
+.wl-mv-leg { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-variant-numeric: tabular-nums; }
+.wl-mv-leg__fill { position: absolute; inset: 0; background: var(--marker-bg); transform: scaleX(0); transform-origin: left center; pointer-events: none; }
+.wl-mv-leg__t, .wl-mv-leg__s, .wl-mv-leg__note { position: relative; }
+.wl-mv-leg__s { color: var(--mute); }
+.wl-mv-leg__note { grid-column: 1 / -1; color: var(--ink-2); }
+.wl-mv-leg.is-moving .wl-mv-leg__fill { animation: wl-mv-travel var(--dur-base) var(--ease-out) forwards; }
+.wl-mv-leg.is-done .wl-mv-leg__fill { transform: scaleX(1); transition: transform var(--dur-base) var(--ease-out); }
+.wl-mv-leg.is-stopped { border-color: var(--alert); }
+@keyframes wl-mv-travel { from { transform: scaleX(.04); } to { transform: scaleX(.92); } }
+
+/* Swap: where a coin sits, quiet beside its name; the pickers' chevron */
+.wl-sw-where { color: var(--mute); }
+.wl-sw-chev { flex: none; color: var(--mute); font-size: 12px; }
+
+/* Hold to swap: the fill sweeps across while held (HOLD_MS), then it goes */
+.wl-hold { position: relative; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.wl-hold__fill { position: absolute; inset: 0; background: rgba(255, 255, 255, .28); transform: scaleX(0); transform-origin: left center; pointer-events: none; }
+:root[data-theme="dark"] .wl-hold__fill { background: rgba(0, 0, 0, .22); }
+.wl-hold.is-held .wl-hold__fill { transform: scaleX(1); transition: transform 600ms linear; }
+.wl-hold.is-held { transform: scale(var(--press-scale)); transition: transform var(--dur-fast) var(--ease-out); }
+.wl-hold__t { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-mv-seg, .wl-mv-ribbon.is-running .wl-mv-seg:not(.is-moving) { transition: none; }
+  .wl-mv-seg.is-moving::after { animation: none; opacity: 0; }
+  .wl-mv-leg.is-moving .wl-mv-leg__fill { animation: none; transform: scaleX(.5); }
+  .wl-mv-leg.is-done .wl-mv-leg__fill { transition: none; }
+  .wl-mv-range::-webkit-slider-thumb { transition: none; }
+  .wl-hold.is-held .wl-hold__fill { transition: none; transform: scaleX(1); }
+  .wl-hold.is-held { transform: none; transition: none; }
+}
+
+/* Swap's amount slider in the ink, never the browser's blue */
+.wl-swap-slide input[type="range"] { accent-color: var(--ink); }
+
+/* ── REVAMP v2 (3 Nov): Move and Swap on the v2 tokens ───────────────────────────────────────────────────────────────
+   The ribbon is a slimmer 8 pt bar; rows sit on .5 hairlines; each slider is a 4 pt track with a white 28 pt thumb that
+   lifts (static elevation, scaled by transform); Swap's two pickers are soft-filled cards on the 16 radius, no outline,
+   pressing on the snap spring; Max is a soft pill. Transform and opacity only in motion. */
+.wl-mv-ribbon { height: 8px; border-radius: 4px; gap: 2px; background: var(--act-fill); }
+.wl-mv-ribbon.is-running { box-shadow: none; }
+.wl-mv-row { padding: 12px 0 4px; border-bottom: .5px solid var(--line); }
+.wl-mv-row.is-focus::before { border-radius: var(--r-sm, 12px); }
+.wl-mv-range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; }
+.wl-mv-range::-moz-range-track, .wl-mv-range::-moz-range-progress { height: 4px; border-radius: 2px; }
+.wl-mv-range::-webkit-slider-thumb { margin-top: -12px; border: 0; box-shadow: 0 0 0 .5px rgba(0, 0, 0, .12), 0 3px 8px rgba(0, 0, 0, .18), 0 1px 1px rgba(0, 0, 0, .1); background: #fff; transition: transform var(--dur-base) var(--ease-out); }
+.wl-mv-range::-moz-range-thumb { border: 0; background: #fff; box-shadow: 0 0 0 .5px rgba(0, 0, 0, .12), 0 3px 8px rgba(0, 0, 0, .18); }
+.wl-mv-range:active::-webkit-slider-thumb { transform: scale(1.02); transition-duration: var(--dur-fast); }
+.wl-mv-leg { border: 0; box-shadow: var(--e-1); background: var(--surface, var(--bg)); }
+.wl-mv-leg.is-stopped { box-shadow: inset 0 0 0 1px var(--alert); }
+.wl-swap-pick { border: 0; border-radius: var(--r-field, 16px); background: var(--act-fill); min-height: 60px; padding: 8px 16px; transition: transform var(--dur-base) var(--ease-out); }
+.wl-swap-pick:active { transform: scale(.98); transition-duration: var(--dur-fast); }
+.wl-swap-all { height: 32px; border: 0; background: var(--act-fill); font: 500 13px/1 var(--font); padding: 0 14px; }
+.wl-swap-slide input[type="range"] { accent-color: var(--ink); height: 44px; }
+@media (prefers-reduced-motion: reduce) { .wl-swap-pick, .wl-swap-pick:active { transition: none; transform: none; } }
+
+/* ── REVAMP P0: Move's legs and summary as grouped sections ──
+   The legs are one inset grouped list: route on the left, its dollars right-aligned, its state small under the route;
+   a running leg's row fills softly as it travels (scaleX). The summary is one grouped block of four rows; the notes
+   under it are small left-aligned footnotes. */
+.zf-group.wl-mv-legs { display: block; margin: 16px 0 0; padding: 0 16px; overflow: hidden; }
+.zf-group .wl-mv-leg { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 2px; align-items: baseline; box-sizing: border-box; min-height: 48px; padding: 13px 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+.zf-group .wl-mv-leg__t { font: 400 16px/22px var(--font); color: var(--ink); }
+.zf-group .wl-mv-leg__v { font: 500 16px/22px var(--font); font-variant-numeric: tabular-nums; color: var(--ink); text-align: right; }
+.zf-group .wl-mv-leg__s:empty { display: none; }
+.zf-group .wl-mv-leg__s { grid-column: 1 / -1; font-size: 13px; }
+.zf-group .wl-mv-leg__note { grid-column: 1 / -1; }
+.zf-group .wl-mv-leg__fill { inset: 0 -16px; border-radius: 0; }
+.zf-group .wl-mv-leg.is-done .wl-mv-leg__s { color: var(--up); }
+.zf-group .wl-mv-leg.is-stopped { box-shadow: none; }
+.zf-group .wl-mv-leg.is-stopped .wl-mv-leg__s { color: var(--alert); }
+.wl-mv-sum { margin-top: 12px; }
+.wl-mv-foot { margin: 8px 4px 0; text-align: left; color: var(--mute); font-size: 13px; line-height: 18px; }
+.wl-mv-sum + .wl-mv-foot, .zf-group + .wl-mv-foot { margin-top: 12px; }
+
+/* ── Swap on the Buy pattern (the design review §4.4): the dollars, chips, the keypad ───────────────────────────────── */
+.wl-swap-chips { display: flex; justify-content: center; gap: 8px; margin: 4px 0 8px; }
+.wl-sheet-lead + .zf-keypad, .wl-swap-chips + .zf-keypad { margin-top: 4px; }
+.wl-swap-amount .zf-money__field { font: 500 56px/60px var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.035em; }
+/* the two pickers as one inset card (G1): pay over get, a hairline between, no gap */
+.wl-swap-pick { margin-top: 0; border-radius: 0; position: relative; }
+.wl-swap-pick:has(+ .wl-swap-pick) { margin-top: 8px; border-radius: var(--r-field, 16px) var(--r-field, 16px) 0 0; }
+.wl-swap-pick + .wl-swap-pick { border-radius: 0 0 var(--r-field, 16px) var(--r-field, 16px); }
+.wl-swap-pick + .wl-swap-pick::before { content: ""; position: absolute; left: 16px; right: 16px; top: 0; border-top: .5px solid var(--line); }
+.wl-swap-pick > .zf-small:first-child { font: 400 15px/20px var(--font); color: var(--mute); }
+/* the notes after the keypad are footnotes: left, quiet, 13/18 (T7), not centred paragraphs */
+.zf-keypad ~ .wl-sheet-lead.zf-small { text-align: left; margin: 8px 16px 0; font: 400 13px/18px var(--font); }
+
+/* ── R3 (the design review §4.4): Move on the A+ system ──────────────────────────────────────────────────────────────
+   G3 hero (the total in T1, one T6 line), the 8 pt ribbon, then ONE inset card of places: icon, name and its new dollars
+   once, "was $…" under the name only for a place that changes, the slider under them; a place nothing can move has no
+   slider, just its line. Card and button edges on x = 16 (the grouped gutter). The privacy line is a disclosure row. */
+.zf-sheet__content:has(> .wl-mv-hero) { --gutter: 24px; padding-left: 24px; padding-right: 24px; }
+.wl-mv-hero { text-align: center; margin: 4px 0 20px; }
+.wl-mv-hero .wl-mv-total { margin: 0; font: 500 56px/60px var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.035em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.wl-mv-lead { margin: 4px 0 0; min-height: 20px; font: 400 15px/20px var(--font); color: var(--mute); }
+.wl-mv-ribbon { margin: 0 0 16px; }
+.wl-mv-rows { margin-top: 0; padding: 0 16px; border-radius: var(--r-md, 16px); background: var(--act-fill); }
+.wl-mv-row { padding: 12px 0 0; border-bottom: .5px solid var(--line); }
+.wl-mv-row:last-child { border-bottom: 0; }
+.wl-mv-row:not(:has(.wl-mv-range)) { padding-bottom: 12px; }
+.wl-mv-row__h { grid-template-columns: 24px 1fr auto; gap: 12px; min-height: 28px; }
+.wl-mv-name { display: grid; min-width: 0; }
+.wl-mv-name .t { font: 400 17px/22px var(--font); color: var(--ink); }
+.wl-mv-name .wl-mv-now { font: 400 15px/20px var(--font); color: var(--mute); text-align: left; }
+.wl-mv-row .wl-mv-usd { font: 500 17px/22px var(--font); font-variant-numeric: tabular-nums; min-width: 0; color: var(--ink); }
+/* finding 17: the figure is a field that reads as the figure, with a hairline under it that says it can be typed */
+.wl-mv-row .wl-mv-type { width: 9ch; padding: 0 0 1px; border: 0; border-bottom: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent); border-radius: 0; background: transparent; text-align: right; -webkit-appearance: none; appearance: none; }
+.wl-mv-row .wl-mv-type:focus { outline: none; box-shadow: none; border-bottom: 1px solid var(--ink); }  /* a-nav-5: the global inset ring is off here; the line under the figure is the cue */
+.wl-mv-row .wl-mv-type:disabled { border-bottom-color: transparent; color: var(--ink); opacity: 1; }
+.wl-mv-rows .wl-mv-range { height: 40px; }
+.wl-mv-rows .wl-mv-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--c) var(--p, 0%), color-mix(in srgb, var(--ink) 12%, transparent) var(--p, 0%)); }
+.wl-mv-range:focus, .wl-mv-range:focus-visible { outline: none; box-shadow: none; }
+.wl-mv-range:focus-visible::-webkit-slider-thumb { box-shadow: inset 0 0 0 2px var(--ink); }
+.wl-mv-rows .wl-mv-hint { margin: -4px 0 12px; font: 400 13px/18px var(--font); }
+.wl-mv-row.is-focus::before { inset: 0 -16px; border-radius: 0; box-shadow: none; }
+.wl-mv-rows .wl-mv-row.is-focus:first-child::before { border-radius: 16px 16px 0 0; }
+.wl-mv-rows .wl-mv-row.is-focus:last-child::before { border-radius: 0 0 16px 16px; }
+/* why Move can't go: one line right above it, left, in the ink (an error is read, not a footnote) */
+.wl-mv-why { text-align: left; font: 400 15px/20px var(--font); color: var(--ink); margin: 16px 16px 0; }
+/* the notes under a group: T7 footers inset to the card's text (x = 32) */
+.wl-mv-foot { margin: 8px 16px 0; }
+/* "Who can see this?": a text row that opens the honest line under it */
+.wl-mv-who { margin: 4px 0 0; }
+.wl-mv-who__q { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 0; background: none; color: var(--ink); font: 500 15px/20px var(--font); cursor: pointer; }
+.wl-mv-who__q::after { content: ""; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform var(--dur-base) var(--ease-out); }
+.wl-mv-who__q[aria-expanded="true"]::after { transform: rotate(-135deg) translateY(-2px); }
+.wl-mv-who .wl-mv-foot { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .wl-mv-who__q::after { transition: none; } }
+/* the line right above Move (why it can't go, or a leg that didn't go) rides the floor with it: on a long plan it never
+   scrolls away from the button it is about (errors sit right above their button) */
+.zf-sheet__content:has(> .wl-mv-hero) > :is(.wl-mv-why, .zf-money__line):has(+ .wl-sheet-go) { position: sticky; bottom: 74px; z-index: 1; margin: 0 0 24px; padding: 8px 16px; background: var(--bg); text-align: left; }
+/* one progress device (the design review change 8): a leg's row says "On its way", then a drawn ✓ and "Done"; no fill bar */
+.zf-group .wl-mv-leg__fill { display: none; }
+.zf-group .wl-mv-leg.is-done .wl-mv-leg__s::before { content: ""; display: inline-block; width: 9px; height: 5px; margin: 0 7px 3px 1px; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); clip-path: inset(0 100% 0 0); animation: wl-mv-tick var(--dur-base) var(--ease-out) forwards; }
+@keyframes wl-mv-tick { to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .zf-group .wl-mv-leg.is-done .wl-mv-leg__s::before { animation: none; clip-path: none; } }
+
+/* ── R3 (the design review §4.4): Swap on the A+ system ──────────────────────────────────────────────────────────────
+   Edges on x = 16; the two pickers one card, each the coin over where it sits (two lines, never a phrase wrapped in two),
+   its dollars right, a line chevron; Max the same chip as $10 · $25 · $50; what arrives is the one line under the
+   dollars, its space kept; the notes after the keypad are footnotes; the privacy line a "Who can see this?" row. */
+.zf-sheet__content:has(> .wl-swap-pick) { --gutter: 16px; padding-left: 16px; padding-right: 16px; }
+.wl-swap-pick { display: grid; grid-template-columns: 64px 28px minmax(0, 1fr) auto 12px; align-items: center; column-gap: 12px; width: 100%; text-align: left; color: var(--ink); }
+.wl-swap-pick .wl-sw-name { display: grid; min-width: 0; font: 400 17px/22px var(--font); }
+.wl-swap-pick .wl-sw-name .wl-sw-where { font: 400 15px/20px var(--font); color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-swap-pick > .zf-small:not(:first-child) { font: 400 15px/20px var(--font); font-family: var(--font-money, var(--font)); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.wl-swap-pick > .zf-body:only-of-type { grid-column: 3 / 5; }
+.wl-sw-chev { grid-column: 5; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; color: var(--mute); }
+.wl-swap-chips .zf-chip.wl-swap-all { height: 32px; padding: 0 12px; font: 600 15px/20px var(--font); }
+.wl-sw-arrives { min-height: 18px; margin: -4px 0 8px; text-align: center; font: 400 15px/20px var(--font); color: var(--mute); }
+/* the whole Swap, the arrives line's two lines and "Who can see this?" included, ends above the floor's fade on a
+   390 × 844 phone: the dollars sit tighter, the keys are 48 pt, the line under the dollars keeps two lines' room */
+.wl-swap-pick:has(+ .wl-swap-pick) { margin-top: 0; }
+.wl-swap-amount .zf-money__amount { margin: 4px 0 0; }
+.wl-sw-arrives { min-height: 40px; margin: 0 16px 4px; }
+.wl-swap-chips { margin: 0 0 4px; }
+.wl-swap-chips + .zf-keypad { margin-top: 0; }
+.wl-swap-chips + .zf-keypad button { height: 48px; }
+/* A-home audit (5 Nov): with no amount yet, Swap reads as Send and Move do (not lit); a tap still says "Pick an amount." */
+.zf-sheet__content > .wl-sheet-go.is-idle { background: var(--fill); background-image: none; color: var(--mute); text-shadow: none; box-shadow: var(--pin-band, none), inset 0 0 0 1px var(--line); }  /* the floor's own off look (wallet.css, Send and Move) */
+.wl-sheet-go.is-idle::before { opacity: 0; }
+/* one gutter for the four money sheets: Add and Move sit on x = 24, so Swap does too */
+.zf-sheet__content:has(> .wl-swap-pick) { --gutter: 24px; padding-left: 24px; padding-right: 24px; }
+/* Move's sliders: a 44 pt touch row (was 40) */
+.zf-sheet input[type="range"] { min-height: 44px; }
+/* "your Safe" under a coin's name is a line of its own: it starts with a capital ("Your Safe") */
+.wl-sw-where { display: block; }
+.wl-sw-where::first-letter { text-transform: uppercase; }
+/* A-home 2 (5 Nov): Request's hint ("Tap a coin to make the request.") reads as the other sheets' hints: one zf-small --mute line, no box */
+.zf-sheet__content:has(> .wl-request-chips) > .zf-money__line { margin: 12px 0 0; padding: 0 16px; background: none; box-shadow: none; border-radius: 0; color: var(--mute); text-align: left; }  /* on the same 16 px inset as the line under it */
+/* Private's row (pair look): ink like the Safe's, its mark a 24 pt disc; the notes under the rows are quiet, centred, mute */
+.wl-mv-private { --c: var(--ink); }
+.wl-mv-rows ~ .wl-mv-foot, .wl-mv-sum ~ .wl-mv-foot, .wl-mv-who .wl-mv-foot { text-align: center; color: var(--mute); font: 400 13px/18px var(--font); }
+.wl-mv-rows .wl-mv-hint { text-align: center; }

@@ -1,0 +1,64 @@
+/* The one row for anything on its way or just finished (LiveRow.tsx): built like Home's coin rows, no card. Its bottom
+   hairline is its progress line: it fills with --up (fill) and, while work goes on, a faint light runs along it (flow).
+   Done, Stopped and Came back are a 16 pt badge on the row's picture (settle). Transform and opacity only. */
+.zf-lrows { list-style: none; margin: 0; padding: 0; }
+.zf-lrow { position: relative; display: grid; grid-template-columns: 40px 1fr auto; column-gap: 16px; align-items: center;
+  width: 100%; min-height: 68px; padding: 12px 0 14px; border: 0; background: none; color: var(--ink); font: inherit;
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* press: a wash across the row, to the screen's edges */
+.zf-lrow::before { content: ""; position: absolute; inset: 0 calc(-1 * var(--gutter)); background: var(--marker-bg);
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }
+.zf-lrow:active::before { opacity: 1; transition-duration: var(--dur-fast); }
+.zf-lrow::after { content: ""; position: absolute; left: 56px; right: 0; bottom: 0; border-bottom: var(--hairline); }
+li:last-child > .zf-lrow::after { content: none; }
+.zf-lrow__mark { position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--act-fill); color: var(--ink); }
+.zf-lrow__mark > svg { width: 20px; height: 20px; }
+.zf-lrow__mark > img { width: 40px; height: 40px; border-radius: 50%; }
+.zf-lrow__badge { position: absolute; right: -2px; bottom: -2px; width: 16px; height: 16px; border-radius: 50%;
+  display: grid; place-items: center; box-shadow: 0 0 0 2px var(--bg); opacity: 0; transform: scale(.98);
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.zf-lrow__badge svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.is-done .zf-lrow__badge    { opacity: 1; transform: none; background: var(--up);   color: var(--bg); }
+.is-stopped .zf-lrow__badge { opacity: 1; transform: none; background: var(--down); color: #fff; }
+.is-back .zf-lrow__badge    { opacity: 1; transform: none; background: var(--ink);  color: var(--bg); }
+.zf-lrow__text { min-width: 0; display: grid; }
+.zf-lrow__t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font: 500 17px/22px var(--font); letter-spacing: -.01em; text-wrap: balance; }
+.zf-lrow__d { margin-top: 2px; font: 400 15px/20px var(--font); color: var(--mute); font-variant-numeric: tabular-nums; }
+.is-stopped .zf-lrow__d { color: var(--ink); }
+.zf-lrow__r { display: grid; justify-items: end; padding-left: 12px; text-align: right; }
+.zf-lrow__v { font: 500 17px/22px var(--font); font-variant-numeric: tabular-nums; }
+.zf-lrow__w { margin-top: 2px; font: 400 15px/20px var(--font); color: var(--mute); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.zf-lrow__line { position: absolute; left: 56px; right: 0; bottom: 0; height: 2px; border-radius: 1px; overflow: hidden;
+  background: var(--line); z-index: 1; }
+.zf-lrow.is-past .zf-lrow__line { display: none; }
+/* fill: the line fills to --p (0..1) */
+.zf-lrow__fill { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; background: var(--up);
+  transform: translateX(calc((var(--p, 0) - 1) * 100%)); transition: transform var(--dur-base) var(--ease-out); }
+.is-slow .zf-lrow__fill { opacity: .5; }
+.is-stopped .zf-lrow__fill { background: var(--down); }
+.is-done .zf-lrow__line { opacity: 0; transition: opacity var(--dur-base) var(--ease-out) 0ms; }
+/* flow: a light crosses the filled part, then rests; only while it is going */
+.zf-lrow__flow { position: absolute; inset: 0; background: linear-gradient(90deg, transparent 42%, var(--flow-light) 50%, transparent 58%);
+  transform: translateX(-50%); animation: none; display: none; }
+.zf-lrow:not(.is-going) .zf-lrow__flow { animation: none; opacity: 0; }
+@keyframes zf-flow { 0% { transform: translateX(-50%); } 60%, 100% { transform: translateX(50%); } }
+/* "2 more": a quiet row that opens the whole list */
+.zf-lrow-more { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; padding: 0;
+  border: 0; background: none; color: var(--mute); font: 400 15px/20px var(--font); cursor: pointer; }
+@media (prefers-reduced-motion: reduce) {
+  .zf-lrow__flow { animation: none; opacity: 0; }
+  .zf-lrow__fill, .zf-lrow__badge, .zf-lrow__line, .zf-lrow::before { transition: none; }
+}
+
+/* Theme v3.1 (THEME.md): a row's amount and its sub-figure are money, in the money face. */
+.zf-lrow__v, .zf-lrow__w { font-family: var(--font-money, var(--font)); }
+
+/* a16 (Sim re-walk 1b, 5 Nov): a going row's words stay one line (cut with "…" if they must) and its time left is the
+   right column, as the Hot moving row (wallet.css .wl-hw--moving), sitting on the sub-line; the row keeps clear of the
+   All-apps handle when it is scrolled to (LiveTrack.tsx: a new job scrolls its row into view; --zf-end is the bar's reach). */
+.zf-lrow.is-going .zf-lrow__d, .zf-lrow.is-slow .zf-lrow__d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zf-lrow__r:not(:has(> .zf-lrow__v)) { align-self: stretch; align-content: end; }
+.zf-lrow__r:not(:has(> .zf-lrow__v)) > .zf-lrow__w { margin-top: 0; }
+.zf-lrow { scroll-margin-bottom: calc(var(--zf-end, 0px) + 12px); }

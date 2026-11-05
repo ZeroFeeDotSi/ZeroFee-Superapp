@@ -1,0 +1,13 @@
+Found 40 mutants to test
+ok       Unmutated baseline in 29s build + 1s test
+MISSED   src/lib.rs:71:39: replace * with + in 1s build + 0s test
+MISSED   src/lib.rs:71:39: replace * with / in 1s build + 0s test
+MISSED   src/lib.rs:72:29: replace * with + in 1s build + 0s test
+MISSED   src/lib.rs:140:9: replace Level::with_device -> Level with Default::default() in 2s build + 0s test
+MISSED   src/lib.rs:254:9: replace Change::is_module -> bool with true in 1s build + 0s test
+MISSED   src/lib.rs:263:5: replace is_setup_step -> bool with true in 1s build + 0s test
+MISSED   src/lib.rs:265:9: delete match arm Change::KidsSet{..} | Change::KidsOff in is_setup_step in 1s build + 0s test
+MISSED   src/lib.rs:367:38: replace == with != in AccountPolicy::execute in 1s build + 0s test
+MISSED   src/lib.rs:414:38: replace == with != in AccountPolicy::execute_many in 1s build + 0s test
+40 mutants tested in 2m: 9 missed, 22 caught, 9 unviable
+exit=2 ALLDONE 14:03:40

@@ -1,0 +1,13 @@
+{
+  "name": "@zerofee/mail",
+  "license": "Apache-2.0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.ts"
+  },
+  "dependencies": {
+    "postal-mime": "2.7.5"
+  }
+}

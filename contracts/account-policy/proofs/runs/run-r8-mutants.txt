@@ -1,0 +1,124 @@
+cargo-mutants 27.1.0 on release 8. Test command: the whole suite except the five fuzz_ property loops (cargo test -- --skip fuzz_), -j 1, --timeout 240; each shard with its own CARGO_TARGET_DIR (never the worktree's).
+
+=== Round A: every function of lib.rs 5a39e768…084c (the first release-8 source, before R8-F1), 3 shards ===
+--- shard 0/3 ---
+Found 125 mutants to test
+ok       Unmutated baseline in 109s build + 92s test
+125 mutants tested in 54m: 9 missed, 97 caught, 19 unviable
+--- shard 1/3 ---
+Found 125 mutants to test
+ok       Unmutated baseline in 109s build + 93s test
+125 mutants tested in 35m: 8 missed, 111 caught, 6 unviable
+--- shard 2/3 ---
+Found 124 mutants to test
+ok       Unmutated baseline in 106s build + 95s test
+124 mutants tested in 82m: 28 missed, 89 caught, 7 unviable
+Totals: 297 caught, 45 missed, 32 unviable, 0 timeouts.
+
+[every missed mutant of round A, with its disposition]
+src/lib.rs:193:9: replace Level::with_device -> Level with Default::default()  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:318:9: delete match arm Change::KidsSet{..} | Change::KidsOff in is_setup_step  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:459:38: replace == with != in AccountPolicy::execute  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:509:38: replace == with != in AccountPolicy::execute_many  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:598:145: replace && with || in AccountPolicy::approve  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:598:85: replace && with || in AccountPolicy::approve  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:598:68: replace && with || in AccountPolicy::approve  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:598:138: replace == with != in AccountPolicy::approve  =>  equivalent: in approve's co_signed_before, `sha256(d) != k` differs from `== k` only for a row naming a removed device; both then leave a request that is not co-signed (the observable outcome is the same)
+src/lib.rs:632:27: replace && with || in AccountPolicy::decline  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1050:81: replace && with || in AccountPolicy::level_for_moves  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1050:77: replace > with >= in AccountPolicy::level_for_moves  =>  equivalent: a coin with `x > 0` in this request always has total `a > 0`, so `a >= 0` admits no other coin
+src/lib.rs:1050:117: replace && with || in AccountPolicy::level_for_moves  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1050:112: replace == with != in AccountPolicy::level_for_moves  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1050:123: replace > with >= in AccountPolicy::level_for_moves  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1137:27: replace || with && in AccountPolicy::key_in_use  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1143:77: replace < with <= in AccountPolicy::in_setup_window  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1192:33: replace != with == in AccountPolicy::unrecord_second_device  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1275:61: replace < with <= in AccountPolicy::restart_young_ages  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1338:9: replace AccountPolicy::drop_waiting with ()  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1505:5: replace dispatch_chain with ()  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1509:171: replace + with - in dispatch_chain  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1627:30: replace != with == in moves  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1646:5: replace parties -> Option<Vec<AccountId>> with None  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1646:5: replace parties -> Option<Vec<AccountId>> with Some(vec![])  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1646:5: replace parties -> Option<Vec<AccountId>> with Some(vec![Default::default()])  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1650:13: replace || with && in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1650:37: replace && with || in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1650:26: replace == with != in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1650:52: replace == with != in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1651:12: delete ! in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1659:55: replace || with && in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1659:88: replace && with || in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1659:71: replace == with != in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1659:91: delete ! in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1660:53: replace && with || in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1660:42: replace == with != in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1661:21: replace && with || in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1661:24: delete ! in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1664:12: delete ! in parties  =>  dead in the release wasm: #[cfg(feature = "modules")] code (Agent, Legacy, Kids), compiled out
+src/lib.rs:1677:5: replace is_ml_dsa_65_key -> bool with true  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1677:49: replace && with || in is_ml_dsa_65_key  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1727:5: replace forget_approver with ()  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1730:17: replace != with == in forget_approver  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1785:43: replace / with % in share_ppm  =>  killed by a new test in tests/r8_mutants.rs (rounds B and C)
+src/lib.rs:1795:36: replace - with / in signer_key  =>  equivalent: signer_key's register id u64::MAX - 1 vs u64::MAX / 1; any register id works
+Dispositions: {'modules': 24, 'killed': 18, 'equivalent': 3, 'OPEN': 0}
+
+=== Round B: the new tests (tests/r8_mutants.rs) against round A's survivors, on 5a39e768 (--test r8_mutants only) ===
+Found 30 mutants to test
+ok       Unmutated baseline in 52s build + 1s test
+30 mutants tested in 3m: 4 missed, 26 caught
+[caught]
+src/lib.rs:598:145: replace && with || in AccountPolicy::approve
+src/lib.rs:598:85: replace && with || in AccountPolicy::approve
+src/lib.rs:598:68: replace && with || in AccountPolicy::approve
+src/lib.rs:598:58: replace == with != in AccountPolicy::approve
+src/lib.rs:1050:81: replace && with || in AccountPolicy::level_for_moves
+src/lib.rs:1050:77: replace > with == in AccountPolicy::level_for_moves
+src/lib.rs:1050:77: replace > with < in AccountPolicy::level_for_moves
+src/lib.rs:1050:117: replace && with || in AccountPolicy::level_for_moves
+src/lib.rs:1050:112: replace == with != in AccountPolicy::level_for_moves
+src/lib.rs:1050:123: replace > with == in AccountPolicy::level_for_moves
+src/lib.rs:1050:123: replace > with < in AccountPolicy::level_for_moves
+src/lib.rs:1050:123: replace > with >= in AccountPolicy::level_for_moves
+src/lib.rs:1143:9: replace AccountPolicy::in_setup_window -> bool with true
+src/lib.rs:1143:9: replace AccountPolicy::in_setup_window -> bool with false
+src/lib.rs:1143:77: replace < with == in AccountPolicy::in_setup_window
+src/lib.rs:1143:77: replace < with > in AccountPolicy::in_setup_window
+src/lib.rs:1143:77: replace < with <= in AccountPolicy::in_setup_window
+src/lib.rs:1192:33: replace != with == in AccountPolicy::unrecord_second_device
+src/lib.rs:1275:61: replace < with == in AccountPolicy::restart_young_ages
+src/lib.rs:1275:61: replace < with <= in AccountPolicy::restart_young_ages
+src/lib.rs:1505:5: replace dispatch_chain with ()
+src/lib.rs:1509:171: replace + with - in dispatch_chain
+src/lib.rs:1509:171: replace + with * in dispatch_chain
+src/lib.rs:1509:140: replace + with - in dispatch_chain
+src/lib.rs:1509:140: replace + with * in dispatch_chain
+src/lib.rs:1627:30: replace != with == in moves
+[missed by this one crate (each caught by the whole suite in round A, or equivalent above)]
+src/lib.rs:598:71: delete ! in AccountPolicy::approve
+src/lib.rs:598:138: replace == with != in AccountPolicy::approve
+src/lib.rs:1050:77: replace > with >= in AccountPolicy::level_for_moves
+src/lib.rs:1275:61: replace < with > in AccountPolicy::restart_young_ages
+
+=== Round C: the FINAL source lib.rs e951e00a…b23a (after R8-F1): finish and finish_recovery (changed by R8-F1) and every function whose survivors got a killing test (approve, level_for_moves, in_setup_window, unrecord_second_device, restart_young_ages, is_ml_dsa_65_key, forget_approver, share_ppm, dispatch_chain, moves); whole suite; 3 shards ===
+Found 27 mutants to test
+ok       Unmutated baseline in 28s build + 131s test
+27 mutants tested in 16m: 1 missed, 26 caught
+Found 27 mutants to test
+ok       Unmutated baseline in 41s build + 121s test
+27 mutants tested in 16m: 1 missed, 26 caught
+Found 26 mutants to test
+ok       Unmutated baseline in 41s build + 121s test
+26 mutants tested in 14m: 25 caught, 1 unviable
+Totals: 77 caught, 2 missed, 1 unviable, 0 timeouts.
+[missed: both the equivalent mutants named above, at their final-source lines]
+src/lib.rs:599:138: replace == with != in AccountPolicy::approve
+src/lib.rs:1058:77: replace > with >= in AccountPolicy::level_for_moves
+[unviable]
+src/lib.rs:1689:22: replace + with - in is_ml_dsa_65_key
+And the two function-level mutants the round-C regex didn't select, on the final source with --test r8_mutants:
+Found 2 mutants to test
+ok       Unmutated baseline in 5s build + 0s test
+2 mutants tested in 11s: 2 caught
+src/lib.rs:1689:5: replace is_ml_dsa_65_key -> bool with true
+src/lib.rs:1739:5: replace forget_approver with ()

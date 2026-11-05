@@ -1,0 +1,98 @@
+/* The Sim's simulated sites (SimSitePage.tsx): our window's bar, the site wallet strip, then a page we draw ourselves.
+   Only the app's tokens (--ink/--mute/--fill/--line/--bg/--up/--down/--lit/--on-mint), 16 px gutters, both themes. */
+.sx { z-index: 30; overflow: hidden; }
+.sx-bar { grid-template-columns: 44px 1fr 44px; }
+.sx-title { padding-left: 0; }
+.sx-title .st-window-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sx-wallet { flex: none; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--fill); font: 400 13px/1.3 var(--font); color: var(--mute); }
+.sx-wallet b { color: var(--ink); font-weight: 600; font-feature-settings: "tnum" 1; }
+.sx-wallet-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sx-wallet-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up); flex: none; }
+.sx-wallet-add { min-height: 36px; padding: 6px 4px; font-size: 14px; font-weight: 500; color: var(--ink); }
+
+.sx-page { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding: 14px 16px calc(var(--zf-safe-bottom, 0px) + 96px); display: flex; flex-direction: column; animation: sx-in var(--dur-base) var(--ease-out); }
+@keyframes sx-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sx-page { animation: none; } }
+.sx-foot { margin-top: auto; padding-top: 20px; text-align: center; color: var(--mute); }
+
+/* the site's own head: our drawn mark, never a site's logo */
+.sx-site-head { display: flex; align-items: center; gap: 12px; margin: 2px 0 14px; }
+.sx-site-head > span:last-child { display: grid; gap: 2px; }
+.sx-site-head b { font: 600 20px/1.2 var(--font); color: var(--ink); letter-spacing: -.01em; }
+.sx-site-mark { width: 36px; height: 36px; border-radius: 10px; flex: none; }
+.sx-site-mark--pump { background: radial-gradient(circle at 30% 30%, var(--up), transparent 70%), var(--fill-2, var(--fill)); }
+.sx-site-mark--gmgn { background: conic-gradient(from 90deg, var(--up), var(--fill-2, var(--fill)), var(--up)); }
+.sx-seg { margin-bottom: 6px; }
+
+.sx-list { list-style: none; margin: 0; padding: 0; }
+.sx-row { appearance: none; border: 0; background: none; width: 100%; display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.sx-row:active { opacity: .7; }
+.sx-list--dense .sx-row { grid-template-columns: 36px 1fr auto; padding: 10px 0; }
+.sx-row-mid { display: grid; gap: 4px; min-width: 0; }
+.sx-row-name { font: 400 15px/1.25 var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sx-row-name b { font-weight: 600; }
+.sx-tick { color: var(--mute); font-size: 13px; }
+.sx-age { color: var(--up); font-size: 12px; font-weight: 500; }
+.sx-row-meta { font: 400 12px/1.3 var(--font); color: var(--mute); font-feature-settings: "tnum" 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sx-row-end { display: grid; justify-items: end; gap: 4px; }
+.sx-chg { font: 500 13px/1 var(--font); font-feature-settings: "tnum" 1; }
+.sx-chg.up { color: var(--up); }
+.sx-chg.down { color: var(--down); }
+
+.sx-badge { display: grid; place-items: center; border-radius: 50%; color: #fff; font-weight: 600; font-family: var(--font); flex: none; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+.sx-spark path { fill: none; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.sx-spark.up path { stroke: var(--up); }
+.sx-spark.down path { stroke: var(--down); }
+.sx-curve { display: block; height: 4px; border-radius: 2px; background: var(--fill-2, var(--fill)); overflow: hidden; max-width: 180px; }
+.sx-curve > span { display: block; height: 100%; border-radius: 2px; background: var(--up); }
+
+/* a coin's page */
+.sx-coin { display: grid; gap: 14px; }
+.sx-coin-head { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center; }
+.sx-coin-head > span:last-child { display: grid; gap: 2px; }
+.sx-coin-name { font: 600 20px/1.2 var(--font); color: var(--ink); }
+.sx-coin-price { display: flex; align-items: baseline; gap: 10px; }
+.sx-coin-usd { font: 500 32px/1.1 var(--font-money, var(--font)); letter-spacing: -.02em; font-feature-settings: "tnum" 1; color: var(--ink); }
+.sx-chart { width: 100%; height: 150px; display: block; }
+.sx-chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.sx-chart.up .sx-chart-line { stroke: var(--up); }
+.sx-chart.down .sx-chart-line { stroke: var(--down); }
+.sx-chart-area { opacity: .12; }
+.sx-chart.up .sx-chart-area { fill: var(--up); }
+.sx-chart.down .sx-chart-area { fill: var(--down); }
+.sx-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0; border-radius: 14px; overflow: hidden; background: var(--line); }
+.sx-stats > div { background: var(--fill); padding: 10px 12px; }
+.sx-stats dt { font: 400 12px/1.2 var(--font); color: var(--mute); }
+.sx-stats dd { margin: 3px 0 0; font: 500 16px/1.2 var(--font); color: var(--ink); font-feature-settings: "tnum" 1; }
+.sx-coin-curve { display: grid; gap: 6px; margin: 0; }
+.sx-coin-curve .sx-curve { max-width: none; height: 6px; }
+.sx-buy { display: grid; gap: 4px; }
+.sx-buys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sx-buys .zf-btn { width: 100%; padding: 0 6px; }
+.sx-sell { justify-self: center; }
+.sx-line { text-align: center; margin: 2px 0 0; }
+.sx-short { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 12px; border-radius: 14px; background: var(--fill); }
+.sx-receipt { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 18px 14px 6px; border-radius: 18px; background: var(--fill); animation: sx-in var(--dur-base) var(--ease-out); }
+.sx-receipt b { font: 600 17px/1.3 var(--font); color: var(--ink); }
+.sx-receipt-mark { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--lit, var(--up)); color: var(--on-mint, #000); }
+.sx-receipt-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.sx-receipt-acts .zf-btn { width: 100%; }
+.sx-receipt-acts > :only-child { grid-column: 1 / -1; }
+
+/* any other address: a plain page */
+.sx-web { display: grid; gap: 16px; }
+.sx-web-hero { display: grid; justify-items: center; gap: 8px; padding: 18px 0 4px; text-align: center; }
+.sx-web-host { font: 600 22px/1.2 var(--font); color: var(--ink); overflow-wrap: anywhere; }
+.sx-web-fav { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--fill-2, var(--fill)); color: var(--ink); font: 600 14px/1 var(--font); }
+.sx-web-fav--big { width: 64px; height: 64px; border-radius: 18px; font-size: 26px; }
+.sx-results { list-style: none; margin: 0; padding: 0 16px; }
+.sx-results li:last-child .zf-row { border-bottom: 0; }
+.sx-web-row { appearance: none; border: 0; border-bottom: 1px solid var(--line); background: none; width: 100%; text-align: left; color: var(--ink); cursor: pointer; font: inherit; }
+.sx-web-row > span:nth-child(2) { display: grid; min-width: 0; }
+.sx-search { display: grid; gap: 2px; padding: 12px 16px; border-radius: 22px; background: var(--fill); }
+.sx-search b { font: 500 16px/1.3 var(--font); color: var(--ink); }
+.sx-card { display: grid; gap: 8px; padding: 16px; border-radius: 18px; border: 1px solid var(--line); }
+.sx-card b { font: 600 17px/1.3 var(--font); color: var(--ink); }
+.sx-card p { margin: 0; }
+.sx-card-tag { justify-self: start; padding: 3px 8px; border-radius: 999px; border: 1px dashed var(--mute); color: var(--mute); font: 600 10px/1.2 var(--font); letter-spacing: .12em; text-transform: uppercase; }

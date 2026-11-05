@@ -1,0 +1,160 @@
+/* Discover (D136, the A+ pass of 3 Nov): one row of tabs where the balance is the tab; the search field is the screen's one
+   pill; the lists are text tabs; rows of hairlines, each coin's own logo, its change as coloured text, a glint (never a
+   box) on a price that moved, and at most two rows in their coin's own light. Only the rows rise in. */
+/* one column no wider than the screen: a wide wallets row (every wallet holding money) scrolls inside its own row, never
+   widening the list past the screen (Sim pass, 4 Nov: prices, Paste and Move were cut off at 390 px) */
+.dc { display: grid; grid-template-columns: minmax(0, 1fr); }
+
+/* The tabs: All, then a market chain's logo and its wallet's balance; a wallet with no market yet sits quiet after them. */
+.dc-top { display: flex; align-items: center; gap: 4px; margin: 2px 0 14px; }
+.dc-tabs { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 2px 0 10px; overflow-x: auto; overscroll-behavior-x: none; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, #000 96%, transparent); mask-image: linear-gradient(to right, #000 96%, transparent); }
+.dc-tabs::-webkit-scrollbar { display: none; }
+.dc-tabs button { appearance: none; border: 0; background: none; padding: 4px 0; display: inline-flex; align-items: center; gap: 6px; flex: none; color: var(--mute);
+  font: 500 15px/1 var(--font); font-variant-numeric: tabular-nums; cursor: pointer; transition: color var(--dur-base); white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+.dc-tabs button.on { color: var(--ink); }
+.dc-tab-usd { letter-spacing: -.01em; }
+.dc-tab-sk { display: inline-block; width: 5ch; height: .9em; border-radius: 6px; }
+.dc-tab-quiet { display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 4px 0 4px 12px; border-left: 1px solid var(--line); color: var(--mute);
+  font: 400 13px/1 var(--font); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dc-tab-quiet img { opacity: .7; }
+.dc-mark { position: absolute; left: 0; bottom: 2px; height: 2px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 10px rgba(var(--glow-rgb), .45);
+  transition: transform var(--snap-ms, var(--spring-ms)) var(--ease-out); } /* v2: transform only (a width transition laid out every frame) */
+.dc-gear { appearance: none; border: 0; background: none; color: var(--ink-2); width: 36px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 20px; cursor: pointer; margin: -8px -10px 0 0; }
+.dc-gear:active { background: var(--raise); }
+/* Move (product decision, 4 Nov): a small pill beside the gear, in the thumb's sight on the wallets' own row */
+.dc-move { appearance: none; border: 0; background: var(--raise); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; height: 32px; padding: 0 12px; flex: none; border-radius: 16px; cursor: pointer; margin: -4px 6px 0 4px; }
+.dc-move:active { opacity: .7; }
+
+/* The one pill: the search field. Paste is plain text inside it. */
+.dc-field { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; border-radius: var(--r-pill, 24px); background: var(--raise); color: var(--mute); transition: box-shadow var(--dur-base) var(--ease-out); }
+.dc-field:focus-within { box-shadow: inset 0 0 0 1.5px var(--ink); } /* inside its own edge: never clipped */
+.dc-field input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--ink); font: 400 16px/1 var(--font); }
+.dc-field input::placeholder { color: var(--mute); }
+.dc-paste { appearance: none; border: 0; background: none; box-shadow: none; padding: 10px 0 10px 8px; color: var(--ink); font: 500 15px/1 var(--font); cursor: pointer; }
+.dc-paste:active { opacity: .6; }
+
+/* The lists, as text tabs (the coin page's ranges): the same six on every chain. */
+.dc-wins { display: flex; gap: 20px; margin-top: 16px; overflow-x: auto; overscroll-behavior-x: none; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); }
+.dc-wins::-webkit-scrollbar { display: none; }
+.dc-wins button { appearance: none; border: 0; background: none; flex: none; padding: 6px 0; color: var(--mute); font: 500 15px/1 var(--font); cursor: pointer;
+  text-decoration: underline; text-decoration-color: transparent; text-decoration-thickness: 1px; text-underline-offset: 7px; transition: color var(--dur-base), text-decoration-color var(--dur-base); }
+.dc-wins button.on { color: var(--ink); text-decoration-color: var(--ink); }
+
+.dc-age-line { margin: 12px 0 0; font: 400 12.5px/1.3 var(--font); color: var(--mute); }
+.dc-quiet { margin: 28px 0 0; text-align: center; font: 400 13px/1.45 var(--font); color: var(--mute); }
+
+/* The rows: only they rise in. */
+.dc-list { display: grid; margin-top: 6px; }
+/* Each row is the one LiveRow (@zerofee/design, liverow.css): its press is the row's wash, as everywhere else. */
+.dc-row:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+/* the price column never shrinks under its digits (test, 4 Nov: clipped); the name gives way */
+.dc-row .zf-lrow__r { min-width: max-content; white-space: nowrap; }
+/* the line (its chain on All, its name, its market cap) is one line, cut short at the end, never two or three */
+.dc-row .zf-lrow__d { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-logo-box { position: relative; width: 40px; height: 40px; }
+.dc-logo { width: 40px; height: 40px; }
+.dc-img { display: block; width: 40px; height: 40px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px var(--line); }
+.dc-img--wait { box-shadow: none; }
+.dc-img--none { background: color-mix(in srgb, var(--ink) 8%, transparent); box-shadow: none; }
+/* a coin's own light, ambient: low saturation, lower still on White */
+.dc-logo .zf-halo__light { filter: blur(14px) saturate(1.2); }
+:root:not([data-theme="dark"]) .dc-logo { --halo: .14; }
+.dc-badge { position: absolute; right: -4px; bottom: -4px; z-index: 2; display: inline-grid; border-radius: 50%; background: var(--bg); box-shadow: 0 0 0 2px var(--bg); }
+.dc-sym { display: flex; align-items: center; gap: 7px; font: 500 16px/1.2 var(--font); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-age { display: inline-flex; align-items: center; gap: 5px; font: 500 11px/1 var(--font); letter-spacing: .02em; color: var(--ink-2); }
+.dc-px { font: 500 15px/1.2 var(--font); font-variant-numeric: tabular-nums; }
+/* the change: coloured text only, $ and % never in a box */
+.dc-chg { font: 500 13px/1 var(--font); font-variant-numeric: tabular-nums; color: var(--mute); }
+.dc-chg.up { color: var(--up); }
+.dc-chg.down { color: var(--down); }
+/* a price that just moved: a glint of its colour in the digits, once; the digits never roll */
+/* v2: the glint is a light of its colour on its own layer, fading once (opacity); it used to animate text-shadow and
+   colour, a paint every frame on every row that ticked */
+.dc-glint-up, .dc-glint-down { position: relative; }
+.dc-glint-up::after, .dc-glint-down::after { content: ""; position: absolute; inset: -6px 0 -6px -10px; pointer-events: none; animation: dc-glint var(--dur-base) var(--ease-out) both; }
+.dc-glint-up::after { background: radial-gradient(closest-side, color-mix(in srgb, var(--up) 26%, transparent), transparent); }
+.dc-glint-down::after { background: radial-gradient(closest-side, color-mix(in srgb, var(--down) 26%, transparent), transparent); }
+@keyframes dc-glint { 0% { opacity: 0; } 10% { opacity: 1; } 100% { opacity: 0; } }
+
+.dc-skel { display: grid; gap: 22px; margin-top: 18px; }
+.dc-skel-row { display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: center; }
+.dc-skel-dot { width: 40px; height: 40px; border-radius: 50%; }
+.dc-skel-bar { height: 14px; width: 62%; }
+
+@media (prefers-reduced-motion: reduce) { .dc-glint-up::after, .dc-glint-down::after { animation: none; opacity: 0; } .dc-mark { transition: none; } }
+/* Rebrand §3.3: a list's logos carry no light (the yellow cloud behind a coin in a list); the search is the one --fill
+   field at 50 pt. The coin page keeps its dim halo (Black only). */
+.dc-logo .zf-halo__light, :root:not([data-theme="dark"]) .dc-logo .zf-halo__light { display: none; }
+.dc-field { height: 50px; background: var(--fill); }
+
+/* the quiet Buy chip (Build A, concept v3.1): a sibling of the row (never a button in a button), 44 pt to hit, a 28 pt
+   pill to see, quiet on the fill, lit only under the finger; gone while the row is the receipt */
+.dc-rr { position: relative; }
+.dc-rr .dc-row { padding-right: 66px; }
+.dc-qb { position: absolute; right: 0; top: 50%; transform: translateY(-50%); appearance: none; border: 0; background: none; padding: 0 0 0 8px; height: 44px; display: grid; place-items: center; color: var(--ink); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.dc-qb__pill { height: 28px; padding: 0 14px; border-radius: 999px; background: var(--fill); font: 600 13px/28px var(--font); letter-spacing: -.01em; transition: background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast); }
+.dc-qb:active .dc-qb__pill { background: var(--lit, var(--mint)); color: var(--on-mint); transform: scale(.98); }
+.dc-qb:focus-visible .dc-qb__pill { box-shadow: inset 0 0 0 2px var(--ink); }
+.dc-rr.is-away .dc-row, .dc-rr.is-landed .dc-row, .dc-rr.is-checking .dc-row, .dc-rr.is-refused .dc-row { padding-right: 0; }
+.dc-sub--buy { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
+.dc-sub__words { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dc-rr.is-refused .dc-sub--buy { color: var(--down); }
+.dc-sub--buy .zf-live { background: var(--mint); }
+.dc-sub--buy .zf-live::after { background: var(--mint); }
+/* the row as the receipt: the mark's 48 ring sits round the 40 logo box; the logo fills the mark's coin (26, grown ×φ to 42
+   while away and landed, never past the row), so the words beside it are never under it */
+.dc-logo-box .zf-receipt--mark { margin: -4px; }
+.dc-logo-box .zf-receipt__coin .dc-logo, .dc-logo-box .zf-receipt__coin .dc-img { width: 100%; height: 100%; }
+/* audit 5 Nov: the row's second line gives way at the name, never the worth; every control a 44 pt target; the wallets row
+   fades its last 28 px, so a wallet scrolled half out of sight is a fade, never a cut sliver */
+.dc-sub { display: flex; min-width: 0; }
+.dc-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-cap { flex: none; white-space: nowrap; }
+.dc-cap::before { content: "·"; margin: 0 .3em; }
+.dc-tabs { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); padding: 0 0 2px; }
+.dc-tabs button { min-height: 44px; padding: 0; }
+.dc-tabs button[data-chain="all"] { position: relative; }
+.dc-tabs button[data-chain="all"]::after { content: ""; position: absolute; inset: 0 -14px 0 0; }
+.dc-wins { margin-top: 6px; }
+.dc-wins button { position: relative; min-height: 44px; padding: 0; text-underline-offset: 9px; }
+.dc-wins button::after { content: ""; position: absolute; inset: 0 -10px; }
+.dc-paste { min-height: 44px; min-width: 44px; padding: 0 0 0 8px; }
+.dc-move { position: relative; }
+.dc-move::after { content: ""; position: absolute; inset: -6px -2px; }
+.dc-gear { width: 44px; height: 44px; margin: -6px -12px 0 0; }
+
+/* Theme v3.1 (THEME.md; GAPS "Trade", 5 Nov): every price, worth and % in the money face with tabular figures; the lists
+   (Hot, New, 5m…) are capsule lanes (the wallets row keeps its mark: as capsules its three figures and Move overflowed 390 pt), never underlined text (a choice is a capsule); Move a 44 pt target */
+.dc-px, .dc-chg, .dc-tab-usd, .dc-cap, .dc-tab-quiet { font-family: var(--font-money, var(--font)); font-variant-numeric: tabular-nums; }
+.dc-wins { gap: 4px; margin-top: 8px; }
+.dc-wins button { min-height: 36px; padding: 0 14px; border-radius: var(--r-pill, 999px); text-decoration: none; transition: color var(--dur-base), background-color var(--dur-base); }
+.dc-wins button::after { inset: -4px 0; }
+.dc-wins button.on { background: var(--fill); color: var(--ink); box-shadow: inset 0 1px 0 var(--edge-hi, transparent); }
+.dc-wins button:first-child { margin-left: -2px; }
+.dc-move { height: 36px; border-radius: var(--r-pill, 999px); margin-top: -6px; }
+.dc-move::after { inset: -4px -2px; }
+/* product decision, 5 Nov: the line is "Doge Pepe · $3.27M" beside the chip at 390; 28 pt back for the name from the row's own
+   spacing (gaps 16 → 10, the figures' lead 12 → 8, the chip's pill 14 → 10 a side), the chip's hit still 44 pt */
+.dc-row.zf-lrow { column-gap: 10px; }
+.dc-row .zf-lrow__r { padding-left: 8px; }
+.dc-rr .dc-row { padding-right: 54px; }
+.dc-qb__pill { padding: 0 10px; }
+.dc-rr.is-away .dc-row, .dc-rr.is-landed .dc-row, .dc-rr.is-checking .dc-row, .dc-rr.is-refused .dc-row { padding-right: 0; }
+
+/* a-nav-5 (5 Nov; QA's crawl rows 8): the chain chips end 16 px before the pinned Move button, with 24 px of room at the
+   scroll's end so the last chip (NEAR) can be dragged clear of the fade; a row's name takes the free width and is cut
+   only at the cell's end (never a few letters short with room beside it), its market cap says what it is, and the cap
+   drops under the name when both do not fit */
+.dc-tabs { margin-right: 16px; padding-right: 24px; }
+/* a16 (Sim re-walk, 5 Nov): the second line is one line: the name gives way ("Slimy Liquidity Market Ma…"), the figure
+   never does and never drops to a third line; it stands alone after a dot, with no label ("mcap" and "cap" are jargon
+   either way); the coin page's Market cap names it */
+.dc-sub { flex-wrap: nowrap; column-gap: 0; }
+.dc-name { flex: 0 1 auto; max-width: 100%; }
+.dc-cap::before { content: "·"; margin: 0 .35em; color: var(--mute); }
+/* A fifteen (5 Nov): "All" (18 pt of text) takes a 44 pt tap, its hit box reaching 13 into the gutter and 14 toward the next
+   tab (which sits 16 away); the list pills are never narrower than 44 (1h was 43.8). */
+.dc-tabs button[data-chain="all"]::after { inset: 0 -14px 0 -13px; }
+.dc-wins button { min-width: 44px; }

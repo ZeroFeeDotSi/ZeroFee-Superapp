@@ -1,0 +1,133 @@
+{
+  "recordedAt": "2026-11-05T12:08:43.485Z",
+  "via": "ZeroFee quote relay https://quotes-seven-gamma.vercel.app/v0/quote, Origin zerofee-app://app (1Click direct at https://1click.chaindefuser.com/v0/quote answered 401: \"User authentication is required for confidential intent quotes\")",
+  "madeUpAddresses": {
+    "pocket": "c67fc0bb0e8f042b29cc3b675b9386a2a7ddf921a99b2539b1c540d605685ff7",
+    "solanaRecipient": "9WfnuyNdZKoyWsme7MBXsWacgJR6qUPzR5vc5TCwRuHJ",
+    "note": "random, generated for this fixture; never funded, never held money"
+  },
+  "note": {
+    "dry": true,
+    "signed": true,
+    "signingKey": "ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc (ONE_CLICK_QUOTE_KEY; 1Click gives no key id in the answer)",
+    "verifiesWith": "packages/core/src/quote-signature.ts signedBy1Click: true for both",
+    "depositAddress": "none (dry quote)",
+    "neverDeposited": true,
+    "redacted": "quoteRequest.appFees[].recipient (the partner fee account) replaced with a placeholder, correlationId dropped; neither is in the signed fields"
+  },
+  "quotes": {
+    "sendPayout": {
+      "what": "Send payout: 5 USDC from Private (CONFIDENTIAL_INTENTS) to an outside Solana address, USDC on Solana (ledger.ts privatePayRequest, EXACT_INPUT as Home Send leg 2)",
+      "request": {
+        "dry": true,
+        "swapType": "EXACT_INPUT",
+        "slippageTolerance": 100,
+        "originAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+        "depositType": "CONFIDENTIAL_INTENTS",
+        "destinationAsset": "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
+        "amount": "5000000",
+        "refundTo": "c67fc0bb0e8f042b29cc3b675b9386a2a7ddf921a99b2539b1c540d605685ff7",
+        "refundType": "CONFIDENTIAL_INTENTS",
+        "recipient": "9WfnuyNdZKoyWsme7MBXsWacgJR6qUPzR5vc5TCwRuHJ",
+        "recipientType": "DESTINATION_CHAIN",
+        "deadline": "2026-11-05T12:18:05.909Z",
+        "confidentiality": "basic"
+      },
+      "response": {
+        "quote": {
+          "amountIn": "5000000",
+          "amountInFormatted": "5.0",
+          "amountInUsd": "4.998930000000",
+          "minAmountIn": "5000000",
+          "amountOut": "4742117",
+          "amountOutFormatted": "4.742117",
+          "amountOutUsd": "4.741102186962",
+          "minAmountOut": "4694695",
+          "timeEstimate": 7,
+          "refundFee": "0",
+          "withdrawFee": "256899"
+        },
+        "quoteRequest": {
+          "dry": true,
+          "depositMode": "SIMPLE",
+          "swapType": "EXACT_INPUT",
+          "slippageTolerance": 100,
+          "originAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+          "depositType": "CONFIDENTIAL_INTENTS",
+          "destinationAsset": "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
+          "amount": "5000000",
+          "refundTo": "c67fc0bb0e8f042b29cc3b675b9386a2a7ddf921a99b2539b1c540d605685ff7",
+          "refundType": "CONFIDENTIAL_INTENTS",
+          "recipient": "9WfnuyNdZKoyWsme7MBXsWacgJR6qUPzR5vc5TCwRuHJ",
+          "recipientType": "DESTINATION_CHAIN",
+          "deadline": "2026-11-05T12:18:05.909Z",
+          "confidentiality": "basic",
+          "quoteWaitingTimeMs": 0,
+          "insured": false,
+          "appFees": [
+            {
+              "recipient": "<ZEROFEE_FEE_ACCOUNT_REDACTED>",
+              "fee": 1
+            }
+          ]
+        },
+        "signature": "ed25519:4WuLsU4mbdajc4r6oYGY1cXqfW5Jits7ef3WdBEefEWVTDQbD8f6djXTjqiAWeVNdDENA347VUJwPrd72u9ukBmr",
+        "timestamp": "2026-11-05T12:08:06.795Z"
+      }
+    },
+    "moveIn": {
+      "what": "Safe -> Private move-in: 5 USDC, depositType INTENTS, recipient/refund CONFIDENTIAL_INTENTS to the pocket (subwallets.ts privateQuoteIn intents=true)",
+      "request": {
+        "dry": true,
+        "swapType": "EXACT_INPUT",
+        "slippageTolerance": 100,
+        "originAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+        "depositType": "INTENTS",
+        "destinationAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+        "amount": "5000000",
+        "refundTo": "c67fc0bb0e8f042b29cc3b675b9386a2a7ddf921a99b2539b1c540d605685ff7",
+        "refundType": "CONFIDENTIAL_INTENTS",
+        "recipient": "c67fc0bb0e8f042b29cc3b675b9386a2a7ddf921a99b2539b1c540d605685ff7",
+        "recipientType": "CONFIDENTIAL_INTENTS",
+        "deadline": "2026-11-05T12:18:05.909Z",
+        "confidentiality": "basic"
+      },
+      "response": {
+        "quote": {
+          "amountIn": "5000000",
+          "amountInFormatted": "5.0",
+          "amountInUsd": "4.998930000000",
+          "minAmountIn": "5000000",
+          "amountOut": "5000000",
+          "amountOutFormatted": "5.0",
+          "amountOutUsd": "4.998930000000",
+          "minAmountOut": "4950000",
+          "timeEstimate": 10,
+          "refundFee": "0",
+          "withdrawFee": "0"
+        },
+        "quoteRequest": {
+          "dry": true,
+          "depositMode": "SIMPLE",
+          "swapType": "EXACT_INPUT",
+          "slippageTolerance": 100,
+          "originAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+          "depositType": "INTENTS",
+          "destinationAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+          "amount": "5000000",
+          "refundTo": "c67fc0bb0e8f042b29cc3b675b9386a2a7ddf921a99b2539b1c540d605685ff7",
+          "refundType": "CONFIDENTIAL_INTENTS",
+          "recipient": "c67fc0bb0e8f042b29cc3b675b9386a2a7ddf921a99b2539b1c540d605685ff7",
+          "recipientType": "CONFIDENTIAL_INTENTS",
+          "deadline": "2026-11-05T12:18:05.909Z",
+          "confidentiality": "basic",
+          "quoteWaitingTimeMs": 0,
+          "insured": false,
+          "appFees": []
+        },
+        "signature": "ed25519:5Z2GyTSjuiTbhPVGmEfvt9RbztAakqMfXSR313Yj6Q9K33iXCNGwMxDQ1UmQ8uBg3HC6MBi4XxD6zEReyC8EyRqQ",
+        "timestamp": "2026-11-05T12:08:08.239Z"
+      }
+    }
+  }
+}

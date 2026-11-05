@@ -1,0 +1,4 @@
+/* The approval window covers the screen; its sheet and its passkey moment sit centred, phone-width. */
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
+#root { position: relative; max-width: 430px; height: 100dvh; margin: 0 auto; }
+.approve-moment { justify-content: center; gap: 16px; text-align: center; }

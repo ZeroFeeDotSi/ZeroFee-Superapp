@@ -1,0 +1,11 @@
+{
+  "name": "@zerofee/tray",
+  "license": "Apache-2.0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pair": "node tray.ts pair",
+    "serve": "node tray.ts serve"
+  }
+}

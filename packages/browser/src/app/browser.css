@@ -1,0 +1,46 @@
+/* The Browser app, on @zerofee/design's tokens ("Monument"): hairlines, spaced capitals, air, one solid ink pill at
+   most per screen. Every colour comes from tokens.css. */
+.br-page { display: flex; flex-direction: column; min-height: 100%; }
+.br-center { display: grid; place-items: center; min-height: 60%; }
+.br-head { margin-top: 26px; margin-bottom: 4px; }
+.br-line { margin-top: 6px; margin-bottom: 8px; }
+.br-note { margin-top: 14px; }
+.br-empty { text-align: center; margin-top: 38%; }
+
+/* The address field: the Browse screen's one action, so no pill on that screen. */
+.br-field { display: flex; align-items: center; gap: 12px; margin-top: 12px; height: 48px; padding: 0 16px; border: 0; border-radius: var(--r-pill, 24px); background: var(--act-fill); }
+.br-field:focus-within { box-shadow: inset 0 0 0 1px var(--ink); }
+.br-field input { flex: 1; min-width: 0; appearance: none; border: 0; background: none; color: var(--ink); font: 400 16px/1 var(--font); letter-spacing: -.01em; outline: none; }
+.br-field input::placeholder { color: var(--mute); }
+
+/* Rows: the shared zf-row, as buttons when they open something. */
+.br-row { appearance: none; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; width: 100%; text-align: left; font: inherit; cursor: pointer; }
+.br-row .t { display: block; }
+.br-row .d { display: block; }
+.br-logo { display: inline-grid; place-items: center; border-radius: var(--r-xs, 8px); overflow: hidden; color: var(--ink-2); }
+.br-logo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.br-quiet { padding: 6px 0 6px 10px; font-size: 14px; }
+.br-clear { align-self: center; margin-top: 14px; }
+
+.br-floor { padding-top: 18px; padding-bottom: 6px; }
+.br-qr { display: grid; place-items: center; margin: 4px 0 14px; }
+.br-address .t { font: 400 14px/1.4 ui-monospace, "SF Mono", Menlo, monospace; }
+
+.br-viewfinder { position: relative; margin-top: 12px; aspect-ratio: 1; border-radius: var(--r-lg, 24px); overflow: hidden; background: var(--raise); }
+.br-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.br-over { position: absolute; inset: 0; min-height: 0; }
+.br-row:focus-visible, .br-field button:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* Wallet tab */
+.br-right { display: grid; justify-items: end; gap: 2px; }
+.br-right .d { font-size: 12.5px; color: var(--mute); }
+.br-sub { grid-template-columns: 30px 1fr auto; padding: 10px 0 10px 42px; }
+.br-sub .t { font-size: 14.5px; }
+.br-big { text-align: center; font: 500 56px/1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; padding: 6px 0 4px; }
+.br-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0 10px; }
+.br-presets button { appearance: none; height: 44px; border-radius: var(--r-sm, 12px); border: 1px solid var(--line); background: none; color: var(--ink); font: 400 14px/1 var(--font); cursor: pointer; }
+.br-presets button.on { border-color: var(--ink); box-shadow: inset 0 0 0 .5px var(--ink); }
+.br-from { text-align: center; margin-bottom: 14px; }
+.br-or { text-align: center; margin-top: 22px; }
+/* Rebrand §3.8: the search is the one --fill field at 50 pt. */
+.br-field { height: 50px; background: var(--fill); }

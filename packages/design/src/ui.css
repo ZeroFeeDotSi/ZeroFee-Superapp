@@ -1,0 +1,211 @@
+/* Shared ZeroFee UI: the few pieces every app screen is built from. One solid ink button per screen, hairlines,
+   spaced-capital labels, and generous air. Sizes are in CSS pixels at phone width. */
+.zf-screen { position: absolute; inset: 0; background: var(--bg); color: var(--ink); overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: none; display: flex; flex-direction: column; }
+.zf-pad { padding-left: var(--gutter); padding-right: var(--gutter); }
+
+.zf-label { font: var(--t-label); letter-spacing: var(--tr-caps, .12em); text-transform: uppercase; color: var(--mute); }
+.zf-title { font-size: var(--fs-title, 28px); font-weight: 500; letter-spacing: var(--tr-title, -.022em); line-height: 1.2; margin: 0; text-wrap: balance; }
+.zf-display { font: var(--t-display); letter-spacing: var(--tr-title, -.022em); margin: 0; text-wrap: balance; }
+.zf-body { font: var(--t-body); color: var(--ink-2); margin: 0; text-wrap: pretty; }
+.zf-small { font: var(--t-small); color: var(--mute); margin: 0; text-wrap: pretty; }
+
+.zf-btn {
+  appearance: none; border: 0; width: 100%; height: 56px; border-radius: 28px; background: var(--ink); color: var(--bg);
+  font: 500 var(--fs-body, 17px)/1 var(--font); letter-spacing: var(--tr-body, -.006em); display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  cursor: pointer; transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out); -webkit-tap-highlight-color: transparent;
+}
+.zf-btn:active { transform: scale(.98); transition-duration: var(--dur-fast); }
+.zf-btn:disabled { background: none; color: var(--mute); box-shadow: inset 0 0 0 1px var(--line); cursor: default; }
+.zf-btn.alert { background: var(--alert); color: #fff; }
+/* The second choice beside the one ink pill ("Pick another coin", "Share", "Ask for another"): an outline, a little air
+   above it. It had no style, so it drew as a second ink pill touching the first (e2e walk, 3 Nov). */
+.zf-btn.zf-btn--quiet { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); margin-top: 10px; }
+.zf-link { appearance: none; border: 0; background: none; color: var(--ink-2); font: 400 15px/1.3 var(--font); padding: 10px; min-height: 44px; min-width: 44px; cursor: pointer; }
+/* An <a> is inline, where min-height does nothing (grade 02f, F4: the Cancelled screen's explorer link was 166x38). */
+a.zf-link { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.zf-icon-btn { appearance: none; border: 0; background: none; color: var(--ink); padding: 8px; margin: -8px; cursor: pointer; display: inline-grid; place-items: center; }
+.zf-hl { fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+
+/* A screen's anatomy: an optional top row, the air in the middle, and the floor where the one action lives. */
+.zf-top { height: 56px; flex: none; display: flex; align-items: center; justify-content: space-between; margin-top: var(--zf-top, env(safe-area-inset-top, 0px)); }
+.zf-floor { flex: none; display: grid; gap: 12px; text-align: center; padding-bottom: calc(var(--zf-safe-bottom, env(safe-area-inset-bottom, 0px)) + 36px); }
+.zf-fill { flex: 1; min-height: 0; }
+
+.zf-note { border: 0; box-shadow: var(--e-1); background: var(--surface, var(--bg)); border-radius: var(--r-md, 16px); padding: 14px 16px; font: var(--t-small); color: var(--ink-2); text-align: left; }
+.zf-row { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.zf-row .t { font-size: 16px; letter-spacing: -.01em; }
+.zf-row .d { font-size: 13px; color: var(--mute); margin-top: 2px; }
+.zf-row .v { font-size: 13px; color: var(--mute); }
+.zf-row .v.add { color: var(--ink); font-weight: 500; }
+.zf-tick { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--ink); display: grid; place-items: center; }
+.zf-tick.on { background: var(--ink); color: var(--bg); }
+.zf-tick.off { border-style: dashed; border-color: var(--mute); }
+
+/* Entrances: content settles in, never bounces around. */
+/* `backwards`, never `both`: a fill kept after the end holds an identity transform, which makes the block a containing
+   block, so a Sheet opened inside it (Recovery's "The wait") sat in the block, not over the whole screen (D135). */
+.zf-enter { animation: zf-enter var(--dur-base) var(--ease-out) backwards; }
+.zf-enter-2 { animation: zf-enter var(--dur-base) var(--ease-out) .04s backwards; }
+.zf-enter-3 { animation: zf-enter var(--dur-base) var(--ease-out) .08s backwards; }
+@keyframes zf-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .zf-enter, .zf-enter-2, .zf-enter-3 { animation: none; } }
+
+/* Press feedback, for any target: it gives a little under the finger and springs back. */
+.zf-press { transition: transform var(--dur-base) var(--ease-out); -webkit-tap-highlight-color: transparent; }
+.zf-press:active { transform: scale(var(--press-scale)); transition-duration: var(--dur-fast); }
+@media (prefers-reduced-motion: reduce) { .zf-press, .zf-press:active { transition: none; transform: none; } }
+
+/* A read that failed or is slow (ReadLine.tsx, Job 1): one quiet line with Retry, never a Problem screen. */
+.zf-readline { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--mute); margin: 8px 0; text-align: center; }
+.zf-readline__retry { min-height: 44px; padding: 0 4px; font-size: 13px; }
+
+/* ── REVAMP: the grouped section and the busy button (product decision, 3 Nov;
+   "Moving… reads as disabled"). ─────────────────────────────────────────────────────────────────────────────────────
+   .zf-group: one inset grouped container (the soft fill on the 16 radius), rows split by .5 hairlines; a row is a label on
+   the left and its figure right-aligned (.zf-group__row with dt/dd, or any two children). Facts that belong together
+   sit in one group, never as floating centred paragraphs. */
+.zf-group { margin: 16px 0 0; padding: 0 16px; list-style: none; border-radius: var(--r-md, 16px); background: var(--act-fill); }
+.zf-group > * { position: relative; }
+.zf-group > * + *::before { content: ""; position: absolute; left: 0; right: 0; top: 0; border-top: .5px solid var(--line); pointer-events: none; }
+.zf-group__row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; min-height: 44px; padding: 12px 0; box-sizing: border-box; }
+.zf-group__row > :first-child { margin: 0; color: var(--ink-2); font: 400 15px/20px var(--font); }
+.zf-group__row > :last-child { margin: 0; color: var(--ink); font: 500 15px/20px var(--font); font-variant-numeric: tabular-nums; text-align: right; }
+/* A button at work: still the ink pill (never the grey outline that reads as "off"), its label a step quieter, and a
+   thread of light running through it (transform only). Pair with aria-busy. */
+.zf-btn.is-busy, .zf-btn.is-busy:disabled { position: relative; overflow: hidden; background: var(--ink); color: color-mix(in srgb, var(--bg) 82%, transparent); box-shadow: none; cursor: progress; }
+.zf-btn.is-busy::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; pointer-events: none; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg) 26%, transparent), transparent); transform: translateX(-100%); animation: none; display: none; }
+@keyframes zf-busy { to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .zf-btn.is-busy::after { animation: none; opacity: 0; } }
+
+/* ══ The button system (the design review §2.1, 3 Nov): seven kinds, nothing else ══════════════════════════════════════
+   B1 Primary   .zf-btn            50 pt, radius 14, ink fill, 17/600. One per screen, only for its goal, on the floor.
+                                   Disabled: the same shape at 30 %. Busy (.is-busy): the same shape, its label stays,
+                                   a 2 pt line of the ground sweeps along its bottom edge.
+   B2 Secondary .zf-btn--quiet     the same size and shape on the soft fill, ink label. Never an outline.
+   B3 Text      .zf-link           17/500 in ink, a 44 pt target.
+   B4 Chip      .zf-chip           32 pt, radius 16, soft fill, 15/600 ink: Copy, Paste, Max, $5 · $25.
+   B5 Round     (Home's .wl-act)   56 pt circle on the soft fill.
+   B6 Icon      .zf-sheet__close   a 30 pt soft disc, 14 pt ✕, in a 44 pt target. Back is a bare ‹.
+   B7 Danger    .zf-link.alert     a B3 in --alert, alone in its group; it always opens a confirm.
+   Loaded after every earlier rule in this file, so these win over the pill shapes above. */
+.zf-btn { height: 50px; border-radius: var(--r-sm-btn, 14px); font: 600 var(--fs-body, 17px)/22px var(--font); letter-spacing: -.01em; }
+.zf-btn:disabled { background: var(--ink); color: var(--bg); box-shadow: none; opacity: .3; cursor: default; }
+.zf-btn.alert:disabled { background: var(--alert); }
+.zf-btn.zf-btn--quiet, .zf-btn.zf-btn--quiet:disabled { background: var(--act-fill); color: var(--ink); box-shadow: none; margin-top: 8px; }
+.zf-btn.is-busy, .zf-btn.is-busy:disabled { opacity: 1; color: var(--bg); }
+.zf-btn.is-busy::after { top: auto; bottom: 0; left: 0; width: 34%; height: 2px; border-radius: 1px; background: var(--bg); opacity: .9; }
+.zf-link { font: 500 var(--fs-body, 17px)/22px var(--font); color: var(--ink); min-height: 44px; }
+.zf-link.alert { color: var(--alert); }
+.zf-chip { appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; min-width: 44px; padding: 0 12px; border: 0; border-radius: 16px;
+  background: var(--act-fill); color: var(--ink); font: 600 15px/20px var(--font); font-variant-numeric: tabular-nums; box-shadow: inset 0 1px 0 var(--edge-hi); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-base) var(--ease-out); position: relative; }
+.zf-chip::before { content: ""; position: absolute; inset: -6px 0; } /* a 44 pt target around a 32 pt chip */
+.zf-chip:active { transform: scale(.98); transition-duration: var(--dur-fast); }
+.zf-chip:disabled { opacity: .3; cursor: default; }
+.zf-chip svg { width: 16px; height: 16px; }
+@media (prefers-reduced-motion: reduce) { .zf-chip, .zf-chip:active { transition: none; transform: none; } }
+
+/* ══ The text system (the design review §2.2): seven styles, two colours, no spaced capitals ══════════════════════════
+   T1 Hero 56/60 300 (money only: Home, wallet pages, keypads, results) · T2 Title 28/34 600 · T3 Bar title 17/22 600,
+   centred in its bar · T4 Section header 20/25 600 ink · T5 Body and rows 17/22 ink · T6 Sub 15/20 --mute · T7 Footnote
+   13/18 --mute. Two colours: --ink and --mute (--ink-2 now reads as --mute). Spaced capitals live only in the mode mark. */
+:root, :root[data-theme="dark"] { --ink-2: var(--mute); }
+.zf-label { font: 600 20px/25px var(--font); letter-spacing: -.012em; text-transform: none; color: var(--ink); }
+.zf-sheet__title.zf-label, .af-top .zf-label, .zf-top .zf-label { font: 600 17px/22px var(--font); letter-spacing: -.01em; }
+.zf-title, .zf-display { font: 600 28px/34px var(--font); letter-spacing: -.022em; }
+.zf-body { font: 400 17px/22px var(--font); color: var(--ink); }
+.zf-small { font: 400 13px/18px var(--font); color: var(--mute); }
+
+/* ══ Fields and focus (product decision, 3 Nov) ═══════════════════════════════════
+   One field: a filled box with no border at rest, 50 pt (the button system's height, so a field and its button sit
+   level), radius 14, 17 pt text. One focus ring, drawn INSIDE the box (an inset box-shadow), so no overflow:hidden parent
+   can ever clip it. The browser's own outline is gone everywhere; keyboard focus shows that inset ring (:focus-visible).
+   A field built as a container (.dc-field, .py-field…) draws the ring on itself (:focus-within) and its bare input none.
+   :where() keeps these at zero specificity, so a screen's own field style still wins. */
+:where(*):focus, :where(*):focus-visible { outline: none; }
+:where(input:not([type="range"], [type="checkbox"], [type="radio"], [type="color"], [type="file"]), textarea, select) {
+  -webkit-appearance: none; appearance: none; box-sizing: border-box; min-height: 50px; padding: 0 16px; border: 0; border-radius: 14px;
+  background: var(--act-fill); color: var(--ink); font: 400 17px/22px var(--font); }
+:where(textarea) { padding: 14px 16px; }
+:where(input, textarea, select)::placeholder { color: var(--mute); }
+:where(input, textarea, select):focus-visible, :where(input, textarea, select):focus { box-shadow: inset 0 0 0 1px var(--ink); }
+:where(button, a, summary, [role="button"], [tabindex]):focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+:where(.zf-btn):focus-visible { box-shadow: inset 0 0 0 2px var(--bg), inset 0 0 0 3.5px var(--ink); }
+/* The ring is for the keyboard only (product decision, 5 Nov: a white square sat on Safe | Hot after a tap). A finger, a mouse, a scripted
+   tap or a script's focus() never draws it: the page starts as data-input="pointer" (apps/web main.tsx) and only a Tab or an
+   arrow key switches it to "keyboard"; a pointerdown switches it back. Fields keep their own typing ring (above). */
+:where(html[data-input="pointer"]) :where(button, a, summary, [role="button"], [tabindex], .zf-btn):focus-visible { box-shadow: none; }
+/* a field drawn as a container: the ring is the container's, inside its own edge; its bare input is plain */
+:where([class*="-field"]:not(.zf-money__field), .sh-address-bar, .ul-entry):focus-within { box-shadow: inset 0 0 0 1px var(--ink); }
+:where([class*="-field"]:not(.zf-money__field), .sh-address-bar) :where(input, textarea) { min-height: 44px; padding: 0; border-radius: 0; background: none; }
+:where([class*="-field"], .sh-address-bar, .zf-money__field, .wl-send2__money) :where(input, textarea):focus,
+:where([class*="-field"], .sh-address-bar, .zf-money__field, .wl-send2__money) :where(input, textarea):focus-visible { box-shadow: none; }
+.ul-entry input:focus, .ul-entry input:focus-visible { box-shadow: none; }
+.zf-group__row > :last-child { white-space: nowrap; } /* a figure never breaks across lines */
+
+/* ══ Rebrand (DESIGN-REBRAND §2.3): the primary is mint with an ink label, in both themes, one per screen ═══════════════
+   Four states: ready (mint, its glow token), off (the soft fill, a mute label and a hairline, never dark on black: never mint at 30 %), busy (stays mint,
+   the 2 pt thread on --on-mint), done (data-state="done", the screen draws its tick). The press scales to .97 and lays
+   an 8 % dark film over the fill. Loaded last, so it wins over B1 above. Money figures: Geist 500, tabular (A0/A1). */
+.zf-btn { height: 56px; border-radius: 18px; background: var(--lit, var(--mint)); color: var(--on-mint); box-shadow: var(--lit-shadow, var(--glow-go)); text-shadow: 0 1px 0 rgba(255, 255, 255, .28); position: relative; overflow: hidden; font: 600 17px/22px var(--font); letter-spacing: -.01em; }
+.zf-btn::before { content: ""; position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }
+.zf-btn:active { transform: scale(var(--press-go, .98)); transition-duration: var(--dur-fast); }
+.zf-btn:active::before { opacity: .08; transition-duration: var(--dur-fast); }
+.zf-btn:disabled, .zf-btn[aria-disabled="true"] { background: var(--fill); background-image: none; color: var(--mute); box-shadow: inset 0 0 0 1px var(--line); text-shadow: none; opacity: 1; transform: none; cursor: default; }
+.zf-btn:disabled::before, .zf-btn[aria-disabled="true"]::before { opacity: 0; }
+.zf-btn.is-busy, .zf-btn.is-busy:disabled { background: var(--lit, var(--mint)); color: var(--on-mint); box-shadow: var(--lit-shadow, var(--glow-go)); }
+.zf-btn.is-busy::after { background: var(--on-mint); opacity: .3; animation-duration: var(--dur-base); }
+.zf-btn.zf-btn--quiet, .zf-btn.zf-btn--quiet:disabled { background: var(--fill); color: var(--ink); box-shadow: none; }
+.zf-btn.alert, .zf-btn.alert:disabled { background: var(--down); color: #fff; box-shadow: none; }
+.zf-amount { font: 500 72px/1 var(--font-money); letter-spacing: -.045em; font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
+.zf-hero-n { font: 500 56px/60px var(--font-money); letter-spacing: -.04em; font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
+:where(input:not([type="range"], [type="checkbox"], [type="radio"], [type="color"], [type="file"]), textarea, select) { background: var(--fill); }
+:where(.zf-btn):focus-visible { box-shadow: inset 0 0 0 2px var(--on-mint); }
+
+/* ══ The lit action (UI concept v3.1, 5 Nov: the mint pill read "dull and cheap"): lit from above ═══════════════════════
+   The rebrand's .zf-btn above now takes --lit (the same mint as a vertical gradient with a top highlight and a darker
+   foot) and --lit-shadow. Off, quiet and alert carry no highlight. The press keeps its .97 and 8 % film. */
+.zf-btn:disabled, .zf-btn.zf-btn--quiet, .zf-btn.zf-btn--quiet:disabled, .zf-btn.alert, .zf-btn.alert:disabled { text-shadow: none; }
+/* The tap (tap.ts tapBurst): a mint ring leaves the button's edge and fades in 550 ms, on its own layer, transform and
+   opacity only. The button itself gives by its own :active. */
+.zf-tapring { position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 3px solid var(--mint); pointer-events: none; opacity: 0; animation: zf-tapring var(--dur-base) var(--ease-out) forwards; }
+@keyframes zf-tapring { 0% { opacity: .35; transform: scale(.98); } 100% { opacity: 0; transform: scale(1.02); } }
+@media (prefers-reduced-motion: reduce) { .zf-tapring { animation: none; } }
+
+/* ══ Theme v3.1 (THEME.md): rows sit in a card, commands on 18, figures in the money face ══════════════════════════════
+   .zf-group was the soft fill on 16; the concept's rows sit on a lifted card (--surface, --e-card, 22). The quiet command
+   takes the lit one's 18 radius (it is a .zf-btn). A chip and a group's figure are numbers more often than words: tabular, the money face. */
+.zf-group { background: var(--surface); box-shadow: var(--e-card); border-radius: var(--r-card, 22px); }
+
+/* ══ Tap highlight and field focus (look 4, 5 Nov; QA's crawl row 24) ═══════════════════════════════════════════════════
+   The browser's default tap-highlight box (a pale blue/white flash) is off on the page and on every control. A tapped
+   field draws the theme's inset ring: a 1 px --ink hairline on the field's own radius, never a white ring or box. */
+html, body, button, a, input, textarea, select, summary, label, [role="button"], [tabindex] { -webkit-tap-highlight-color: transparent; }
+
+/* ══ A mouse's hover (desktop audit, 5 Nov: on a laptop every row, chip, key and button was inert until pressed) ═══════
+   Only for a real pointer, never a finger: the one quiet answer is a 6 % ink film over whatever the control already
+   wears (a row on the page, a chip on its fill, a tile on its fill), fast on the shared ease. The lit button brightens
+   a touch instead; a key lights its press disc; a tab or a segment takes ink. Disabled controls answer nothing. */
+@media (hover: hover) and (pointer: fine) {
+  :root { --hover-film: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .zf-chip, .zf-icon-btn, .zf-link, .zf-btn.zf-btn--quiet, .wl-pick, .wl-pick__opt, button.wl-row, button.zf-row, .wl-addline__tap, .wl-addline__qr, .sec-fact-row--btn, .zf-tray__icon, .zf-sheet__back, .wl-buy, .wl-act__dot,
+  .zf-sheet__close::before, .zf-keypad button::before, .zf-appbar__item::before {
+    transition-property: background-color, background-image, color, opacity, transform; transition-duration: var(--dur-fast); transition-timing-function: var(--ease-out);
+  }
+  :is(.zf-chip, .zf-icon-btn, .zf-link, .zf-btn.zf-btn--quiet, .wl-pick, .wl-pick__opt, button.wl-row, button.zf-row, .wl-addline__tap, .wl-addline__qr, .sec-fact-row--btn, .zf-sheet__back):hover:not(:disabled) {
+    background-image: linear-gradient(var(--hover-film), var(--hover-film));
+  }
+  .zf-tray__app:hover .zf-tray__icon { background-image: linear-gradient(var(--hover-film), var(--hover-film)); }
+  .zf-sheet__close:hover::before { background-image: linear-gradient(var(--hover-film), var(--hover-film)); }
+  /* the lit button: brighter, its own glow kept (a16: 1.04 did not show on the sim's desktop; 1.06 does) */
+  .zf-btn:hover:not(:disabled):not(.zf-btn--quiet):not(.is-busy) { filter: brightness(1.06); }
+  /* Home's ink Buy pill (wallet.css .wl-buy) and its action discs (.wl-act): the film, in the ground's colour on ink */
+  .wl-buy:hover:not(:disabled) { background-image: linear-gradient(color-mix(in srgb, var(--bg) 14%, transparent), color-mix(in srgb, var(--bg) 14%, transparent)); }
+  .wl-act:hover:not(:disabled) .wl-act__dot { background-image: linear-gradient(var(--hover-film), var(--hover-film)); }
+  /* a key: its press disc, half lit */
+  .zf-keypad button:hover:not(:disabled)::before { opacity: .6; transform: none; }
+  /* a tab or a segment not on: its name takes ink; a tab's own pill shows faintly under it */
+  .zf-seg__item:hover:not(.on) { color: var(--ink); }
+  .zf-appbar__item:hover:not([data-on]) { color: var(--ink); }
+  .zf-appbar__item:hover:not([data-on])::before { opacity: .55; }
+}

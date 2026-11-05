@@ -1,0 +1,14 @@
+{
+  "name": "@zerofee/shell-api",
+  "license": "Apache-2.0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./app-module": "./src/app-module.ts",
+    "./*": "./src/*"
+  },
+  "peerDependencies": {
+    "react": "19.3.0"
+  }
+}

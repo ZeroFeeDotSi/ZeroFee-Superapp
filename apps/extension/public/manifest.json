@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "ZeroFee",
+  "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApWGZJe3cAckY2vS2OAJh2UE1nx1rGfkbDZsQTR1xpnnBbdYYMGyvixTYSCSP43+N0x/PQMmAHf60ZPMWggb5vvZQBBInscZDRGQHfT+q87p53qgQEvhvoEiEKeYrYtelDXquromR6YdkmFEPAKW9GyPkllMXAyxEjdT0oGte1eHl85KVPbnWhldZJc4URGOmU0n43lpYkEBdFD6j722Bv5TsQ1DwQkGqvfI7Qu7cx8L2itP3oCroLVqhLyOIU48Ieg9IUdPNCqJMrF8VTb9HdXvsWxtReSP1mRAvTEjyjpIsWBKsViHPbsNtBhsaAoZinqqqKExZtNv+FVV5Jda+UwIDAQAB",
+  "description": "ZeroFee on your computer: your Safe, Send, Swap, Trade and AgentZero, with your iPhone as the key. On Axiom, pump.fun and GMGN, a trading panel.",
+  "minimum_chrome_version": "128",
+  "permissions": ["storage", "sidePanel"],
+  "host_permissions": ["https://axiom.trade/*", "https://pump.fun/*", "https://gmgn.ai/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "side_panel": { "default_path": "app.html" },
+  "action": { "default_title": "ZeroFee" },
+  "content_scripts": [
+    {
+      "matches": ["https://axiom.trade/*", "https://pump.fun/*", "https://gmgn.ai/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; style-src 'self'; img-src 'self' data: https://coin-images.coingecko.com https://assets.geckoterminal.com; connect-src https://solana-rpc.publicnode.com https://solana.api.pocket.network https://public.rpc.solanavibestation.com https://lite-api.jup.ag https://api.geckoterminal.com https://api.coingecko.com wss://solana-rpc.publicnode.com wss://public.rpc.solanavibestation.com"
+  }
+}

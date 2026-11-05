@@ -1,0 +1,118 @@
+Release 7 final (lib.rs c3bdaee8…b75a), cargo kani --no-default-features (release features), Kani 0.68.0 / CBMC 6.11.0, one harness per call, 8 GB watcher.
+
+--- batch a (cap: 5m; batches b and c were stopped by hand once their remaining harnesses were the same place-bound shape that had timed out) ---
+=== r7_0_release_minimum_delay
+VERIFICATION:- SUCCESSFUL
+Verification Time: 0.014085917s
+=== r7_1_fallback_default
+VERIFICATION:- SUCCESSFUL
+Verification Time: 0.3748241s
+=== r7_1b_check_fallback
+VERIFICATION:- SUCCESSFUL
+Verification Time: 0.101640545s
+=== r7_1c_new_bounds
+VERIFICATION:- SUCCESSFUL
+Verification Time: 196.28194s
+=== r7_8_floor_exact
+VERIFICATION:- SUCCESSFUL
+Verification Time: 1.6033157s
+=== r7_2a_can_finish_no_device
+VERIFICATION:- SUCCESSFUL
+Verification Time: 2.9368117s
+=== r7_2b_can_finish_device_no_yes
+VERIFICATION:- SUCCESSFUL
+Verification Time: 7.5713406s
+=== r7_7_recovery_status
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== r7_4_step_gas_cap
+VERIFICATION:- SUCCESSFUL
+Verification Time: 0.59374535s
+=== r7_6_yes_binds_to_this_recovery
+VERIFICATION:- SUCCESSFUL
+Verification Time: 8.14609s
+=== r7_6b_refusal_ends_and_freezes
+VERIFICATION:- SUCCESSFUL
+Verification Time: 7.057035s
+=== r7_6c_plain_refusal_freezes_with_stop_waiting
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== r7_3_one_stop_per_recovery
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== r7_5_removal_waits_fallback
+Failed Checks: call to foreign "C" function `sha256` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/2423
+ File: "~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/near-sys-0.4.0/src/lib.rs", line 44, in near_sdk::env::sha256_array::<&[u8]>
+VERIFICATION:- FAILED
+Verification Time: 2.057052s
+=== r7_5b_removal_other_key_waits_floor
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+ALLDONE
+
+--- batch b (cap: 6m; batches b and c were stopped by hand once their remaining harnesses were the same place-bound shape that had timed out) ---
+=== r7_7_recovery_status_no_device
+VERIFICATION:- SUCCESSFUL
+Verification Time: 2.1278234s
+=== r7_7b_recovery_status_device_of_age
+VERIFICATION:- SUCCESSFUL
+Verification Time: 5.1106615s
+=== r7_5_removal_waits_fallback
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== r7_5b_removal_other_key_waits_floor
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== r7_6c_plain_refusal_freezes_with_stop_waiting
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== r7_3_one_stop_per_recovery_48h
+VERIFICATION:- FAILED
+
+--- batch c (cap: 6m; batches b and c were stopped by hand once their remaining harnesses were the same place-bound shape that had timed out) ---
+=== r7_5c_device_removal_48h
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== r7_5c_device_removal_24h
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== r7_5c_device_removal_3d
+VERIFICATION:- FAILED
+
+--- batch d (cap: 6m; batches b and c were stopped by hand once their remaining harnesses were the same place-bound shape that had timed out) ---
+=== r7_5d_device_removal_48h
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+=== r7_3d_one_stop_48h
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+ALLDONE
+
+--- release-6 harnesses on this source, 29 Oct (from run-kani-r7.log) ---
+=== p2_level_order
+VERIFICATION:- SUCCESSFUL
+Verification Time: 116.275536s
+=== p3_floor
+VERIFICATION:- SUCCESSFUL
+Verification Time: 6.0759115s
+=== p6b_unlisted_coin_is_strictest
+VERIFICATION:- SUCCESSFUL
+Verification Time: 37.048317s
+=== p7c_add_move_saturates
+VERIFICATION:- SUCCESSFUL
+Verification Time: 0.33373362s
+=== p10b_key_shape
+VERIFICATION:- SUCCESSFUL
+Verification Time: 0.19491078s
+=== p4a_unless_frozen_recovery_only
+=== p1e_share_ppm_divceil_spec
+
+--- batch e: 20-minute cap, two in parallel ---
+=== r7_5d_device_removal_48h
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+ALLDONE
+=== r7_6c_plain_refusal_freezes_with_stop_waiting
+VERIFICATION:- FAILED
+CBMC timed out. You may want to rerun your proof with a larger timeout or use stubbing to reduce the size of the code the verifier reasons about.
+ALLDONE

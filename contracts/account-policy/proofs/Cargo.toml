@@ -1,0 +1,37 @@
+[package]
+name = "account-policy-proofs"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Proof harnesses for the frozen release-7 contract (release 6 in the repo at 35e84f4 before it). build.rs copies ../src/lib.rs (sha256-pinned) into generated/ and
+# appends the proof modules as CHILD modules of the contract, so they reach its private functions and state without
+# one line of the contract changing. `cargo kani` runs the bounded proofs; `cargo test --release` runs the explicit-state
+# checker, the model conformance and the contract's own unit tests.
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+modules = []
+fuzzing = []
+# The contract's 60-second shortest delay (its own `short-waits`), so the checker's one-hour delay is accepted.
+short-waits = []
+default = ["short-waits"]
+
+[dependencies]
+near-sdk = { version = "=5.29.1", features = ["unit-testing"] }
+near-sys = "=0.2.14"
+
+[dev-dependencies]
+
+[profile.release]
+overflow-checks = true
+debug-assertions = true
+
+# Kani compiles the dev profile. With debug assertions on, near-sdk's `require!` expands to `assert!` (a plain panic that
+# no stub can see); off, it calls `env::panic_str`, which the harnesses stub to prune or fail. Kani's own overflow and
+# unwinding checks are independent of these flags.
+[profile.dev]
+debug-assertions = false
+overflow-checks = true

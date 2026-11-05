@@ -1,0 +1,5 @@
+# Copied BitChat sources (fetch.sh) and the build: never committed.
+/Sources/BitLogger/
+/Sources/BitFoundation/
+/Sources/harness/BitChat/
+/.build/

@@ -1,0 +1,12 @@
+
+running 1 test
+from set-up: 76609 states, 236705 transitions, liveness checked on 921 states
+aged device, window over: 77404 states, 238521 transitions, liveness checked on 920 states
+role separation left to NEAR's method lists (assumption A1), 2 pair(s):
+  - start_recovery accepted at contract level from the unknown key (NEAR's method list refuses it)
+  - execute accepted at contract level from the second device (NEAR's method list refuses it)
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 31 filtered out; finished in 2530.05s
+
+exit=0

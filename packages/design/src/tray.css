@@ -1,0 +1,52 @@
+/* The tray (Tray.tsx): Monument. A quiet scrim, a sheet with a grab bar, every app as one hairline icon and its name on a
+   grid of four, and a small dot under the apps in the bottom row. It covers the app bar while it is up. */
+.zf-tray { position: absolute; inset: 0; z-index: 40; }
+/* v2: a plain scrim, no backdrop blur (a full-screen blur re-rasterised every frame the tray moves; study.md L17) */
+.zf-tray__scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 78%, transparent); }
+/* Product decision, 5 Nov (this menu only): a bottom sheet that fits its content (the title and the app grid), not the whole screen.
+   24 pt at the sides and the top, 16 pt between rows, 16 pt and the home indicator below; --r-sheet on the top corners; the
+   scrim behind it; Close stays in the corner (rule 12). It is the width of the phone (or of the laptop frame it sits in), it
+   still rises from below and follows a finger down, and it scrolls inside only if the apps ever outgrow the screen. */
+.zf-tray__body {
+  position: absolute; left: 0; right: 0; bottom: 0; top: auto; max-height: calc(100% - var(--zf-top, env(safe-area-inset-top, 0px)) - 24px);
+  overflow-y: auto; overscroll-behavior: none; background: var(--surface, var(--bg)); border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  padding: 24px 24px calc(env(safe-area-inset-bottom, 0px) + 16px); box-shadow: 0 -.5px 0 var(--line), 0 -24px 64px -8px rgba(0, 0, 0, .14);
+  touch-action: none; will-change: transform; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.zf-tray__grab { display: block; width: 100%; height: 30px; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; }
+.zf-tray__grab span { display: block; width: 36px; height: 5px; border-radius: 3px; background: var(--line); margin: 6px auto 0; }
+.zf-tray__title { display: flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; margin: 0 0 16px; }
+.zf-tray .zf-tray__close { top: 24px; z-index: 1; }
+/* v2: a line of light along the tray's top edge in Black (a gradient, drawn once) */
+.zf-tray__body::before { content: ""; position: absolute; left: 15%; right: 15%; top: 0; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(var(--glow-rgb), .3), transparent); opacity: 0; }
+:root[data-theme="dark"] .zf-tray__body::before { opacity: 1; }
+.zf-tray__grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px var(--sp-2, 8px); }
+.zf-tray__app {
+  appearance: none; border: 0; background: none; padding: 0; margin: 0; min-height: 76px; cursor: pointer; color: var(--ink);
+  display: grid; justify-items: center; align-content: start; gap: 8px; -webkit-tap-highlight-color: transparent;
+}
+.zf-tray__icon { width: 56px; height: 56px; border-radius: var(--r-md, 16px); display: grid; place-items: center; background: var(--act-fill); box-shadow: inset 0 0 0 .5px var(--line); overflow: hidden; }
+@supports (corner-shape: squircle) { .zf-tray__icon { border-radius: 20px; corner-shape: squircle; } }
+.zf-tray__icon img { width: 56px; height: 56px; object-fit: cover; }
+.zf-tray__app.cur .zf-tray__icon { background: var(--marker-bg); box-shadow: var(--glow); }
+.zf-tray__name { font: 500 12px/16px var(--font); letter-spacing: 0; text-align: center; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zf-tray__pin { width: 4px; height: 4px; border-radius: 50%; background: transparent; margin-top: -3px; }
+.zf-tray__pin.on { background: var(--ink); }
+/* A locked app (product decision, 3 Nov): the icon and name in the quiet ink, a small lock in the tile's corner. */
+.zf-tray__app--locked { color: var(--mute); }
+.zf-tray__app--locked .zf-tray__icon { position: relative; }
+.zf-tray__lock { position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; background: var(--bg); box-shadow: 0 0 0 1px var(--line); color: var(--ink); }
+.zf-tray__hint { text-align: center; margin-top: 16px; }
+/* D147, arranging (the iPhone's home screen): the first row of four is the bottom row, a soft band behind it. A held icon
+   lifts and follows the finger; the others slide on the spring (--ease-spring) to make room; the drop settles on it.
+   Reduce Motion: they snap. */
+.zf-tray__grid { position: relative; }
+.zf-tray__grid--arrange::before { content: ""; position: absolute; left: -6px; right: -6px; top: -8px; height: 100px; border-radius: 22px; background: color-mix(in srgb, var(--ink) 4%, transparent); pointer-events: none; }
+.zf-tray__grid.is-arranging .zf-tray__app { transition: transform var(--dur-base) var(--ease-out); }
+.zf-tray__grid.is-arranging .zf-tray__app.is-lifted { position: relative; z-index: 2; transition: none; }
+.zf-tray__grid--arrange .zf-tray__icon { transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
+.zf-tray__app.is-lifted .zf-tray__icon { transform: scale(1.02); background: var(--bg); box-shadow: 0 0 0 1px var(--line), var(--lift); }
+.zf-tray__grid.is-arranging .zf-tray__app.is-dropping { position: relative; z-index: 2; transition: transform var(--dur-base) var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .zf-tray__grid.is-arranging .zf-tray__app, .zf-tray__grid.is-arranging .zf-tray__app.is-dropping, .zf-tray__grid--arrange .zf-tray__icon { transition: none; }
+}

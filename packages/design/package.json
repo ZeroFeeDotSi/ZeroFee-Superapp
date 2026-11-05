@@ -1,0 +1,16 @@
+{
+  "name": "@zerofee/design",
+  "license": "Apache-2.0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "peerDependencies": {
+    "react": "19.3.0"
+  },
+  "dependencies": {
+    "qrcode-generator": "2.0.4"
+  }
+}

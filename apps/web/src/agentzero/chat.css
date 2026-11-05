@@ -1,0 +1,220 @@
+/* AgentZero's chat, on the app's own design (product decision, 3 Nov):
+   the app's type scale and tokens (tokens.css), hairlines above and below instead of boxes, the ink pill for the one
+   action, Chat's own message and composer shapes, and the app's empty state. Black and white: the living mark at the
+   top (az-mark.css) is the only colour. */
+.azc { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.azc-viewport { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 0 16px; -webkit-overflow-scrolling: touch; overscroll-behavior: none; }
+/* What scrolls up under the top bar fades out over its last 20px, never a cut edge (D157 walk: the bottom of a
+   black "hi" bubble stood under the Activity mark as a black half-circle). The padding keeps the thread at rest clear of it. */
+.azc-viewport { -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 20px); mask-image: linear-gradient(to bottom, transparent 0, black 20px); }
+
+/* the thread: AgentZero's words in the app's body type with no bubble; the person's in Chat's own ink bubble */
+.azc-msg { margin: 14px 0; font: var(--t-body); color: var(--ink); overflow-wrap: anywhere; }
+.azc-msg p { margin: 0 0 8px; white-space: pre-wrap; }
+.azc-msg p:last-child { margin-bottom: 0; }
+.azc-user { margin-left: auto; max-width: 86%; width: fit-content; padding: 9px 13px; border-radius: 16px; background: var(--ink); color: var(--bg); animation: zf-enter var(--dur-base) var(--ease-out) both; }
+.azc-assistant { max-width: 100%; }
+.azc-assistant b, .azc-assistant strong { font-weight: 600; }
+/* words arrive one by one while they stream (opacity and a small rise) */
+.azc-w { display: inline-block; white-space: pre; animation: azc-word var(--dur-base) var(--ease-out) both; }
+@keyframes azc-word { from { opacity: 0; transform: translateY(.2em); } to { opacity: 1; transform: none; } }
+/* said to a screen reader only (the mark says "thinking" on screen) */
+.azc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.azc-thinking { color: var(--mute); }
+
+/* a tool step: one line between hairlines (the app's rows), its state on the right; a tap opens why */
+.azc-step { margin: 12px 0; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.azc-step summary { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; cursor: pointer; list-style: none; font-size: 15px; letter-spacing: -.01em; }
+.azc-step summary::-webkit-details-marker { display: none; }
+.azc-step-state { font: var(--t-small); color: var(--mute); white-space: nowrap; }
+.azc-step--refused .azc-step-state { color: var(--ink); }
+.azc-step > .zf-small { margin-top: 6px; }
+.azc-live .zf-small { margin: 6px 0 0; }
+/* an action in the thread (a plan's Start, Home's Open, Review): part of the reply, never a slab. The text first in the
+   reply's own type, then one small ink pill and, beside it, the other choice as a quiet word. No box, no full width.
+   Each target still takes a 44 pt tap (its ::after reaches past the pill). */
+.azc-card { margin: 12px 0; }
+.azc-card-line { margin: 0; font: var(--t-body); color: var(--ink); }
+.azc-card > .azc-system { margin: 6px 0 0; }
+.azc-card > .azc-system:first-child { margin: 0 0 6px; }
+.azc-plan-steps { margin: 2px 0 0; padding-left: 1.3em; font: var(--t-body); color: var(--ink); }
+.azc-plan-steps li { margin: 0 0 2px; padding-left: .15em; }
+.azc-plan-steps li::marker { color: var(--mute); font-variant-numeric: tabular-nums; }
+.azc-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin-top: 8px; }
+.azc-act, .azc-act-link { position: relative; appearance: none; margin: 0; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
+.azc-act { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--ink); color: var(--bg); font: 500 14px/1 var(--font); letter-spacing: -.005em; transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-base) var(--ease-out); }
+.azc-act:active { transform: scale(.98); }
+.azc-act--quiet { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.azc-act-link { background: none; padding: 0; color: var(--mute); font: 400 14px/32px var(--font); }
+.azc-act::after, .azc-act-link::after { content: ""; position: absolute; inset: -6px -4px; }
+@media (prefers-reduced-motion: reduce) { .azc-act { transition: none; } .azc-act:active { transform: none; } }
+.azc-sheet { margin: 8px 0; }
+
+/* a line from ZeroFee itself (a stop, a fault, a note): the app's small grey line, no bar, no box */
+.azc-system { margin: 10px 0; color: var(--mute); }
+/* Try again under a failed reply's line (product decision, 4 Nov): the thread's own small pill */
+.azc-retry > .azc-system { margin-bottom: 8px; }
+.azc-note { margin: 0; padding: 6px 0 0; color: var(--mute); text-align: center; }
+.azc-cost { margin: 8px 0 0; font: var(--t-small); color: var(--mute); }
+.azc-quiet { all: unset; cursor: pointer; display: block; margin: 10px 0 0; color: var(--mute); font: var(--t-small); text-decoration: underline dotted; text-decoration-color: var(--line); text-underline-offset: 4px; }
+
+/* a figure from the person's own Activity: plain text with a faint dotted underline (a tap opens its moves); a figure
+   Claude typed itself reads "Not known" */
+.azc-fact { display: inline; padding: 0; margin: 0; border: 0; border-radius: 0; background: none; font: inherit; color: inherit; letter-spacing: inherit; cursor: pointer;
+  text-decoration: underline dotted; text-decoration-color: var(--mute); text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.azc-fact--sheet { text-decoration: none; cursor: default; }
+.azc-unknown, .azc-unchecked { color: var(--mute); }
+
+/* AgentZero's words as Markdown (md.ts): modest headings, lists with a hanging indent, monospace that wraps */
+.azc-md > :last-child { margin-bottom: 0; }
+.azc-assistant .azc-md p { white-space: normal; }
+.azc-h { font-weight: 600; font-size: 16px; }
+.azc-list { margin: 0 0 10px; padding-left: 1.15em; list-style-position: outside; }
+.azc-list li { margin: 0 0 2px; padding-left: .15em; }
+.azc-list li::marker { color: var(--mute); }
+.azc-code { font: 14px/1.4 ui-monospace, Menlo, monospace; padding: 0 3px; border-radius: 4px; background: var(--raise); overflow-wrap: anywhere; }
+.azc-pre { margin: 0 0 8px; padding: 10px 12px; border-radius: 12px; background: var(--raise); border: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.4 ui-monospace, Menlo, monospace; }
+.azc-pre code { font: inherit; }
+.azc-host { color: var(--mute); }
+.azc-mdlink { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; text-align: left; }
+
+/* ready: the app's empty state (Trade's, Wallet's): one centred line, then the three starters as the app's rows */
+.azc-ready { display: grid; gap: 22px; padding-top: 22%; }
+.azc-lead { text-align: center; color: var(--ink-2); }
+.azc-starters { border-top: 1px solid var(--line); }
+.azc-starter { appearance: none; box-sizing: border-box; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 56px; padding: 14px 0; margin: 0;
+  border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font: var(--t-body); letter-spacing: -.01em; text-align: left; cursor: pointer; }
+.azc-starter svg { flex: none; color: var(--mute); }
+
+/* the composer: Chat's own (a quiet field and the ink pill); the iPhone keyboard's dictation types into it */
+.azc-composer { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; padding-top: 8px; }
+.azc-input { appearance: none; box-sizing: border-box; width: 100%; resize: none; min-height: 46px; max-height: 140px; margin: 0; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--raise); color: var(--ink); font: var(--t-body); line-height: 1.35; }
+.azc-input::placeholder { color: var(--mute); }
+.azc-send { width: auto; min-width: 72px; padding: 0 20px; height: 46px; }
+.azc-stop { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* focus is black and white too (never the browser's blue) */
+.azc :focus-visible, .azc-app :focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.azc .azc-input:focus, .azc .azc-input:focus-visible { outline: none; border-color: var(--ink); }
+
+/* the Claude chip, at the right of the app's top row, level with the menu */
+/* D144: left of the shell's Activity icon, top right of the header */
+.azc-keys { position: absolute; top: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 16px); right: calc(var(--gutter) + 40px); z-index: 6; display: flex; }
+.azc-chip { appearance: none; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--ink); font: var(--t-small); cursor: pointer; }
+
+/* setup (no key): the app's empty state, the key card's title in the app's title type, Chat's field and pill */
+.azc-keycard { padding-top: 18%; text-align: center; }
+.azc-keytitle { margin: 0 0 18px; color: var(--ink); }
+.azc-keyform { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.azc-keyrow { display: flex; gap: 8px; align-items: center; }
+.azc-field { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; font: var(--t-body); color: var(--ink); background: var(--raise); }
+.azc-keyfield { flex: 1; margin-top: 0; min-width: 0; height: 46px; }
+.azc-paste { width: auto; flex: none; padding: 0 20px; height: 46px; }
+.azc-keyline { margin: 0; color: var(--ink); }
+.azc-keyprivate { margin: 0; color: var(--mute); text-align: center; }
+.azc-link { appearance: none; border: 0; background: none; padding: 10px 0; min-height: 44px; align-self: center; text-align: center; color: var(--ink-2); font: 400 15px/1.3 var(--font); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; cursor: pointer; }
+.azc-keyrows { padding-top: 8px; margin-bottom: 14px; }
+.azc-keyrowline { margin: 0; padding: 14px 0; border-bottom: 1px solid var(--line); color: var(--ink); }
+.azc-keyacts { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.azc-btn-quiet { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+/* the Claude sheet's Model and Effort (product decision, 3 Nov): two rows, then a three-step meter */
+.azc-model { margin-top: 28px; text-align: left; }
+.azc-sect { margin: 0 0 6px; color: var(--mute); }
+.azc-pick { appearance: none; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; width: 100%; min-height: 64px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); text-align: left; font: var(--t-body); cursor: pointer; }
+.azc-pick-name { grid-column: 1; grid-row: 1; color: var(--ink); }
+.azc-pick-mark { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--ink); }
+.azc-pick-line { grid-column: 1; grid-row: 2; color: var(--mute); }
+.azc-model [role="radiogroup"] + .azc-sect { margin-top: 24px; }
+.azc-meter { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; }
+/* the meter's own name (it was .azc-step, the in-chat cards' name: every plan card was squeezed to a 40 px pill) */
+.azc-meter-step { appearance: none; height: 40px; border: 0; border-radius: 999px; background: none; color: var(--ink-2); font: var(--t-small); cursor: pointer; }
+.azc-meter-step[aria-checked="true"] { background: var(--ink); color: var(--bg); }
+.azc-meterline { margin: 10px 0 0; color: var(--mute); text-align: center; }
+
+/* AgentZero's inbox (L5) */
+.azc-inbox { padding: 12px 0 24px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; overscroll-behavior: none; height: 100%; box-sizing: border-box; }
+.azc-address { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 2px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow-wrap: anywhere; color: var(--ink); }
+.azc-mails { list-style: none; margin: 0; padding: 0; }
+.azc-mail-row { all: unset; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; width: 100%; padding: 14px 0; border-bottom: 1px solid var(--line); color: var(--ink); }
+.azc-mail-subj { grid-column: 1 / -1; color: var(--mute); }
+.azc-mail-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+
+/* the menu top left (product decision, 3 Nov): New chat, Jobs and limits, the saved chats, as the app's rows */
+.azc-app { position: relative; height: 100%; }
+.azc-pushed { position: absolute; inset: 0; z-index: 30; background: var(--bg); }
+.azc-menu { display: flex; flex-direction: column; }
+.azc-menu-row { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; width: 100%; min-height: 56px; border-bottom: 1px solid var(--line); color: var(--ink); font: var(--t-body); letter-spacing: -.01em; }
+.azc-menu-head { margin: 22px 0 4px; font: var(--t-label); letter-spacing: .18em; text-transform: uppercase; color: var(--mute); }
+.azc-menu-none { margin: 8px 0; color: var(--mute); }
+.azc-chats { list-style: none; margin: 0; padding: 0; }
+.azc-chat { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); }
+.azc-chat-open { all: unset; box-sizing: border-box; cursor: pointer; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 14px 0; color: var(--ink); }
+.azc-chat-title { font: var(--t-body); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.azc-chat.is-on .azc-chat-title { font-weight: 600; }
+.azc-chat-when { color: var(--mute); }
+.azc-chat-del { all: unset; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; padding: 0 4px 0 12px; color: var(--mute); font: var(--t-small); }
+
+@media (prefers-reduced-motion: reduce) {
+  .azc-w, .azc-user { animation: none; }
+}
+
+/* ══ The chat flow (the copy review, 5 Nov; $ZEROFEE_HOME/AGENTZERO-CHAT-UI-2026-11-05.md): Trade's tap and receipt, in the
+   thread. One lit verb per screen, capsule = choice, rect = command, circle = the thing you press. ═══════════════════ */
+/* 1. Send is a 44 pt circle with an arrow: lit (tokens.css --lit) only when there are words; quiet while the box is
+   empty; Stop is the same circle with a square. The box itself stays Chat's field. */
+.azc-composer { gap: 10px; }
+.azc-send { width: 44px; min-width: 44px; height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; margin-bottom: 2px; }
+.azc-send svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.azc-send:disabled { background: var(--fill, var(--raise)); color: var(--mute); box-shadow: none; text-shadow: none; opacity: 1; }
+.azc-stop { background: var(--fill, var(--raise)); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); text-shadow: none; }
+.azc-stop i { display: block; width: 14px; height: 14px; border-radius: 3px; background: currentColor; }
+/* while the last reply waits on its act (Start, Open Move, Review), that act is the screen's lit verb and Send goes quiet */
+.azc:has(.azc-assistant:last-of-type .azc-acts > .azc-act:first-child:not(.azc-act--quiet)) .azc-send:not(:disabled):not(.azc-stop) { background: var(--fill, var(--raise)); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); text-shadow: none; }
+/* 2. the wait: one dot at the left margin, where the first word will start, breathing until it does */
+.azc-wait { display: block; width: 8px; height: 8px; margin: 18px 0 10px 2px; border-radius: 50%; background: var(--mute); animation: none; }
+@keyframes azc-wait { 0%, 100% { opacity: .3; transform: scale(.98); } 50% { opacity: 1; transform: scale(1); } }
+/* 3. a reply's list: five lines, then "and N more" (MdText.tsx); bold is a weight, not a shout */
+.azc-assistant b, .azc-assistant strong { font-weight: 500; }
+.azc-list li { margin: 0 0 6px; }
+.azc-list.is-capped > li:nth-child(n+6):not(.azc-more) { display: none; }
+.azc-more { list-style: none; margin-left: -1.15em; }
+.azc-more button { position: relative; appearance: none; border: 0; background: none; padding: 4px 0; margin: 0; color: var(--mute); font: var(--t-body); cursor: pointer; }
+.azc-more button::after { content: ""; position: absolute; inset: -10px -8px; }
+/* 4. the acts: the first is the lit command (44 pt, rect 14); the rest are quiet. Never full width: a command in a reply,
+   not a slab (in-chat-actions.test). */
+.azc-acts { gap: 10px 16px; margin-top: 10px; }
+.azc-acts > .azc-act:first-child:not(.azc-act--quiet) { height: 44px; padding: 0 20px; border-radius: 14px; background: var(--lit, var(--mint)); color: var(--on-mint); box-shadow: var(--lit-shadow, none); font: 600 15px/1 var(--font); }
+.azc-acts > .azc-act--quiet, .azc-acts > .azc-act:not(:first-child) { height: 44px; padding: 0 16px; border-radius: 14px; background: var(--fill, var(--raise)); color: var(--ink); box-shadow: none; }
+.azc-retry > .azc-act--quiet { height: 44px; padding: 0 16px; border-radius: 14px; background: var(--fill, var(--raise)); color: var(--ink); box-shadow: none; }
+/* 5. a money card that follows its move: Trade's receipt mark (packages/design ReceiptMark) at the left, the words beside it:
+   away while it is on its way, the ring and tick once Activity says it landed, the cross when it stopped */
+.azc-money[data-mark] { display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 12px; align-items: start; }
+.azc-money[data-mark] > .zf-receipt--mark { grid-row: 1 / span 2; margin-top: 2px; }
+.azc-money[data-mark] > :not(.zf-receipt--mark) { grid-column: 2; }
+.azc-money[data-mark] > .azc-system { margin: 4px 0 0; }
+.azc-money[data-mark] > .azc-acts { margin-top: 10px; }
+/* 6. one place, one sentence: while the thread's last reply follows its move, the shell's bottom line ("… on its way.") is
+   not shown over AgentZero (notice-bar.css hides it under a sheet the same way); the other apps still get it */
+.ah:has(.ah-page:not([aria-hidden="true"]) .azc-assistant:last-of-type .azc-money[data-mark]) > .zf-notice { display: none; }
+@media (prefers-reduced-motion: reduce) { .azc-wait { animation: none; opacity: .6; } }
+
+/* ══ Theme v3.1 (A apps 4): fields are --fill with no border (hairline only as the focus ring); the input 48 pt; the lit
+   act a command at --r-cmd, 56 pt where it is the screen's floor; the meter a capsule track; cards at --r-card. ═════ */
+.azc-input { min-height: 48px; border: 0; border-radius: var(--r-field); background: var(--fill); box-shadow: inset 0 1px 0 var(--edge-hi); }
+.azc .azc-input:focus, .azc .azc-input:focus-visible { border: 0; box-shadow: inset 0 0 0 1px var(--ink); }
+.azc-field { border: 0; border-radius: var(--r-field); background: var(--fill); }
+.azc-field:focus, .azc-field:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--ink); }
+.azc-keyfield { height: 48px; }
+.azc-paste { height: 48px; border-radius: var(--r-cmd); }
+.azc-pre { border: 0; border-radius: var(--r-field); background: var(--fill); }
+.azc-user { border-radius: var(--r-card); }
+.azc-meter { border: 0; background: var(--fill); box-shadow: inset 0 1px 0 var(--edge-hi); }
+.azc-meter-step { height: 44px; font-weight: 500; }
+.azc-meter-step[aria-checked="true"] { background: var(--thumb); color: var(--ink); box-shadow: var(--thumb-shadow); }
+.azc-chip { height: 44px; border: 0; background: var(--fill); }
+.azc-acts > .azc-act:first-child:not(.azc-act--quiet) { border-radius: var(--r-cmd); }
+.azc-acts > .azc-act--quiet, .azc-acts > .azc-act:not(:first-child), .azc-retry > .azc-act--quiet { border-radius: var(--r-cmd); }
+/* first run: the screen's lit action (Save the key, Start) is the floor command, 56 pt */
+.azc-keyacts .zf-btn { height: 56px; border-radius: var(--r-cmd); }
+.azc-btn-quiet { background: var(--fill); box-shadow: none; }

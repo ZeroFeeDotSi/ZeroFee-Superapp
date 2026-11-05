@@ -1,0 +1,7 @@
+/* The On your phone page (OnYourPhone.tsx): one calm column, centred, the button at the foot. */
+.oyp { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px; min-height: 100%; padding: 48px 24px 32px; box-sizing: border-box; }
+.oyp__icon { width: 72px; height: 72px; border-radius: 20px; display: grid; place-items: center; background: var(--raise); overflow: hidden; }
+.oyp__icon img { width: 48px; height: 48px; border-radius: 12px; }
+.oyp__title { margin: 8px 0 0; }
+.oyp__why { margin: 0; max-width: 32ch; color: var(--ink-2); }
+.oyp__go { margin-top: auto; width: 100%; max-width: 360px; text-align: center; text-decoration: none; }

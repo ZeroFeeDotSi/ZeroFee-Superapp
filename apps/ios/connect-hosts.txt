@@ -1,0 +1,102 @@
+# Every https origin the phone's page may fetch (and, at the end, ZeroFee Chat's wss relays) (its CSP connect-src, with 'self', the relay's origin and WSS_HOSTS;
+# audit NF-12). One per line. tools/ios/csp.test.ts fails when the page's code names a host that is in neither this
+# list nor its list of hosts only linked to, so a new endpoint is added here on purpose.
+# NEAR (mainnet and testnet nodes, key and transaction indexes, archival reads, the testnet account helper)
+https://rpc.mainnet.fastnear.com
+https://near.drpc.org
+https://api.fastnear.com
+https://tx.main.fastnear.com
+https://archival-rpc.mainnet.fastnear.com
+https://archival-rpc.mainnet.near.org
+https://test.rpc.fastnear.com
+https://near-testnet.drpc.org
+https://testnet-rpc.intea.rs
+https://rpc.intea.rs
+https://test.api.fastnear.com
+https://tx.test.fastnear.com
+https://archival-rpc.testnet.fastnear.com
+https://archival-rpc.testnet.near.org
+https://helper.testnet.near.org
+# NEAR AI Cloud (Agent, release 10): answers about the person's own Activity in a private enclave, and the enclave's proof
+https://cloud-api.near.ai
+# 1Click and its bridge
+https://1click.chaindefuser.com
+https://bridge.chaindefuser.com
+# Solana nodes, Jupiter, Jito
+https://solana-rpc.publicnode.com
+https://solana.api.pocket.network
+https://public.rpc.solanavibestation.com
+https://lite-api.jup.ag
+https://mainnet.block-engine.jito.wtf
+# BNB Chain nodes
+https://bsc-dataseed.bnbchain.org
+https://bsc-dataseed1.defibit.io
+https://bsc-dataseed1.ninicoin.io
+https://bsc-rpc.publicnode.com
+https://bsc.api.pocket.network
+https://rpc-bsc.48.club
+# Robinhood Chain nodes
+https://rpc.mainnet.chain.robinhood.com
+https://robinhood-rpc.publicnode.com
+https://robinhood.drpc.org
+# Ethereum, Base, Arbitrum, Gnosis nodes (the separate wallets)
+https://eth.drpc.org
+https://ethereum-rpc.publicnode.com
+https://mainnet.base.org
+https://base-rpc.publicnode.com
+https://arb1.arbitrum.io
+https://arbitrum.drpc.org
+https://rpc.gnosischain.com
+https://gnosis-rpc.publicnode.com
+# Market data and swaps when no relay is set (with one, Trade asks the relay)
+https://api.geckoterminal.com
+# Hyperliquid TESTNET (D119 perps landing 1). Mainnet's API (landing 3) is reached by the phone's isolated core only
+# (CoreContext.swift coreHosts), never by the page; the page's connect-src gains it only with the gate's own allow-list.
+https://api.hyperliquid-testnet.xyz
+https://api.coingecko.com
+https://aggregator-api.kyberswap.com
+# Anthropic: Agent's robot, and AgentZero's rule box with the person's own Claude key (D88: the phone asks Claude itself)
+https://api.anthropic.com
+# ZeroFee Chat's relays (D55; packages/chat/src/allowlist.ts ALLOWED_RELAYS, the same 40): a place's 5 are BitChat's pick
+# over these, and private messages go on three of them (DM_RELAYS). Sockets, not fetches: the page opens these for
+# Nostr's REQ/EVENT and nothing else. No wildcard; a new relay is added here on purpose (tools/chat/pick-relays.ts).
+wss://nos.lol
+wss://relay.primal.net
+wss://offchain.pub
+wss://nostr.hifish.org
+wss://nostr.sathoarder.com
+wss://relay.guggero.org
+wss://relay.layer.systems
+wss://relay.angor.io
+wss://relay.nostrhub.fr
+wss://21milionidinostr.duckdns.org
+wss://relay.nostu.be
+wss://nostrelay.circum.space
+wss://relay.cyberguy.fyi
+wss://nostr-relay.xbytez.io
+wss://nostr.christiansass.de
+wss://nostr.chaima.info
+wss://nostr.azzamo.net
+wss://relay.dwadziesciajeden.pl
+wss://adre.su
+wss://ec2.f7z.io
+wss://freelay.sovbit.host
+wss://nostr.quali.chat
+wss://bitchat.nostr1.com
+wss://bridge.tagomago.me
+wss://relay.nostriot.com
+wss://wot.nostr.party
+wss://nostr.liberty.fans
+wss://nostr.overpay.com
+wss://nostr.thebiglake.org
+wss://relay.bowlafterbowl.com
+wss://nostr-relay.zimage.com
+wss://no.str.cr
+wss://relay.ru.ac.th
+wss://relay.islandbitcoin.com
+wss://nostr-01.yakihonne.com
+wss://relay-arg.zombi.cloudrodion.com
+wss://relay01.lnfi.network
+wss://relay02.lnfi.network
+wss://staging.yabu.me
+wss://yabu.me

@@ -1,0 +1,8 @@
+From: Shop <orders@example-shop.test>
+To: lena.river@zerofee.si
+Subject: Order confirmed
+Date: Mon, 02 Nov 2026 16:20:00 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Your order 482913 is confirmed. Sign in to see it.

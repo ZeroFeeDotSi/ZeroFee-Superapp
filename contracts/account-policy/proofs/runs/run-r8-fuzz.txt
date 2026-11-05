@@ -1,0 +1,344 @@
+Release 8 FUZZ ROUND, 30 Oct 2026. The REAL source of record is lib.rs e951e00a…b23a (tests.rs
+aab66611…11e1), pinned in proofs/build.rs, wasm 1f7d6334…f863: it is the release-8 lib with the fix of R8-F1, which this
+round found (section 6). Three lib.rs versions passed through this round, in order:
+  913d0f7e…ab62 (first r8)  -> 5a39e768…084c (FB-3 callback never deletes a key, 20:18) -> e951e00a…b23a (R8-F1 fix, 21:10).
+Only the runs in section 7 are on e951e00a and count as "real source". Sections 3 and 5 ran on the earlier two and are kept as
+history (they found H-r8-1, H-r8-2 and R8-F1); their minutes do NOT count toward the campaign.
+cargo +nightly-2026-08-21 fuzz {build,run}, libFuzzer, --target-dir $WORKDIR/r8/target-fuzz (never the
+worktree's). Binaries run directly, one process per target. Contract EVENT_JSON lines and libFuzzer NEW/REDUCE/pulse lines and
+the recommended dictionaries are left out: summaries and the final stat lines only.
+
+Commands (from contracts/account-policy/proofs/fuzz):
+  cargo +nightly-2026-08-21 fuzz build --target-dir $WORKDIR/r8/target-fuzz recovery_seq_wide
+  cargo +nightly-2026-08-21 fuzz build --target-dir $WORKDIR/r8/target-fuzz contract
+  …/release/recovery_seq_wide -max_total_time=3900 -max_len=259 -len_control=0 -print_final_stats=1 -rss_limit_mb=4096 $WORKDIR/r8/corpus-wide
+  …/release/contract -max_total_time=1200 -print_final_stats=1 -rss_limit_mb=4096 $WORKDIR/r8/corpus-contract
+Controls: a scratch copy per control, PROOFS_SKIP_PIN=1, target dir $WORKDIR/r8/target-ctrl (section 4).
+Machine shared with other rounds (Kani, mutants); exec/s figures are under that load.
+
+=== 1. The widened target `recovery_seq_wide` (proofs/src/fuzz_api.rs::drive_recovery_wide, fuzz_targets/recovery_seq_wide.rs)
+
+The release-7 target `recovery_seq` (drive_recovery_sequence) is kept unchanged and still builds; the wide one is a new
+target. Input: 3 config bytes, then up to 64 operations of 4 bytes (kind, signer, argument, extra); max_len 259.
+
+Start state (config):
+- recovery delay 1, 2, 3, 7 or 30 days; fallback and floor computed by the ORACLE from literals (3 x delay clamped to
+  [7 d, 30 d]; delay + min(delay, 1 d)), never from the contract's helpers;
+- 0 to 3 second devices (keys 9, 10, 11), each aged (age row at 0) or young (age row at the start time), per bit;
+- bands: one of five presets: P0 Face ID only; P1 small (0.01 NEAR + 1000 usdc units, one budget) Face ID, rest Wait 2 h;
+  P2 small Face ID, rest Device; P3 small Wait 1 h, rest Both 2 h; P4 small Device, rest Both 1 h (P2-P4 only with a device);
+- the account's setup window open or closed (created now or at 0); backup words key 4 present or absent (first words at
+  Face ID). Phone key 1, sealed device list.
+
+Operations (17 kinds), each from one of 9 signers: the current phone, the current backup key, devices 9 / 10 / 11, a
+stranger (7), the old phone (1), keys 12 and 13 (which may become devices or the backup key):
+  0 start_recovery to key 5, 6, 12, 9, 1 or 13          9  remove_key of 9, 10, 11, 12, 13, 4, 1 or 5
+  1 approve_recovery, right or wrong key / finish time   10 add_second_device 9..13 (new, or the refill of a recorded one)
+  2 refuse_recovery None / Some(false) / Some(true)      11 set_recovery_key 4 (renewal), 12, 13, 5, 9
+  3 cancel_recovery                                      12 set_protection(one of the five presets)
+  4 finish_recovery                                      13 execute: 11 spend presets (below)
+  5 approve(any waiting request)                         14 the FB-3 callback on_second_device_key for any callback the
+  6 decline(any waiting request)                            contract scheduled so far, with PromiseResult Successful or
+  7 run(any waiting request)                                Failed (testing_env's promise_results; state through "STATE")
+  8 cancel(any waiting request)                          15 upgrade(code hash) placement (its run makes the
+ 16 time step: 1 s, 1 h, 12 h, 1 d, 2 d, 7 d, 30 d,          use_global_contract + upgrade_check batch), or upgrade_check
+    delay, fallback, floor, the stop's wait (+0-3 s)        (6 / 7 / 8) at any moment
+So: several devices, aged and young, added at any time (also during a recovery and during a freeze: the add of 12/13 runs
+when co-signed during a recovery, or at once in the setup window); removals of devices, of the backup key (refused), of
+the phone's own key (refused), of fresh keys 12/13 (the RK sequence: remove_key(12), set_recovery_key(12), run the words
+first, then the removal must be refused); spends and their co-signing or declining by young and aged devices during a
+dispute; the stop; upgrades; the FB-3 callback in all four (result x refill) combinations.
+
+Spend presets (receiver, steps; the oracle counts what they move from literals: Σ deposits + Σ gas x 2e8 as "near"):
+ 0 bob 0.001 NEAR transfer; 1 bob 5 NEAR transfer; 2 usdc ft_transfer_call 1 unit, 200 Tgas (RS-2's case); 3 usdc
+ ft_transfer 500 units, 10 Tgas; 4 bob 2 x storage_deposit at 200 Tgas (400 Tgas: RS-1's case, must be refused); 5 bob
+ do_it (unmeasurable: strictest); 6 bob storage_deposit with 0-510 Tgas (fuzzer-chosen); 7 two near_deposit calls with
+ 0-319 Tgas each; 8 usdc ft_transfer_call 2000 units (over the small band); 9 intents.near mt_transfer of 10 usdc units;
+ 10 bob 1-10 withdraw_all calls at 30 Tgas each (30-300 Tgas in all).
+
+The oracle (an independent shadow: phones, backup key, devices with the moment each one's age counts from, the recovery,
+the device's yes (key, time, device), the one stop, the freeze, the bands, every waiting request with its kind, finish time,
+device need, approval and co-signer, and the scheduled callbacks). A refusal (NEAR panic) restores the account and its
+cells; a Rust panic that is no refusal is a crash. After EVERY accepted call it checks the call was allowed and then that
+the contract agrees with the shadow EXACTLY on: the waiting request ids, the second devices, the backup key, the recovery,
+the freeze cell, the bands, the stop-asked cell, the phone list (sealed), the number of devices of age, and
+recovery_status (approved, needs_device). The rules checked at the call:
+- everything the release-7 oracle checked, for several devices: only the backup key starts / finishes; a finish never before
+  the delay, and with any device of age never before the fallback without a device of age's yes to THIS (key, time); only a
+  device of age says yes or refuses, only to the exact waiting recovery; a plain refusal ends it and freezes now + floor, a
+  confirmed one needs the stop and writes no freeze; with a device of age at most one stop per recovery, waiting exactly
+  min(1 d, delay / 2); an unanswered stop never ends a recovery a device of age said yes to and otherwise freezes; with no
+  device of age the stop ends at once and freezes; a removal waits >= floor, a device of age's >= max(floor, fallback); after
+  a finish the new key is the only phone and young devices are gone; liveness: the words' finish of a due recovery and a
+  device of age's yes to the exact waiting recovery succeed;
+- RK: no receipt deletes the CURRENT backup key's access key unless it is re-added in the same batch (a renewal), and the
+  run of a removal of the key that is now the backup must be refused; likewise for the phone's key and a recorded device's
+  key (NEAR's keys follow the records);
+- FB-3: a Failed add's callback leaves the device unrecorded (and the bands converted if it was the last); a Failed refill's
+  callback never unrecords and adds the key again; a Successful callback changes nothing; no callback deletes any key;
+  a refill (add_second_device of a recorded device) goes at once, never removes it, renews the key, schedules the callback;
+- a young device's yes never co-signs: a young device approves only what needs a device; its yes leaves no co-sign on
+  record (and never replaces an aged one's); whether a request is co-signed is the shadow's own (approved, co-signer still
+  recorded and of age NOW);
+- nothing the phone asked alone survives a recovery start, a stop, a refusal, new words during a recovery or a finish (the
+  exact id list must match the shadow's drop of every request not co-signed), and while a recovery waits only co-signed
+  requests or the stop run, by run or by approve (approve runs a request exactly when the shadow says it may);
+- frozen accounts never run anything at Face ID: while a recovery waits or the freeze holds, execute never runs at once and
+  waits >= floor; outside, it runs at once only when the oracle's own band for the request is Face ID;
+- RS-1: execute is accepted only if every step <= 300 Tgas and the saturating sum <= 250 Tgas;
+- RS-2 and the bands: the placed level is at least the oracle's band for what the request alone moves (deposits + gas x 2e8
+  as NEAR; unmeasurable -> strictest): the wait and the device need of that band (24-hour history only adds);
+- settings (protection, add device, remove key, new words, upgrade) wait >= the floor at the strictest level, except the
+  setup window's first device / protection and the first backup key; a key never takes a second role (add, new words,
+  recovery to a key in use is refused); decline only of what needs a device or, in a dispute, by a device of age, never a
+  device's removal; owner methods only from the current phone.
+
+=== 2. The `contract` target (fuzz_targets/contract.rs), release-8 additions
+- sub-target 0 (`moves`): besides "near >= Σ deposits", now RS-2: "near" >= Σ deposits + Σ gas x 2e8 (saturating, literal
+  price), for every receiver (intents.near, a coin, arbitrary) and every method, standard coin methods included;
+- new sub-target 5 (`execute`, via fuzz_api::drive_execute): arbitrary steps on an account whose only band waits (so nothing
+  runs at once); accepted EXACTLY when check_steps' rules hold (literals: 1-10 steps, method 1-256 bytes, args <= 4096,
+  not add_public_key / remove_public_key / disable_auth_by_predecessor_id, each <= 300 Tgas) AND the saturating gas sum
+  <= 250 Tgas; any other panic is a crash. The selector is now `% 6` (0 moves, 1 check_steps, 3 recovery calls, 4
+  upgrade_check(6), 5 execute, 2 decode).
+- sub-target 0 also runs every input a second time with its call steps SHAPED into well-formed standard coin calls (an
+  odd first args byte picks ft_transfer / ft_transfer_call / mt_* / nft_* / ft_withdraw with JSON receiver_id, amount
+  (= the deposit mod 1e30), token_id(s), amounts, token, msg), so the RS-2 check meets measured coin calls (H-r8-2 below).
+  RS-1 and RS-2 failures now restore the default panic hook first, so the message reaches the log.
+
+=== 3. Smoke runs and harness faults (fixed in the HARNESS; the contract was never edited)
+
+- 20:13-20:16, recovery_seq_wide 3 min on the PREVIOUS release-8 lib (913d0f7e…ab62, before the lead's final FB-3
+  change): 10 hand-written scenario seeds (RK sequence, recovery with yes, fallback finish, FB-3 add / refill callbacks,
+  spends on mixed bands with 3 devices, stops, a young device's yes, devices added during a recovery / freeze + upgrade,
+  phone-only stop + frozen spends, first and new words): 29,037 sequences, 160/s, cov 8,388, corpus 10 -> 1,297, peak
+  547 MB, no violation. Does not count as real source.
+- 20:18 the lead's FINAL lib.rs (5a39e768…084c): a failed add's callback only unrecords the device (no key deleted).
+  Oracle updated: a callback must never delete any key (new check); FB-3 controls re-cut (FB3b, new FB3c).
+- 20:17-20:19, recovery_seq_wide 90 s on the final lib: 4,903 sequences (53/s, control builds alongside), no violation.
+  contract 60 s on the final lib: 40,848 execs, 669/s, cov 6,876, no crash.
+- 20:19:41 first wide campaign start; after 29 s (5,092 sequences) the oracle reported
+  "RK: the backup key 9's access key was deleted while it is the backup". Replayed and decoded: backup words absent at the
+  start; set_recovery_key(12) (first words, at once); set_recovery_key(9) asked FIVE times (each placed: `key_in_use`
+  does not look at waiting requests); after the floor the first run makes 9 the words; a SECOND waiting
+  SetRecoveryKey(9) then runs: its re-check passes (9 is the backup itself), `recovery_key.take()` deletes key 9 in one
+  receipt and `add_function_call_key(9)` adds it in the next receipt of the same call. Local receipts to the same account
+  run in the order made, so key 9 ends present with the words' methods and a fresh allowance: a renewal in two receipts.
+  H-r8-1 (HARNESS): the first oracle demanded the re-add in the SAME receipt. Fixed: the oracle now replays the call's
+  receipts in order and checks each key's state after all of them. Not a contract defect; noted as an observation (a
+  second waiting new-words request to the same key is a harmless renewal, and while a recovery waits only a co-signed one
+  can run, where its end_recovery(false) is the documented new-words end). The campaign was restarted at 20:24:47 on the
+  fixed oracle; nothing before counts.
+- 20:39 control RS2 on `contract` NOT caught in 5 min (449,598 execs): sub-target 0's random bytes practically never spell a
+  standard coin method with a JSON amount, so `moves` returned None (unmeasured) and the RS-2 check never met a coin call.
+  H-r8-2 (HARNESS reach): the shaped second pass above added; RS2 on `contract` then caught in 3 s; the `contract`
+  campaign was RE-RUN on the strengthened target (campaign 2 below). Campaign 1 is reported but carries the weaker RS-2.
+
+=== 4. Planted-bug controls (the oracle can fail for the reasons that matter)
+
+Each control: a scratch COPY of the crate (contracts/account-policy/{Cargo.toml, src, proofs/{Cargo.*, build.rs, src},
+proofs/fuzz/{Cargo.*, fuzz_targets}}) under $WORKDIR/r8/fuzz-controls/<name>/, ONE replacement in its lib.rs
+(asserted to match exactly once), PROOFS_SKIP_PIN=1, built into a control-only target dir ($WORKDIR/r8/target-ctrl),
+never the worktree's src. All built AFTER the H-r8-1 fix (and RS1/RS2's `contract` binaries after H-r8-2). Fuzzed with the
+same libFuzzer flags as the campaign, cap 300 s each, (a) from the same 10 scenario seeds, and (b) from NO seeds at all
+(so a catch on a hand-written seed is not mistaken for the fuzzer's own reach).
+
+| ctl  | planted bug (lib.rs copy)                                                   | (a) from the 10 seeds                    | (b) from no seeds          |
+|------|-----------------------------------------------------------------------------|------------------------------------------|----------------------------|
+| C1   | finish_recovery ignores the device of age (`if false && aged > 0 …`)        | caught, 3 s, on a seed                   | caught, 205 s, 21,957 seq  |
+| C2   | a plain refuse_recovery ends with end_recovery(false): no freeze            | caught, 3 s, on a seed                   | caught, 29 s, 4,789 seq    |
+| C3   | cancel_recovery no longer stores stop_asked                                 | caught, 3 s, on a seed                   | caught, 2 s, 272 seq       |
+| C4   | approve_recovery checks the key only, not the finish time                   | caught, 46 s, 2,450 seq (mutation)       | caught, 168 s, 23,436 seq  |
+| C5   | a device of age's removal waits only the floor (`floor.max(0)`)             | caught, 6 s, on a seed                   | caught, 2 s, 488 seq       |
+| RK   | RemoveKey's run-time backup-key re-check deleted                            | caught, 5 s, on the RK seed              | NOT caught in 300 s (30,810 seq) |
+| RS1  | execute's 250 Tgas total check deleted                                      | caught, 5 s, on a seed                   | caught, 9 s, 768 seq       |
+| RS2  | gas counted as NEAR only for non-standard methods (the release-7 rule)      | caught, 15 s, 681 seq (mutation)         | caught, 28 s, 1,634 seq    |
+| FB3a | the callback forgets the device on a failed REFILL (`if false && refill`)   | caught, 5 s, on a seed                   | caught, 64 s, 4,128 seq    |
+| FB3b | the callback does nothing on a failed add (unrecord + state_write removed)  | caught, 5 s, on a seed                   | caught, 116 s, 7,006 seq   |
+| FB3c | the callback deletes the key on a failed add (forget instead of unrecord)   | caught, 5 s, on a seed                   | NOT caught in 300 s (27,462 seq) |
+| W1   | widened space: a YOUNG device's yes recorded as its co-sign (always hash)    | caught, 3 s, on a seed                   | NOT caught in 300 s (34,722 seq) |
+| RS1/contract | as RS1, on the `contract` target (sub-target 5, r7 corpus as seeds) | caught, 19 s, 30,696 execs (first build, before the hook fix: caught in 97 s with the message swallowed) | - |
+| RS2/contract | as RS2, on the `contract` target (sub-target 0)                      | before H-r8-2: NOT caught in 303 s (449,598 execs); after: caught, 3 s, 2,395 execs | - |
+
+Messages as reported (wide target unless named):
+ C1   "finished before the fallback with no yes from a device of age"
+ C2   "freeze differs after op 2: contract None, oracle Some(1123200000000000)"   (the plain refusal wrote no freeze)
+ C3   "stop_asked differs after op 3: oracle true"
+ C4   "approve_recovery accepted: key 11 (aged true), wrong key/time bits 2"
+ C5   "RemoveKey(9) waits 345600000000000 < 777600000000000 (level Wait { seconds: U64(3600) }, owed 777600000000000)"
+ RK   "RK: the removal of key 12 ran while it is the backup key"   (remove_key(12), set_recovery_key(12), words run first)
+ RS1  "RS-1: execute accepted steps with gas [200000000000000, 200000000000000]"
+ RS2  "a spend ran at once below its band: Wait { seconds: U64(7200) } (near 40000000000000000000001, nep141:usdc.near 1)"
+      (the 1-unit ft_transfer_call at 200 Tgas: 0.04 NEAR of gas, over the 0.01 NEAR Face ID band, ran at Face ID)
+ FB3a "FB-3: a failed refill removed device 10"
+ FB3b "FB-3: device 10 is still recorded after its add failed"
+ FB3c "FB-3: the callback (failed true, refill false) deleted a key"
+ W1   "waiting requests differ after op 0: contract [1], oracle []"   (a request only a then-young device said yes to
+      survived the words' recovery start)
+ RS1/contract "RS-1: execute verdict differs from the rules: accepted true, total gas 281440616972288"
+ RS2/contract "RS-2: measured NEAR 127605887674580086313029815383208493057 below the deposits plus the gas carried
+      127605887675358701954125011133608493057"
+Reading: every control is caught by the oracle (column a); 9 of the 12 wide controls are also found by the fuzzer from an
+empty corpus within 5 min. RK, FB3c and W1 need a specific 4-6-call sequence (RK: remove_key(K), set_recovery_key(K),
+the floor, run the words, run the removal; W1: a Both band, a young device's yes, the floor, a recovery start) and were
+caught only from the scenario seeds within the cap, so the campaign's power on those three rests on the seeds being in its
+corpus (they are: the campaign corpus started from the same seeds).
+
+=== 5. Campaigns on lib 5a39e768…084c (SUPERSEDED by e951e00a at 21:10; history, not the real source of record)
+
+--- recovery_seq_wide, strict oracle (20:24:23-21:10:30, 46 min, stopped when the lib changed): >= 262,144 sequences
+    (last pulse #262144 cov 8,737 ft 36,668 corpus 1,939, ~99/s, rss 648 MB), no violation. It did NOT reach R8-F1.
+--- recovery_seq_wide with an R8-F1-tolerant switch (21:06-21:10, 4 min, stopped): no violation. The switch was removed
+    from the source afterwards (the strict rule stays, at the lead's request).
+(Section 4's controls ran on 5a39e768 too; section 7 re-runs them on e951e00a.)
+
+--- contract, campaign 1 (20:19:41-20:39:43, before H-r8-2; seeds: the r7 contract corpus, 854 units loaded)
+#4761	INITED cov: 6872 ft: 12192 corp: 854/109Kb exec/s: 2380 rss: 182Mb
+#3209458	DONE   cov: 7034 ft: 13526 corp: 1359/225Kb lim: 4096 exec/s: 2672 rss: 207Mb
+Done 3209458 runs in 1201 second(s)
+stat::number_of_executed_units: 3209458
+stat::average_exec_per_sec:     2672
+stat::new_units_added:          3755
+stat::peak_rss_mb:              207
+Result: no crash, no oracle failure. (RS-2 there reached only measured calls the random bytes happened to spell.)
+
+--- contract, campaign 2 (20:41:28-21:01:30, the strengthened target: shaped coin calls for RS-2, messages restored)
+#6763	INITED cov: 7250 ft: 14215 corp: 1315/192Kb exec/s: 3381 rss: 215Mb
+#3281785	DONE   cov: 7283 ft: 16195 corp: 1814/431Kb lim: 4096 exec/s: 2732 rss: 228Mb
+Done 3281785 runs in 1201 second(s)
+stat::number_of_executed_units: 3281785
+stat::average_exec_per_sec:     2732
+stat::new_units_added:          3560
+stat::peak_rss_mb:              228
+Result: 20 min 02 s, 3,281,785 executions, 2,732/s, 7,283 coverage edges, corpus 1,814, peak 228 MB: no crash, no
+RS-1 / RS-2 / check_steps / decode / migration failure. Six sub-targets share the executions (≈ 0.55 M each).
+
+--- the release-7 target recovery_seq, unchanged, on the r8 source (20:44:50-20:49:57, r7 corpus 762 -> 699 loaded)
+#2840	INITED cov: 5720 ft: 18082 corp: 699/49Kb exec/s: 284 rss: 518Mb
+#51865	DONE   cov: 5727 ft: 18148 corp: 740/54Kb lim: 193 exec/s: 172 rss: 542Mb
+stat::number_of_executed_units: 51865
+stat::peak_rss_mb:              542
+Result: 5 min, no violation (the old space still reachable and still clean on release 8).
+
+=== 6. Finding R8-F1 on lib 5a39e768 (from the widened oracle's "the phone's key is never deleted" rule) — FIXED in e951e00a
+
+How it was found, honestly: not by a fuzzing run. While the 5a39e768 campaign ran, reading the oracle's rule against the
+RemoveKey finish suggested the path; an 8-call probe written by hand ($WORKDIR/r8/probe/phone_removal) made the
+REAL 5a39e768 build report it. The 46-min strict campaign on 5a39e768 had not reached it, and the F1 control in section 7
+is not reached by 5 min of fuzzing either: the oracle catches it, the fuzzer's random search does not find the 8-call
+sequence within those budgets.
+
+
+R8-F1 (Informational / Low, liveness; same class as the re-score's RK item: a removal checked only when it is ASKED).
+`remove_key` refuses the phone's own key (`public_key != signer_key()`) and the backup key; at RUN time release 8
+re-checks only the backup key. A removal of a key that is NOT on the account, co-signed by a second device of age, survives
+a recovery start (it is co-signed); if the recovery then moves the account to exactly that key, the removal later runs and
+deletes the NEW phone's access key and empties the sealed device list: the account has no phone until the words recover
+it again. Minimal sequence (decoded probe $WORKDIR/r8/probe/phone_removal, reported by the real r8 build:
+"a removal deleted the key of the current phone (5)"):
+  delay 2 d, one second device (9) of age, words 4, bands Face ID only.
+  1 phone:   remove_key(K5)           -> waits the floor (3 d); K5 is on no role, so it is accepted
+  2 dev 9:   approve(that id)         -> co-signed (aged), not run (its wait is not over)
+  3 words:   start_recovery(K5)       -> K5 is not "in use" (key_in_use does not look at waiting removals); the co-signed
+                                         removal is kept
+  4 dev 9:   approve_recovery(K5, t)  5 +2 d   6 words: finish_recovery -> the phone is K5, device list [K5], sealed
+  7 +1 d (the removal's 3 d are over) 8 phone K5: run(removal id)  -> devices.keys = [], delete_key(K5)
+  (step 8 can also be the laptop's approve(id), which runs it at once now that no recovery waits.)
+  The probe as recovery_seq_wide input (hex; the local file was deleted at clean-up):
+  0105100900070005020000000100000102000010000700040100001000030007000000
+  H-r8-1's input (hex): 01000100100009000001000010007e7e09ffffffffffffffffffffffffffffffffffff0060606060606060f9f9f9f9f9f9f9
+  f9f9f9f9f9f9f9f9f9606060606060606060606060606060606060606060606060606060606060000000000000000000000000000000ffffffffffff
+  ffffffffffffffffffffffffffffffffffffffff72ffffffffffffffffffffffffffffff7e7e7e7e7e7e7e7e7e7e7e7e7e3e7e7e7e7e7e7e7e7e7e7e
+  7e7e7e7e877e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7eff7e7e7e7e7effffff7e7e7e7e7e7eff7e7e7e7e7effffffffffff
+  ffe70401ffffffff000000100009e7040100
+Impact: no money moves; it needs the phone AND a second device of age to co-sign the removal of a key that is on no role,
+and then a recovery to exactly that key, so in practice it is self-inflicted or needs two of three (which already control
+the account); the new phone can cancel the waiting removal (it is listed in waiting_requests), and the words recover the
+account again (start_recovery to a new key works: the list is empty but sealed). Suggested fix (contract change, the
+the product's call): in the RemoveKey finish, also refuse a key that is now a device key of the sealed list (as for the backup
+key), or have start_recovery / finish_recovery drop waiting removals of the recovery's new key. Reported to the lead at
+21:08; the lead fixed it in lib e951e00a (finish_recovery drops any waiting RemoveKey of the new key; the RemoveKey
+finish also refuses the waiting recovery's new key and the last key on the device list). This round never edited src.
+Oracle updated for e951e00a (strict, no switch): the shadow drops a waiting removal of the new key at the finish, and a
+removal that runs on the current phone's key or on the waiting recovery's new key is a violation.
+Replay on e951e00a: the probe runs clean ("Executed … in 45 ms", the removal is dropped at the finish, exactly as the
+shadow predicts). Replay on the F1 control (the three fix lines removed): "waiting requests differ after op 4: contract
+[1], oracle []" (the finish kept the removal).
+
+Observation O-1 (no defect): several waiting set_recovery_key requests for the same key K may be placed (key_in_use does not
+look at waiting requests); after the first runs, a second one passes its re-check (K is the backup itself) and deletes and
+re-adds K in two receipts of one call: net a renewal (H-r8-1 above).
+
+=== 7. THE REAL SOURCE OF RECORD: lib e951e00a…b23a (pin checked by build.rs, no PROOFS_SKIP_PIN)
+
+Rebuilt both targets at 21:11 from the worktree (oracle with the R8-F1 rules above, strict). Replays: the 10 seeds run clean
+(cov 7,609); the R8-F1 probe runs clean (the removal is dropped at the finish).
+
+--- controls re-run on e951e00a copies (same procedure as section 4, from the same 10 seeds, cap 300 s), 21:15-21:23
+F1   (NEW: the R8-F1 fix removed: the finish's drop of removals of the new key, and the RemoveKey finish's refusal of the
+     waiting recovery's new key and of the last device-list key)
+     on the probe input: CAUGHT at once: "waiting requests differ after op 4: contract [1], oracle []"
+     fuzzing from the 10 seeds: NOT caught in 303 s (42,704 seq); from no seeds: NOT caught in 303 s (42,908 seq)
+RK   CAUGHT 5 s, 6 seq (on a seed)      "RK: the removal of key 12 ran while it is the backup key"
+RS1  CAUGHT 5 s, 16 seq (on a seed)     "RS-1: execute accepted steps with gas [200000000000000, 200000000000000]"
+RS2  CAUGHT 12 s, 2,226 seq             "a spend ran at once below its band: Wait { seconds: U64(7200) } (near 4e22+1, usdc 1)"
+FB3a CAUGHT 5 s, 7 seq (on a seed)      "FB-3: a failed refill removed device 10"
+FB3b CAUGHT 5 s, 7 seq (on a seed)      "FB-3: device 10 is still recorded after its add failed"
+FB3c CAUGHT 5 s, 7 seq (on a seed)      "FB-3: the callback (failed true, refill false) deleted a key"
+W1   CAUGHT 2 s, 9 seq (on a seed)      "waiting requests differ after op 0: contract [1], oracle []"
+C1   CAUGHT 2 s, 4 seq (on a seed)      "finished before the fallback with no yes from a device of age"
+C2   CAUGHT 2 s, 44 seq                 "freeze differs after op 2: contract None, oracle Some(1382401000000000)"
+C3   CAUGHT 2 s, 10 seq (on a seed)     "stop_asked differs after op 3: oracle true"
+C4   CAUGHT 5 s, 759 seq                "approve_recovery accepted: key 11 (aged true), wrong key/time bits 2"
+C5   CAUGHT 2 s, 14 seq                 "RemoveKey(9) waits 345600000000000 < 777600000000000 (level Wait 3600 s, owed 777600000000000)"
+RS1/contract CAUGHT 53 s, 151,857 execs "RS-1: execute verdict differs from the rules: accepted true, total gas 295824681450765"
+RS2/contract CAUGHT 2 s, 2,397 execs    "RS-2: measured NEAR 127605887674580086313029815383208493057 below the deposits plus the
+                                         gas carried 127605887675358701954125011133608493057"
+So 14 of 14 planted bugs are caught by the oracle on e951e00a; 13 of them by fuzzing within 5 min, F1 only on its probe.
+
+--- contract, FINAL campaign on e951e00a (21:12:07-21:32:10; the strengthened target of section 2; corpus from campaign 2)
+#8367	INITED cov: 7277 ft: 16120 corp: 1721/355Kb exec/s: 2789 rss: 231Mb
+#4247191	DONE   cov: 7292 ft: 16440 corp: 1846/386Kb lim: 4096 exec/s: 3536 rss: 248Mb
+Done 4247191 runs in 1201 second(s)
+stat::number_of_executed_units: 4247191
+stat::average_exec_per_sec:     3536
+stat::new_units_added:          2064
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              248
+Result: 20 min 03 s, 4,247,191 executions, 3,536/s, 7,292 coverage edges, corpus 1,846, peak 248 MB: no crash, no RS-1 /
+RS-2 / check_steps / decode / migration failure (six sub-targets share the executions, ≈ 0.7 M each).
+
+--- recovery_seq_wide, FINAL campaign on e951e00a (21:12:08-22:17:09, ONE process, -max_total_time=3900; corpus: the 10
+    seeds plus everything earlier runs added, 1,692 units loaded)
+#4370	INITED cov: 8749 ft: 36793 corp: 1692/226Kb exec/s: 208 rss: 586Mb
+#784214	DONE   cov: 8793 ft: 38106 corp: 2113/276Kb lim: 259 exec/s: 201 rss: 712Mb
+Done 784214 runs in 3901 second(s)
+stat::number_of_executed_units: 784214
+stat::average_exec_per_sec:     201
+stat::new_units_added:          2955
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              712
+Result: 65 min 01 s, 784,214 sequences (each up to 64 calls), 201/s, 8,793 coverage edges, corpus 2,113 (2,955 units added),
+peak 712 MB: NO oracle violation, no crash, no timeout, no OOM.
+
+--- recovery_seq_wide, auxiliary run on e951e00a (21:32:24-22:12:26, a second process, from the 10 seeds + the R8-F1 probe)
+#536090	DONE   cov: 8778 ft: 37062 corp: 2467/338Kb lim: 259 exec/s: 223 rss: 711Mb
+Done 536090 runs in 2401 second(s)
+stat::peak_rss_mb:              711
+Result: 40 min 01 s, 536,090 sequences, 223/s, 8,778 edges, corpus 11 -> 2,467: no violation (with the F1 path in its corpus).
+
+=== 8. Verdict
+On the release-8 source of record (lib e951e00a…b23a): 65 min 01 s of the widened recovery / approval / spending state
+machine (784,214 sequences) + a 40 min auxiliary run (536,090) + 20 min of `contract` (4,247,191 executions) found no
+violation and no crash. The widened oracle has teeth: 14 of 14 planted bugs caught on e951e00a copies (13 by fuzzing within
+5 min, F1 only on its probe). In this round the widened oracle found ONE contract defect, R8-F1 (Informational / Low,
+liveness: a co-signed removal could delete the phone that a later recovery made), on lib 5a39e768, by a hand-written probe
+and not by a fuzzing run; the lead fixed it in e951e00a, and the fix holds (probe clean; control F1 caught). Harness faults
+found and fixed: H-r8-1 (the RK receipt check was per receipt, not per call) and H-r8-2 (the `contract` RS-2 oracle never
+met a measured coin call). Observation O-1: a second waiting new-words request to the same key is a harmless renewal.
+Limits: the space is preset-driven (5 band presets, 11 spend presets, keys 1-13), the 24-hour history only gives a lower
+bound on a spend's level, and the FB-3 callback can be delivered at any later moment (a superset of NEAR's next-block
+delivery). RK, FB3c, W1 and F1 are reached from their scenarios, not from scratch, within 5 min.
+
+Clean-up: $WORKDIR/r8/target-fuzz, target-fuzz2, target-ctrl, fuzz-controls (all control copies), the raw fuzz logs,
+the corpora and the probe file were deleted after this log was written (the two reproducers are in hex in section 6).

@@ -1,0 +1,112 @@
+/* "Add money to start" (FundStart.tsx): Monument, hairlines and air. */
+.fs { display: grid; gap: 14px; padding-top: 4px; }
+.fs > .zf-small { max-width: 330px; }
+
+/* The coins: two calm columns of tiles, a hairline each. */
+.fs-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.fs-tile { appearance: none; display: grid; justify-items: start; gap: 4px; padding: 16px 16px 14px; min-height: 104px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.fs-tile:active { transform: scale(0.985); background: var(--raise); }
+.fs-tile > span:first-child { margin-bottom: 6px; }
+.fs-tile__t { font-size: 16px; letter-spacing: -.01em; }
+.fs-tile__d { font-size: 12.5px; color: var(--mute); }
+/* B28: a coin 1Click won't change right now says so on its own tile, in ink; it stays tappable. */
+.fs-tile--refused .fs-tile__d { color: var(--ink); }
+
+.fs-rows { margin-top: 6px; }
+.fs-pick { width: 100%; appearance: none; background: none; border-left: 0; border-right: 0; border-top: 0; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.fs-go { color: var(--mute); }
+.fs-wait { display: grid; justify-items: center; gap: 14px; text-align: center; }
+
+/* The address. */
+.fs-deposit { justify-items: center; text-align: center; gap: 10px; }
+.fs-deposit .zf-small { max-width: 320px; }
+.fs-amount { margin: -4px 0 0; font: 400 15px/1.3 var(--font); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.fs-qr { margin-top: 4px; padding: 10px; border: 1px solid var(--line); border-radius: 20px; background: #fff; line-height: 0; }
+.fs-addr { font: 400 13px/1.55 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .02em; word-spacing: .12em; max-width: 290px; color: var(--ink-2); }
+.fs-memo { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink); }
+.fs-watch { text-align: center; gap: 2px; }
+.fs-watch .zf-body { display: flex; justify-content: center; align-items: center; gap: 10px; }
+.fs-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; position: relative; background: var(--up); } /* live (motion.css): the one dot that pings */
+.fs-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--up); animation: none; display: none; }
+
+/* The checklist: one line a step, a hairline between. */
+.fs-steps { list-style: none; margin: 10px 0 4px; padding: 0; border-top: 1px solid var(--line); }
+.fs-step { display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--line); font-size: 16px; letter-spacing: -.01em; }
+.fs-step__mark { width: 22px; height: 22px; border-radius: 50%; box-sizing: border-box; border: 1px solid var(--line); display: grid; place-items: center; font-size: 12px; line-height: 1; }
+.fs-step--todo { color: var(--mute); }
+.fs-step--done .fs-step__mark { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.fs-step--now .fs-step__mark { border-color: var(--ink); border-top-color: transparent; animation: fs-spin 1s linear infinite; }
+.fs-step--failed .fs-step__mark { border-color: var(--alert); color: var(--alert); }
+.fs-step--failed .fs-step__t { color: var(--alert); }
+@keyframes fs-spin { to { transform: rotate(360deg); } }
+.fs-line--alert { color: var(--ink-2); }
+.fs-quiet { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* The one thread over the apps while the account opens (Job 1). */
+.fs-thread { padding: 0 8px; }
+.fs .zf-thread { margin-bottom: 6px; }
+
+/* What an app shows while the account opens: plain flow from the top (a centred grid clipped its second line on the
+   iPhone, 2 Nov), the one button on the floor, clear of the app bar (the scroll's end keeps it clear, af-main). */
+.fs-opening-main { display: flex; flex-direction: column; }
+.fs-opening { padding-top: 24px; }
+.fs-opening__floor { padding-bottom: 8px; }
+
+/* The address still waiting, on the coins: the bar's own shape, its action in words. */
+/* The way back to an address already waiting (J1): one row, the dot, the coin, Show the address. */
+.fs-resume { appearance: none; width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; min-height: 44px; margin-top: 2px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--raise); color: var(--ink); font: 400 13.5px/1.2 var(--font); text-align: left; cursor: pointer; }
+.fs-resume__t { padding: 8px 0; text-wrap: pretty; overflow-wrap: anywhere; }
+.fs-resume__go { font-weight: 500; font-size: 13.5px; color: var(--ink); white-space: nowrap; }
+
+/* Leaving set-up: two quiet links under the coins, and the sheet that says what it does first. */
+.fs-leave { display: flex; flex-wrap: wrap; justify-content: center; column-gap: 6px; padding-top: 18px; }
+.fs-sheet { display: grid; gap: 12px; text-align: center; padding-top: 4px; }
+.fs-sheet .zf-btn { margin-top: 8px; }
+
+.zf-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .fs-dot::after, .fs-step--now .fs-step__mark { animation: none; } .fs-dot::after { opacity: 0; } }
+/* A plain loading ring (never the brand mark, which reads as "not allowed" here). */
+.fs-spin { width: 30px; height: 30px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid var(--line); border-top-color: var(--ink); animation: fs-spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .fs-spin { animation: none; } }
+.fs-addr-more { width: 100%; max-width: 290px; margin-top: 6px; }
+.fs-addr-more .fs-addr { margin-top: 2px; max-width: 13.5em; } /* four groups a line: 64 hex = 4 even lines */
+
+/* ── "Add money to start" (the Move builder's markup, a26cb004; the design review §4.1) ────────────────────────────────
+   One page: the progress line, a left-aligned hero (the coin's mark, the T2 title, one T6 line), the step's content as
+   inset grouped cards, and a pinned floor that nothing renders under. Copy is a chip. The live line is the one status. */
+.fs-page { display: flex; flex-direction: column; min-height: 100%; padding-bottom: calc(var(--zf-safe-bottom, env(safe-area-inset-bottom, 0px)) + 96px); }
+.fs-progress { position: relative; width: 132px; height: 4px; margin: 12px auto 0; border-radius: 2px; background: var(--line); overflow: hidden; }
+.fs-progress::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--mint, #2ee6a6); transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform var(--dur-base) var(--ease-out); }
+.fs-hero { display: grid; justify-items: start; text-align: left; margin-top: 24px; }
+.fs-hero__mark { width: 40px; height: 40px; margin-bottom: 16px; }
+.fs-hero__title { margin: 0; font: 600 28px/34px var(--font); letter-spacing: -.022em; color: var(--ink); text-wrap: balance; }
+.fs-hero__line { margin: 8px 0 0; font: 400 15px/20px var(--font); color: var(--mute); }
+.fs-hero__q { margin: 12px 0 0; font: 500 15px/20px var(--font); color: var(--ink); }
+.fs-search { width: 100%; margin-top: 24px; }
+p.fs-group { margin: 32px 0 8px; font: 600 20px/25px var(--font); letter-spacing: -.012em; color: var(--ink); }
+.fs-coins { list-style: none; margin: 8px 0 0; padding: 0 16px; border-radius: 16px; background: var(--act-fill); }
+.fs-coins > li { position: relative; }
+.fs-coins > li + li::before { content: ""; position: absolute; left: 56px; right: 0; top: 0; border-top: .5px solid var(--line); }
+.fs-coin { appearance: none; display: grid; grid-template-columns: 40px 1fr auto; grid-template-rows: auto auto; column-gap: 16px; align-items: center; width: 100%; min-height: 64px; padding: 12px 0; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; }
+.fs-coin__mark { grid-row: 1 / 3; width: 40px; height: 40px; }
+.fs-coin__sym { font: 500 17px/22px var(--font); }
+.fs-coin__name { grid-column: 2; font: 400 15px/20px var(--font); color: var(--mute); }
+.fs-coin::after { content: ""; grid-column: 3; grid-row: 1 / 3; width: 8px; height: 8px; margin-right: 4px; border-right: 1.5px solid var(--mute); border-bottom: 1.5px solid var(--mute); transform: rotate(-45deg); }
+.fs-coin:active { background: var(--marker-bg); }
+.fs-addr { appearance: none; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; margin-top: 24px; padding: 0 16px; border: 0; border-radius: 16px; background: var(--act-fill); color: var(--ink); font: 400 17px/22px var(--font); text-align: left; cursor: pointer; }
+.fs-addr__text { flex: 1; min-width: 0; }
+.fs-addr__go { flex: none; color: var(--mute); }
+.fs-qr { display: grid; justify-items: center; gap: 16px; padding-top: 8px; }
+.fs-qr > svg, .fs-qr > canvas, .fs-qr > img, .fs-qr .zf-qr { width: 232px; height: 232px; padding: 20px; box-sizing: content-box; border-radius: 24px; background: #fff; box-shadow: inset 0 0 0 .5px var(--line); }
+.fs-qr__addr { width: 100%; margin: 0; padding: 16px; box-sizing: border-box; border-radius: 16px; background: var(--act-fill); font: 400 15px/22px ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .02em; color: var(--ink); overflow-wrap: anywhere; text-align: left; }
+.zf-btn.fs-copy { width: auto; height: 32px; padding: 0 14px; border-radius: 16px; background: var(--act-fill); color: var(--ink); font: 600 15px/20px var(--font); }
+.fs-live { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.fs-live__ring { position: relative; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--up); }
+.fs-live.is-waiting .fs-live__ring::after, .fs-live.is-opening .fs-live__ring::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: color-mix(in srgb, var(--up) 55%, transparent); animation: none; display: none; }
+.fs-live.is-here .fs-live__ring, .fs-live.is-done .fs-live__ring { width: 20px; height: 20px; animation: zf-pop var(--dur-base) var(--ease-out) both; }
+.fs-live.is-here .fs-live__ring::before, .fs-live.is-done .fs-live__ring::before { content: ""; position: absolute; left: 7px; top: 4px; width: 5px; height: 9px; border-right: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(45deg); }
+.fs-live.is-stopped .fs-live__ring { background: var(--alert); }
+.fs-live__line { margin: 0; font: 400 17px/22px var(--font); color: var(--ink); }
+.fs-floor { position: sticky; bottom: 0; z-index: 2; display: grid; gap: 8px; margin-top: auto; padding: 24px 0 calc(var(--zf-safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 0%, transparent), var(--bg) 24px); }
+@media (prefers-reduced-motion: reduce) { .fs-progress::after { transition: none; } .fs-live .fs-live__ring, .fs-live .fs-live__ring::after { animation: none; } }

@@ -1,0 +1,73 @@
+.ah { position: absolute; inset: 0; overflow: hidden; overflow: clip; background: var(--bg); }
+/* The pages: all in one place, each moved by AppHost's spring (its style.transform, written per frame). A page at rest
+   has no transform, so a sheet inside it rises over the app bar (no stacking context of its own). */
+.ah-track { position: absolute; inset: 0; }
+.ah-page { position: absolute; inset: 0; background: var(--bg); overflow: hidden; overflow: clip; }
+/* An app's first screen fades in when it first shows, never pops (J2). Opacity only, and only while it runs. */
+.ah-app { position: absolute; inset: 0; animation: ah-app-in var(--dur-base) var(--ease-out) backwards; }
+/* v2: it also settles from 98.5 % (transform), so the first show reads as arriving, not blinking on */
+@keyframes ah-app-in { from { opacity: 0; transform: scale(0.985); } }
+/* With the app bar, what the bottom of a page keeps clear is the whole bar: its lift off the foot (--bar-gap, the home
+   indicator inside it), the capsule (--bar-h) and the All-apps handle above it (--bar-reach). UI test, 5 Nov: the handle
+   (96 x 44) sat on the coin page's Buy, pump.fun's Open and AgentZero's Fund; every pinned floor reads this one value. */
+.ah--bar .ah-page { --zf-safe-bottom: calc(var(--bar-gap) + var(--bar-h) + var(--bar-reach)); }
+/* The freeze banner (FreezeBanner.tsx): no strip on top any more (product decision, 3 Nov): the shell's one notice at the bottom
+   says its line, and a tap opens this card's countdown and its Stop it (NoticeBar.tsx, notice-bar.css). */
+.ah-notice__bare { display: grid; gap: 4px; }
+.ah-notice__in { background: var(--surface, var(--raise)); border: 0; box-shadow: var(--e-1); border-radius: var(--r-md, 16px); padding: 14px 18px 8px; display: grid; gap: 4px; }
+.ah-notice__text { font: var(--t-body); color: var(--ink); margin: 0 0 4px; text-wrap: pretty; }
+.ah-notice__acts { display: flex; flex-wrap: wrap; column-gap: 20px; margin-top: 10px; }
+.ah-notice__act { white-space: nowrap; font: var(--t-body); font-weight: 600; color: var(--ink); background: none; border: 0; min-height: 44px; padding: 0; cursor: pointer; }
+.ah-notice__act.alert { color: var(--alert); }
+
+.ah-switcher {
+  position: absolute; inset: 0; z-index: 30; background: var(--bg); display: flex; flex-direction: column; align-items: center;
+  padding-top: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 70px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
+  animation: ah-in var(--dur-base) var(--ease-out) both; container-type: inline-size;
+}
+.ah-switcher__label { margin-bottom: 30px; }
+.ah-cards {
+  width: 100%; flex: 1; min-height: 0; display: flex; gap: 18px; overflow-x: auto; overscroll-behavior-x: none; scroll-snap-type: x mandatory; padding: 0 19cqw;
+  box-sizing: border-box; scrollbar-width: none;
+}
+.ah-cards::-webkit-scrollbar { display: none; }
+.ah-card {
+  appearance: none; flex: 0 0 62cqw; scroll-snap-align: center; border: 0; box-shadow: var(--e-2); background: var(--surface, var(--bg)); color: var(--ink);
+  border-radius: var(--r-lg, 24px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 24px;
+  cursor: pointer; transition: transform var(--dur-base) var(--ease-out);
+}
+.ah-card.cur { box-shadow: var(--e-2), 0 0 0 1.5px var(--ink); }
+.ah-card:active { transform: scale(.98); }
+.ah-switcher__hint { margin: 22px 0 6px; }
+@keyframes ah-in { from { opacity: 0; transform: scale(1.02); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ah-switcher { animation: none; } .ah-app { animation-duration: var(--dur-base); } }
+/* opaque at once, its content fading in: never two screens' text on top of each other (grade 30 Oct) */
+.ah-problem { position: absolute; inset: 0; z-index: 46; background: var(--bg); } /* over the one money sheet (45): its Problem is about it */
+.ah-problem > * { animation: ah-in var(--dur-base) var(--ease-out) both; }
+/* Which app this screen belongs to, so a Problem is never read as another app's. */
+.ah-notice__count b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+/* An app that crashed: its Problem fills that app's page only (the other apps and the bar stay usable). */
+.ah-crashed { position: absolute; inset: 0; background: var(--bg); }
+/* A locked tile dragged into the bottom row (D147): its small lock sits at the icon's top right. */
+.zf-appbar__item .zf-tray__lock { right: auto; bottom: auto; top: 2px; left: calc(50% + 5px); width: 14px; height: 14px; border-radius: 7px; }
+.zf-appbar__item .zf-tray__lock svg { width: 8px; height: 8px; }
+/* Content given as it is (the funding's thread) in the notice's place at the bottom: its own look, no second card. */
+.zf-notice.zf-notice--given { background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* On a test phone (3 Nov): "glitchy, not smooth between pages". An app that is not on screen runs none of its
+ * endless animations (a glow, a breathing mark): they cost every frame, even hidden, and most of all mid-slide. Its
+ * page shows again (aria-hidden off) at the first frame of the slide that brings it, so they resume as it arrives. */
+.ah-page[aria-hidden="true"] *, .ah-page[aria-hidden="true"] *::before, .ah-page[aria-hidden="true"] *::after { animation-play-state: paused !important; }
+/* Product decision, 3 Nov: five apps in the bottom row, so the tray's grid is five wide: its first row IS the bottom row (D147's
+   band behind it). A site's app (pump.fun, GMGN) wears its own logo, rounded like the others' marks. */
+.ah .zf-tray__grid { grid-template-columns: repeat(5, 1fr); gap: 18px 4px; }
+.ah .zf-tray__name { max-width: 100%; }
+.ah-site-icon { display: block; width: 24px; height: 24px; border-radius: 7px; object-fit: cover; }
+
+/* Product decision, 3 Nov (P0): the tray never opens by itself. The very first open, the grab bar glows a little stronger for a few
+   pulses (transform and opacity only), then the usual D147 beckon. */
+@keyframes ah-first-beckon {
+  0%, 100% { transform: none; opacity: 1; }
+  40% { transform: translateY(-1px); opacity: .65; }
+}
+.ah--first .zf-appbar__grab span { animation: ah-first-beckon var(--dur-base) var(--ease-out) 0ms 4; }
+@media (prefers-reduced-motion: reduce) { .ah--first .zf-appbar__grab span { animation: none; } }

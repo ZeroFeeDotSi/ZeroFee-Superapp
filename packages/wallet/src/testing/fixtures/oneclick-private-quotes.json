@@ -1,0 +1,53 @@
+{
+  "recordedAtIso": "2026-10-25T14:00:19.402Z",
+  "note": "Dry 1Click quotes with confidentiality \"basic\", authorised by the partner key through the quote server (operator-run, key never in the app). Only status and amounts were kept.",
+  "request": {
+    "dry": true,
+    "swapType": "EXACT_INPUT",
+    "slippageTolerance": 100,
+    "originAsset": "nep141:wrap.near",
+    "amount": "200000000000000000000000",
+    "depositType": "ORIGIN_CHAIN",
+    "refundTo": "intents.near",
+    "refundType": "INTENTS",
+    "confidentiality": "basic"
+  },
+  "results": {
+    "toLedger": {
+      "request": {
+        "destinationAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+        "recipientType": "INTENTS"
+      },
+      "status": 201,
+      "amountOut": "884094",
+      "minAmountOut": "875253",
+      "timeEstimate": 22,
+      "confidentiality": "basic"
+    },
+    "toSolana": {
+      "request": {
+        "destinationAsset": "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
+        "recipientType": "DESTINATION_CHAIN"
+      },
+      "status": 201,
+      "amountOut": "616743",
+      "minAmountOut": "610575",
+      "timeEstimate": 19,
+      "confidentiality": "basic"
+    },
+    "addToPrivate": {
+      "request": {
+        "originAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+        "amount": "1000000",
+        "destinationAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+        "refundType": "CONFIDENTIAL_INTENTS",
+        "recipientType": "CONFIDENTIAL_INTENTS"
+      },
+      "status": 201,
+      "amountOut": "1000000",
+      "minAmountOut": "990000",
+      "timeEstimate": 20,
+      "confidentiality": "basic"
+    }
+  }
+}

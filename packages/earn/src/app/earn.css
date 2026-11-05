@@ -1,0 +1,64 @@
+/* The Earn app, on @zerofee/design's tokens ("Monument"): hairlines, spaced capitals, light big numbers with tabular
+   figures, one solid ink pill per screen. Every colour comes from tokens.css. */
+.en { font-variant-numeric: tabular-nums; padding-top: 8px; }
+.en-col { display: flex; flex-direction: column; min-height: 100%; }
+.en-centered { text-align: center; align-items: center; }
+.en-center { min-height: 60%; display: grid; place-items: center; }
+.en-loading { place-content: center; gap: 18px; text-align: center; }
+.en-loading p { margin: 0; max-width: 30ch; text-wrap: pretty; }
+.en-gap { margin-top: 22px; }
+
+.en-idle { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.en-big { font-size: 38px; font-weight: 500; font-family: var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; line-height: 1.05; }
+.en-display { font: var(--t-display); letter-spacing: -.02em; min-height: 40px; display: flex; align-items: center; }
+.en-total { margin-top: 12px; }
+.en-sub { margin-top: 8px; color: var(--ink-2); }
+.en-amount { font-size: 56px; font-weight: 500; font-family: var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.03em; line-height: 1.05; margin-top: 18px; }
+.en-amount small { font-size: 20px; font-weight: 400; letter-spacing: 0; color: var(--ink-2); }
+
+.en-pick { appearance: none; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); font: inherit; text-align: left; cursor: pointer; padding: 0; }
+.en-pick:disabled { cursor: default; }
+.en-picked { margin-top: 10px; border-top: 1px solid var(--line); }
+.en-pick:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.en-row { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; padding: 14px 0; }
+.en-row > span:nth-child(2) { display: grid; gap: 2px; min-width: 0; }
+.en-row .t { font-size: 16px; letter-spacing: -.01em; }
+.en-row .d { font-size: 12.5px; color: var(--mute); }
+.en-rate { font-size: 26px; font-weight: 500; font-family: var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.02em; text-align: right; display: grid; place-items: center end; min-width: 48px; }
+.en-val { display: grid; justify-items: end; gap: 2px; }
+.en-val .v { font-size: 15px; letter-spacing: -.01em; }
+.en-val .vd { font-size: 12.5px; color: var(--mute); }
+.en-rows { margin-top: 14px; }
+.en-hist { border-bottom: 1px solid var(--line); grid-template-columns: 22px 1fr auto; }
+
+.en-src { margin-top: 10px; }
+.en-forecast { margin-top: 4px; color: var(--ink-2); min-height: 1.45em; }
+.en-link { padding: 12px 0 0; text-align: left; color: var(--ink); }
+.en-hero { width: 100%; text-align: left; margin-top: 4px; }
+
+.en-says { width: 100%; margin-top: 14px; text-align: left; }
+.en-say { padding: 12px 0; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
+.en-say p { margin: 0; font-size: 15px; line-height: 1.42; color: var(--ink); text-wrap: pretty; }
+
+.en-presets { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 20px 0 12px; }
+.en-presets button { appearance: none; height: 40px; border-radius: 13px; border: 1px solid var(--line); background: none; color: var(--ink); font: 400 14px/1 var(--font); cursor: pointer; }
+.en-presets button.on { border-color: var(--ink); box-shadow: inset 0 0 0 .5px var(--ink); }
+
+.en-kvs { width: 100%; margin-top: 18px; text-align: left; }
+.en-kv { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+.en-kv span:first-child { color: var(--mute); }
+.en-kv span:last-child { text-align: right; }
+
+.en-empty { padding: 120px 8px 0; text-align: center; display: grid; gap: 14px; }
+.en-sheet-floor { padding-bottom: 8px; margin-top: 18px; }
+
+.en-welcome { padding-bottom: 4px; }
+.en-welcome .zf-title { margin: 22px 0 0; text-wrap: balance; }
+.en-welcome-lines { display: grid; gap: 12px; margin-top: 14px; max-width: 34ch; }
+.en-welcome-lines p { margin: 0; text-wrap: pretty; }
+.en-welcome .zf-floor { display: grid; gap: 10px; width: 100%; }
+
+/* ── Theme v3.1 (A apps 4): the amount presets are a capsule track on --fill (the chosen one the raised thumb), no border. ── */
+.en-presets { gap: 0; padding: 3px; border-radius: var(--r-pill); background: var(--fill); box-shadow: inset 0 1px 0 var(--edge-hi); }
+.en-presets button { height: 44px; border: 0; border-radius: var(--r-pill); background: none; font-weight: 500; }
+.en-presets button.on { background: var(--thumb); color: var(--ink); border: 0; box-shadow: var(--thumb-shadow); }

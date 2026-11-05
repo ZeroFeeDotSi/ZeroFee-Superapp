@@ -1,0 +1,52 @@
+/* D135 (product decision, 3 Nov): every sheet takes the WHOLE screen, with a Close button, locked at that size. It never grows,
+   shrinks or jumps as its content changes: the body is the screen's full height from the first frame, its head (title,
+   Close) never moves, and only the content area scrolls. */
+.zf-sheet { position: absolute; inset: 0; z-index: 45; }
+/* Kept under the body (scripts and journeys close a sheet by clicking it); the body covers it, so a finger can't. */
+.zf-sheet__scrim { position: absolute; inset: 0; background: var(--bg); }
+.zf-sheet__body {
+  position: absolute; inset: 0; height: 100%; display: flex; flex-direction: column; background: var(--bg); overflow: hidden;
+}
+/* The rise is Sheet.tsx riseSheet: the shared spring (spring.ts), the page behind in sight until it lands. */
+/* The head: the title in spaced capitals, centred; Close in the corner. A fixed height, so nothing below it moves. */
+/* …glass, floating over the content (TRADE-A-PLUS 1): the content scrolls and glows up under it, never cut flat */
+.zf-sheet__head { position: absolute; z-index: 2; top: 0; left: 0; right: 0; height: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 64px); padding: var(--zf-top, env(safe-area-inset-top, 0px)) 64px 0;
+  display: flex; align-items: center; justify-content: center;
+  /* a fade, not a pane: solid where the title sits, clear at its foot, so nothing under it shows an edge */
+  background: linear-gradient(to bottom, var(--bg) 0, var(--bg) calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 40px), color-mix(in srgb, var(--bg) 0%, transparent) 100%); }
+.zf-sheet__title { margin: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+.zf-sheet__close {
+  position: absolute; top: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 10px); right: calc(var(--gutter) - 12px); width: 44px; height: 44px; border-radius: 22px;
+  display: grid; place-items: center; background: none; border: 0; padding: 0; color: var(--ink); cursor: pointer;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+/* v2: the ✕ sits on a 32 pt soft disc (Phantom, Apple's sheets) inside its 44 pt target; the disc fades darker on press */
+.zf-sheet__close::before { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: var(--act-fill); transition: opacity var(--dur-fast) var(--ease-out); } /* B6: a 30 pt disc */
+.zf-sheet__close svg { width: 14px; height: 14px; }
+.zf-sheet__close > * { position: relative; }
+.zf-sheet__close:active { transform: scale(var(--press-scale, .98)); transition-duration: var(--dur-fast); }
+.zf-sheet__close:active::before { opacity: .6; }
+/* The content: fills what is left and scrolls inside it; the floor of the screen stays clear of the home indicator. */
+.zf-sheet__content {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; -webkit-overflow-scrolling: touch;
+  padding: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 68px) var(--gutter) calc(env(safe-area-inset-bottom, 0px) + 28px);
+}
+/* The host's one line first (AgentZero filled this sheet in): said plainly, above everything the sheet says. */
+.zf-sheet__note { margin: 0 0 12px; padding: 12px 16px; border-radius: var(--r-sm, 12px); border: 0; box-shadow: var(--e-1); color: var(--ink); text-align: center; }
+/* fall: on close the sheet fades and drops 24 px (Sheet.tsx FALL_MS = --dur-base) and takes no tap while it does, so the page behind answers */
+.zf-sheet[data-closing] { pointer-events: none; }
+.zf-sheet[data-closing] .zf-sheet__body { animation: zf-sheet-fall var(--dur-base) var(--ease-out) both; }
+.zf-sheet[data-closing] .zf-sheet__scrim { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
+@keyframes zf-sheet-fall { from { transform: none; opacity: 1; } to { transform: translateY(24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .zf-sheet__body { animation: none; } .zf-sheet[data-closing] .zf-sheet__body { animation: none; } }
+/* One sheet at a time (sheet-stack.ts): a sheet opened over another hides it until it closes. */
+.zf-sheet[data-under] { display: none; }
+/* The head's height is its whole box, the phone's status bar inside it (phone test, 4 Nov: the title drew half
+   a status bar lower than ✕ and under the pots line, because the safe-area padding was added on top of the height). */
+.zf-sheet__head { box-sizing: border-box; }
+/* A short word in a full sheet (The wait, a confirm): its lines and button sit in the middle of the sheet, not in its
+   top third with two thirds empty under them (desktop audit, 5 Nov). */
+.zf-sheet__mid { min-height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding-bottom: 48px; }
+/* B6: a page opened from a list inside a sheet has ‹ (back to the list) top left, as well as ✕ */
+.zf-sheet__back { position: absolute; top: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 10px); left: calc(var(--gutter) - 14px); width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; background: none; color: var(--ink); cursor: pointer; }
+.zf-sheet__back svg { width: 22px; height: 22px; }

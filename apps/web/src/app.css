@@ -1,0 +1,95 @@
+/* The app is a phone-width column; on a wide screen the same solid ground fills the rest. */
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
+/* Firm frame (bug report, 4 Nov): the page itself never scrolls, pans or bounces;
+   only a screen's own content region scrolls. Each scroller says overscroll-behavior: none itself (a sideways strip,
+   overscroll-behavior-x), never a rule on every element: an overflow-hidden box (a row's clipped text) is a scroll
+   container too, and with `none` on it a short quick flick that starts there never reaches the list under it (tester,
+   4 Nov: Trade's list ignored a fast 120 px flick; firm-frame.test.ts). The laptop page (below) scrolls as a document. */
+html, body { overflow: hidden; overscroll-behavior: none; }
+body { font: var(--t-body); -webkit-font-smoothing: antialiased; }
+#root { position: relative; max-width: 430px; height: 100dvh; margin: 0 auto; overflow: hidden; overflow: clip; }
+/* One fixed frame (rule 10, 5 Nov): on a phone the page is pinned to the
+   screen, so a drag that no scroller takes has nothing to move (iOS rubber-bands an overflow-hidden document that is not
+   fixed, and older WebKit ignores overscroll-behavior). Text in the app is not selectable by dragging (a drag on Browser
+   painted a selection over the whole page); fields, code blocks and anything marked .zf-selectable still are. */
+@media (max-width: 599px) {
+  html:not([data-mode="laptop"]), html:not([data-mode="laptop"]) body { position: fixed; inset: 0; width: 100%; }
+}
+#root { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#root :where(input, textarea, select, [contenteditable], pre, code, .zf-selectable) { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+
+/* Wide screens (a laptop): show the app as an app, in a phone-shaped frame, centred. Phones get the plain full screen. */
+@media (min-width: 600px) {
+  html, body { background: var(--desk); }
+  /* one row the window's height: in a window shorter than the frame's 852 px the row grew to 852 and the scaled frame sat
+     low, off the 50vh its name and switch are placed from */
+  body { display: grid; place-items: center; min-height: 100vh; grid-template-rows: 100vh; overflow: hidden; }
+  #root {
+    width: 393px; height: 852px; max-width: none; margin: 0; flex: none; border-radius: 56px; background: var(--bg);
+    box-shadow: 0 0 0 11px #0b0b0c, 0 0 0 12.5px #2b2b2e, 0 40px 90px -20px rgba(0, 0, 0, .35);
+    transform: scale(var(--fit, 1)); transform-origin: center;
+  }
+}
+
+/* The public site names the phone once, above its frame (main.tsx): a laptop's desk margin. On a phone the app is the
+   whole screen, as the iPhone app is. */
+.demo-title { display: none; }
+@media (min-width: 600px) {
+  .demo-title {
+    display: block; position: fixed; left: 0; right: 0; margin: 0; text-align: center; pointer-events: none;
+    top: max(8px, calc(50vh - var(--fit, 1) * 438px - 30px));
+    font: 500 12px/1 var(--font); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2);
+  }
+}
+
+/* The public site's Sim | Real switch (site-switch.ts, product decision, 4 Nov): on a computer just above the phone frame,
+   under the site's name; on a phone's browser a 48 px strip at the top and the app under it, so it never covers the
+   app's own top bar. The side the page is in is mint; the other is a quiet word on the same pill. 44 pt each side. */
+.zf-site-switch { display: flex; gap: 2px; width: 176px; margin: 0 auto; padding: 2px; box-sizing: border-box; height: 44px;
+  border-radius: var(--r-pill, 999px); background: var(--fill, var(--act-fill)); box-shadow: 0 0 0 .5px var(--line); }
+.zf-site-switch button { position: relative; flex: 1; appearance: none; border: 0; padding: 0; border-radius: var(--r-pill, 999px); background: none; color: var(--mute);
+  font: 600 14px/1 var(--font); letter-spacing: .01em; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.zf-site-switch button[aria-pressed="true"] { background: var(--mint, #2ee6a6); color: var(--on-mint, #04140e); cursor: default; }
+.zf-site-switch button::before { content: ""; position: absolute; inset: -6px 0; }   /* 44 pt target on a phone's 32 pt pill */
+@media (hover: hover) and (pointer: fine) { .zf-site-switch button[aria-pressed="false"]:hover { color: var(--ink); } }
+.zf-site-switch button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--mint, #2ee6a6); }
+.zf-site-switch button[aria-pressed="true"]:focus-visible { box-shadow: inset 0 0 0 2px var(--on-mint, #04140e); }
+@media (max-width: 599.98px) {
+  /* one band (a web test, 4 Nov: the switch sat under the status bar and the app kept the status bar's height again under
+     it, a 52 px empty band): the switch under the status bar, then the mark's row, then the app (mode-mark.css) */
+  .zf-site-switch { margin: calc(env(safe-area-inset-top, 0px) + 6px) auto 6px; height: 36px; }
+  html[data-site-switch] #root { height: calc(100dvh - 48px - env(safe-area-inset-top, 0px)); }
+}
+@media (min-width: 600px) {
+  .zf-site-switch { position: fixed; z-index: 1; left: 0; right: 0; top: max(32px, calc(50vh - var(--fit, 1) * 438px - 56px)); }
+  html[data-site-switch] .demo-title { top: max(8px, calc(50vh - var(--fit, 1) * 438px - 80px)); }
+}
+
+/* The web wallet's top note (top-note.tsx, product decision, 5 Nov; look: the UI lead, 5 Nov): the first thing in the app's frame on
+   every screen of the web wallet, the app under it. One --fill card, a hairline under it, 16 px padding, no icon, no
+   colour band; tokens only, so it flips with the theme. While it is open it takes the top inset itself, so the mode
+   mark's strip and the app under it don't add it again. Every target is 44 px: "Got it", and each text link (its 12 px
+   padding is taken back by its margin, so the line keeps its 20 px). */
+.zf-top-note-page { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.zf-top-note-rest { position: relative; flex: 1; min-height: 0; }
+.zf-top-note { flex: none; display: grid; gap: 6px; padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px 16px; background: var(--fill, var(--raise)); border-bottom: var(--hairline, .5px solid var(--line)); color: var(--ink); }
+.zf-top-note__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -8px 0 -4px; }
+.zf-top-note__title { margin: 0; font: 600 17px/22px var(--font); letter-spacing: -.01em; color: var(--ink); }
+.zf-small.zf-top-note__line { margin: 0; font: 400 15px/20px var(--font); color: var(--ink); }
+.zf-top-note__link { display: inline-block; box-sizing: border-box; min-height: 44px; padding: 12px 0; margin: -12px 0; line-height: 20px; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.zf-btn.zf-top-note__close { flex: none; width: auto; height: 44px; min-height: 44px; min-width: 44px; margin: 0 -12px 0 0; padding: 0 12px; border-radius: var(--r-sm, 12px); background: none; color: var(--ink); box-shadow: none; text-shadow: none; font: 600 15px/20px var(--font); }
+.zf-top-note-page:has(> .zf-top-note) .zf-under-mark { inset: 30px 0 0 0; }
+.zf-top-note-page:has(> .zf-top-note) .zf-mode-mark--strip { top: 4px; }
+/* a phone's browser: the Sim | Real switch above the app already took the top inset */
+@media (max-width: 599.98px) { html[data-site-switch] .zf-top-note { padding-top: 16px; } }
+/* a computer: the phone frame's rounded top corners (56 px) need the note's first line lower */
+@media (min-width: 600px) { .zf-top-note { padding-top: 44px; } }
+
+/* The laptop page (/?laptop) is a laptop page: it fills the window instead of sitting in the phone frame. */
+html[data-mode="laptop"], html[data-mode="laptop"] body { background: var(--bg); display: block; overflow: auto; }
+html[data-mode="laptop"] #root { width: auto; height: auto; max-width: none; min-height: 100dvh; margin: 0; border-radius: 0; box-shadow: none; transform: none; overflow: visible; }
+
+/* The page rests (shell-api rest.ts: hidden, or covered by a site's window on the iPhone): every endless animation waits.
+   Nobody can see it, and each one costs a style pass a frame (HEAT-2026-11-03: 60 a second on every tab). */
+html[data-zf-rest] *, html[data-zf-rest] *::before, html[data-zf-rest] *::after { animation-play-state: paused !important; }

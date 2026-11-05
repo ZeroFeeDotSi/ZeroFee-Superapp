@@ -1,0 +1,68 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/v0/market/:src/:mpath*",
+      "destination": "/api/relay?route=market&src=:src&mpath=:mpath*"
+    },
+    {
+      "source": "/v0/sol/send",
+      "destination": "/api/relay?route=sol-send"
+    },
+    {
+      "source": "/v0/near/send",
+      "destination": "/api/relay?route=near-send"
+    },
+    {
+      "source": "/v0/near2/send",
+      "destination": "/api/relay?route=near2-send"
+    },
+    {
+      "source": "/v0/rh/rpc",
+      "destination": "/api/relay?route=rh-rpc"
+    },
+    {
+      "source": "/v0/sol/read",
+      "destination": "/api/relay?route=sol-read"
+    },
+    {
+      "source": "/v0/agentzero/:action",
+      "destination": "/api/relay?route=agentzero-:action"
+    },
+    {
+      "source": "/v0/pair/:id",
+      "destination": "/api/relay?route=pair&id=:id"
+    },
+    {
+      "source": "/v0/keep/:id",
+      "destination": "/api/relay?route=keep&id=:id"
+    },
+    {
+      "source": "/v0/trace/:id",
+      "destination": "/api/relay?route=trace&id=:id"
+    },
+    {
+      "source": "/v0/alerts/:action",
+      "destination": "/api/relay?route=alerts&action=:action"
+    },
+    {
+      "source": "/v0/deposit/submit",
+      "destination": "/api/relay?route=deposit-submit"
+    },
+    {
+      "source": "/v0/:route",
+      "destination": "/api/relay?route=:route"
+    }
+  ],
+  "functions": {
+    "api/relay.mjs": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/v0/alerts/check",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}

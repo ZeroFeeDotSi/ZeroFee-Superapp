@@ -1,0 +1,7 @@
+/* A locked app's sheet (locked-apps.tsx): the icon, the name, one line and "Coming soon", centred; the corner Close is its way out. */
+.soon { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; padding-bottom: 40px; }
+.soon__icon { width: 88px; height: 88px; border-radius: 26px; display: grid; place-items: center; box-shadow: 0 0 0 1px var(--line), 0 0 34px -10px rgba(var(--glow-rgb), var(--halo)); color: var(--ink); margin-bottom: 6px; }
+.soon__icon svg { width: 40px; height: 40px; }
+.soon__icon .zf-hl { stroke-width: .8; }
+.soon__name, .soon__line { max-width: 300px; }
+.soon__when { margin-top: 4px; }

@@ -1,0 +1,18 @@
+{
+  "name": "@zerofee/trade",
+  "license": "Apache-2.0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "dependencies": {
+    "@noble/curves": "2.0.1",
+    "@noble/hashes": "2.0.1",
+    "lightweight-charts": "5.2.1"
+  },
+  "peerDependencies": {
+    "react": "19.3.0"
+  }
+}

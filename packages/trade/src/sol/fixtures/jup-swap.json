@@ -1,0 +1,21 @@
+{
+ "swapTransaction": "<base64 v0 tx, replaced per test>",
+ "lastValidBlockHeight": 437353519,
+ "prioritizationFeeLamports": 780,
+ "computeUnitLimit": 59251,
+ "loadedAccountsDataSize": 3610073,
+ "loadedAccountsDataSizeLimit": null,
+ "transactionVersion": 0,
+ "prioritizationType": {
+  "computeBudget": {
+   "microLamports": 13168,
+   "estimatedMicroLamports": 13168
+  }
+ },
+ "simulationSlot": 459318376,
+ "dynamicSlippageReport": null,
+ "simulationError": null,
+ "addressesByLookupTableAddress": null,
+ "timeTaken": 0.005324356,
+ "createAtaTimeTaken": 0.002224293
+}

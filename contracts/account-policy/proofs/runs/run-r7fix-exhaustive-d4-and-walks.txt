@@ -1,0 +1,9 @@
+Release 7 after the re-audit fixes (lib.rs 07809c92…81f6, wasm ca149c9b…a488), 29 Oct: cargo test --release checker (pins on), PROOFS_DEPTH=4 PROOFS_DEPTH_CORE=4 PROOFS_WALKS=300 PROOFS_STEPS=100, all keys and the new actions (approve_recovery, refuse_recovery, a stale yes, the role probes). 2,846 s.
+from set-up: 93148 states, 291354 transitions, liveness checked on 1083 states
+aged device, window over: 94589 states, 295436 transitions, liveness checked on 1055 states
+role separation left to NEAR's method lists (assumption A1), 0 pair(s):
+core, aged device: 43141 states, 73420 transitions, liveness checked on 335 states
+random walks: 300 × 100 steps
+role separation left to NEAR's method lists (assumption A1), 0 pair(s):
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 49 filtered out; finished in 2846.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

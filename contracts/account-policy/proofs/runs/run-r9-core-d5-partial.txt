@@ -1,0 +1,143 @@
+START 2026-11-01 14:53:38
+lib.rs sha256: e83ec614796ce334b1f8ce6515c9aaf80b8d70531d7a642d651762f2fc8eec5e
+tests.rs sha256: fffb90b4924ee673873618d5c1631d4feb2c4fafa9d4bc5880c4c24ecb5a7956
+checker.rs sha256: 1675fe173e4c7c76681f11cd1416cc357b871cc4924bee54ec7fc8a7e62e2724
+model.rs sha256: 368a1fd886ac90a498e8dbdf1f64c9f78c235553a750b5072a46917163afc1ec
+command: PROOFS_DEPTH_CORE=5 cargo test --release checker_exhaustive_deep_core -- --nocapture --test-threads 1
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1219:9
+     |
+1219 |         apply(&mut x, &Act::Time(floor + DAY_NS + 1));
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+     = note: `#[warn(unused_must_use)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1221:9
+     |
+1221 |         apply(&mut x, &Act::Time(DAY_NS));
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1227:17
+     |
+1227 |                 apply(&mut x, &Act::Time(31 * DAY_NS + 1));
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1232:25
+     |
+1232 |                         apply(&mut x, &Act::Approve(*d, id));
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1270:17
+     |
+1270 |                 apply(&mut y, &Act::Time(by));
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1277:17
+     |
+1277 |                 apply(&mut y, &Act::Callback(i, true));
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1287:13
+     |
+1287 |             apply(&mut y, &Act::Time(by));
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1296:13
+     |
+1296 |             apply(&mut z, &Act::Callback(i, false));
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1305:17
+     |
+1305 |                 apply(&mut z, &Act::Callback(i, true));
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1311:13
+     |
+1311 |             apply(&mut y, &Act::Callback(i, true));
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1571:13
+     |
+1571 |             apply(&mut start, &Act::Time(pre));
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `Result` in tuple element 1 that must be used
+    --> src/../generated/checker.rs:1601:5
+     |
+1601 |     apply(&mut start, &Act::Time(DAY_NS + 1));
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: `account-policy-proofs` (lib test) generated 12 warnings
+    Finished `release` profile [optimized] target(s) in 0.48s
+     Running unittests src/lib.rs (<scratch>/target/release/deps/account_policy_proofs-cadc82c82ba5e25b)
+
+running 1 test
+core, aged device: progress 600 s: 32934 states, 57183 transitions, at depth 3, queue 30535
+core, aged device: progress 1200 s: 76112 states, 134881 transitions, at depth 4, queue 70559
+core, aged device: progress 1800 s: 115120 states, 206098 transitions, at depth 4, queue 106716
+core, aged device: progress 2401 s: 168436 states, 302192 transitions, at depth 4, queue 156126
+core, aged device: progress 3001 s: 228514 states, 413875 transitions, at depth 4, queue 211803
+core, aged device: progress 3601 s: 275050 states, 502329 transitions, at depth 4, queue 254792
+core, aged device: progress 4201 s: 317143 states, 590158 transitions, at depth 4, queue 293805
+core, aged device: progress 4801 s: 352312 states, 662040 transitions, at depth 4, queue 326471
+core, aged device: progress 5401 s: 382319 states, 722496 transitions, at depth 4, queue 354309
+error: test failed, to rerun pass `--lib`
+
+Caused by:
+  process didn't exit successfully: `<scratch>/target/release/deps/account_policy_proofs-cadc82c82ba5e25b checker_exhaustive_deep_core --nocapture --test-threads 1` (signal: 2, SIGINT: terminal interrupt signal)
+     5673.06 real      4835.68 user       109.60 sys
+          1114112000  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              580241  page reclaims
+                 302  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   1  signals received
+               18454  voluntary context switches
+            13208614  involuntary context switches
+          1707107456  instructions retired
+           840663367  cycles elapsed
+            63341144  peak memory footprint
+exit=101 END 2026-11-01 16:28:11

@@ -1,0 +1,8 @@
+
+running 1 test
+core, aged device: 440095 states, 843212 transitions, liveness checked on 1663 states
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 31 filtered out; finished in 3786.64s
+
+exit=0 ALLDONE 13:09:07

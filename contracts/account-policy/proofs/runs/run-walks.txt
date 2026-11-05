@@ -1,0 +1,12 @@
+
+running 2 tests
+random walks: 1000 × 100 steps
+role separation left to NEAR's method lists (assumption A1), 2 pair(s):
+  - execute accepted at contract level from the second device (NEAR's method list refuses it)
+  - start_recovery accepted at contract level from the unknown key (NEAR's method list refuses it)
+ok
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 473.60s
+
+exit=0

@@ -1,0 +1,60 @@
+/* The receipt (UI concept v3.1, 5 Nov): one object on one axis. The coin (64) sits in a 128 box; when the trade lands it
+   grows one step on the scale (×φ, 104) and a mint ring draws round it one gap outside (128); the tick lands as a 34-pt
+   badge ON the coin, never a second circle. Under it the amount, one caption, one line, the chain line. The same object
+   serves Trade's Buy and Sell receipt and Home's "Job created" sheet. Transform and opacity only. */
+.zf-receipt { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--sp-2, 8px); }
+.zf-receipt__obj { position: relative; width: var(--ring, 128px); height: var(--ring, 128px); display: grid; place-items: center; flex: none; }
+.zf-receipt__ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.zf-receipt__ring { opacity: 0; } /* until the chain answers: not even the dash a closed dasharray leaves at 3 o'clock */
+.zf-receipt[data-state="landed"] .zf-receipt__ring { opacity: 1; }
+.zf-receipt__ring circle { fill: none; stroke: var(--mint); stroke-width: 3; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.zf-receipt__coin { position: relative; width: var(--coin, 64px); height: var(--coin, 64px); border-radius: 50%; display: grid; place-items: center; transition: transform var(--dur-base) var(--ease-out); }
+.zf-receipt__coin > * { width: 100%; height: 100%; }
+.zf-receipt__badge { position: absolute; right: 6px; bottom: 6px; width: var(--badge, 34px); height: var(--badge, 34px); border-radius: 50%; display: grid; place-items: center; background: var(--lit); color: var(--on-mint); box-shadow: 0 0 0 4px var(--bg), 0 6px 14px -4px rgba(0, 0, 0, .5); transform: scale(.98); opacity: 0; }
+.zf-receipt__badge svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+/* away: the coin grows at once (the tap took); the ring and badge wait for the chain */
+.zf-receipt[data-state="away"] .zf-receipt__coin, .zf-receipt[data-state="checking"] .zf-receipt__coin, .zf-receipt[data-state="landed"] .zf-receipt__coin { width: calc(var(--coin, 64px) * 1.625); height: calc(var(--coin, 64px) * 1.625); }
+/* landed: the ring draws, then the badge pops; nothing frames an overshoot */
+.zf-receipt[data-state="landed"] .zf-receipt__ring circle { animation: zf-receipt-ring var(--dur-base) var(--ease-out) forwards; }
+.zf-receipt[data-state="landed"] .zf-receipt__badge { animation: zf-receipt-badge var(--dur-base) 0ms var(--ease-out) forwards; }
+@keyframes zf-receipt-ring { to { stroke-dashoffset: 0; } }
+@keyframes zf-receipt-badge { to { transform: scale(1); opacity: 1; } }
+/* refused: no mint anywhere; the badge is the alert colour with a cross, the coin back at its size */
+.zf-receipt[data-state="refused"] .zf-receipt__badge { background: var(--down); color: #fff; animation: zf-receipt-badge var(--dur-base) var(--ease-out) forwards;
+  /* on the coin at its own size (no ring to sit on): the badge's centre at the coin's lower-right edge */
+  right: calc(50% - var(--coin, 64px) / 2 - var(--badge, 34px) / 3); bottom: calc(50% - var(--coin, 64px) / 2 - var(--badge, 34px) / 3); }
+/* the job's object (Job created, 5 Nov): a raised disc, never a bare glyph at 104 px; the glyph sits at 46 % of it, in ink */
+.zf-receipt__disc { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; background: var(--disc); box-shadow: var(--disc-shadow); color: var(--ink); }
+.zf-receipt__disc > * { width: 46%; height: 46%; }
+.zf-receipt__disc svg { width: 100%; height: 100%; stroke-width: 1.6; }
+/* a job's receipt sits at a third of the screen (the object's centre), the lit Done at the floor */
+.zf-receipt--job { margin-top: clamp(24px, 9dvh, 96px); gap: var(--sp-2, 8px); }
+.zf-receipt--job .zf-receipt__head { font: 600 20px/26px var(--font); margin-top: 4px; }
+.zf-receipt--job .zf-receipt__line { font-size: 15px; line-height: 20px; }
+.zf-receipt--job .zf-receipt__amount { margin-top: 8px; }
+/* the lit Done after a job receipt in a plain sheet (Trade): clear air above it, never touching the last line */
+.zf-receipt--job + .zf-btn { margin-top: 32px; }
+.zf-receipt__amount { font: 500 52px/60px var(--font-money, var(--font)); letter-spacing: -.045em; font-variant-numeric: tabular-nums; color: var(--ink); margin: 0; }
+.zf-receipt__head { font: 600 15px/20px var(--font); color: var(--ink); margin: 0; }
+.zf-receipt__line { font: 400 14px/18px var(--font); color: var(--mute); margin: 0; }
+.zf-receipt__chain { display: inline-flex; align-items: center; gap: 8px; font: 400 13px/18px var(--font); color: var(--mute); margin: 0; min-height: 18px; }
+.zf-receipt__extra { font-variant-numeric: tabular-nums; }
+.zf-receipt__extra::before { content: "· "; }
+.zf-receipt__chain .zf-live { background: var(--mint); }
+.zf-receipt__chain .zf-live::after { background: var(--mint); }
+.zf-receipt__chain-tick { width: 16px; height: 16px; border-radius: 50%; background: color-mix(in srgb, var(--up) 16%, transparent); display: grid; place-items: center; }
+.zf-receipt__chain-tick svg { width: 10px; height: 10px; stroke: var(--up); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+@media (prefers-reduced-motion: reduce) {
+  .zf-receipt__coin { transition: none; }
+  .zf-receipt[data-state="landed"] .zf-receipt__ring circle { animation: none; stroke-dashoffset: 0; }
+  .zf-receipt__badge { animation: none !important; }
+  .zf-receipt[data-state="landed"] .zf-receipt__badge, .zf-receipt[data-state="refused"] .zf-receipt__badge { transform: scale(1); opacity: 1; }
+}
+
+/* the mark alone (ReceiptMark): the object at row size (48: coin 26 → 42, ring 48, badge 18), the same states; the ring
+   and badge strokes hold their weight at that size */
+.zf-receipt--mark { display: block; flex: none; }
+.zf-receipt--mark .zf-receipt__ring circle { stroke-width: 7; }
+.zf-receipt--mark .zf-receipt__badge { right: -2px; bottom: -2px; box-shadow: 0 0 0 2px var(--bg); }
+.zf-receipt--mark[data-state="refused"] .zf-receipt__badge { right: calc(50% - var(--coin) / 2 - var(--badge) / 3); bottom: calc(50% - var(--coin) / 2 - var(--badge) / 3); }
+.zf-receipt--mark .zf-receipt__badge svg { width: 55%; height: 55%; stroke-width: 3.2; }

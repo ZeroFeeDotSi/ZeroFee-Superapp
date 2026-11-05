@@ -1,0 +1,108 @@
+/* ZeroFee Chat, on @zerofee/design's tokens ("Monument"): hairlines, air, one solid ink pill per screen. */
+.ch { padding-top: 8px; }
+.ch-col { display: flex; flex-direction: column; min-height: 100%; }
+.ch-me { display: flex; align-items: baseline; gap: 10px; margin-top: 22px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.ch-nick { font-size: 17px; letter-spacing: -.01em; flex: 1; }
+.ch-join { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 22px; align-items: center; }
+.ch-join input, .ch-compose input, .ch-input {
+  appearance: none; width: 100%; box-sizing: border-box; font: var(--t-body); color: var(--ink); background: var(--raise);
+  border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px;
+}
+.ch-join input:focus-visible, .ch-compose input:focus-visible, .ch-input:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.ch-join .zf-btn, .ch-post { width: auto; padding: 0 20px; min-height: 46px; }
+.ch-place { width: 100%; display: flex; justify-content: space-between; align-items: center; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); font: var(--t-body); padding: 14px 0; cursor: pointer; text-align: left; }
+.ch-fine { color: var(--mute); margin-top: 18px; text-wrap: pretty; }
+
+.ch-chat { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.ch-status { color: var(--mute); margin: 0 0 8px; }
+.ch-conn { margin: -6px 0 8px; border-top: 0; }
+.ch-conn > .zf-more__label { min-height: 32px; color: var(--mute); }
+.ch-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; display: flex; flex-direction: column; gap: 10px; padding: 6px 0 10px; border-top: 1px solid var(--line); }
+.ch-empty { color: var(--mute); text-align: center; margin-top: 30px; }
+.ch-msg { max-width: 86%; align-self: flex-start; }
+.ch-mine { align-self: flex-end; text-align: right; }
+.ch-who { font: var(--t-label); letter-spacing: .08em; color: var(--mute); margin-bottom: 3px; overflow-wrap: anywhere; }
+.ch-text { font: var(--t-body); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--raise); border: 1px solid var(--line); border-radius: 16px; padding: 9px 13px; display: inline-block; text-align: left; }
+.ch-mine .ch-text { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+/* a link in a bubble (sd-chat crawl, 5 Nov, g): the bubble's own colour, underlined; it opens in ZeroFee's Browser */
+.ch-link { color: inherit; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.ch-chip { margin-top: 8px; display: grid; gap: 6px; }
+.ch-chipbtn { min-height: 44px; width: auto; justify-self: start; padding: 0 16px; font-size: 15px; }
+.ch-paid { min-height: 44px; justify-self: start; display: flex; align-items: center; margin: 0; font-size: 15px; font-weight: 600; }
+.ch-note { margin: 6px 0 0; }
+.ch-compose { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; align-items: center; }
+.ch-request { display: block; margin: 8px auto 4px; }
+.ch-picks { margin-top: 10px; }
+.ch-form { display: grid; gap: 4px; }
+.ch-field { display: grid; gap: 6px; margin-top: 10px; }
+.ch-chains { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+/* 44 pt, every chip (grade 02g, G3: the network chips were 37) */
+.ch-tab { appearance: none; background: none; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; padding: 0 16px; min-height: 44px; font: var(--t-small); cursor: pointer; }
+.ch-tab.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.ch-private { display: block; margin: 0 0 8px; text-align: left; }
+/* A name is the way to hide, mute or message someone: a 44 pt target (grade 02g, G3: 180×24), the text as small as before. */
+.ch-whobtn { appearance: none; background: none; border: 0; padding: 0 12px 0 0; cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; margin: -10px 0 -7px; }
+.ch-delivery { color: var(--mute); margin-top: 3px; }
+.ch-net { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; border-bottom: 1px solid var(--line); }
+.ch-sentlink { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 0; text-align: left; overflow-wrap: anywhere; }
+.ch-sentlink .u { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-hint { color: var(--mute); margin-top: 8px; }
+/* A private conversation's one line on top (J3 C8): what it is, one tap down; Mute beside it. */
+.ch-dmtop { display: flex; align-items: flex-start; gap: 12px; }
+.ch-dmtop > .zf-more { flex: 1; min-width: 0; }
+.ch-mute { min-height: 32px; flex: none; margin-top: -6px; }
+/* A message of ours with no "Delivered" after 10 s (J3 C4): one line, and Send again. */
+.ch-late { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px 10px; }
+.ch-late .zf-link { min-height: 32px; }
+/* J3 part 2, NEAR names and rooms. A checked name: the account, then its mark in its own badge (no nickname can sit in it). */
+.ch-name { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; text-transform: none; letter-spacing: 0; }
+.ch-name__id { font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.ch-mark { display: inline-flex; align-items: baseline; gap: 4px; font-size: 12px; line-height: 1; padding: 3px 7px; border-radius: 999px; background: var(--ink); color: var(--bg); white-space: nowrap; }
+.ch-mark small { font-size: 11px; opacity: .8; }
+.ch-whobtn:has(.ch-name) { flex-wrap: wrap; gap: 4px 8px; text-decoration: none; margin: -6px 0 -2px; }
+.ch-role { color: var(--mute); white-space: nowrap; text-transform: none; letter-spacing: 0; }
+.ch-others { display: block; margin: 6px auto 0; min-height: 44px; }
+.ch-bind { display: grid; gap: 10px; margin-top: 10px; }
+.ch-switch { appearance: none; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; background: none; border: 0; border-top: 1px solid var(--line); color: var(--ink); font: var(--t-body); padding: 8px 0; cursor: pointer; text-align: left; }
+.ch-switch__knob { width: 44px; height: 26px; border-radius: 999px; border: 1px solid var(--line); background: var(--raise); position: relative; flex: none; }
+.ch-switch__knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--mute); transition: left var(--dur-fast); }
+.ch-switch__knob.on { background: var(--ink); border-color: var(--ink); }
+.ch-switch__knob.on::after { left: 20px; background: var(--bg); }
+.ch-person { display: flex; gap: 14px; align-items: center; }
+/* B27, Chat for a first-time person (design review 2 Nov §9, change 10). The "+" sits top-right in the app's own header. */
+/* S3 (k-chat, 4 Nov): the + sat on the Activity icon (same corner), so a tap on it opened Activity. It stands left of
+   it now, a 44 px target of its own with 4 px between them; the ring it shows stays 36 px. */
+.ch-plus { position: absolute; right: calc(var(--gutter, 24px) + 32px); top: 4px; box-sizing: border-box; width: 44px; height: 44px; border-radius: 50%; border: 4px solid transparent; box-shadow: inset 0 0 0 1px var(--line); background: none; background-clip: padding-box; color: var(--ink); font: 400 24px/1 var(--font, inherit); display: grid; place-items: center; cursor: pointer; padding: 0 0 2px; }
+/* The first screen: three lines with air, then the two ways in the first line names. */
+.ch-first { display: flex; flex-direction: column; padding-top: 18vh; }
+.ch-firstline { font: var(--t-body); font-size: 21px; line-height: 1.35; letter-spacing: -.01em; margin: 0 0 14px; color: var(--ink); }
+.ch-firstacts { display: grid; gap: 8px; margin-top: 30px; }
+.ch-pick { min-height: 44px; }
+.ch-nearline { margin-top: 12px; color: var(--mute); }
+/* Your chats: initial · name and last line · time. */
+.ch-row { appearance: none; width: 100%; display: flex; align-items: center; gap: 14px; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); padding: 12px 0; min-height: 64px; cursor: pointer; text-align: left; }
+.ch-row__dot { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font: var(--t-body); }
+.ch-row__text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ch-row__title { font: var(--t-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-row__line { color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-row__time { flex: none; color: var(--mute); align-self: flex-start; margin-top: 4px; }
+.ch-row__new { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 11px; background: var(--ink); color: var(--bg); font-size: 12px; padding: 0 6px; }
+/* A place: the dot after its name (green when connected), one small line under it, the composer with its round $. */
+.ch-live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--mute); vertical-align: middle; margin-left: 2px; }
+.ch-live.on { background: #1f9d55; }
+.ch-you { display: block; margin: -8px auto 8px; min-height: 32px; color: var(--mute); text-align: center; }
+.ch-compose--money { grid-template-columns: auto 1fr auto; }
+.ch-dollar { width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--ink); font: var(--t-body); font-size: 19px; cursor: pointer; }
+.ch-fresh { display: block; text-align: left; min-height: 36px; }
+.ch-sheetlead { margin: 0 0 4px; }
+/* the sheet's button off its text by the grid's 24 (QA, 5 Nov: the green button touched the text) */
+.ch-sheetfloor { margin-top: 24px; }
+.ch-nickform { display: grid; gap: 6px; margin-bottom: 12px; }
+/* C-4: Tip under a message, quiet, a full finger's height */
+.ch-tip { min-height: 44px; justify-self: start; display: flex; align-items: center; margin: 0; font-size: 15px; }
+/* C-1: Split a bill */
+/* a row in the form's column (e2e walk 3 Nov: it sat as a loose line, 10 px off the column) */
+.ch-splitswitch { justify-self: stretch; min-height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 10px 0; color: var(--ink); border-bottom: 1px solid var(--line); text-align: left; }
+.ch-people { display: flex; align-items: center; gap: 18px; }
+.ch-people .ch-tab { min-width: 44px; min-height: 44px; font-size: 20px; }
+.ch-came { margin: 6px 0 0; }

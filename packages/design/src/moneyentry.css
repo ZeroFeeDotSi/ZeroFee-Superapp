@@ -1,0 +1,32 @@
+/* The one money-entry layout (DESIGN-REBRAND §2, product decision, 4 Nov: the Buy page "very bad"): the hero floats in the free
+   space, every control sits just above the button in the thumb's reach, so there is no dead gap. The amount chips are
+   one segmented track with a sliding thumb (a real control, 44 pt targets). Used by Trade's Buy and Sell sheets. */
+.zf-me { display: flex; flex-direction: column; min-height: 100%; box-sizing: border-box; }
+.zf-me__hero { position: relative; isolation: isolate; flex: 1 1 auto; min-height: 168px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 8px 0; }
+.zf-me__controls { flex: none; display: grid; gap: 16px; }
+.zf-me__src { margin: 0; min-height: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--mute); font: 400 15px/20px var(--font); }
+.zf-me__src b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.zf-me__chips { position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr); height: 44px; padding: 4px; box-sizing: border-box; border-radius: 22px; background: var(--fill); }
+.zf-me__thumb { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--n)); border-radius: 18px; background: var(--thumb); box-shadow: var(--e-thumb);
+  transform: translateX(calc(var(--at, 0) * 100%)); transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-fast) var(--ease-out); pointer-events: none; }
+.zf-me__chips[data-none] .zf-me__thumb { opacity: 0; }
+.zf-me__chips button { position: relative; appearance: none; border: 0; background: none; border-radius: 18px; color: var(--mute); font: 600 15px/20px var(--font); font-variant-numeric: tabular-nums;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; transition: color var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.zf-me__chips button[aria-pressed="true"], .zf-me__chips button[aria-checked="true"] { color: var(--ink); }
+.zf-me__chips button:active { transform: scale(var(--press-chip, .98)); transition-duration: var(--dur-fast); }
+.zf-me__chips button:disabled { color: var(--faint); }
+/* A key the amount can't take shakes the figure once (the keypad's onRefuse). */
+.zf-me-refuse { animation: zf-refuse var(--dur-base) var(--ease-out); }
+@keyframes zf-refuse { 20% { transform: translateX(-3px); } 45% { transform: translateX(2px); } 70% { transform: translateX(-1px); } }
+@media (prefers-reduced-motion: reduce) { .zf-me__thumb, .zf-me__chips button { transition: none; } .zf-me-refuse { animation: none; } }
+
+/* Theme v3.1 (THEME.md): the amounts are figures (the money face, tabular), and the options in a track are 38 pt, not 36:
+   the track's pad is 3 and its thumb 19, concentric with the 22 capsule (22 − 3). */
+.zf-me__chips { padding: 3px; box-shadow: inset 0 1px 0 var(--edge-hi); }
+.zf-me__thumb { top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n)); border-radius: 19px; }
+.zf-me__chips button { border-radius: 19px; font-family: var(--font-money, var(--font)); }
+.zf-me__src b { font-family: var(--font-money, var(--font)); }
+
+/* A fifteen (5 Nov): every option in the track is a 44 pt target (Apple's minimum) while it stays 38 to the eye: the hit
+   box reaches 4 over and under the chip's edge (the track's 3 pad and 1 beyond), never sideways, the chips touch there. */
+.zf-me__chips button::before { content: ""; position: absolute; inset: -4px 0; }

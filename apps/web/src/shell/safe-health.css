@@ -1,0 +1,22 @@
+/* S-2: the Safe's health check, under the Safe sheet's coins (SafeHealth.tsx; loads with it, never in Home's first load) */
+.wl-health { margin-top: 22px; }
+.wl-health__head { color: var(--mute); margin: 0 0 2px; }
+/* the grouped-section system (the design review §2.3, §4.10): "Health check" is a section header (T4), its checks one
+   inset card of 52 pt rows with hairlines between; each tick a 22 pt disc in the live colour when done */
+.wl-health { margin-top: 32px; }
+.wl-health__head { margin: 0 0 8px; font: 600 20px/25px var(--font); letter-spacing: -.012em; color: var(--ink); }
+.wl-health .wl-rows { margin: 0; padding: 0 16px; border-radius: 16px; background: var(--act-fill); }
+.wl-health .wl-row { min-height: 52px; padding: 0; border-bottom: .5px solid var(--line); grid-template-columns: 22px 1fr auto; }
+.wl-health .wl-row:last-child { border-bottom: 0; }
+.wl-health .wl-row .t { font: 400 17px/22px var(--font); }
+.wl-health .zf-tick.on { background: var(--up); border-color: var(--up); color: #fff; }
+/* R2 (4 Nov): the thread's card above already offers the step under way, so Health check doesn't say it a second time
+   ("Add a second device" twice). Words is step 1, Protected 3, Second device 4. */
+.wl-home:has(.zf-thread__step--now:nth-child(1)) .wl-health [data-health="words"]:has(.zf-tick.off),
+.wl-home:has(.zf-thread__step--now:nth-child(3)) .wl-health [data-health="rules"]:has(.zf-tick.off),
+.wl-home:has(.zf-thread__step--now:nth-child(4)) .wl-health [data-health="device"]:has(.zf-tick.off) { display: none; }
+/* R2 (the test list: plain rows, no grey pills): Health check is a plain list on Home, a T4 header, 52 pt rows with
+   hairlines inset to the text, none after the last */
+.wl-health .wl-rows { padding: 0; border-radius: 0; background: none; }
+.wl-health .wl-row { border-bottom: 0; position: relative; }
+.wl-health .wl-row + .wl-row::before { content: ""; position: absolute; left: 34px; right: 0; top: 0; border-top: .5px solid var(--line); }

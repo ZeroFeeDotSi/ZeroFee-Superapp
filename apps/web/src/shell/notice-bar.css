@@ -1,0 +1,39 @@
+/* One notice at a time (NoticeBar.tsx): one line just above the app row, never over it, never over the app's own top bar,
+   hidden while a full-screen sheet is open (the sheet says its own line). HOME-VISUAL's tokens: the raised ground, the
+   hairline, the body type; motion in transform and opacity only, off under Reduce Motion. */
+.zf-notice {
+  position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); z-index: 26;
+  display: grid; border-radius: 14px; background: var(--surface, var(--raise)); color: var(--ink);
+  box-shadow: var(--e-2), inset 3px 0 0 var(--up); font: 400 15px/20px var(--font);
+  animation: zf-notice-in var(--dur-base) var(--ease-out) both;
+}
+/* above the app row, never over it */
+.ah--bar .zf-notice { bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 8px); }
+/* a full-screen sheet is open: it says its own line */
+.ah:has(.zf-sheet:not([data-under])) .zf-notice, .ah:has(.ah-problem) .zf-notice { display: none; }
+/* what a page keeps clear at its bottom grows by the notice, so it never hides the end of a list */
+.ah--bar:has(> .zf-notice) .ah-page { --zf-safe-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 62px); }
+.ah:not(.ah--bar):has(> .zf-notice) .ah-page { --zf-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + 62px); }
+.zf-notice__row { display: flex; align-items: center; gap: 4px; min-height: 46px; padding-left: 16px; }
+.zf-notice__line {
+  flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 44px; display: flex; align-items: center;
+}
+button.zf-notice__line { cursor: pointer; }
+.zf-notice--alert .zf-notice__line::before { content: ""; flex: none; width: 7px; height: 7px; margin-right: 10px; border-radius: 50%; background: var(--alert); }
+.zf-notice__act { flex: none; min-height: 44px; padding: 0 10px; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.zf-notice__x { flex: none; width: 44px; height: 44px; border: 0; background: none; color: var(--mute); font: 400 20px/1 var(--font); cursor: pointer; }
+.zf-notice.is-open .zf-notice__line { white-space: normal; }
+.zf-notice__more { display: grid; gap: 6px; padding: 0 16px 12px; color: var(--ink-2); }
+.zf-notice__more p { margin: 0; }
+.zf-notice__links { display: flex; gap: 16px; }
+.zf-notice__links .zf-link { min-height: 44px; padding: 0; display: inline-flex; align-items: center; font-size: 13px; }
+@keyframes zf-notice-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .zf-notice { animation: none; } }
+
+/* hierarchy: the notice is a framed card on the 14 radius with a coloured left edge (live green; an alert red) */
+.zf-notice--alert { box-shadow: var(--e-2), inset 3px 0 0 var(--alert); }
+.zf-notice__row { padding-left: 19px; }
+/* the grid track must not grow to the one-line text (it ran past the screen edge, hiding the ellipsis and the x) */
+.zf-notice { grid-template-columns: minmax(0, 1fr); }
+.zf-notice__row, .zf-notice__more { min-width: 0; }

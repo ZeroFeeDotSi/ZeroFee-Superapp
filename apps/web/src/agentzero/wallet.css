@@ -1,0 +1,37 @@
+/* AgentZero's own wallet (L9): the app's look. Black and white, quiet grey lines, no boxes or bars; the orb is the only colour. */
+.azw { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; }
+.azw-big { margin: 0; font: 500 34px/1.1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.02em; color: var(--ink); }
+.azw-done { font-size: 27px; }
+.azw-quiet { margin: 0; color: var(--mute); }
+.azw-rows { display: flex; flex-direction: column; margin: 6px 0 4px; }
+.azw-row { display: flex; justify-content: space-between; gap: 12px; margin: 0; padding: 12px 0; border-top: 1px solid var(--line); font: 400 16px/1.3 var(--font); color: var(--ink); }
+.azw-rows .azw-row:last-child { border-bottom: 1px solid var(--line); }
+.azw-rowbtn { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; width: 100%; padding: 12px 0; border-top: 1px solid var(--line); font: 400 16px/1.3 var(--font); color: var(--ink); cursor: pointer; }
+.azw-rowbtn span:last-child { color: var(--mute); }
+.azw-from { border-top: 0; padding: 4px 0 0; }
+.azw-acts { display: flex; flex-direction: column; gap: 10px; }
+.azw-amounts { display: flex; gap: 8px; }
+.azw-amount { flex: 1; height: 44px; border: 0; border-radius: 22px; background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); font: 400 16px/44px var(--font); cursor: pointer; }
+.azw-amount:disabled { cursor: default; }
+.azw-amount:disabled:not([aria-pressed="true"]) { opacity: .45; }
+.azw-fundline { margin: 0 0 10px; color: var(--ink); text-align: center; }
+.azw-amount[aria-pressed="true"] { background: var(--ink); color: var(--bg); box-shadow: none; }
+.azw-other { width: 100%; box-sizing: border-box; }
+.azw-link { align-self: center; color: var(--mute); }
+.azw-fund { margin: 236px 0 8px; padding: 0 8px; display: flex; flex-direction: column; gap: 14px; text-align: center; animation: azc-up var(--dur-base) var(--az-soft, ease) 0ms both; }
+.azw-fundtitle { margin: 0; font: 500 27px/1.18 var(--font); letter-spacing: -.015em; color: var(--ink); }
+.azw-fund .azc-keyform { text-align: left; }
+.azw-line { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 4px 12px; margin: 0; padding: 6px 20px; color: var(--mute); text-align: center; }
+/* D37: what a message costs, on its own line under the line above the box (quiet when all is well) */
+.azw-price { flex-basis: 100%; }
+.azw-line-quiet { padding-top: 2px; padding-bottom: 2px; }
+.azw-act { all: unset; cursor: pointer; color: var(--ink); font: 400 14px/1.4 var(--font); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
+/* The meter is a design-system chip (.zf-chip: soft fill, its focus ring drawn inside) seated in the column between the top
+   bar and the thread, so the thread scrolls under neither it nor its text (product decision, 4 Nov: a reply ran through it).
+   Quiet: the mute ink, regular weight; a second line (low) makes it taller, never wider than its text. */
+.azc .azw-meter-slot { flex: none; display: flex; justify-content: center; min-height: 40px; }
+.azc .azw-meter { flex: none; align-self: center; height: auto; min-height: 32px; margin: 8px 0 0; padding: 5px 14px; flex-direction: column; gap: 0; color: var(--mute); font: 400 14px/1.3 var(--font); text-align: center; font-variant-numeric: tabular-nums; border-radius: 16px; }
+/* product decision, 4 Nov: the meter rises while AgentZero thinks; what it has left only when low, quieter, under it */
+.azc .azw-used, .azc .azw-left { display: block; }
+.azc .azw-left { font-size: 12px; opacity: .8; }
+.azw-today { margin: 0; color: var(--ink); font: 400 15px/1.4 var(--font); font-variant-numeric: tabular-nums; }

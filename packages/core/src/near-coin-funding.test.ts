@@ -149,7 +149,7 @@ test("re-review L: two Put aways at once never share a nonce (one turn with the 
 
 test("shut (every phone until the test run): neither Make ready nor Put away moves anything (control above: open)", async () => {
   const { w, asked, sent } = await setup({ native: NEAR });
-  await assert.rejects(w.floatNearOut(String(NEAR), "speed-near-test-0002"), (e: { problem?: { more?: string } }) => /open soon/.test(e.problem?.more ?? ""));
-  await assert.rejects(w.floatNearIn("all", "speed-near-home-04"), (e: { problem?: { more?: string } }) => /open soon/.test(e.problem?.more ?? ""));
+  await assert.rejects(w.floatNearOut(String(NEAR), "speed-near-test-0002"), (e: { problem?: { more?: string } }) => /doesn't buy or sell NEAR coins/.test(e.problem?.more ?? ""));
+  await assert.rejects(w.floatNearIn("all", "speed-near-home-04"), (e: { problem?: { more?: string } }) => /doesn't buy or sell NEAR coins/.test(e.problem?.more ?? ""));
   assert.equal(asked.length + sent.length, 0);
 });

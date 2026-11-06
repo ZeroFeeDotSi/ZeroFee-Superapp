@@ -3,8 +3,8 @@
 import type { Problem } from "@zerofee/core/problem";
 import { problemLine } from "@zerofee/core/services";
 
-/** "Another job is using this money. Nothing moved. Your money is in your Safe." The where is added only when the
- *  refusal's own words don't already say where the money is (never said twice). */
+/** The where is added only when the refusal's own words don't already say where the money is (never said twice). The busy
+ *  refusal is the UI reviewer's sentence as it stands (6 Nov): "nothing moved" is its where. */
 export function stoppedLine(p: Problem): string {
-  return /\bYour money\b|\bstill in your\b/i.test(p.whatHappened) ? p.whatHappened : problemLine(p);
+  return p.code === "shell.job.taken" || /\bYour money\b|\bstill in your\b/i.test(p.whatHappened) ? p.whatHappened : problemLine(p);
 }

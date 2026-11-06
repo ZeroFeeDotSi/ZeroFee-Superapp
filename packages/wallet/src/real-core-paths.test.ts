@@ -442,10 +442,10 @@ test("ENTRY 3. Send from the Safe with the fill (ledger.sendFromSafe, fill), to 
   // the bound sheet (feat/safe-send-fill, QA's MUST 1): the Send, the Safe's whole step over the $20 payout,
   // the full address first, unfolded, then where it lands (the audit's D37 condition, the copy review's words)
   assert.match(s.shown[0]!.title, /^Send \$[\d.]+ from your Safe$/, s.shown[0]!.title);
-  // the UI lead's ruling (5 Nov): what they get (the payout's amountIn), what the Safe sends, what stays; Y = Z + T
-  const legs = s.shown[0]!.lines.filter((l) => /^(They get|Your Safe sends|Stays in Private|From your Safe|Together|Network fees) · /.test(l));
+  // the UI lead's ruling (5 Nov): what they get (the payout's amountIn), what the Safe sends, what stays; Y = Z + T + the move in's own cost
+  const legs = s.shown[0]!.lines.filter((l) => /^(They get|Your Safe sends|Stays in Private|From your Safe|Together|Fees) · /.test(l));
   assert.match(legs[0]!, /^They get · \d[\d,]*(\.\d{1,4})? SOL \(\$19\.40\)$/, `the named coin's signed figure, then what it is worth to them: ${legs[0]}`);
-  assert.deepEqual(legs.slice(1), ["Your Safe sends · $30.00", "Stays in Private · $10.40", "Network fees · about $0.20"], "the fill: a whole step over the $20 payout; T $19.60 = $19.40 + $0.20");
+  assert.deepEqual(legs.slice(1), ["Your Safe sends · $30.00", "Stays in Private · $10.10", "Fees · about $0.50"], "the fill: a whole step over the $20 payout; the move in brings $29.70 (audit, 6 Nov: its $0.30 is a fee, not money staying); $30.00 = $10.10 + T $19.60 + $0.30; T $19.60 = $19.40 + $0.20");
   assert.ok(!s.shown[0]!.lines.some((l) => /unnamed coin/.test(l)), "control: never the unnamed words");
   assert.deepEqual(s.shown[0]!.lines.slice(0, 2), [`To ${STRANGER}`, "Public on Solana."], s.shown[0]!.lines.join(" | "));
   assert.equal(s.shown[0]!.hint, `Wallet says: Send 20 USDC to ${STRANGER}`);

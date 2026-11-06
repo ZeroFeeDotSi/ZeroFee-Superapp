@@ -35,7 +35,7 @@ test("on: propose_act offers only AgentZero's wallet, from and to; the prompt sa
     assert.doesNotMatch(a.description, /\b(spending|sol|hood|bsc|safe) \(/, `${name}: no person's place is offered`);
     assert.match(system, /acts and trades only from that wallet, never from the person's Safe or wallets/, name);
     const job = (tools as { name: string; description: string }[]).find((t) => t.name === "propose_job")!;
-    assert.match(job.description, /buying from AgentZero's own wallet; keep money in the person's chosen wallet, filled from AgentZero's wallet/, name);
+    assert.match(job.description, /buying from AgentZero's own wallet; sign in to sites/, name);
   }
   assert.deepEqual(actPlaces(true), ["agent"]);
 });

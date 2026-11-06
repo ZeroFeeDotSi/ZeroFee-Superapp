@@ -44,6 +44,8 @@ export const SAMPLE_NEAR_COINS: Record<string, { usd: number; decimals: number; 
   "nep141:sol.omft.near": { usd: 93.6944399590669, decimals: 9, symbol: "SOL" },
   "nep141:nbtc.bridge.near": { usd: 77820.2167837972, decimals: 8, symbol: "NBTC" },
   "nep141:tron.omft.near": { usd: 0.315563028546166, decimals: 6, symbol: "TRX" },
+  // NEAR itself, as a coin the NEAR wallet holds (wNEAR, 1Click's id), at the Sim's NEAR price (MockBridge DEFAULT_TOKENS)
+  "nep141:wrap.near": { usd: 4.43, decimals: 24, symbol: "NEAR" },
 };
 /** 1Click's spread in the demo's swaps inside Spending. */
 const SWAP_SPREAD = 0.003;
@@ -179,8 +181,8 @@ export function createFloatMock(o: FloatMockOptions, wallets: () => { id: string
     pending.set(id, p);
     p.timer = setTimeout(() => land(id), Math.max(0, dueAt - Date.now()));
   };
-  const start = (m: Omit<FloatMove, "id" | "status" | "where" | "startedAtIso" | "updatedAtIso">, walletId?: string): FloatMove => {
-    const move: FloatMove = { id: `fm-${moves.length + 1}`, status: "pending", where: "in-flight", startedAtIso: now(), updatedAtIso: now(), ...m };
+  const start = (m: Omit<FloatMove, "id" | "status" | "where" | "startedAtIso" | "updatedAtIso">, walletId?: string, id = `fm-${moves.length + 1}`): FloatMove => {
+    const move: FloatMove = { id, status: "pending", where: "in-flight", startedAtIso: now(), updatedAtIso: now(), ...m };
     moves.unshift(move);
     arm(move.id, Date.now() + (m.kind === "swap" ? o.swapMs ?? 900 : moveMs), walletId);
     return { ...move };
@@ -323,7 +325,7 @@ export function createFloatMock(o: FloatMockOptions, wallets: () => { id: string
           if (typeof p.atLeast !== "string" || !/^\d{1,40}$/.test(p.atLeast) || BigInt(p.atLeast) > min) throw problem("security.subwallet.refused", "Its price is too far from ZeroFee's own.");
           if (decline()) return { declined: true };
           add(from, -units);
-          const swapMove = start({ kind: "swap", sent: { tokenId: from, amount: units.toString() }, expected: { tokenId: to, amount: min.toString() }, usd: Math.round(usdIn * 100) / 100 });
+          const swapMove = start({ kind: "swap", sent: { tokenId: from, amount: units.toString() }, expected: { tokenId: to, amount: min.toString() }, usd: Math.round(usdIn * 100) / 100 }, undefined, `fm-${p.key as string}`);
           swapOut.set(swapMove.id, out);
           return keep(p, swapMove);
         }

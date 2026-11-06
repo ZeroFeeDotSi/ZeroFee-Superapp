@@ -2,6 +2,7 @@
 // is on (wallet-flag.ts): the one number on top, its Details, the first run, Add money, the low / empty / cap / paused
 // lines above the box. Every money step is the core's own door and sheet (use-agent-wallet.ts); this file only shows.
 // The look is the app's: black and white, quiet grey lines, the orb the only colour; no boxes, no bars.
+import { intentsPaid } from "@zerofee/core/zero-fee";
 import { TimeLeft } from "@zerofee/wallet/app/money/JobMade.tsx";
 import { LEG_SEC } from "@zerofee/shell-api/job-steps.ts";
 import { useEffect, useState } from "react";
@@ -154,6 +155,8 @@ export function FillSheet({ w, amount, other: otherFirst = false, onClose, onDon
             {w.fillMinUsd !== null && <p className="zf-small azw-quiet" {...(pick === "other" && other !== "" && !ok ? { role: "alert" } : {})}>{fillFloor(w.fillMinUsd, w.fillFeesUsd)}</p>}
             {short && <p className="zf-small azw-quiet" role="alert">{FILL_SHORT}</p>}
             {line && <p className="zf-small azw-quiet" role="alert">{line}</p>}
+            {/* who the fee goes to, right above the button (the copy review, 6 Nov): a fill leaves the NEAR wallet through NEAR Intents (core agent-wallet.ts toAgent) */}
+            <div className="zf-fee"><p className="zf-small azw-quiet" data-testid="az-fill-paid">{intentsPaid()}</p></div>
             <button type="button" className="zf-btn" disabled={!ok || short || busy} data-agentzero-fill={ok ? String(Math.round(usd * 1e6)) : undefined} onClick={(e) => void go(e.nativeEvent)}>{busy ? "Asking…" : ok ? fillButton(usd) : FILL_TITLE}</button>
           </>
         )}

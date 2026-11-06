@@ -35,13 +35,13 @@ test("Phantom's shape: a Home sheet's action (wl-sheet-go, a direct child of the
 test("Phantom's shape on Send: the Send button (one tap, no hold) stands on the form's floor under the one scroll box, its form filling the sheet (a16: a floor, no sticky)", () => {
   const css = readFileSync(new URL("./money/send.css", import.meta.url), "utf8");
   assert.match(css, /\.zf-sheet__content:has\(> \.wl-send\) > \.wl-send \{ flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; \}/);
-  // product decision, 5 Nov (we are zero fee): the line under the button is the floor's last child; the floor never scrolls, so nothing is sticky
+  // the copy review, 6 Nov: the fee block stands right above the button, which ends the floor; the floor never scrolls, so nothing is sticky
   assert.match(css, /\.wl-send2__floor \{ position: relative; flex: none; display: flex; flex-direction: column;/);
-  assert.match(css, /\.wl-send2__floor > \.wl-zerofee \{ box-sizing: border-box; min-height: 52px; margin: 0; padding: 8px 0; \}/);
+  assert.match(css, /\.wl-send2__floor > \.zf-fee \{ min-height: 54px; \}/);
   assert.doesNotMatch(css, /position: sticky/, "control: no sticky left in Send");
-  // control: the hold, then only its line, end the form, and the form sits in Send's box (else the rules pin nothing)
+  // control: the fee block, then the hold, end the form, and the form sits in Send's box (else the rules pin nothing)
   const form = readFileSync(new URL("./money/SendForm.tsx", import.meta.url), "utf8");
-  assert.match(form, /<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">\{label\}<\/button>\}\n\s*\{\/\*[^\n]*\*\/\}\n\s*<p className="zf-small wl-zerofee"[^\n]*<\/p>\n\s*<\/div>\n\s*<\/div>\n\s*\);\n\}/);
+  assert.match(form, /<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">\{label\}<\/button>\}\n\s*<\/div>\n\s*<\/div>\n\s*\);\n\}/);
   assert.match(form, /<div className="wl-send2__floor">/, "the button and its line stand on the floor");
   assert.equal((form.match(/className="zf-btn wl-hold"/g) ?? []).length, 3, "control: Swap first and Move back take the pinned place too");
   assert.match(readFileSync(new URL("./money/SendSheet.tsx", import.meta.url), "utf8"), /<div className="wl-send">[\s\S]{0,200}<SendForm /);

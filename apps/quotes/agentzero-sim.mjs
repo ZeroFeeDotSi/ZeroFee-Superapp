@@ -61,7 +61,7 @@ export const SIM_RESTED_WORDS = "AgentZero is off in the Sim right now. Use it i
 export const SIM_REAL_LINE = "This is the Sim. On the iPhone app it does this for real.";
 /**
  * The tools that act in the real world, left out of the Sim's list: AgentZero's jobs (copying a wallet on pump.fun,
- * keeping money ready, paying a list, signing in to sites) and stopping one, its own wallet's acts, its mail, its
+ * signing in to sites) and stopping one, its own wallet's acts, its mail, its
  * receipts and pocket money (its real jobs' records), and the browser.
  */
 export const SIM_REAL_TOOLS = ["propose_job", "stop_job", "propose_act", "read_mail", "read_receipts", "read_meter", "browse"];
@@ -88,7 +88,7 @@ export const SIM_SYSTEM = [
   "In the Sim, send, swap, move, add, request and trade open the Sim's own sheets on its pretend money, and read_holdings and read_activity read its pretend money. Use them exactly as in the app.",
   "In the Sim, AgentZero has no wallet of its own and its thinking is free: never mention paying for replies.",
   "In the Sim there is no Face ID: it runs in a browser tab, and the person approves each money step on the Sim's sheet with its Approve button. Never say Face ID; say they approve it.",
-  `What only the iPhone app does for real: AgentZero's jobs (copying a wallet on pump.fun, keeping money ready, paying a list of people, signing in to sites), its email, signing up anywhere, browsing a website, and AgentZero's own wallet. Asked for any of those, reply with exactly this one line and nothing else: "${SIM_REAL_LINE}"`,
+  `What only the iPhone app does for real: AgentZero's jobs (copying a wallet on pump.fun, signing in to sites), its email, signing up anywhere, browsing a website, and AgentZero's own wallet. Asked for any of those, reply with exactly this one line and nothing else: "${SIM_REAL_LINE}"`,
 ].join("\n");
 
 /** The Messages request, built here only: the model, effort, max_tokens, system prompt and tools are the route's own. */

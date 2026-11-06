@@ -175,7 +175,7 @@ test("read_holdings on the web: the web's own wallets from Home's read, never \"
   assert.match(phone, /^Your Safe/, "control: the phone's answer starts with the Safe");
 });
 
-test("send on the web: the tool opens Home's Send filled in; AgentZero itself can't send or sign; Wallet's Send signs only on the password (wrong password: nothing sent)", async () => {
+test("send on the web: the tool opens Home's Send filled in; AgentZero itself can't send or sign; the public transfer is shut even for Wallet with the right password (the private Send: wallet web-send-entry.test.ts)", async () => {
   const { core, agent, sheets, sent } = await webCore();
   const words = `can you get my brother $5 of ETH, his address is ${TO_EVM}`;
   const { out } = await turn(words, await webHands(agent), [toolSse("s1", "send", { to: TO_EVM, usd: 5, coin: "ETH" })]);
@@ -186,15 +186,9 @@ test("send on the web: the tool opens Home's Send filled in; AgentZero itself ca
     const r = await agent.call(m, { chain: "hood", to: TO_EVM, amount: "0.001" });
     assert.ok("problem" in r, `${m}: AgentZero can't`);
   }
-  // the sheet's Send is Wallet's: over its cap it asks the password; a wrong one sends nothing, the right one signs
-  const go = core.call<{ status: string }>("subwallet.send", { app: "wallet", chain: "hood", to: TO_EVM, amount: (5 / 3000).toFixed(6), password: "wrong" });
-  const r1 = await go;
-  assert.ok("problem" in r1, `a wrong password is refused: ${JSON.stringify(r1)}`);
-  assert.equal(sent.length, 0);
-  const r2 = await core.call<{ status: string }>("subwallet.send", { app: "wallet", chain: "hood", to: TO_EVM, amount: (5 / 3000).toFixed(6), password: PASSWORD });
-  assert.ok("ok" in r2, JSON.stringify(r2));
-  assert.equal(sent.length, 1, "signed and sent on the password");
-  assert.equal(sheets.length, 0, "the password was the ask");
+  const r = await core.call<{ status: string }>("subwallet.send", { app: "wallet", chain: "hood", to: TO_EVM, amount: (5 / 3000).toFixed(6), password: PASSWORD });
+  assert.ok("problem" in r, JSON.stringify(r));
+  assert.deepEqual([sent.length, sheets.length], [0, 0], "nothing signed, nothing asked");
 });
 
 test("trade on the web: the tool opens Trade's own Buy filled in; AgentZero can't sign a trade", async () => {

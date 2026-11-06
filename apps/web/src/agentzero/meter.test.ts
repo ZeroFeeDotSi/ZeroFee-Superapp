@@ -90,7 +90,7 @@ test("the meter's second line says what AgentZero has left only when it is low o
 
 test("the wallet's sheet: what AgentZero has, used · paid today, how it pays ZeroFee, the chat's cost, fees, the month, the limit, Add money and Move all", () => {
   const sheet = text(renderToStaticMarkup(createElement(WalletSheet, { w: wallet({ usedUsd: 0.034, paidUsd: 0, owedUsd: 0.034 }), chatUsd: 0.0246, onClose: () => undefined })));
-  for (const line of ["$4.21", "Used today $0.034 · paid $0.000", "Pays Anthropic after each reply, at Anthropic's price. ZeroFee takes nothing.", "This chat cost $0.025 · Claude's price, nothing added", "This month $1.50 of $20", "Monthly limit $20 a month", "Fees for sending 0.090 NEAR", "Add money", "Move all to my Safe", "Payments for thinking are public on NEAR. They never name your Safe."]) assert.ok(sheet.includes(line), `${line} in: ${sheet}`);
+  for (const line of ["$4.21", "Used today $0.034 · paid $0.000", "Pays after each reply, at Anthropic's price. ZeroFee passes it on and takes nothing.", "This chat cost $0.025 · Claude's price, nothing added", "This month $1.50 of $20", "Monthly limit $20 a month", "Fees for sending 0.090 NEAR", "Add money", "Move all to my Safe", "Payments for thinking are public on NEAR. They never name your Safe."]) assert.ok(sheet.includes(line), `${line} in: ${sheet}`);
   assert.ok(sheet.indexOf("$4.21") < sheet.indexOf("Used today"), "what AgentZero has comes first");
 });
 

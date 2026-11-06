@@ -12,7 +12,7 @@
 // thrown away (the same rule as plan.ts). The sheet's words are then made by jobs.ts from the checked terms.
 import { thisDevice } from "@zerofee/shell-api/approval-words.ts";
 import { ANTHROPIC_BASE_URL, CLAUDE_EFFORT, CLAUDE_MODEL } from "../claude.ts";
-import { defaultTerms, isNearName, isSolanaAddress, type JobKind, type JobTerms } from "./jobs.ts";
+import { defaultTerms, isNearName, isSolanaAddress, jobsLine, type JobKind, type JobTerms } from "./jobs.ts";
 import { readRoutine, type RoutineTerms } from "./routines.ts";
 
 export type Reading =
@@ -40,7 +40,7 @@ export function readPayOnce(words: string): Extract<Reading, { kind: "pay" }> | 
   return null;
 }
 
-export const CANNOT_LINE = "AgentZero does four jobs: copy a wallet, keep money in your SOL wallet, pay your list, sign you in.";
+export const CANNOT_LINE = jobsLine(false);
 
 /** Finding 47: a send to a chain address typed in the job box ("Send $1 of SOL to 7xKX…") got the four jobs back. */
 export const SEND_ELSEWHERE_LINE = "AgentZero doesn't send money to an address. Use Send on Home for that.";

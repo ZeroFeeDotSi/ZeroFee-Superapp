@@ -96,7 +96,15 @@ test("its balance is the USDC 1Click holds for it, read with its own sign-in; ot
 test("D152: emptying AgentZero's wallet says what moves and what stays (its little NEAR for fees); no credit, no refund (control: the old credit lines are gone)", async () => {
   const { emptyWords, fillWords } = await import("./agent-wallet.ts");
   const words = emptyWords(18.99).lines.join(" ");
-  assert.match(words, /All of AgentZero's \$18\.99 moves to your Safe through Private./);
+  assert.match(words, /All of AgentZero's \$18\.99 moves to your Safe\. Anyone can see the two are linked\./);
+  // the auditor, 6 Nov: the quote's fee comes out of it. The signed quote's figure, in the one form; no figure in the quote, none here
+  const priced = emptyWords(18.99, 18.92).lines;
+  assert.ok(priced.includes("Your Safe gets about $18.92"), priced.join(" | "));
+  assert.ok(priced.includes("Fees · about $0.07"), priced.join(" | "));
+  assert.ok(priced.includes("NEAR Intents and the network keep this. ZeroFee takes nothing."), priced.join(" | "));
+  assert.ok(priced.indexOf("Fees · about $0.07") + 1 === priced.indexOf("NEAR Intents and the network keep this. ZeroFee takes nothing."), "the figure, then who keeps it");
+  assert.doesNotMatch(words, /gets about|Fees ·|keep this/, "control: no quote figure, no figure");
+  assert.match(words, /Any fee goes to NEAR Intents and the network\. ZeroFee takes nothing\./);
   // linkability hunt M2 (5 Nov): the same amount lands in the Safe's public balance about 20 s later, so never "privately"
   assert.doesNotMatch(words, /privately|hidden/i);
   assert.match(words, /keeps its little NEAR for sending fees/);

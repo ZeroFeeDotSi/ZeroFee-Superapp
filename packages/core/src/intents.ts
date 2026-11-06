@@ -97,7 +97,7 @@ export interface IntentsFacts {
 export interface SendPayout {
   recipient: string; recipientType: string; originAsset: string; destinationAsset: string; amountIn: string; amountOut: string;
   /** The signed quote's dollar figures (quote-signature.ts signs both): what leaves Private and what the payee's coin is
-   *  worth, for the fill sheet's "They get · 1.2345 SOL ($39.60)" and its "Network fees · about $0.40". */
+   *  worth, for the fill sheet's "They get · 1.2345 SOL ($39.60)" and its "Fees · about $0.40". */
   amountInUsd?: string; amountOutUsd?: string;
 }
 /** The payout fits this move in: the same coin, and no more than the move in promises to bring (send-words
@@ -610,7 +610,7 @@ function intoOwnWords(own: string, quote: QuoteFacts, send: string, warnings: Wa
       titleFor: null,
       // the full address from the signed quote first, unfolded, then where it lands (the audit's D37 condition, the copy review's words), as
       // every outside sheet; then Private said once, the split, what they get
-      lines: [sent.to, sent.seen, PRIVATE_SAID, `${SEND_LEG_WORDS.gets} · ${fourPlacesText(money(sent.destinationAsset, sent.amountOut, facts))}${sent.gets ? ` (${sent.gets})` : ""}`, ...sent.lines, LEG_WORDS.seen, `If it can't, the money comes back to ${PRIVATE_POCKET}`, PRIVATE_RECEIPT],
+      lines: [sent.to, sent.seen, PRIVATE_SAID, `${SEND_LEG_WORDS.gets} · ${fourPlacesText(money(sent.destinationAsset, sent.amountOut, facts))}${sent.gets ? ` (${sent.gets})` : ""}`, ...sent.lines, LEG_WORDS.seen, `If it can't, the money comes back to ${PRIVATE_POCKET}`, ...(sent.lines.includes(SEND_LEG_WORDS.kept) ? [] : [PRIVATE_RECEIPT])],
       warnings: [...warnings, promise],
       effects,
     };

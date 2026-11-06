@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { askRefusal, askStart, createTradeAsks, shellAsk, tradeAsks, type TradeAsk, type TradeEnd } from "./trade-ask.ts";
+import { agentNearLine, askRefusal, askStart, createTradeAsks, shellAsk, tradeAsks, type TradeAsk, type TradeEnd } from "./trade-ask.ts";
+import { NATIVE_COINS } from "./release.ts";
 
 const MINT = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
 const buy: TradeAsk = { side: "buy", chain: "sol", address: MINT, usd: 25, from: "agentzero" };
@@ -162,4 +163,20 @@ test("a hold never lasts for ever: past HOLD_MAX_MS it is dropped and the next a
   t += 2;
   assert.equal(ch.busyNow(), false);
   assert.equal(ch.ask({ ...buy, usd: 5 }), true, "the lost hold no longer blocks");
+});
+
+test("AgentZero's no on a NEAR coin (copy review, 6 Nov): it sends you to Trade only where Trade can buy one, NATIVE_COINS on; off, Trade's page refuses too, so it says only the no", () => {
+  assert.equal(agentNearLine("buy", true), "I don't trade NEAR coins yet. You can buy them yourself in Trade.");
+  assert.equal(agentNearLine("sell", true), "I don't trade NEAR coins yet. You can sell them yourself in Trade.", "the verb is the ask's");
+  assert.equal(agentNearLine("buy", false), "I don't trade NEAR coins yet.");
+  assert.equal(agentNearLine("sell", false), "I don't trade NEAR coins yet.");
+  assert.equal(NATIVE_COINS, false, "a test run has the switch off, as the Sim and public source builds");
+  assert.equal(agentNearLine(), agentNearLine("buy", false), "the default is the build's own switch");
+  const ask = { side: "buy", chain: "near", address: "token.rhealab.near", from: "agentzero", usd: 5 } as const;
+  assert.equal(askRefusal(ask, ["sol", "hood"]), agentNearLine(ask.side, false));
+  assert.equal(askRefusal({ ...ask, chain: "bsc", address: "0x" + "a".repeat(40) }, ["sol"]), "Trade doesn't trade on that chain yet.", "control: another chain keeps its words");
+  assert.equal(askRefusal(ask, ["sol", "near"]), null, "control: a listed NEAR opens");
+  let end: TradeEnd | undefined;
+  assert.equal(createTradeAsks().ask(ask, (e) => (end = e), ["sol", "hood"]), false);
+  assert.deepEqual(end, { went: false, refused: agentNearLine("buy", false) }, "the line the chat's card shows");
 });

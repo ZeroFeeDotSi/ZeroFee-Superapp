@@ -41,11 +41,11 @@ test("the box empties when a job is sent, before it is read (control: the empty-
 });
 
 test("every job sheet says its rough cost before Start, the funding page's figure at the model's own price (control: not on a running job)", () => {
-  assert.equal(jobCostLine(), "Costs about $0.06, paid to Claude Sonnet 5.5.");
+  assert.equal(jobCostLine(), "Usually under $0.06, at Anthropic's price for Claude Sonnet 5.5.");
   assert.ok(jobCostLine().includes(FUND_MODEL_NAME), "the model's name from the one table");
   assert.equal(Math.round(jobUsd() * 100) / 100, 0.06);
   assert.ok(fundLines().cost[0]!.includes("$0.06"), "the same figure as the funding page");
-  assert.match(app, /\{!isRunning && <p className="zf-small ag-under ag-cost">\{jobCostLine\(\)\}<\/p>\}\n\s*<div className="ag-sheet-floor">/);
+  assert.match(app, /\{!isRunning && <p className="zf-small ag-under ag-cost">\{jobCostLine\(\)\}<\/p>\}\n\s*<\/div>\n\s*<div className="ag-sheet-floor">/);
 });
 
 test("the copy review's S14 words on AgentZero's own page: \"Its wallet · $12.00\" / \"Its wallet · empty\", as on Home's Hot row (control: never the old words)", () => {

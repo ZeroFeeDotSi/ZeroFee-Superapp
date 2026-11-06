@@ -263,3 +263,38 @@ test("P7 rounding (fix/quote-deadline-2): at any second of a 5-minute window the
     Date.now = real;
   }
 });
+
+test("keep before sign (QA, 5 Nov): the swap is kept, pending, before the signed quote is read, the yes asked or anything signed; a page gone mid-swap finds it by its key (control: a refusal before the quote keeps nothing)", async () => {
+  const s = await setup();
+  const kept = async () => (JSON.parse(new TextDecoder().decode((await s.vault.get("float-move-log"))!)).kept as { move: { id: string; status: string } }[]).map((k) => `${k.move.id}:${k.move.status}`);
+  const seen: Record<string, string[]> = {};
+  const { generateIntent, status } = s.r;
+  s.r.generateIntent = async (a, b) => ((seen.intent = await kept()), generateIntent(a, b));
+  s.r.status = async (a, t) => ((seen.status ??= await kept()), status(a, t));
+  const submitIntent = s.r.submitIntent;
+  s.r.submitIntent = async (x) => ((seen.sign = await kept()), submitIntent(x));
+  const m = await s.w.floatSwap("buy", QTC, "5000000", "0", key(7), TRADE);
+  assert.ok(!("declined" in m));
+  const pending = [`fm-${key(7)}:pending`];
+  assert.deepEqual([seen.intent, seen.status, seen.sign], [pending, pending, pending], "kept before the intent, the signed quote and the signature");
+  // a reload right after the call: the move is there to follow, by its key's id
+  assert.ok((await s.w.floatMoveList()).some((x) => x.id === `fm-${key(7)}` && x.kind === "swap"));
+  // control: a swap refused before any quote (under $1) is never kept, so nothing shows that never started
+  const c = await setup();
+  await assert.rejects(c.w.floatSwap("buy", QTC, "500000", "0", key(8), TRADE));
+  assert.deepEqual(await (async () => (JSON.parse(new TextDecoder().decode((await c.vault.get("float-move-log"))!)).kept as unknown[]).length)(), 0);
+});
+
+test("a record that can't be read is never an empty book: no 'Nothing moved' from it, and no write over it (control: no record yet is an empty book)", async () => {
+  for (const bad of ["{not json", JSON.stringify({ base: {} }), "null"]) {
+    const { w, vault } = await setup();
+    await vault.put("float-move-log", utf8(bad));
+    const says = (e: any) => /can't read your NEAR wallet's record/.test(e.problem?.more);
+    await assert.rejects(w.floatMoveList(), says, bad);
+    await assert.rejects(w.floatBalance(), says, bad);
+    assert.equal(new TextDecoder().decode((await vault.get("float-move-log"))!), bad, "nothing written over it");
+  }
+  const { w, vault } = await setup();
+  await vault.delete("float-move-log");
+  assert.deepEqual(await w.floatMoveList(), [], "control: none yet");
+});

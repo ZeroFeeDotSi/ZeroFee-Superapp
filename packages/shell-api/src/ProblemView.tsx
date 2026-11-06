@@ -13,6 +13,7 @@ const moneyWords = (m: Problem["money"]): string | null => {
     case "on-the-way": return `Your money is on its way: ${m.where}.`;
     case "coming-back": return `Your money is coming back: ${m.where}.`;
     case "needs-you": return `Your money is waiting for you: ${m.where}.`;
+    case "unsure": return `Your money is ${m.where}. ${m.check}`;
     case "not-involved": return null;
   }
 };

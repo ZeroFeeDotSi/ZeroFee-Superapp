@@ -169,7 +169,9 @@ test("Move all to my Safe (D152, SR3 L14): privately, one 1Click quote home into
   const m = await walletDo({ ...(w.agentKit() as object), chain: near.chain } as never, "walletEmpty", key(8));
   assert.ok(!("declined" in m));
   assert.deepEqual(shown.map((s) => s.title), ["Move AgentZero's money to your Safe"]);
-  assert.match(shown[0]!.lines[0]!, /\$7\.50 moves to your Safe through Private./);
+  assert.match(shown[0]!.lines[0]!, /\$7\.50 moves to your Safe\. Anyone can see the two are linked\./);
+  assert.ok(shown[0]!.lines.includes("Your Safe gets about $7.50"), shown[0]!.lines.join(" | "));
+  assert.ok(shown[0]!.lines.includes("NEAR Intents and the network keep this. ZeroFee takes nothing."), shown[0]!.lines.join(" | "));
   assert.deepEqual([asked[0].recipient, asked[0].recipientType, asked[0].depositType], [MAIN, "INTENTS", "ORIGIN_CHAIN"]);
   const tx = near.sent[0]!.tx;
   assert.equal(tx.receiverId, USDC_CONTRACT);

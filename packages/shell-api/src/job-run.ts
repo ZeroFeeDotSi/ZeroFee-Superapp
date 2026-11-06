@@ -44,7 +44,7 @@ export function claim(keys: readonly string[]): (() => void) | null {
 /** Refused before anything is saved: another job's call on this money hasn't answered yet (copywriter, 5 Nov). */
 export const jobTaken = (): Problem => ({
   code: "shell.job.taken",
-  whatHappened: "Another job is using this money. Nothing moved. Try again once it's signed.",
+  whatHappened: "Another job is using this money, so nothing moved. Try again once that job is signed.",
   money: { state: "safe", where: "where it was" },
   next: { kind: "retry", label: "Try again" },
 });

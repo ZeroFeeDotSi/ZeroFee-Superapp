@@ -63,7 +63,7 @@ const SERVICE_WORDS = new Set(["1Click", "intents"]);
 /** Product decision, 5 Nov (mandatory protocols; zero fee: every money screen says who is paid, directly, the protocol): the protocol
  *  by name as the one doing the work or being paid ("1Click prices it.", "NEAR Intents doesn't swap one of these coins.",
  *  "Paid to NEAR Intents' solver directly."), or the name alone (a label). Never marketing ("Swap with 1Click today."): it lifts only the service-name bans. */
-export const PROTOCOL_ROLE = new RegExp(`\\b${SERVICES}(?:'s? (?:fee|price|solver|bridge))? (?:prices|priced|swaps|doesn't swap|moves|settles|charges|takes|signs|didn't sign|sent a different)\\b|\\b(?:[Pp]aid|[Pp]ays|[Tt]hrough|[Gg]oes) (?:to |straight to |directly to )?${SERVICES}\\b|^(?:1Click|NEAR Intents)$`);
+export const PROTOCOL_ROLE = new RegExp(`\\b${SERVICES}(?:'s? (?:fee|price|solver|bridge))? (?:prices|priced|swaps|doesn't swap|moves|settles|charges|takes|signs|didn't sign|sent a different)\\b|\\b(?:[Pp]aid|[Pp]ays|[Tt]hrough|[Gg]oes) (?:to |straight to |directly to )?${SERVICES}\\b|\\bNEAR Intents and the network keep\\b|^(?:1Click|NEAR Intents)$`);
 
 /** Strings that may keep a banned word, each with its reason (The house style, section 5: only where it is defined in plain words
  *  or is a name the person must see). Matched on the file and the text. */
@@ -91,7 +91,7 @@ export const ALLOWED: { file: RegExp; text: RegExp; why: string }[] = [
   // Product decision (5 Nov, Jobs "they" voice): a job's steps name the protocol doing the work, from this one table.
   { file: /packages\/shell-api\/src\/job-steps\.ts$/, text: /^NEAR Intents$/, why: "Jobs name the protocol doing the work (product decision, 5 Nov)" },
   // the audit's privacy ruling (5 Nov): PRIVATE_SEEN names who sees every payment, by the name people can look up; never "private from everyone".
-  { file: /packages\/wallet\/src\/app\/format\.ts$/, text: /^Private from the public, except the money going in\. NEAR Intents' solver sees every payment\.$/, why: "the honest privacy line names who sees, the whole sentence only (audit)" },
+  { file: /packages\/wallet\/src\/app\/format\.ts$/, text: /^Private from the public, except the money going in and coming out\. NEAR Intents sees every payment\.$/, why: "the honest privacy line names who sees, the whole sentence only (audit)" },
   // Send's NEAR line (build, 5 Nov): a balance held in NEAR Intents lands as wNEAR; the product's name is how that form is told.
   { file: /packages\/wallet\/src\/send-reach\.ts$/, text: /^Lands as wNEAR, the NEAR Intents form of NEAR\.$/, why: "names the form wNEAR is, by the product's own name, the whole sentence only" },
   // D98 (QA): AgentZero's receipt for a Chat request it paid privately names the route people can look up, once.

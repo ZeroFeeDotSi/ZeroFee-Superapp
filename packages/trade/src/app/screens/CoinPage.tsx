@@ -27,7 +27,7 @@ const REFUSAL_WORDS: Record<PageRefusal, (symbol: string) => { whatHappened: str
   "fee-raisable": tradeProblems.coinFeeRaisable, "fee-high": tradeProblems.coinFeeHigh,
 };
 import { agoText } from "../chart-math.ts";
-import { amount, compactUsd, dexName, listPrice, pct, moveWords, usd } from "../format.ts";
+import { amount, coinHeadline, compactUsd, dexName, listPrice, pct, moveWords, usd } from "../format.ts";
 import { coinPageSince } from "../your-coins.ts";
 import { CoinOrders } from "./Orders.tsx";
 import { CoinStanding } from "./Standing.tsx";
@@ -39,6 +39,7 @@ import { wholeLife } from "../../market/candles.ts";
 import { buyCoin } from "./buy-button.ts";
 import { statFigures } from "../coin-stats.ts";
 import { CandlesIcon, LineIcon } from "../icons.tsx";
+import { agentNearLine } from "@zerofee/shell-api/trade-ask.ts";
 import { CHAIN_NAME, MARKET, NEAR_NOT_TRADED, useCoinChart, useCoinDetail, useLive, useNoteTick, useTick, useTrade, useWarmRanges } from "../runtime.tsx";
 import { tickKey } from "../../market/ticks.ts";
 import { CHAIN_SHORT } from "./Discover.tsx";
@@ -166,7 +167,7 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
     if (!d || mintHere === undefined || held.value === undefined || !checksAnswered) return;
     autoDone.current = true;
     if (no) onAutoFail?.(REFUSAL_WORDS[no](symbol).whatHappened);
-    else if (!MARKET.includes(seed.chain)) onAutoFail?.(NEAR_NOT_TRADED);
+    else if (!MARKET.includes(seed.chain)) onAutoFail?.(agentNearLine(auto));
     else if (auto === "sell" && !holds) onAutoFail?.(`You don't hold any ${symbol}.`);
     else onAuto?.(auto, d);
   }, [auto, d, detail.error, mintHere, held.value, no, holds, checksAnswered]);
@@ -210,7 +211,7 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
   const trap = sellTrap(safety.card);
   const stale = Date.now() - heardAt > STALE_MS;
   const copy = () => { void navigator.clipboard?.writeText(seed.address).then(() => setCopied(true), () => undefined); };
-  const sinceWords = coinPageSince(position, px);
+  const sinceWords = coinPageSince(position, px, MARKET.includes(seed.chain));
   const where = `${CHAIN_SHORT[seed.chain]}${d?.pools?.[0] && dexName(d.pools[0].dex) ? ` · ${dexName(d.pools[0].dex)}` : ""}`;
   const canTrade = !no && MARKET.includes(seed.chain) && !(!d && detail.error);
   const moveChips = MOVE_CHIPS.flatMap(([w, label, words]) => { const v = d?.moves?.[w]; return v === undefined ? [] : [[w, label, words, v] as const]; });
@@ -220,7 +221,7 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
       {/* D136 (design review 17, 19): the coin in its own light, its name once, its chain and pool under it */}
       <div className="tr-coin-head">
         <span className="zf-halo is-on cp-logo">{(d?.logoUrl ?? seed.logoUrl) && <img className="zf-halo__light" src={d?.logoUrl ?? seed.logoUrl} alt="" />}<CoinIcon symbol={symbol} src={d?.logoUrl ?? seed.logoUrl} size={48} /></span>
-        <div><div className="tr-sym">{d?.name && d.name !== symbol ? d.name : symbol}</div><div className="zf-small cp-where"><CoinIcon symbol={CHAIN_SHORT[seed.chain]} icon={seed.chain === "bsc" ? "bsc" : seed.chain} size={14} />{where}</div></div>
+        <div><div className="tr-sym">{coinHeadline(d?.name, symbol, seed.address)}</div><div className="zf-small cp-where"><CoinIcon symbol={CHAIN_SHORT[seed.chain]} icon={seed.chain === "bsc" ? "bsc" : seed.chain} size={14} />{where}</div></div>
       </div>
       {/* a coin people couldn't sell back says so first, before any price or change (UX audit 4 Nov) */}
       {trap && <p className="cp-trap" role="alert"><span className="cp-trap-mark" aria-hidden="true">!</span>{trap}</p>}

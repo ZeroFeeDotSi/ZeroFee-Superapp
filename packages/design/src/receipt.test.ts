@@ -87,3 +87,22 @@ test("MUST (QA, 5 Nov): a refusal the chain made after landing took its network 
   assert.match(sheet, /const feeTaken = rec\.status === "failed" && rec\.hashes\.length > 0;/, "the sheet: failed with a hash sent = landed and failed");
   assert.match(sheet, /side === "sell" \? `About \$\{heroOf\(\)\}`/, "SHOULD (c): a sale's dollars read About until the chain's figure");
 });
+
+test("receipt.css parses as written: no rule opens inside another, and each badge rule keeps its colour and its place (a rule pasted into another's body lost the refused badge and the job's disc, and no other test saw it)", () => {
+  const css = readFileSync(new URL("./receipt.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  let depth = 0, outer = "";
+  for (const at of css.matchAll(/([^{}]*)([{}])/g)) {
+    if (at[2] === "}") { depth--; continue; }
+    const inGroup = depth === 1 && /@media/.test(outer);
+    assert.ok(depth === 0 || inGroup || /^\s*(to|from|\d+%)/.test(at[1]!), `a rule opens inside another: ${at[1]!.trim().slice(0, 80)}`);
+    if (depth === 0) outer = at[1]!;
+    depth++;
+  }
+  assert.equal(depth, 0, "every rule closes");
+  const body = (state: string) => new RegExp(`\\.zf-receipt\\[data-state="${state}"\\] \\.zf-receipt__badge \\{([^{}]*)\\}`).exec(css)?.[1] ?? "";
+  assert.match(body("refused"), /background: var\(--down\);/);
+  assert.match(body("back"), /background: var\(--ink\); color: var\(--bg\);/);
+  assert.doesNotMatch(body("back"), /--down/, "no red");
+  for (const s of ["refused", "back"]) assert.match(body(s), /right: calc\(50% - var\(--coin, 64px\) \/ 2 - var\(--badge, 34px\) \/ 3\); bottom: calc\(/, `${s}: on the coin's edge`);
+  assert.match(css, /\.zf-receipt__disc \{/, "the job's disc is its own rule");
+});

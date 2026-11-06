@@ -214,10 +214,11 @@ async function homeRig(o: Parameters<typeof agentNear>[0] = {}, lie?: (req: any)
 
 test("Move all to my Safe, PRIVATELY (SR3 L14): one 1Click quote home into the Safe's NEAR Intents balance, read back as signed; then one plain ft_transfer to its deposit address, never a transfer that names the Safe", async () => {
   const r = await homeRig({ usdcMicros: 7_500_000n });
-  const shown: number[] = [];
-  const m = await r.pay.empty("kim.near", async (usd) => (shown.push(usd), true));
+  const shown: number[] = [], gets: (number | null)[] = [];
+  const m = await r.pay.empty("kim.near", async (usd, out) => (shown.push(usd), gets.push(out), true));
   assert.ok(!("declined" in m));
   assert.deepEqual(shown, [7.5]);
+  assert.deepEqual(gets, [7.5], "the signed quote's amountOut, for the sheet's figure");
   const q = r.asked[0];
   assert.deepEqual([q.originAsset, q.depositType, q.destinationAsset, q.amount, q.recipient, q.recipientType, q.refundTo, q.refundType, q.swapType], [AGENT_USDC, "ORIGIN_CHAIN", AGENT_USDC, "7500000", "kim.near", "INTENTS", r.agent, "ORIGIN_CHAIN", "EXACT_INPUT"]);
   const { tx } = r.near.sent[0]!;

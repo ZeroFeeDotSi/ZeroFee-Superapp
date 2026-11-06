@@ -140,3 +140,22 @@ test("the copy review's Sim re-walk (5 Nov): the coin page's headline price is t
   assert.equal(price(0.000004469), "$0.000004469", "control: the old headline's figure");
   assert.equal(listPrice(8.37), price(8.37), "control: a dollar-size price is the same either way");
 });
+
+import { coinHeadline, isRawCoinId, UNNAMED_COIN } from "./format.ts";
+test("a coin page's headline is never a raw id: its name, else its symbol, else plain words (control: real names stay)", () => {
+  // the Sim's XRP page: GeckoTerminal's name is the contract, its dex id reads "near-intents"
+  assert.equal(coinHeadline("xrp.omft.near", "XRP", "xrp.omft.near"), "XRP");
+  assert.equal(dexName("near-intents"), "NEAR Intents");
+  for (const raw of ["xrp.omft.near", "nep141:xrp.omft.near", "nep245:v2_1.omni.hot.tg:56_1", "0x1234…abcd", "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", "So11…1112"]) {
+    assert.ok(isRawCoinId(raw), raw);
+    assert.equal(coinHeadline(raw, "XRP"), "XRP", raw);
+    assert.equal(coinHeadline(raw, raw), UNNAMED_COIN, `${raw}: no name at all never falls back to the id`);
+  }
+  assert.equal(coinHeadline(undefined, ""), UNNAMED_COIN);
+  assert.equal(coinHeadline("TOKENX", "T", "tokenx"), "T", "the coin's own address, any casing, is an id");
+  // control: real names, dotted and spaced ones too
+  for (const name of ["Ripple", "dog wif hat", "pump.fun", "Wrapped NEAR", "XRP"]) assert.equal(coinHeadline(name, "X", "abc.near"), name);
+  // both pages' headlines go through it
+  for (const page of ["./screens/CoinPage.tsx", "../native/NativeScreens.tsx"]) assert.match(readFileSync(new URL(page, import.meta.url), "utf8"), /coinHeadline\(/);
+  assert.doesNotMatch(readFileSync(new URL("./screens/CoinPage.tsx", import.meta.url), "utf8"), /tr-sym">\{d\?\.name/, "control: the old headline read the name raw");
+});

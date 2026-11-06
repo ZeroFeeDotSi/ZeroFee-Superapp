@@ -21,6 +21,8 @@ import { LANDED_UNREAD } from "@zerofee/core/private-route";
 import { LEG_SEC, MEASURED_SEC, etaLine, legsEndsAt, markStep, privateMoveSteps, safeMoveSteps, sendLegs, stepLabel } from "@zerofee/shell-api/job-steps.ts";
 import { mark } from "@zerofee/design/tap.ts";
 import { SAFE_SWAP } from "@zerofee/shell-api/task-earlier.ts";
+import { isHomeSwapRow } from "./swap-ended.ts";
+import { NEAR_SWAP_BACK, SWAP_AGAIN, swapEndOf } from "../../near-swap-words.ts";
 
 export type StepState = "waiting" | "doing" | "done" | "failed";
 export interface LiveStep { label: string; state: StepState; /** ms from the start, once done */ atMs?: number; /** job-steps.ts's key ("safe", "near", "intents", "land"): the crawl's marks */ key?: string }
@@ -35,13 +37,16 @@ export interface LiveTrack {
   steps: LiveStep[];
   /** Ended: done, or the step that failed and where the money is now. `slow`: not seen arriving in SLOW_MS (still
    *  followed: it ends done the moment it lands). */
-  end?: { ok: boolean; line: string; slow?: true; /** the line says what stopped itself (never the step's "didn't finish" before it) */ whole?: true;
+  end?: { ok: boolean; line: string; slow?: true; /** the line says what stopped itself (never the step's "didn't finish" before it) */ whole?: true; /** the job's own title for how it stopped, in place of "<verb> stopped" and "Stopped" */ head?: string; /** a true refund (near-swap-words.ts swapEndOf): the neutral "back" face, on its sheet too */ back?: true;
     /** S21 (the copy review's ruling, 5 Nov): NEAR Intents says it's done, the Safe's read hasn't shown it. Still on its way (slow), its
      *  line only: no time left, never the green Done; a Job that stays pending until the read shows it. */
     unshown?: true };
   endMs?: number;
   /** No quote and no job's carry yet: when the route's measured time says it ends (withCarry makes it endsAt). */
   measuredEndsAt?: number;
+  /** The sheet's bar when it isn't the row's title, and "Job created." before it at the tap (a swap in place, copy review 6 Nov). */
+  bar?: string;
+  made?: true;
   /** Rule 8: a stopped job's next taps, the first lit (QA's Sim crawl, 5 Nov, 081/083: no next tap). */
   next?: StopNext[];
   /** How long the protocol takes, in its own words (job-steps.ts etaLine: its quote, else measured). */
@@ -62,7 +67,7 @@ export function onLegs(t: LiveTrack): LiveTrack {
 }
 
 /** Where a stopped job's tap goes: Move again to that wallet (it pays from Private first), Private's own screen, or Send. */
-export type StopGo = { kind: "move"; to: string; usd?: string } | { kind: "private" } | { kind: "send"; wallet?: string };
+export type StopGo = { kind: "move"; to: string; usd?: string } | { kind: "private" } | { kind: "send"; wallet?: string } | { kind: "swap" };
 export interface StopNext { label: string; go: StopGo }
 /** A stopped job's words and taps (the design review, 5 Nov): the figure when known, never "your money". */
 export const STOP_WORDS = {
@@ -71,6 +76,7 @@ export const STOP_WORDS = {
   tryAgain: "Try again",
   openPrivate: "Open Private",
   sendAgain: "Send again",
+  swapAgain: SWAP_AGAIN,
 } as const;
 
 const NAME: Record<string, string> = { safe: "your Safe", private: "your private balance", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
@@ -677,6 +683,10 @@ export function publishTracks(tasks: Tasks | undefined, list: readonly LiveTrack
   }
 }
 
+/** A finished row holds this long (motion --m-hold-ms), then leaves in FOLD_MS (opacity and a 4 px rise, live.css). */
+export const FOLD_AFTER_MS = 2500;
+export const FOLD_MS = 200;
+
 /** A job's starting row (job-start.ts, product decision, 5 Nov: the tap makes the job, Home shows it at once) as Home's live row,
  *  until the core's own row for it comes: "Getting ready", or the words it was refused with (on its row, never a lost
  *  sheet). One refused shows for an hour; its real row, once made, replaces it (the starting one is dropped). */
@@ -685,10 +695,14 @@ export function startingTracks(list: readonly Task[], now: number = Date.now()):
   // a Buy or Sell of a Safe coin (Trade's job, native-buy/sell) is the Safe's money too: its line on Home while it goes
   // (Sim re-check, 5 Nov: no Home line after a Buy); ended, its record is Home's history row (task-earlier.ts)
   const safeSwap = (t: Task) => t.app === "trade" && SAFE_SWAP.test(t.id) && t.state === "pending";
-  return list.filter((t) => safeSwap(t) || (t.app === "home" && (t.id.startsWith("job:") || t.id.startsWith("move:mv-")) && (t.state === "pending" || now - (t.endedAt ?? t.startedAt) < 60 * 60_000))).map((t) => ({
+  // a swap in place has no core row to replace it, so this is its one row for good: going, then its neighbours' ended window
+  // (done, it holds and folds as a finished row does; stopped, the hour). It never shows here once done and folded.
+  const homeSwap = (t: Task) => t.app === "home" && isHomeSwapRow(t.id) && (t.state === "pending" || now - (t.endedAt ?? t.startedAt) < (t.state === "done" ? FOLD_AFTER_MS + FOLD_MS : 60 * 60_000));
+  return list.filter((t) => safeSwap(t) || homeSwap(t) || (t.app === "home" && (t.id.startsWith("job:") || t.id.startsWith("move:mv-")) && (t.state === "pending" || now - (t.endedAt ?? t.startedAt) < 60 * 60_000))).map((t) => ({
     id: t.id, kind: KIND[t.title.split(" ")[0] ?? ""] ?? "move", title: t.title, wallets: [], startMs: t.startedAt, ...(t.endsAt !== undefined ? { endsAt: t.endsAt } : {}),
     steps: t.steps.map((x) => ({ label: x.label, state: x.state })),
-    ...(t.state === "pending" ? {} : { end: { ok: t.state === "done", line: t.detail ?? "" }, ...(t.endedAt !== undefined ? { endMs: t.endedAt } : {}) }),
+    ...(isHomeSwapRow(t.id) ? { bar: "Swap", ...(t.state !== "pending" && t.detail === NEAR_SWAP_BACK ? { next: [{ label: STOP_WORDS.swapAgain, go: { kind: "swap" as const } }] } : {}) } : {}),
+    ...(t.state === "pending" ? {} : { end: isHomeSwapRow(t.id) && t.state !== "done" ? { ok: false, ...swapEndOf(t.detail ?? "") } : { ok: t.state === "done", line: t.detail ?? "" }, ...(t.endedAt !== undefined ? { endMs: t.endedAt } : {}) }),
   }));
 }
 
@@ -705,6 +719,7 @@ export function keptTrack(kept: LiveTrack, next: LiveTrack | undefined): LiveTra
  *  left", "Done in 21 s"). A stopped one says "Move stopped". */
 const ASKED: Record<string, "Move" | "Send" | "Add" | "Swap"> = { Move: "Move", Moving: "Move", Moved: "Move", Send: "Send", Sending: "Send", Sent: "Send", Add: "Add", Adding: "Add", Added: "Add", Swap: "Swap", Swapping: "Swap", Swapped: "Swap" };
 export function rowTitle(t: LiveTrack): string {
+  if (t.end && !t.end.ok && t.end.head) return t.end.head;
   const m = /^(Move|Moving|Moved|Send|Sending|Sent|Add|Adding|Added|Swap|Swapping|Swapped)\b(.*)$/.exec(t.title);
   if (!m) return t.end && !stillGoing(t) && !t.end.ok ? `${t.title}: stopped` : t.title;
   const verb = ASKED[m[1]!]!;
@@ -712,3 +727,10 @@ export function rowTitle(t: LiveTrack): string {
   return `${verb}${m[2]}`;
 }
 
+/** The tracker's one line, step and time joined by a dot: no stop in front of the dot, whichever job's step it is. */
+export const oneLine = (line: string): string => line.replace(". · ", " · ");
+
+/** An ended job's face on its row: the money came back, or it stopped. Only `back` or a line that says "came back" is a refund. */
+export const endFace = (end: { line: string; back?: true }): "back" | "stopped" => (end.back || /came back/i.test(end.line) ? "back" : "stopped");
+/** The mark on a job's sheet: under way, landed, refused, or a true refund's neutral one. */
+export const trackMark = (t: LiveTrack): "away" | "landed" | "refused" | "back" => (!t.end ? "away" : t.end.ok ? "landed" : stillGoing(t) ? "away" : t.end.back ? "back" : "refused");

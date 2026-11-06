@@ -3,6 +3,7 @@
 // screens see the same interface as the sample; only this file talks to the core about the float.
 // One wallet per chain (D55): each chain has its current wallet (Trade's, the apps' and Chat's), and any older ones (an
 // earlier slot, the old apps wallet, replaced words) drain their own coin back to the reserve, never wallet to wallet.
+import { SERVICE_NAMES } from "@zerofee/core/services";
 import type { MoveProof } from "@zerofee/core/tx-proof";
 import { ProblemError } from "@zerofee/core/problem";
 import { overCapUsd } from "@zerofee/core/spending";
@@ -111,7 +112,7 @@ export function addEnd(m: AddMovementEnd): Pick<MoveRow, "status" | "where" | "n
   if (code === "ledger.hold.part-sent") return { status: "failed", where: "main", stayed: true, note: "Only part of it ran after the wait, so the money stayed in your Safe" };
   const id = m.depositAddress ? ` (its id: ${m.depositAddress})` : "";
   if (code === "ledger.send.unread" || code === "ledger.hold.unknown") return { status: "failed", where: "in-flight", note: `Not clear yet if it left your Safe${id} · if it did, it's in your NEAR wallet` };
-  return { status: "failed", where: "in-flight", note: `The swap service is still finishing it${id} · if not, the money comes back to your NEAR wallet` };
+  return { status: "failed", where: "in-flight", note: `${SERVICE_NAMES.oneclick} is still finishing it${id} · if not, the money comes back to your NEAR wallet` };
 }
 
 export interface CoreFloatDeps {

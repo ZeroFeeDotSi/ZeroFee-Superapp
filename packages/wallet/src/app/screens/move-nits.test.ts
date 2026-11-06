@@ -100,7 +100,7 @@ test("R3 (the design review §4.4): Move opens on the total and one line, no \"W
   const sheet = readFileSync(new URL("./MoveSheet.tsx", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
   assert.match(sheet, /<div className="wl-mv-hero">\s*<p className="wl-mv-total"[^>]*>\{usdShort\(total\)\}<\/p>\s*<p className="wl-mv-lead">\{running \? \(allEnded \? "" : MOVE_WORDS\.closeOk\) : MOVE_WORDS\.untouched\}<\/p>/);
   assert.doesNotMatch(sheet, /wl-mv-head|<span className="zf-label">\{MOVE_WORDS\.head\}/, "control: no header row");
-  assert.match(sheet, /\{block && block !== MOVE_WORDS\.untouched && <p className="zf-small wl-mv-why"/, "the why line above Move only for a real reason");
+  assert.match(sheet, /\{block && block !== MOVE_WORDS\.untouched\n\s*\? <p className="zf-small wl-mv-why"/, "the why line above Move only for a real reason");
   assert.match(sheet, /\{!running && legs\.length > 0 && \(\s*<div className="wl-mv-who">[\s\S]*?aria-expanded=\{who\}[\s\S]*?\{who && <p className="zf-small wl-mv-foot" data-testid="move-private">\{MOVE_WORDS\.privately\}<\/p>\}/);
   assert.doesNotMatch(sheet, /\{!running && <p className="zf-small wl-mv-foot">\{MOVE_WORDS\.privately\}<\/p>\}/, "control: never the always-on grey paragraph");
   const css = readFileSync(new URL("../money/move-swap.css", import.meta.url), "utf8");

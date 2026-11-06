@@ -33,7 +33,7 @@ test("QA walk MUST 1: a $40 NEAR Send from the Safe with Private short fills Pri
   assert.equal(sheet.title, "Send $40.00 from your Safe");
   // the copy review's fill-sheet words (train 37): what they get first (coin, then its dollars), what the Safe sends, what stays
   // QA's Sim walk: the brackets are what the payee's coin is worth ($39.60), and the $0.40 is named, last
-  assert.deepEqual(sheet.lines.filter((l) => /^(They get|Your Safe sends|Stays in Private|Network fees) · /.test(l)), ["They get · 8.939 wNEAR ($39.60)", "Your Safe sends · $50.00", "Stays in Private · $10.00", "Network fees · about $0.40"]);
+  assert.deepEqual(sheet.lines.filter((l) => /^(They get|Your Safe sends|Stays in Private|Fees) · /.test(l)), ["They get · 8.939 wNEAR ($39.60)", "Your Safe sends · $50.00", "Stays in Private · $10.00", "Fees · about $0.40"]);
   assert.ok(![sheet.title, ...sheet.lines].some((l) => /\d\.\d{5,}/.test(l)), "no coin figure past 4 places");
   // control: USDC as before ($25 → the $30 step)
   const u = await send(mock, USDC, "25");

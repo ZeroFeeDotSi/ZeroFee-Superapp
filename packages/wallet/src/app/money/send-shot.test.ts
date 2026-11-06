@@ -12,7 +12,7 @@ const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8").rep
 
 test("Send's line sits right above Hold, where every money sheet says it; never at the top while the form is up (control: the sent screen still says it)", () => {
   const form = src("./SendForm.tsx"), sheet = src("./SendSheet.tsx");
-  assert.match(form, /\{said \? <SheetLine text=\{said\} \/> : why && <p className="zf-small wl-send2__why"[^\n]*\n\s*(?:\{source\.cant && source\.swap && onSwap\n\s*\? <button [^\n]*\n\s*: source\.cant && source\.back && onBack\n\s*\? <button [^\n]*\n\s*: )?<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">/, "the line, then Hold (or, for a coin that can't go, its Swap or Move back in Hold's place)");
+  assert.match(form, /\{said \? <SheetLine text=\{said\} \/> : why && <p className="zf-small wl-send2__why"[^\n]*\n\s*\{\}\n\s*<div className="zf-fee">\n[^\n]*\n[^\n]*\n\s*<\/div>\n\s*(?:\{source\.cant && source\.swap && onSwap\n\s*\? <button [^\n]*\n\s*: source\.cant && source\.back && onBack\n\s*\? <button [^\n]*\n\s*: )?<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">/, "the line, the fee block, then Hold (or, for a coin that can't go, its Swap or Move back in Hold's place)");
   assert.match(sheet, /said=\{line \?\? services\.line\}/);
   assert.doesNotMatch(sheet, /^\s*<SheetLine text=\{line \?\? services\.line\} \/>$/m, "no line at the top over the form");
   assert.match(sheet, /\{flying && <SheetLine text=\{line \?\? services\.line\} \/>\}/, "control: with no form, the line still shows");
@@ -70,7 +70,7 @@ test("R3 (the design review §4.5): Send fits one phone screen: no balances line
   assert.doesNotMatch(css, /\.wl-send2 > \.wl-hold \{ overflow: hidden; \}/, "control: no clip, so the fade shows");
   assert.match(form, /<b>\{source\.place\}<\/b>/, "From reads \"From your SOL wallet\", never cut");
   assert.match(css, /\.wl-send2__floor > :is\(\.wl-send2__why, \.zf-money__line\) \{ margin: 0; padding: 0 16px; text-align: left; \}/, "the line sits right above its button");
-  assert.match(css, /\.wl-send2__floor \{ position: relative; flex: none; display: flex; flex-direction: column; gap: 8px; padding-top: 4px; background: var\(--bg\); \}\n\.wl-send2__floor > \.wl-zerofee \{ min-height: 36px; padding: 0; \}/, "the floor's ground is solid");
+  assert.match(css, /\.wl-send2__floor \{ position: relative; flex: none; display: flex; flex-direction: column; gap: 8px; padding-top: 4px; background: var\(--bg\); \}/, "the floor's ground is solid");
   assert.doesNotMatch(css, /position: sticky/, "control: nothing in Send is sticky any more");
 });
 

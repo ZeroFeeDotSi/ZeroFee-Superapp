@@ -60,8 +60,9 @@ test("042: every Sim outside sheet says where it lands, as the core's (\"Public 
   const w = seen[0]!;
   assert.equal(w.lines[0], `To ${STRANGER}`, "control: the full address first");
   assert.ok(w.lines.includes("Public on Solana."), w.lines.join(" | "));
-  const fees = w.lines.findIndex((l) => l.startsWith("Network fees · about"));
-  assert.equal(w.lines[fees >= 0 ? fees + 1 : 1], "Public on Solana.", "after the fee, as the core's outsideLines");
+  const fees = w.lines.findIndex((l) => l.startsWith("Fees · about"));
+  if (fees >= 0) assert.equal(w.lines[fees + 1], "NEAR Intents and the network keep this. ZeroFee takes nothing.", "the copy review's fee line: who keeps it, under the figure");
+  assert.equal(w.lines[fees >= 0 ? fees + 2 : 1], "Public on Solana.", "after the fee, as the core's outsideLines");
   assert.ok(!w.lines.some((l) => /\d\.\d{5,}/.test(l)), `no raw coin figure: ${w.lines.join(" | ")}`);
   assert.ok(w.lines.some((l) => l.includes("0.0525 SOL")), w.lines.join(" | "));
 });

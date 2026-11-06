@@ -37,7 +37,7 @@ export const PrivateMark = ({ size = 30 }: { size?: number }) => (
 // Home's four actions (design review §1): Add, Send, Swap, Move, one glyph each on a round button.
 export const ActAdd = () => P("M12 5v14M5 12h14");
 export const ActSend = () => P("M12 19V5M6 11l6-6 6 6");
-export const ActSwap = () => P("M5 9h13l-3.5-3.5M19 15H6l3.5 3.5");
+export { ActSwap } from "@zerofee/design/icons.tsx";
 export const ActMove = () => P("M8 4v15l-3-3M16 20V5l3 3");
 /** The wallet bar's All (four tiles) and Safe (a shield), at the chains' logo size. */
 export const TabAll = () => P("M5 5h5v5H5zM14 5h5v5h-5zM5 14h5v5H5zM14 14h5v5h-5z", 16);

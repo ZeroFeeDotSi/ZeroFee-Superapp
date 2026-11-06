@@ -15,7 +15,7 @@ import { HOME_LEG_MIN_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, leastHome, leastIn } 
 import type { Problem } from "@zerofee/core/problem";
 import { serviceOf } from "@zerofee/core/services";
 import { safeHeld, type EarnPart } from "../format.ts";
-import { intentsPaid } from "@zerofee/core/zero-fee";
+import { feesFigure, intentsKept } from "@zerofee/core/zero-fee";
 
 /** A swap's Problem the sheet says itself, with its own Try again: one whose one step is Try again and that names no
  *  service (a service's is the sheet's line, services.ts sheetLineOf). Never the shell's screen behind the sheet
@@ -176,13 +176,11 @@ export function leastFair(usd: number, fee: number, big: { usd: number; feeUsd: 
   return at > usd ? at : null;
 }
 /**
- * Who the fee goes to, from the price 1Click gave (finding 48: said whenever priced; product decision, 5 Nov: never scary, ZeroFee
- * takes nothing): "About $0.13 of your $3 goes to NEAR Intents and the network. ZeroFee takes nothing." No price yet:
- * who is paid, with no figure. Said under the swap's button.
+ * The fee, from the price 1Click gave (finding 48: said whenever priced; product decision, 5 Nov: never scary, ZeroFee takes nothing; the copy review's
+ * fee line): "Fees · about $0.13" over the button, and who keeps it under the button. No price yet: who is paid, no figure.
  */
-export function feesLine(usd: number, cost: SwapPrice | null): string {
-  return intentsPaid(cost && Number.isFinite(cost.feeUsd) ? cost.feeUsd : null, usd);
-}
+export const feesLine = (cost: SwapPrice | null): string | null => feesFigure(cost && Number.isFinite(cost.feeUsd) ? cost.feeUsd : null);
+export const paidLine = (cost: SwapPrice | null): string => intentsKept(feesLine(cost) !== null);
 /** Over FEE_OK_SHARE of a small amount (QA, 5 Nov: said before the tap; the real figure is feesLine's): the
  *  least amount where the fee falls under 5 %, plainly. Null when it isn't over, or no size brings it under. */
 export function fairLine(usd: number, cost: SwapPrice | null, big: { usd: number; feeUsd: number } | null): string | null {
@@ -198,26 +196,40 @@ export const feeHigh = (usd: number, cost: SwapPrice | null): boolean => !!cost 
  * least, said once and plainly while the amount is picked ("At least $2.59 from a wallet to your Safe."); no chip, Max
  * or opening amount under it is offered.
  */
-/** `under`: what is said once an amount under it is typed (the Safe's: SWAP_WORDS.safeSwapLeast, the copy review's words); the
- *  route's own figure always, never the $2 of another route (the copy review's walk, 5 Nov: "$2" and "$2.09" on one screen). */
-export function floorOf(r: SwapRoute | null): { usd: number; line: string; under: string } {
-  if (r?.kind === "move" && r.from !== "near" && r.to !== "near") return { usd: PAIR_MIN_USD, line: SWAP_WORDS.leastPair, under: SWAP_WORDS.leastPair };
-  if (r?.kind === "topup" && r.to !== "near") return { usd: SAFE_LEG_MIN_USD, line: SWAP_WORDS.leastFromSafe, under: SWAP_WORDS.safeSwapLeast };
-  if (r?.kind === "home" && r.from !== "near") return { usd: HOME_LEG_MIN_USD, line: SWAP_WORDS.leastToSafe, under: SWAP_WORDS.leastToSafe };
-  if (r?.kind === "safe") return { usd: SAFE_LEG_MIN_USD, line: SWAP_WORDS.leastInSafe, under: SWAP_WORDS.safeSwapLeast };
-  return { usd: SWAP_MIN_USD, line: SWAP_WORDS.least, under: SWAP_WORDS.least };
+/** `under`: what the refusal says once an amount under the route's least is typed (the UI reviewer's ruling, 6 Nov: the
+ *  least is said only then, never as a standing line above the keypad); chips and Max under `usd` are never offered. */
+export function floorOf(r: SwapRoute | null): { usd: number; under: string } {
+  if (r?.kind === "move" && r.from !== "near" && r.to !== "near") return { usd: PAIR_MIN_USD, under: SWAP_WORDS.leastPair };
+  if (r?.kind === "topup" && r.to !== "near") return { usd: SAFE_LEG_MIN_USD, under: SWAP_WORDS.safeSwapLeast };
+  if (r?.kind === "home" && r.from !== "near") return { usd: HOME_LEG_MIN_USD, under: SWAP_WORDS.leastToSafe };
+  if (r?.kind === "safe") return { usd: SAFE_LEG_MIN_USD, under: SWAP_WORDS.safeSwapLeast };
+  return { usd: SWAP_MIN_USD, under: SWAP_WORDS.least };
 }
 
 /**
- * The ONE floor line under the keypad (the copy review's walks, 5 Nov: under $2.09 two floor lines with two figures; S9: "Swap $7 or
- * more" beside "start at $2.09"): under the route's least, its `under` words; at or over it, the route's least with
- * the quote's own fee after it ("Fees about $0.29.", the copy review's ruling, 5 Nov: no fee-size line). Null with no route.
+ * Swap's floor, line 1 and the one button (the UI reviewer's ruling and QA's conditions, 6 Nov). One slot, in this order: a
+ * refusal that can be asked again, with the button reading its "Try again" (never a second grey button); why the amount
+ * can't go; the sheet's own line; a price that didn't come, with Try again asking for it; else the privacy line. `again`:
+ * the refusal's button words while it stands; an edit ends it (the sheet's `edited`). The fee block is another line: no
+ * state here takes its place.
  */
-export function floorSay(r: SwapRoute | null, usd: number, feeUsd: number | null): string | null {
-  if (!r) return null;
-  const f = floorOf(r);
-  if (usd > 0 && usd < f.usd) return f.under;
-  return feeUsd !== null && Number.isFinite(feeUsd) && feeUsd >= 0.005 && usd >= f.usd ? `${f.line} ${SWAP_WORDS.fees(feeUsd.toFixed(2))}` : f.line;
+export function swapFloor(o: { again: string | null; block: string | null; tried: boolean; said: boolean; priceDown: boolean }): { line: "stopped" | "why" | "said" | "price" | "stays"; tap: "swap" | "again" | "price"; label: string } {
+  if (o.again) return { line: "stopped", tap: "again", label: o.again };
+  const go = { tap: "swap" as const, label: SWAP_WORDS.title };
+  // nothing can go: the sub-line slot says it (swapSub), once
+  if (o.block === SWAP_WORDS.none) return { line: "stays", ...go };
+  if (o.block && (o.block !== SWAP_WORDS.amount || o.tried)) return { line: "why", ...go };
+  const price = !o.block && o.priceDown ? { tap: "price" as const, label: "Try again" } : go;
+  if (o.said) return { line: "said", ...price };
+  return { line: price.tap === "price" ? "price" : "stays", ...price };
+}
+
+/** The one sub-line slot above the keypad: a swap that couldn't come back, else what arrives once an amount can go (the
+ *  coin figure, as Send), else what one swap can take. */
+export function swapSub(o: { back: string | null; arrives: string | null; part: string | null }): { id: "swap-back" | "swap-arrives" | "swap-part"; text: string } | null {
+  if (o.back) return { id: "swap-back", text: o.back };
+  if (o.arrives) return { id: "swap-arrives", text: o.arrives };
+  return o.part ? { id: "swap-part", text: o.part } : null;
 }
 
 /** The words of the sheet (a five-year-old can read them; under 12 words where a person acts). */
@@ -231,14 +243,10 @@ export const SWAP_WORDS = {
   holding: "Keep holding…",
   least: `Swaps start at $${SWAP_MIN_USD}.`,
   leastPair: `From one wallet to another, swaps start at $${PAIR_MIN_USD.toFixed(2)}.`,
-  leastFromSafe: `From your Safe to a wallet, swaps start at $${SAFE_LEG_MIN_USD.toFixed(2)}.`,
   leastToSafe: `From a wallet to your Safe, swaps start at $${HOME_LEG_MIN_USD.toFixed(2)}.`,
-  // words: the copy review (swap directions, 5 Nov)
-  leastInSafe: `Swaps inside your Safe start at $${SAFE_LEG_MIN_USD.toFixed(2)}.`,
-  // an amount under the Safe's least typed (the copy review's ruling, 5 Nov; the core's spendingProblems.safeSwapLeast)
-  safeSwapLeast: `Swap at least $${SAFE_LEG_MIN_USD.toFixed(2)} from your Safe.`,
+  // an amount under the Safe's least typed (the UI reviewer's ruling, 6 Nov)
+  safeSwapLeast: `Swaps start at $${SAFE_LEG_MIN_USD.toFixed(2)}.`,
   // the floor's cost line over the floor (the copy review's ruling, 5 Nov): the quote's own fee, never a fee-size line
-  fees: (usd: string) => `Fees about $${usd}.`,
   amount: "Pick an amount.",
   // the place that really pays a Safe → wallet swap (the build's trace, S2; words: the copy review
   paidFrom: (usd: string) => `${usd} leaves Private. If Private is short, your Safe covers the rest.`,
@@ -247,6 +255,8 @@ export const SWAP_WORDS = {
   most: (usd: string) => `You can swap up to ${usd}.`,
   /** Under Max, when one swap pays only part of the Safe coin's one figure (product decision, 5 Nov). the copy review's words. */
   part: (usd: string) => `Up to ${usd} can go in one swap.`,
+  /** The sub-line slot when one swap can take nothing now (copy review, 6 Nov): never "Up to $0.00"; the button stays off. */
+  none: "Nothing more can go in one swap right now.",
   // the From list empty (the copy review's ruling, 5 Nov): one line
   nothing: "Nothing in your Safe can be swapped yet.",
   // audit H1: only what's true (the account isn't named; an amount and time can still be matched)
@@ -268,6 +278,7 @@ export const privateLine = (r: SwapRoute | null): string | null => (r && r.kind 
 export function swapBlock(o: { route: SwapRoute | null; usd: number; most: number }): string | null {
   if (!o.route) return SWAP_WORDS.pick;
   if (!(o.usd > 0)) return SWAP_WORDS.amount;
+  if (o.route && o.most < 0.01) return SWAP_WORDS.none;
   // the route's own least, in its own words (the copy review's walk, 5 Nov: under $2 the Safe → a wallet said "$2" beside its "$2.09"):
   // between two chains' wallets, the least that still arrives (review M1); the core's floors after the fees, before any
   // Approve (UI's AgentZero walk, 3 Nov: Face ID is never asked for a leg that would stop on the way); E7 (swap
@@ -314,7 +325,7 @@ export function paysHere(o: { networks: readonly { network: string; cashUsd: str
   const push = (place: "safe-usdc" | "safe-near", symbol: string, parts: number[]) => {
     const usd = Number(safeHeld(all, symbol, o.earning ?? [])?.usd ?? parts.reduce((n, x) => n + x, 0));
     const most = cents(Math.min(room, Math.max(...parts)));
-    out.push({ place, usd, most, ...(usd - most >= 0.01 ? { part: SWAP_WORDS.part(`$${most.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`) } : {}) });
+    out.push({ place, usd, most, ...(usd - most >= 0.01 && most >= 0.01 ? { part: SWAP_WORDS.part(`$${most.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`) } : {}) });
   };
   if (Math.max(0, ...usdc) >= 0.01) push("safe-usdc", "USDC", usdc);
   if (Math.max(0, ...near) >= 0.01) push("safe-near", "NEAR", near);

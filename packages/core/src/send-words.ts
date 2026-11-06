@@ -2,6 +2,7 @@
 // own file so they load with the first Send, never in Home's first load (speed budget). D143 (approval-policy.ts): the
 // pocket is a hot key, so its payment has no sheet of its own; the Safe's own sheet (Face ID) is the one for leg 1.
 // Nothing here reads the network.
+import { FEES_KEPT } from "./zero-fee.ts";
 import type { parseQuote } from "./intents.ts";
 
 type Quote = NonNullable<ReturnType<typeof parseQuote>>;
@@ -20,7 +21,8 @@ export const OUTSIDE_WORDS = {
   title: (from: string) => `Send from your ${from}`,
   to: (address: string) => `To ${address}`,
   get: (usd: string) => `They get about $${usd}`,
-  fees: (usd: string) => `Network fees · about $${usd}`,
+  fees: (usd: string) => `Fees · about $${usd}`,
+  kept: FEES_KEPT,
   high: (pct: string) => `${pct}% goes to fees. On a bigger send, fees are a smaller part.`,
   declined: (from: string) => `You said no. Nothing left your ${from}.`,
   /** What a send out doesn't hide (privacy audit, 4 Nov; QA's filing, 5 Nov): the payee's side is public, said

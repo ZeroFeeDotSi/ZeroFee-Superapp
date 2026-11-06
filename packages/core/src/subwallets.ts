@@ -246,7 +246,7 @@ export function outsideLines(to: string, inUsd: string | undefined, outUsd: stri
   if (a === null || b === null || !(a > 0) || b > a) return { lines: [OUTSIDE_WORDS.to(to), OUTSIDE_WORDS.seen(network)], warnings: [] };
   const fee = a - b, pct = ((fee / a) * 100).toFixed(1);
   return {
-    lines: [OUTSIDE_WORDS.to(to), OUTSIDE_WORDS.get(b.toFixed(2)), OUTSIDE_WORDS.fees(fee.toFixed(2)), OUTSIDE_WORDS.seen(network)],
+    lines: [OUTSIDE_WORDS.to(to), OUTSIDE_WORDS.get(b.toFixed(2)), OUTSIDE_WORDS.fees(fee.toFixed(2)), OUTSIDE_WORDS.kept, OUTSIDE_WORDS.seen(network)],
     warnings: fee / a > OUTSIDE_FEE_WARN ? [{ kind: "large-amount", text: OUTSIDE_WORDS.high(pct) }] : [],
   };
 }

@@ -21,6 +21,7 @@ import { mark } from "@zerofee/design/tap.ts";
 import "@zerofee/design/receipt.css";
 import { downLine, serviceOf, type Service } from "@zerofee/core/services";
 import { sayWent } from "@zerofee/shell-api/money.ts";
+import { feesFigure, intentsKept, intentsPaid } from "@zerofee/core/zero-fee";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { onOwnApproval } from "@zerofee/shell-api/job-run.ts";
 import { JOB_WORDS, startJob, type JobHandle } from "@zerofee/shell-api/job-start.ts";
@@ -52,7 +53,7 @@ const TAKE_OUT_LOST = "No answer came back. Home shows where your money is.";
 /** Finding 61: the least an Add puts in a site's wallet: a Safe -> wallet leg's least (the core refuses less before any
  *  sheet), so its last step never stops in the NEAR wallet under the core's $2 floor. */
 export const SITE_ADD_LEAST_USD = SAFE_LEG_MIN_USD;
-/** Said under the amount while it is under SITE_ADD_LEAST_USD (Move's own words, swap-corridor.ts leastFromSafe). */
+/** Said under the amount while it is under SITE_ADD_LEAST_USD (Move's own words). */
 export const SITE_ADD_LEAST_LINE = `Add at least $${SAFE_LEG_MIN_USD.toFixed(2)} to cover the network fee.`;
 /** Under the least, the lit button moves the least (QA, 5 Nov: GMGN's "Move $2" was a dead grey button). */
 export const SITE_ADD_LEAST_GO = `Add $${SAFE_LEG_MIN_USD.toFixed(2)}`;
@@ -103,7 +104,7 @@ export function feeLine(cost: FeeCost, usd: number, waitedMs?: number, down = fa
   if (cost === undefined) return waitedMs === undefined ? FEE_WAIT_LINE : quoteWaitLine(waitedMs);
   if (cost === "late") return feeLateLine("oneclick", down);
   if (typeof cost === "object") return "late" in cost ? feeLateLine(cost.late, down) : cost.said;
-  return cost > usd * FEE_LINE_SHARE ? `About $${cost.toFixed(2)} in fees.` : null;
+  return cost > usd * FEE_LINE_SHARE ? feesFigure(cost) : null;
 }
 /** A refusal's own words for the fee line: its detail where the core gave one (subwalletRefused keeps it in `more`). */
 const saidOf = (p: Problem): string => (p.more && p.more.length <= 140 ? p.more : p.whatHappened);
@@ -368,12 +369,16 @@ function SiteAddSheetFor({ wallet, name, network, safeUsd, coins, askedUsd, auto
           {(under || fresh) && !over && <p className="zf-small wl-sheet-meta" role="status" data-testid="site-add-least">{SITE_ADD_LEAST_LINE}</p>}
           {/* ST13: a site with a wallet per network says which one it goes to; a one-network site, where it comes from */}
           <p className="zf-small wl-sheet-meta" data-testid="site-add-route">{routeLine}</p>
-          {fee && <p className="zf-small wl-sheet-meta" data-testid="site-add-fee">{fee}</p>}
           {(cost === "late" || (typeof cost === "object" && cost !== null)) && <button className="zf-btn zf-btn--quiet" onClick={() => setPriceAgain((n) => n + 1)}>Try again</button>}
           <SheetLine text={line ?? services.line} />
           {busyAgain !== null && !busy && <p className="zf-small wl-sheet-meta" role="status" data-testid="site-add-busy">{SITE_BUSY_LINE}</p>}
           {busyAgain !== null && !busy && <button className="zf-btn zf-btn--quiet" data-testid="site-add-busy-again" onClick={() => void go(busyAgain)}>Try again</button>}
           {!busy && <Keypad value={fresh ? "" : usd} decimals={2} onChange={(v) => { setFresh(false); setUsd(v); }} />}
+          {/* the fee block, right above the button (the copy review, 6 Nov): one 1Click payment, site-route.ts */}
+          <div className="zf-fee">
+            {fee && <p className="zf-small" data-testid="site-add-fee">{fee}</p>}
+            <p className="zf-small" data-testid="site-add-paid">{intentsKept(typeof cost === "number" && fee !== null)}</p>
+          </div>
           {/* under the least, the lit choice is the least itself (QA, 5 Nov: "Move $2" was a dead grey button) */}
           {under ? (
             <button className="zf-btn wl-sheet-go" data-testid="site-add-least-go" disabled={busy || services.down} onClick={() => { const least = SITE_ADD_LEAST_USD.toFixed(2); setFresh(true); setUsd(least); void go(least); }}>
@@ -582,6 +587,8 @@ function SiteBackSheetFor({ wallet, also = [], name, safeUsd, askedUsd, onClose,
             ? `At least ${dollars(backLeast(picked).toFixed(2))} reaches your Safe, after fees. Coins you bought stay in your ${name} wallet.`
             : `All of it. Coins you bought stay in your ${name} wallets.`}</p>}
           <SheetLine text={line ?? services.line} />
+          {/* the fee block, right above the button (the copy review, 6 Nov): a take-out goes through NEAR Confidential */}
+          {!Object.keys(legs).length && <div className="zf-fee"><p className="zf-small" data-testid="takeout-paid">{intentsPaid()}</p></div>}
           {!Object.keys(legs).length && <button className="zf-btn wl-sheet-go" disabled={busy || services.down} onClick={() => void go()}>{busy ? "Getting it ready…" : `Take out ${dollars(String(picked))}`}</button>}
         </>
       )}

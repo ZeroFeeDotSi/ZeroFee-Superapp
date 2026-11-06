@@ -4,9 +4,9 @@
 // one tap away, in the app. Loaded on the bell's first tap (TaskBell.tsx).
 import { useEffect, useState, type ReactNode } from "react";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
-import { LiveRow, progressOf, type LiveRowState } from "@zerofee/design/LiveRow.tsx";
+import { LiveRow, progressOf, timeSlot, type LiveRowState } from "@zerofee/design/LiveRow.tsx";
 import { ago, tickEvery } from "@zerofee/design/time.ts";
-import { AppAgent, AppBrowser, AppChat, AppHome, AppTrade } from "@zerofee/design/icons.tsx";
+import { ActSwap, AppAgent, AppBrowser, AppChat, AppHome, AppTrade } from "@zerofee/design/icons.tsx";
 import { useShell } from "./AppFrame.tsx";
 import { timeLeft } from "./job-steps.ts";
 import { TASK_APP_HOME, taskStore, type Task, type TaskApp } from "./tasks.ts";
@@ -23,6 +23,8 @@ const ORDER: TaskApp[] = ["home", "trade", "perps", "agentzero", "browser", "cha
 // Copywriter: the opposite of running, for a trade that worked, failed or was cancelled)
 export const CENTRE_WORDS = { title: "Activity", now: "Now", earlier: "Ended", empty: "Nothing yet. What you do in any app shows here." } as const;
 /** A receipt's rows (the copywriter, 5 Nov). `public`: under AgentZero's payments only (they never name the Safe). */
+/** A row's mark: its app's, or on a swap job of Home's, the swap mark its row on Home has (by the title, as Home's row: live-steps.ts startingTracks). */
+export const markOf = (t: Pick<Task, "app" | "id" | "title">): (() => ReactNode) => (t.app === "home" && (t.id.startsWith("swap:") || /^Swap\b/.test(t.title)) ? ActSwap : ICON[t.app]);
 export const RECEIPT_WORDS = { amount: "Amount", where: "Where", when: "When", proof: "Proof", public: "Anyone can check this on the chain. It never names your Safe." } as const;
 /** A finished task with a public transaction is a receipt: a tap opens it (QA 4 Nov: a receipt row opened nothing). */
 export const hasReceipt = (t: Pick<Task, "state" | "proof">): boolean => t.state !== "pending" && !!t.proof?.length;
@@ -35,6 +37,14 @@ export function goingLine(t: Pick<Task, "steps" | "startedAt" | "endsAt">, now: 
   const step = t.steps.find((s) => s.state === "doing") ?? t.steps.find((s) => s.state === "waiting") ?? t.steps.at(-1);
   const left = timeLeft(t.endsAt, now, t.startedAt);
   return step ? `${step.label} · ${left}` : left;
+}
+
+/** The going line's two columns (real-tap proof, 6 Nov: at 390 wide, "NEAR Intents is swapping it · 1 s left" lost its time):
+ *  the step on the left, the time left under the dollars, as Home's own row (LiveTrack.tsx rowParts). No step: the time alone. */
+export function goingParts(t: Pick<Task, "steps" | "startedAt" | "endsAt">, now: number): { line: string; left?: string } {
+  const line = goingLine(t, now);
+  const at = line.lastIndexOf(" · ");
+  return at < 0 ? { line } : { line: line.slice(0, at), left: line.slice(at + 3) };
 }
 
 /** A finished task's one line: where the money is, or why it stopped. */
@@ -76,14 +86,16 @@ export function TaskCentre({ onClose, onBack, only, onAll }: { onClose: () => vo
     shell.openApp(TASK_APP_HOME[t.app].app as AppId, t.open?.route);
   };
   const row = (t: Task) => {
-    const Icon = ICON[t.app];
+    const Icon = markOf(t);
     const going = t.state === "pending";
     const line = going ? goingLine(t, Math.max(at, Date.now())) : endedLine(t);
-    const when = going ? undefined : ago(new Date(t.endedAt ?? t.updatedAt ?? t.startedAt).toISOString(), Date.now());
+    const parts = going ? goingParts(t, Math.max(at, Date.now())) : null;
+    const slot = parts ? timeSlot(parts.left) : {};
+    const when = parts ? slot.when : ago(new Date(t.endedAt ?? t.updatedAt ?? t.startedAt).toISOString(), Date.now());
     return (
       <li key={`${t.app}:${t.id}`}>
-        <LiveRow mark={<Icon />} title={t.title} line={line} usd={t.usd} when={when} state={ROW_STATE[t.state]} p={going ? progressOf(t.steps) : undefined}
-          onOpen={() => (hasReceipt(t) ? setOver(<Receipt t={t} onClose={() => setOver(null)} onView={(url) => { setOver(null); onClose(); shell.openApp("browser", undefined, url); }} />) : open(t))} label={[t.title, line, t.usd, when, `Open ${TASK_APP_HOME[t.app].name}`].filter(Boolean).join(". ")} />
+        <LiveRow mark={<Icon />} title={t.title} line={parts ? parts.line : line} {...(slot.below ? { below: slot.below } : {})} usd={t.usd} when={when} state={ROW_STATE[t.state]} p={going ? progressOf(t.steps) : undefined}
+          onOpen={() => (hasReceipt(t) ? setOver(<Receipt t={t} onClose={() => setOver(null)} onView={(url) => { setOver(null); onClose(); shell.openApp("browser", undefined, url); }} />) : open(t))} label={[t.title, line, t.usd, parts ? undefined : when, `Open ${TASK_APP_HOME[t.app].name}`].filter(Boolean).join(". ")} />
         {t.proof?.map((x) => <TxProofLine key={x.hash} tx={x} onView={(url) => { onClose(); shell.openApp("browser", undefined, url); }} />)}
       </li>
     );

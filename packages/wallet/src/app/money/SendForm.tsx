@@ -8,7 +8,7 @@ import { SEND_EMPTY } from "./dead-ends.ts";
 import { Keypad } from "@zerofee/design/Keypad.tsx";
 import { padBase } from "@zerofee/design/keypad.ts";
 import { SheetLine } from "@zerofee/design/MoneySheet.tsx";
-import { intentsPaid } from "@zerofee/core/zero-fee";
+import { intentsKept } from "@zerofee/core/zero-fee";
 import { FIRST_PAYMENT, SEND_CANT, shortId, feeLines } from "./send-words.ts";
 import { TAP_ADDRESS, TAP_AGAIN, TAP_PASTE, refusedLine } from "./send-said.ts";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -485,16 +485,18 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
       <div className="wl-send2__floor">
       {/* the fee lines (what stays, the quote) sit on the floor over the button, with its line */}
       {rent && <p className="zf-small" data-testid="send-rent">{rent}</p>}
-      {feeNow && <p className="zf-small" data-testid="send-fee">{feeNow.fees}</p>}
       {feeNow?.high && <p className="zf-small" role="status" data-testid="send-fee-high">{feeNow.high}</p>}
       {said ? <SheetLine text={said} /> : why && <p className="zf-small wl-send2__why" role="status" data-testid="send-why">{why}</p>}
+      {/* the fee block, right above the button (the copy review, 6 Nov): both of Send's routes go through NEAR Intents (SendSheet's two calls) */}
+      <div className="zf-fee">
+        {feeNow && <p className="zf-small" data-testid="send-fee">{feeNow.fees}</p>}
+        <p className="zf-small" data-testid="send-paid">{intentsKept(!!feeNow)}</p>
+      </div>
       {source.cant && source.swap && onSwap
         ? <button type="button" className="zf-btn wl-hold" onClick={() => onSwap(source)} disabled={busy} data-testid="send-swap-first">{SEND_CANT.swapButton(SEND_ROWS[source.swap].coin)}</button>
         : source.cant && source.back && onBack
         ? <button type="button" className="zf-btn wl-hold" onClick={() => onBack(source)} disabled={busy} data-testid="send-move-back">{SEND_CANT.siteButton}</button>
         : <button type="button" className="zf-btn wl-hold" disabled={!ready} onClick={go} data-testid="send-go">{label}</button>}
-      {/* who the fee goes to, under the Send button (product decision, 5 Nov: we are zero fee): every Send goes through NEAR Intents */}
-      <p className="zf-small wl-zerofee" data-testid="send-paid">{intentsPaid()}</p>
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
 import { usdOf } from "../../amount.ts";
 import { amountOf, balanceTotal, chainName, coins, dollars, plusUsd, safeLines, titleOf, type Line } from "../format.ts";
 import { awayUsd as awayOf, sumUsd, type HeldCoin } from "../trading.ts";
+import { NEAR_CHAIN_COINS, nearOwnCoins, type NearOwnCoin } from "../near-coins.ts";
 import { ActAdd, ActMove, ActSend, ActSwap, TabSafe } from "../icons.tsx";
 import { swapLabel } from "../money/swap-follow.ts";
 import type { AddOnWay, addOnWayLine as AddOnWayLine } from "../money/adds-on-way.ts";
@@ -156,6 +157,8 @@ export const HIDE_KEY = "hide-amounts";
 export interface SubRow { key: string; symbol: string; amount: string; usd: string | null; address?: string; icon?: string }
 export interface HomeRow {
   chain: RowChain;
+  /** The NEAR wallet holds a coin with no price (near-coins.ts): its figure leaves it out, and says so. */
+  uncounted?: true;
   name: string;
   /** The native coin as the chain has it, with its symbol ("1.42 SOL"); null for NEAR (dollars only) or when unread. */
   amount: string | null;
@@ -173,8 +176,6 @@ export interface HomeRow {
  * is its own row with its own dollars, never counted in the row above it as well (Phantom's shape). NEAR is Spending's own
  * balance on NEAR Intents (USDC) plus the NEAR coins held there (D96): dollars first, its rows what it really holds.
  */
-/** The chains' own coins the NEAR wallet can hold (an Add's forward that stopped, a refund), as Home names them. */
-const NEAR_CHAIN_COINS: Record<string, { symbol: string; decimals: number; icon: string }> = { "nep141:sol.omft.near": { symbol: "SOL", decimals: 9, icon: "sol" }, "nep141:hood.omft.near": { symbol: "ETH", decimals: 18, icon: "eth" } };
 /** The SOL and ETH the NEAR wallet holds (subwallet.float.balance), each priced from 1Click's list: so nothing there is
  *  invisible on Home. Dust under a cent is left out. */
 export function nearChainCoins(coins: readonly { tokenId: string; amount: string }[] | null, price: (tokenId: string) => number | null): SubRow[] {
@@ -186,8 +187,10 @@ export function nearChainCoins(coins: readonly { tokenId: string; amount: string
   });
 }
 
-/** `inNear`: the SOL or ETH the NEAR wallet holds (nearChainCoins), each its own line. */
-export function homeRows(s: SpendingStatus, held: HeldCoin[] = [], inNear: SubRow[] = []): HomeRow[] {
+/** `inNear`: the SOL or ETH the NEAR wallet holds (nearChainCoins), each its own line. `own`: every other coin it holds
+ *  (near-coins.ts nearOwnCoins: bought in place or by Trade), read from its balance: added to its figure (they aren't in
+ *  reserveUsd), and Trade's NEAR positions are not listed beside them (the same coins, counted once). null: not read. */
+export function homeRows(s: SpendingStatus, held: HeldCoin[] = [], inNear: SubRow[] = [], own: readonly NearOwnCoin[] | null = null): HomeRow[] {
   const coinsOn = (c: RowChain): SubRow[] => held.filter((h) => h.chain === c).map((h) => ({ key: `${c}:${h.address}`, symbol: h.symbol, amount: h.amount, usd: h.usd ?? null, address: h.address }));
   const rows: HomeRow[] = [];
   for (const c of ORDER) {
@@ -206,8 +209,9 @@ export function homeRows(s: SpendingStatus, held: HeldCoin[] = [], inNear: SubRo
         return { ...x, usd: usd.toFixed(2) };
       });
       const cash = Math.max(0, left).toFixed(2);
-      const subs = coinsOn("near").length || inNear.length ? [...(Number(cash) >= 0.01 ? [{ key: "near:cash", symbol: "Cash", amount: "", usd: cash }] : []), ...inNear, ...coinsOn("near")] : [];
-      rows.push({ chain: "near", name: ROW_NAME.near, amount: null, usd: sumUsd([reserve, ...coinsOn("near").map((x) => x.usd)]), coins: subs });
+      const mine: SubRow[] = own ? own.map((c) => ({ key: c.key, symbol: c.symbol, amount: c.amount, usd: c.usd, address: c.address, ...(c.icon ? { icon: c.icon } : {}) })) : coinsOn("near");
+      const subs = mine.length || inNear.length ? [...(Number(cash) >= 0.01 ? [{ key: "near:cash", symbol: "Cash", amount: "", usd: cash }] : []), ...inNear, ...mine] : [];
+      rows.push({ chain: "near", name: ROW_NAME.near, amount: null, usd: sumUsd([reserve, ...mine.map((x) => x.usd)]), coins: subs, ...(mine.some((x) => x.usd === null) ? { uncounted: true as const } : {}) });
       continue;
     }
     const n = s.networks.find((x) => x.network === c);
@@ -303,7 +307,7 @@ export function Home(a: HomeActions) {
   const [lineHidden, setLineHidden] = useState(() => webLineHidden());
   // D134: every figure from `shown`, the copy kept on this phone until each part is read again (display only)
   const { bridge, balanceProblem, activity, shown: view, refresh, kid: childPhone } = useWallet();
-  const { tokens, balances, balancesAt, chains, earning, pocket, spending, spendingStale, spendingAt, held, nearCoins, heldFailed, wallets, trading, tradingPartial, settled, complete, lastTotal } = view;
+  const { tokens, balances, balancesAt, chains, earning, pocket, spending, spendingStale, spendingAt, held, nearCoins, nearOwn, heldFailed, wallets, trading, tradingPartial, settled, complete, lastTotal } = view;
   // Safe | Hot (product decision, 5 Nov): the Safe first. The web wallet has no Safe: Hot alone (its tab is never drawn)
   const [picked, setTab] = useState<HomeTab>("safe");
   const tab: HomeTab = web ? "hot" : picked;
@@ -400,7 +404,7 @@ export function Home(a: HomeActions) {
 
   // the wallets: Hot's Trade section, one per chain
   const kid = childPhone === true;
-  const rows = spending?.loaded && !spending.unread ? homeRows(spending, held ?? [], nearChainCoins(nearCoins, (id) => Number(tokens.get(id)?.priceUsd) || null)) : null;
+  const rows = spending?.loaded && !spending.unread ? homeRows(spending, held ?? [], nearChainCoins(nearCoins, (id) => Number(tokens.get(id)?.priceUsd) || null), nearOwn) : null;
   // a wallet's figure: its own coin and the coins in it (a site's wallet is its own section, after Trade's)
   const figure = (r: HomeRow) => {
     const usd = walletUsd(r);
@@ -529,9 +533,10 @@ export function Home(a: HomeActions) {
     const { usd, empty } = figure(r);
     // its coin read, its price not: the amount where its dollars go
     const said = usd === null && r.unpriced ? r.amount : null;
-    // NEAR's line says its own NEAR (one line, never a sentence), else its cash
-    const nearCoin = r.chain === "near" ? r.coins.find((c) => c.symbol === "NEAR") : undefined;
-    const names = r.chain === "near" ? (nearCoin ? `${coins(nearCoin.amount, 4)} NEAR` : HOME_WORDS.nearLine) : r.amount ?? "";
+    // NEAR's line is its cash; beside coins bought in it (each its own row below, NEAR too) its cash's own figure, $0.00 too
+    // (all of it spent), so the row's figure (cash and coins) is never read as its cash; hidden amounts hide it
+    const cashOf = r.chain === "near" && !hide ? r.coins.find((c) => c.symbol === "Cash") ?? (r.coins.length ? { usd: "0.00" } : undefined) : undefined;
+    const names = r.chain === "near" ? (cashOf ? `${HOME_WORDS.nearLine} ${$(cashOf.usd)}` : HOME_WORDS.nearLine) : r.amount ?? "";
     // every coin in it but its cash: bought ones (an address: their page), and SOL or ETH the NEAR wallet holds (D140)
     const bought = r.coins.filter((c) => c.symbol !== "Cash");
     const icon = r.chain === "hood" ? "eth" : r.chain;
@@ -544,7 +549,8 @@ export function Home(a: HomeActions) {
         <CoinRow i={0} symbol={NATIVE[r.chain]} icon={icon} chain={r.chain} title={HOT_NAME[r.chain]} detail={empty ? HOME_WORDS.emptyRow : hide && r.chain !== "near" ? HIDDEN_AMOUNT : names} usd={said && !hide ? said : $(lineUsd)} on={() => a.onRow?.(r.chain)} />
         {addTo(r.chain)}
         {bought.map((c, i) => <CoinRow key={c.key} i={i + 1} symbol={c.symbol} {...(c.icon ? { icon: c.icon } : c.address && logo(r.chain, c.address) ? { src: logo(r.chain, c.address)! } : {})}
-          chain={r.chain} title={c.symbol} detail={`${hide ? HIDDEN_AMOUNT : coins(c.amount, 4)} ${c.symbol}`} usd={$(c.usd)} {...(c.address ? { on: () => a.onRowCoin?.(r.chain, c.address!, c.symbol) } : {})} />)}
+          chain={r.chain} title={c.symbol} {...(c.amount ? { detail: `${hide ? HIDDEN_AMOUNT : coins(c.amount, 4)} ${c.symbol}` } : {})} usd={c.usd === null && r.uncounted ? "" : $(c.usd)} {...(c.address ? { on: () => a.onRowCoin?.(r.chain, c.address!, c.symbol) } : {})} />)}
+        {r.uncounted && <p className="zf-small wl-list-empty">{HOME_WORDS.unpriced}</p>}
       </div>
     );
   };

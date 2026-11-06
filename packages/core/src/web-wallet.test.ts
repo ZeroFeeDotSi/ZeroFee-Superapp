@@ -103,7 +103,7 @@ test("web wallet: nothing that needs the Safe runs: refused by name, and no Safe
   for (const m of ["account.create", "account.fund.start", "account.protection.set", "account.rules.update", "account.waiting.run", "account.agent.set", "recovery.renew", "subwallet.privatePay", "subwallet.hiddenFromRow", "subwallet.float.move", "account.secondDevice.pair"]) {
     assert.equal(code(await core.call(m, {})), "security.web.no-safe", m);
   }
-  assert.ok(!webAllows("subwallet.pocket.move", {}) && webAllows("subwallet.list", {}) && webAllows("subwallet.send", { app: "wallet", chain: "sol" }));
+  assert.ok(!webAllows("subwallet.pocket.move", {}) && webAllows("subwallet.list", {}) && webAllows("subwallet.sendPrivate", { app: "wallet", chain: "sol" }));
   assert.equal(ok(await core.call("account.id")), null, "no Safe account to name");
   // a wallet read still works (the hot wallets are here)
   assert.ok(ok(await core.call<unknown[]>("subwallet.list", {})).length >= 3);
@@ -128,11 +128,11 @@ const coreSrc = readFileSync(new URL("./demo-core.ts", import.meta.url), "utf8")
 /** Every method the core answers by name, and the prefixes it routes before its switch. */
 const EVERY = [...new Set([...coreSrc.matchAll(/case "([a-zA-Z]+\.[a-zA-Z.]+)"/g)].map((m) => m[1]!))];
 const ROUTED = ["account.agent.status", "perps.open", "intents.quote", "pair.start", "guardian.status", "secondDevice.answer"];
-const ALLOWED = ["account.state", "account.id", "approval.answer", "subwallet.session.endAll", "subwallet.list", "subwallet.balances", "subwallet.coins", "subwallet.read", "subwallet.float.balance", "subwallet.add.onWay", "subwallet.create", "subwallet.send", "subwallet.sendPrivate", "subwallet.sendPrivate.status", "subwallet.sendCoins"];
+const ALLOWED = ["account.state", "account.id", "approval.answer", "subwallet.session.endAll", "subwallet.list", "subwallet.balances", "subwallet.coins", "subwallet.read", "subwallet.float.balance", "subwallet.add.onWay", "subwallet.create", "subwallet.sendPrivate", "subwallet.sendPrivate.status", "subwallet.sendCoins"];
 /** Home's Swap in place (product decision, 5 Nov): Wallet's own calls only. */
 const IN_PLACE = ["subwallet.float.swapQuote", "subwallet.float.swap", "subwallet.float.move"];
 const TRADE = ["subwallet.signTx", "subwallet.sign", "subwallet.session.start", "subwallet.session.end", "subwallet.preflight"];
-const NEVER = ["subwallet.near.trade", "subwallet.near.wallet", "subwallet.near.register", "subwallet.near.rheaSwap", "subwallet.near.rheaAdd", "subwallet.add.quote", "subwallet.site.moveBack", "subwallet.site.moveBackAll", "subwallet.export", "subwallet.site.forHost", "subwallet.site.moveBacks", "subwallet.site.signIns", "subwallet.site.addCost", "subwallet.signMessage", "subwallet.signTypedData", "subwallet.float.out", "subwallet.float.move", "subwallet.privatePay", "account.create", "tx.request"];
+const NEVER = ["subwallet.send", "subwallet.near.trade", "subwallet.near.wallet", "subwallet.near.register", "subwallet.near.rheaSwap", "subwallet.near.rheaAdd", "subwallet.add.quote", "subwallet.site.moveBack", "subwallet.site.moveBackAll", "subwallet.export", "subwallet.site.forHost", "subwallet.site.moveBacks", "subwallet.site.signIns", "subwallet.site.addCost", "subwallet.signMessage", "subwallet.signTypedData", "subwallet.float.out", "subwallet.float.move", "subwallet.privatePay", "account.create", "tx.request"];
 
 test("web wallet allowlist: every core method off the list is refused by name, whatever app asks; on it, only its own asks", async () => {
   assert.ok(EVERY.length > 100, "read the core's methods");
@@ -150,9 +150,8 @@ test("web wallet allowlist: every core method off the list is refused by name, w
   // Swap in place: Wallet's own, never another app's (control: Wallet's passes the gate)
   for (const m of IN_PLACE) assert.deepEqual([undefined, "trade", "browser", "wallet"].map((app) => webAllows(m, app ? { app } : {})), [false, false, false, true], m);
   // the allowed ones, only as asked
-  assert.equal(webAllows("subwallet.send", { app: "wallet", chain: "bsc" }), false, "Send: SOL or ETH (RH) only");
-  assert.equal(webAllows("subwallet.send", { app: "trade", chain: "sol" }), false, "Send: Wallet's own only");
-  assert.equal(webAllows("subwallet.send", { app: "wallet", chain: "hood", token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" }), false, "Send: the coin itself only");
+  assert.equal(webAllows("subwallet.send", { app: "wallet", chain: "sol" }), false, "the public Send: never on the web, even Wallet's");
+  assert.equal(webAllows("subwallet.sendPrivate", { app: "wallet", chain: "sol" }), true, "control: the private Send");
   assert.equal(webAllows("subwallet.sendPrivate", { app: "wallet", chain: "bsc" }), false, "the private Send: SOL or ETH (RH) only");
   assert.equal(webAllows("subwallet.sendPrivate", { app: "browser", chain: "sol" }), false, "the private Send: Wallet's own only");
   // W4: the web Send's tokens held, Wallet's own read only (control: Wallet's passes)
@@ -181,38 +180,15 @@ test("WEB_TRADE: a build-time constant; on, Trade's own signing runs for Trade o
 import { TO_EVM, sendingCore, until } from "./testing/web-core.ts";
 
 
-test("decision A: a Send to an outside address asks the password every time, at any amount: none is asked for (not counted), wrong is refused and counted, right sends; nothing moves before it", async () => {
-  const { core, sheets, sent, tries } = sendingCore();
-  ok(await core.call("account.web.import", { words: WORDS }));
-  for (const amount of ["0.001", "0.1"]) { // $3, under the cap; $300, over it: the same ask
-    const before = tries();
-    const had = sent.length;
-    const none = await core.call("subwallet.send", { app: "wallet", chain: "hood", to: TO_EVM, amount });
-    assert.equal(code(none), "security.web.password", `${amount}: no password, no send`);
-    assert.equal(tries(), before, "an empty one isn't a try");
-    const wrong = await core.call("subwallet.send", { app: "wallet", chain: "hood", to: TO_EVM, amount, password: "wrong password here" });
-    assert.equal(code(wrong), "security.web.password");
-    assert.equal(sent.length, had, "nothing sent with none or a wrong password");
-    const right = ok(await core.call<{ status: string }>("subwallet.send", { app: "wallet", chain: "hood", to: TO_EVM, amount, password: PASSWORD }));
-    assert.notEqual(right.status, "declined");
-  }
-  assert.equal(tries(), 4, "each typed password checked once");
-  assert.equal(sent.length, 2, "sent with the right password");
-  assert.equal(sheets.length, 0, "over the cap the password is the ask: no second sheet");
-});
-
-test("decision A control: a move to the person's own wallet needs no password (under the cap none at all; over it, the cap's sheet as before)", async () => {
+test("the HARD RULE: the web's only Send is the private one: the public transfer is refused with the right password, to anyone, and nothing moves or is checked (decision A's password: web-send-private.test.ts, through this same door)", async () => {
   const { core, sheets, sent, tries } = sendingCore();
   ok(await core.call("account.web.import", { words: WORDS }));
   const own = ok(await core.call<{ wallets: { wallet: string; address: string }[] }>("account.web.status")).wallets.find((w) => w.wallet === "eth")!.address;
-  ok(await core.call("subwallet.send", { app: "wallet", chain: "hood", to: own, amount: "0.001" }));
-  assert.deepEqual([sent.length, tries(), sheets.length], [1, 0, 0], "own wallet, under the cap: sent, no password, no sheet");
-  const over = core.call<{ status: string }>("subwallet.send", { app: "wallet", chain: "hood", to: own, amount: "0.1" });
-  await until(() => sheets.length === 1);
-  assert.equal(sheets[0]!.password, true, "over the cap: the cap's own sheet, unchanged");
-  ok(await core.call("approval.answer", { id: sheets[0]!.id, approve: false }));
-  assert.equal(ok(await over).status, "declined");
-  assert.equal(sent.length, 1);
+  for (const to of [TO_EVM, own]) {
+    const r = await core.call("subwallet.send", { app: "wallet", chain: "hood", to, amount: "0.001", password: PASSWORD });
+    assert.equal(code(r), "security.web.no-safe", to === own ? "own wallet" : "outside");
+  }
+  assert.deepEqual([sent.length, tries(), sheets.length], [0, 0, 0]);
 });
 
 test("decision A: the phone (no web door) is unchanged: sendPlain gets no gate, so an outside send never asks a password there", () => {
@@ -278,19 +254,6 @@ test("web wallet: the root and the words go in one write (putAll); a failed writ
   Object.defineProperty(single, "putAll", { value: undefined });
   assert.notEqual(code(await webCore(single).call("account.web.import", { words: WORDS })), "ok");
   assert.equal(await single.get(WEB_WORDS), null);
-});
-
-test("QA (5 Nov, the merge of decision A with the outside-send ruling): on the web an outside $3 Send is ONE password check and no approval sheet; a wrong one sends nothing", async () => {
-  const { core, sheets, sent, tries } = sendingCore();
-  ok(await core.call("account.web.import", { words: WORDS }));
-  const right = ok(await core.call<{ status: string }>("subwallet.send", { app: "wallet", chain: "hood", to: TO_EVM, amount: "0.001", password: PASSWORD }));
-  assert.notEqual(right.status, "declined");
-  assert.equal(tries(), 1, "one password check");
-  assert.equal(sheets.length, 0, "no approval.needed: the password was the ask");
-  assert.equal(sent.length, 1);
-  const wrong = await core.call("subwallet.send", { app: "wallet", chain: "hood", to: TO_EVM, amount: "0.001", password: "wrong password here" });
-  assert.equal(code(wrong), "security.web.password");
-  assert.deepEqual([sent.length, sheets.length], [1, 0], "a wrong password: nothing sent, no sheet");
 });
 
 test("W7: the web door lets AgentZero use its mailbox, its own wallet (read, pay, ticket, fill, set-up) and a dry price; never empty, an act, a pocket, a spend, a send or a signature (control: Wallet still can't call AgentZero's wallet)", async () => {

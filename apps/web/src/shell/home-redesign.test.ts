@@ -309,6 +309,21 @@ test("home/add2: SOL or ETH the NEAR wallet holds (an Add's forward that stopped
   assert.deepEqual(home.homeRows(s, []).find((r) => r.chain === "near")!.coins, []);
 });
 
+test("bug hunt, 4 Nov item 1: a coin bought in place is a row of the NEAR wallet with its dollars, added to its figure (not in reserveUsd); no price: its amount, and the row says it left it out", () => {
+  const s = { ...SPENDING, reserveUsd: "40.00", networks: [] } as unknown as SpendingStatus;
+  const own = [
+    { key: "near:nep141:zec.omft.near", tokenId: "nep141:zec.omft.near", address: "zec.omft.near", symbol: "ZEC", amount: "0.01", raw: "1000000", usd: "10.00" },
+    { key: "near:nep141:np.near", tokenId: "nep141:np.near", address: "np.near", symbol: "NP", amount: "2.5", raw: "250", usd: null },
+  ];
+  const near = home.homeRows(s, [{ chain: "near", address: "zec.omft.near", symbol: "ZEC", amount: "0.01", usd: "10.00" }], [], own).find((r) => r.chain === "near")!;
+  assert.equal(near.usd, "50.00", "$40.00 cash + $10.00 of ZEC: the swap's dollars stay in the total");
+  assert.deepEqual(near.coins.map((c) => [c.symbol, c.amount, c.usd]), [["Cash", "", "40.00"], ["ZEC", "0.01", "10.00"], ["NP", "2.5", null]], "Trade's ZEC position is the same coin: listed once");
+  assert.equal(near.uncounted, true);
+  // control: the balance unread, Trade's positions as before (the bug: a coin bought in place was in neither)
+  const before = home.homeRows(s, [], []).find((r) => r.chain === "near")!;
+  assert.deepEqual([before.usd, before.coins, before.uncounted], ["40.00", [], undefined]);
+});
+
 test("the rows: SOL, ETH (RH) and NEAR always ($0.00 too); BNB only open and funded; a row is its native coin, a held coin its own sub-row (never counted twice); NEAR in dollars with what it holds under it, never a NEAR amount made from USDC", () => {
   const s = { ...SPENDING, reserveUsd: "37.90", networks: [
     { network: "sol", name: "Solana", cashUsd: "0.00", coinsUsd: "0.00", readyUsd: "0", nativeAmount: "0" },

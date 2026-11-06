@@ -40,7 +40,7 @@ export function sendPayoutNamed(facts: IntentsFacts, out: SendPayout): boolean {
  * The block (the UI lead's rulings, 5 Nov): "Your Safe sends · $Y" (the move in's amountIn, the bytes' own), "Stays in
  * Private · $Z" (left out at 0); `gets` is $T (the payout's amountIn, what leaves Private to them), said in brackets on
  * the sheet's one "They get" line after the signed coin figure (intents.ts: "They get · 1.2345 SOL ($40.00)", the audit's
- * MUST 4); Y = Z + T always, in whole cents. `to`: whom it pays, the full address open, never folded (D37 and the audit's
+ * MUST 4); Y = Z + T + what the move in itself costs, in whole cents. `to`: whom it pays, the full address open, never folded (D37 and the audit's
  * MUST). Null: a coin the core can't name.
  */
 
@@ -52,17 +52,24 @@ export function sendFillWords(q: QuoteFacts, s: SendPayout, facts: IntentsFacts)
   const unit = (u: bigint) => (dollar ? u / 10n ** BigInt(c.decimals - 2) : u);
   const say = (v: bigint): string => (dollar ? `$${(v / 100n).toLocaleString("en-US")}.${String(v % 100n).padStart(2, "0")}` : fourPlacesText(`${formatAmount(v, c.decimals)} ${c.symbol}`));
   const safeRaw = BigInt(q.amountIn), pays = BigInt(s.amountIn) > safeRaw ? safeRaw : BigInt(s.amountIn);
-  const together = unit(pays), stays = unit(safeRaw) - together;
+  // the audit (6 Nov): what stays is what the move in signs to bring (its amountOut) less the payout, so its own cost is never
+  // said as money staying; no figure, or one above what went in: the bytes' amountIn, as before
+  const brought = isUnits(q.amountOut) && BigInt(q.amountOut) <= safeRaw ? BigInt(q.amountOut) : safeRaw;
+  const together = unit(pays), sends = unit(safeRaw), stays = brought > pays ? unit(brought) - together : 0n;
   // QA's Sim walk (5 Nov): what the payee's coin is worth (the signed amountOutUsd), and the network fees the payout
   // pays (T less that, in whole cents; T in dollars: the dollar coin's own figure, else the quote's amountInUsd), named
   const outC = centsOf(s.amountOutUsd), tC = dollar ? together : centsOf(s.amountInUsd);
-  const feesC = outC !== null && tC !== null && tC > outC ? tC - outC : 0n;
+  const payoutC = outC !== null && tC !== null && tC > outC ? tC - outC : 0n;
+  // the move in's own cost joins them: a dollar coin's by its units, any other by the quote's two dollar figures
+  const inOutC = centsOf(q.amountOutUsd), inInC = centsOf(q.amountInUsd);
+  const moveInC = dollar ? sends - unit(brought) : inInC !== null && inOutC !== null && inInC > inOutC ? inInC - inOutC : 0n;
+  const feesC = payoutC + moveInC;
   // every outside sheet (QA's D37 condition, 5 Nov; subwallets.ts OUTSIDE_WORDS): the FULL address first,
   // unfolded, then where the payee's side lands in the copy review's words ("Public on Solana.", or "Private." into a private balance)
   const net = s.recipientType === "CONFIDENTIAL_INTENTS" ? null : landsOn(s.destinationAsset, s.recipientType);
   return {
     title: `Send ${say(together)} from your Safe`,
-    lines: [`${SEND_LEG_WORDS.sends} · ${say(together + stays)}`, ...(stays > 0n ? [`${SEND_LEG_WORDS.stays} · ${say(stays)}`] : []), ...(feesC > 0n ? [SEND_LEG_WORDS.fees(dollarsText(feesC))] : [])],
+    lines: [`${SEND_LEG_WORDS.sends} · ${say(sends)}`, ...(stays > 0n ? [`${SEND_LEG_WORDS.stays} · ${say(stays)}`] : []), ...(feesC > 0n ? [SEND_LEG_WORDS.fees(dollarsText(feesC)), SEND_LEG_WORDS.kept] : [])],
     gets: outC !== null ? dollarsText(outC) : "",
     to: `To ${s.recipient}`,
     seen: s.recipientType === "CONFIDENTIAL_INTENTS" ? "Private." : net ? `Public on ${net}.` : "Anyone can see it land.",

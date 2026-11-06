@@ -17,6 +17,7 @@ import type { Bridge } from "@zerofee/core/bridge";
 import type { Problem } from "@zerofee/core/problem";
 import type { TxOutcome } from "@zerofee/core/signer";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
+import { oneAtATime } from "./one-at-a-time.ts";
 import type { AppModule } from "@zerofee/shell-api/app-module.ts";
 import { AppFrame, PushedFrame, useShell, type TrayItem } from "@zerofee/shell-api/AppFrame.tsx";
 import { agentZeroSteps, onAgentZeroStep, type AgentZeroStep } from "@zerofee/shell-api/agentzero-steps.ts";
@@ -37,10 +38,10 @@ import { AGENT_PRIVATE_ROUTE } from "@zerofee/core/agent-route";
 import type { ChatSheet } from "../chat/turn.ts";
 import { MEMORY_KIND_WORDS, memoryStore, type MemoryLine } from "../zero/memory.ts";
 import { onDemoPage } from "@zerofee/shell-api/release.ts";
-import { ADD_BUTTON, FUND_AMOUNTS, FUND_BUTTON, FUND_JOB_WORDS, FUND_TITLE, fillFundJob, fundJob, fundLines, jobCostLine, walletRow } from "./fund-words.ts";
+import { ADD_BUTTON, addable, FUND_AMOUNTS, FUND_BUTTON, FUND_JOB_WORDS, FUND_TITLE, fillFundJob, fundJob, fundLines, jobCostLine, STOP_BACK_DONE, STOP_BACK_LINE, walletRow } from "./fund-words.ts";
 import { onOwnApproval } from "@zerofee/shell-api/job-run.ts";
 import { receiptLeft } from "@zerofee/shell-api/job-steps.ts";
-import { startJob as startMoneyJob, type JobHandle } from "@zerofee/shell-api/job-start.ts";
+import { startJob as startMoneyJob, watchShown, type JobHandle } from "@zerofee/shell-api/job-start.ts";
 
 /** What the chat's card says for something AgentZero can't do yet (an act while AGENT_ACT is off). */
 const CANT_YET = "AgentZero can't do this yet.";
@@ -59,6 +60,7 @@ import { CANNOT_LINE, readJob, type Allowance, type Reading, type RuleFault } fr
 import { Send } from "./icons.tsx";
 import { AppBrowser, AppHome, Check, Copy } from "@zerofee/design/icons.tsx";
 import { LeaderCard } from "./LeaderCard.tsx";
+import { LeaderField } from "./LeaderField.tsx";
 import { AzLead } from "./AzLead.tsx";
 import { offersTurnOn, pausedUntil, pocketFrom, readWithin, type PocketRead } from "./pocket-read.ts";
 /** Concept v3.1: a soft glyph per job on the start page (design icons; a glyph, never a logo). */
@@ -95,14 +97,18 @@ export interface AgentState {
   lastLimitUsd?: number;
   /** Until when the account's dispute pauses AgentZero's spending (dispute_until, QA). */
   pausedUntilIso?: string;
+  /** The Sim: what is really in its wallet (the funding took it from the sample Safe). */
+  heldUsd?: number;
+  /** The Sim: a higher limit or a turn-on still waiting on the account, as the account has it. */
+  waiting?: Raise;
 }
 
 
 /** The core's view in dollars: USDC 1:1, NEAR at today's price. */
 export function agentState(view: unknown, nearUsd: number): AgentState | null {
   if (!view || typeof view !== "object") return null;
-  const v = view as { limitUsd?: number; lastLimitUsd?: number; disputeUntilNs?: string; spentTodayUsd?: string; sample?: boolean; people?: string[]; budget?: { coins?: { coin: string; per_day: string }[]; recipients?: string[]; ends_at_ns?: string }; spent?: [string, string, string][] };
-  if (typeof v.limitUsd === "number") return { limitUsd: v.limitUsd, spentUsd: Number(v.spentTodayUsd ?? 0), sample: v.sample === true, people: Array.isArray(v.people) ? v.people : [], ...(typeof v.lastLimitUsd === "number" ? { lastLimitUsd: v.lastLimitUsd } : {}), ...pausedUntil(v.disputeUntilNs) };
+  const v = view as { limitUsd?: number; lastLimitUsd?: number; heldUsd?: number; waiting?: Raise; disputeUntilNs?: string; spentTodayUsd?: string; sample?: boolean; people?: string[]; budget?: { coins?: { coin: string; per_day: string }[]; recipients?: string[]; ends_at_ns?: string }; spent?: [string, string, string][] };
+  if (typeof v.limitUsd === "number") return { limitUsd: v.limitUsd, spentUsd: Number(v.spentTodayUsd ?? 0), sample: v.sample === true, people: Array.isArray(v.people) ? v.people : [], ...(typeof v.lastLimitUsd === "number" ? { lastLimitUsd: v.lastLimitUsd } : {}), ...(typeof v.heldUsd === "number" ? { heldUsd: v.heldUsd } : {}), ...(v.waiting ? { waiting: v.waiting } : {}), ...pausedUntil(v.disputeUntilNs) };
   const usd = (coin: string, units: string) => (coin === USDC_ID ? Number(units) / 1e6 : coin === WNEAR_ID || coin === "near" ? (Number(units) / 1e24) * nearUsd : 0);
   const limit = (v.budget?.coins ?? []).find((c) => c.coin === USDC_ID) as { coin: string; per_day: string; convert_per_day?: string } | undefined;
   return { anyAddressUsd: limit?.convert_per_day ? Number(limit.convert_per_day) / 1e6 : 0, limitUsd: limit ? usd(USDC_ID, limit.per_day) : 0, spentUsd: (v.spent ?? []).reduce((t, [c, day]) => t + usd(c, day), 0), sample: false, people: Array.isArray(v.budget?.recipients) ? v.budget.recipients : [], endsAtNs: v.budget?.ends_at_ns, ...pausedUntil(v.disputeUntilNs) };
@@ -180,7 +186,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
   const [replies, setReplies] = useState<ReplyRow[]>(() => replyRows(taskStore().list()));
   useEffect(() => taskStore().subscribe(() => setReplies(replyRows(taskStore().list()))), []);
   // a higher its wallet waiting its safety wait (page-rows.ts), kept on this phone
-  const [raise, setRaiseState] = useState<Raise | null>(null);
+  const [raiseKept, setRaiseState] = useState<Raise | null>(null);
   useEffect(() => {
     void bridge.call<{ value: string | null }>("device.store.get", { key: RAISE_KEY }).then((r) => "ok" in r && setRaiseState(readRaise(r.ok?.value)));
   }, [bridge]);
@@ -190,7 +196,9 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
   };
   const [sheet, setSheet] = useState<SheetState | null>(null);
   /** Funding's job was made (its Safe's yes): what it adds and where from, until Done. */
-  const [funded, setFunded] = useState<{ amount: string; from: string; endsAt: number } | null>(null);
+  const [funded, setFunded] = useState<{ amount: string; from: string; endsAt: number; landedAt?: number } | null>(null);
+  // W9-5b: its core's answer landed it: the receipt stops saying "About 10 s left" and "It keeps going" over money already there
+  const fundedLanded = () => setFunded((f) => (f ? { ...f, landedAt: Date.now() } : f));
   const [why, setWhy] = useState<Receipt | null>(null);
   const [proof, setProof] = useState<Proof | null>(null);
   const [checking, setChecking] = useState(false);
@@ -200,7 +208,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
   const [allowance, setAllowance] = useState<Allowance | null>(null);
   const [hasOwnKey, setHasOwnKey] = useState(false);
   const [readBy, setReadBy] = useState<"allowance" | "own-key" | null>(null);
-  const [startsAt, setStartsAt] = useState<string | null>(null);
+  const [startsAtKept, setStartsAt] = useState<string | null>(null);
   const [computerAt, setComputerAt] = useState<string | null>(null);
   // "Ask me above $X" (FLOW-V5 §5 item 1): kept by the core on this device; undefined while it's read.
   const [askAbove, setAskAboveState] = useState<number | null | undefined>(undefined);
@@ -278,6 +286,10 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
   }, [shell.active, read]);
 
   const on = !!agent && agent.limitUsd > 0;
+  // hunt (042, 6 Nov walk): what waits is the account's own answer in the Sim, so a Cancel in Waiting, a Stop or a reload
+  // leaves no "Goes up to $50" and no lost "AgentZero starts" behind
+  const raise = agent?.sample ? (on ? agent.waiting ?? null : null) : raiseKept;
+  const startsAt = agent?.sample ? (on ? null : agent.waiting?.atIso ?? null) : startsAtKept;
   const pocketUsd = on ? agent.limitUsd : 0;
   const starts = (kind: JobKind) => jobStarts(kind, { sample: agent?.sample === true, pocket: !noPocket });
   // Safe pocket money only where the core grants that key (QA: never with AgentZero's own wallet on)
@@ -350,7 +362,8 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
       else if (r.ok.status === "waiting") j.made([]);
       else if (r.ok.status === "declined") j.gone();
       else shell.tasks?.end(j.id, "failed", r.ok.status === "problem" ? r.ok.problem.whatHappened : FUND_JOB_WORDS.stopped);
-      if (!("ok" in r && r.ok.status === "done")) setFunded(null);
+      if ("ok" in r && r.ok.status === "done") fundedLanded();
+      else setFunded(null);
     }
     if ("problem" in r) {
       // S2: the account's rules have no its wallet after all (release 9): say so in AgentZero's words, never "isn't
@@ -367,6 +380,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
       // on already: a higher limit waits, the one in force stays (the row says both); off: AgentZero starts then
       if (on) setRaise({ usd, atIso: r.ok.readyAtIso });
       else setStartsAt(r.ok.readyAtIso);
+      await read();
       return true;
     }
     if (r.ok.status !== "done") {
@@ -396,12 +410,20 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
       const end = await fillJob({ bridge, tasks, usd, tap, key: `agent-fill-${Date.now().toString(36)}`, made: () => { setSheet(null); setFunded({ ...f.said, endsAt: Date.now() + f.job.etaSec * 1000 }); } });
       if ("refused" in end) { setFunded(null); void shell.showProblem(end.refused); }
       else if ("declined" in end || "problem" in end) setFunded(null); // a no takes the row away; a refusal's row says why (rule 8)
-      else { tasks?.end(end.job.id, "done", FUND_JOB_WORDS.done); void read(); }
+      else { tasks?.end(end.job.id, "done", FUND_JOB_WORDS.done); fundedLanded(); void read(); }
     } finally {
       pocketBusy.current = false;
       setBusy(false);
     }
   };
+
+  // hunt (013/014, 6 Nov): a second click before the screen redraws: one job, one Stop, one payment, never two sheets
+  const acting = useRef(false);
+  const once = oneAtATime(acting);
+  // a kill switch has its own gate: a Start that hangs never swallows a Stop (audit, 6 Nov)
+  const stopping = useRef(false);
+  const onceStop = oneAtATime(stopping);
+  const [stopBusy, setStopBusy] = useState(false);
 
   const startJob = async (terms: JobTerms) => {
     // The pay list lives on the account (budget.recipients): starting it is the core's Approve, on or off. Another
@@ -455,6 +477,8 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
       const left = "ok" in c ? (c.ok.outcomes ?? []).length - c.ok.cancelled : 0;
       if ("ok" in c && c.ok.cancelled > 0) {
         setStartsAt(null);
+        setRaise(null);
+        void read();
         why.push("The change still waiting on your account was cancelled.");
       }
       if (!("ok" in c)) why.push("NEAR didn't answer. A change may still be waiting. Look in Waiting.");
@@ -475,8 +499,10 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
 
   const stopAll = async () => {
     setBusy(true);
+    setStopBusy(true);
     const r = await bridge.call<TxOutcome>("account.agent.revoke");
     setBusy(false);
+    setStopBusy(false);
     if ("problem" in r) return void shell.showProblem(r.problem as Problem);
     if (r.ok.status !== "done") return;
     saveJobs((js) => js.map((j) => ({ ...j, on: false })));
@@ -487,7 +513,8 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
     // limit that was in force, not the dropped raise (hunt 5 Nov, 042)
     setRaise(null);
     if (on && (POCKET_CHOICES as readonly number[]).includes(Math.round(pocketUsd))) setChoice(Math.round(pocketUsd));
-    addReceipts([makeReceipt({ kind: "note", jobId: "", line: "Stopped AgentZero. Its key is off your account." }, Date.now(), ["You stopped AgentZero.", "Its key came off your account. Every job stopped.", "Your receipts stay here."])]);
+    const back = agent?.sample ? agent.heldUsd ?? 0 : 0;
+    addReceipts([makeReceipt({ kind: "note", jobId: "", line: "Stopped AgentZero. Its key is off your account." }, Date.now(), ["You stopped AgentZero.", "Its key came off your account. Every job stopped.", ...(back > 0 ? [STOP_BACK_DONE(back)] : []), "Your receipts stay here."])]);
     setSheet(null);
     setStartsAt(null);
     await read();
@@ -773,7 +800,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
         <div className="ag-rows ag-rows--tight">
           <button className="ag-row" disabled={pocket.k === "reading"} onClick={() => (pocket.k === "unread" ? void read() : offersTurnOn(pocket) ? setSheet({ kind: "pocket" }) : undefined)}>
             <span>
-              <span className="t">{walletRow(on ? Math.max(0, Math.round((pocketUsd - Math.max(today, agent.spentUsd)) * 100) / 100) : 0)}</span>
+              <span className="t">{walletRow(on ? agent.heldUsd ?? Math.max(0, Math.round((pocketUsd - Math.max(today, agent.spentUsd)) * 100) / 100) : 0)}</span>
               <span className="d">{pocket.k === "reading" ? "Looking at your account…" : pocket.k === "unread" ? (pocket.problem?.whatHappened ?? POCKET_UNREAD_LINE) : on && raiseShown(raise, on, pocketUsd) ? `Goes up to ${dollars(raise!.usd)} on ${new Date(raise!.atIso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}. Spent so far: ${dollars(Math.max(today, agent.spentUsd))}.` : on && agent.pausedUntilIso ? pausedLine(agent.pausedUntilIso) : on ? `Spent so far: ${dollars(Math.max(today, agent.spentUsd))}.${ownWalletWords().row ? ` ${ownWalletWords().row}` : ""}` : startsAt ? `AgentZero starts ${new Date(startsAt).toLocaleString("en-US", { weekday: "long", hour: "numeric", minute: "2-digit" })}.` : "Off. Fund it to turn AgentZero on."}</span>
             </span>
             <span className="v">›</span>
@@ -875,14 +902,14 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
           })()}
           <div className="zf-label ag-section">How much</div>
           <div className="ag-pick" role="radiogroup" aria-label="How much">
-            {FUND_AMOUNTS.map((c) => (
+            {addable(FUND_AMOUNTS, on && pocketHere ? pocketUsd : 0).map((c) => (
               <button key={c} className={`ag-chip${choice === c ? " on" : ""}`} role="radio" aria-checked={choice === c} onClick={() => setChoice(c)}>{`$${c}`}</button>
             ))}
           </div>
           {pocketHere && <p className="zf-small ag-under">{pocketWaitLine(recoveryDelay, agent ? pocketAtOnce({ on, sample: agent.sample, limitUsd: pocketUsd, ...(agent.lastLimitUsd !== undefined ? { lastLimitUsd: agent.lastLimitUsd } : {}), choiceUsd: choice }) : undefined)}</p>}
           <div className="ag-sheet-floor">
             {pocketHere ? (
-              <button className="zf-btn" disabled={busy || (on && Math.round(pocketUsd) === choice)} onClick={() => void setPocket(choice, runningList(jobs), needsAnyAddress(jobs), true).then((ok) => ok && setSheet(null))}>{ADD_BUTTON}</button>
+              <button className="zf-btn" disabled={busy || !(choice > (on ? pocketUsd : 0)) || agent?.waiting?.usd === choice} onClick={() => void setPocket(choice, runningList(jobs), needsAnyAddress(jobs), true).then((ok) => ok && setSheet(null))}>{ADD_BUTTON}</button>
             ) : (
               // the real fill: the core checks this trusted tap on the element marked with its amount (wallet-fill.ts)
               <button className="zf-btn" disabled={busy} data-agentzero-fill={String(Math.round(choice * 1e6))} onClick={(e) => void fillOwn(choice, e.nativeEvent)}>{ADD_BUTTON}</button>
@@ -898,14 +925,14 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
             <p className="zf-receipt__amount">{funded.amount}</p>
             <p className="zf-receipt__head">{JOB_WORDS.created}</p>
             <p className="zf-receipt__line" data-testid="az-fund-from">{funded.from}</p>
-            <p className="zf-receipt__line" data-testid="job-time-left">{receiptLeft(funded.endsAt, Date.now())}</p>
-            <p className="zf-receipt__line">{JOB_WORDS.watch}</p>
+            <p className="zf-receipt__line" data-testid="job-time-left">{receiptLeft(funded.endsAt, Date.now(), undefined, funded.landedAt)}</p>
+            {watchShown(funded.landedAt) && <p className="zf-receipt__line">{JOB_WORDS.watch}</p>}
           </div>
           <div className="ag-sheet-floor"><button className="zf-btn" onClick={() => setFunded(null)} data-testid="az-fund-done">Done</button></div>
         </Sheet>
       )}
 
-      {sheet?.kind === "job" && <JobSheet sheet={sheet} running={jobOf(sheet.terms.kind)} agentOn={on || !pocketHere} sample={agent?.sample === true} pocketUsd={sheetPocketUsd} busy={busy} onStart={(t) => void startJob(t)} onStop={stopJob} oldPocket={() => bridge.call<{ oldPocket?: true }>("account.agent.pocket").then((r) => "ok" in r && r.ok.oldPocket === true)} onEmpty={() => bridge.call<{ status?: string; declined?: true }>("account.agent.pocketEmpty").then((r) => ("problem" in r ? r.problem.more ?? r.problem.whatHappened : "declined" in r.ok ? null : r.ok.status === "done" ? "It's in your SOL wallet." : "Sent. Check Activity."))} onPocket={pocketHere ? () => setSheet({ kind: "pocket" }) : undefined} onClose={() => setSheet(null)} />}
+      {sheet?.kind === "job" && <JobSheet sheet={sheet} running={jobOf(sheet.terms.kind)} agentOn={on || !pocketHere} sample={agent?.sample === true} pocketUsd={sheetPocketUsd} busy={busy} onStart={(t) => void once(startJob)(t)} onStop={onceStop(stopJob)} oldPocket={() => bridge.call<{ oldPocket?: true }>("account.agent.pocket").then((r) => "ok" in r && r.ok.oldPocket === true)} onEmpty={() => bridge.call<{ status?: string; declined?: true }>("account.agent.pocketEmpty").then((r) => ("problem" in r ? r.problem.more ?? r.problem.whatHappened : "declined" in r.ok ? null : r.ok.status === "done" ? "It's in your SOL wallet." : "Sent. Check Activity."))} onPocket={pocketHere ? () => setSheet({ kind: "pocket" }) : undefined} onClose={() => setSheet(null)} />}
 
       {sheet?.kind === "pay" && (
         <Sheet title="Pay once" onClose={() => setSheet(null)}>
@@ -920,9 +947,9 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
             {!on ? (
               <button className="zf-btn" disabled={busy} onClick={() => setSheet({ kind: "pocket" })}>{FUND_BUTTON}</button>
             ) : !jobOf("pay-list") ? (
-              <button className="zf-btn" disabled={busy} onClick={(e) => void payOnce(sheet.id, sheet.to, sheet.usd, e.nativeEvent)}>Make a pay list</button>
+              <button className="zf-btn" disabled={busy} onClick={(e) => void once(payOnce)(sheet.id, sheet.to, sheet.usd, e.nativeEvent)}>Make a pay list</button>
             ) : (
-              <button className="zf-btn" data-agentzero-pay={sheet.id} disabled={busy || payCheck === null || !!payCheck.cannot} onClick={(e) => void payOnce(sheet.id, sheet.to, sheet.usd, e.nativeEvent)}>{`Pay ${dollars(sheet.usd)}`}</button>
+              <button className="zf-btn" data-agentzero-pay={sheet.id} disabled={busy || payCheck === null || !!payCheck.cannot} onClick={(e) => void once(payOnce)(sheet.id, sheet.to, sheet.usd, e.nativeEvent)}>{`Pay ${dollars(sheet.usd)}`}</button>
             )}</div>
         </Sheet>
       )}
@@ -960,7 +987,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
           {agent?.sample && <p className="zf-small">On the web demo this uses sample money.</p>}
           <p className="zf-small">Next: what AgentZero would do and the most it can cost, then your yes. Never your Safe.</p>
           <div className="ag-sheet-floor">
-            <button className="zf-btn" disabled={busy} onClick={() => void runAct(sheet)}>Continue</button>
+            <button className="zf-btn" disabled={busy} onClick={() => void once(runAct)(sheet)}>Continue</button>
           </div>
         </Sheet>
       )}
@@ -1026,9 +1053,10 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
           <div className="ag-rows">
             <div className="ag-row"><span className="t">AgentZero's key comes off your account now.</span></div>
             <div className="ag-row"><span className="t">Every job stops. Nothing more moves.</span></div>
+            {agent?.sample && (agent.heldUsd ?? 0) > 0 && <div className="ag-row"><span className="t">{STOP_BACK_LINE(agent.heldUsd ?? 0)}</span></div>}
             <div className="ag-row"><span className="t">Your receipts stay here.</span></div>
           </div>
-          <div className="ag-sheet-floor"><button className="zf-btn" disabled={busy} onClick={() => void stopAll()}>Approve</button></div>
+          <div className="ag-sheet-floor"><button className="zf-btn" disabled={stopBusy} onClick={() => void onceStop(stopAll)()}>Approve</button></div>
         </Sheet>
       )}
     </Frame>
@@ -1058,12 +1086,12 @@ function JobSheet({ sheet, running, agentOn, sample, pocketUsd, busy, onStart, o
   }, [sheet.terms.kind, sample]);
   return (
     <Sheet title={s.title} onClose={onClose}>
+      {/* a scroll box and a floor, as Send: the card ends above the button whatever it holds */}
+      <div className="ag-sheet-column">
+      <div className="ag-sheet-scroll">
       {sheet.said && <p className="zf-small ag-said">{`You said: “${sheet.said.words}”${sheet.said.by === "claude" ? " · read by Claude" : ` · read on ${thisDevice()}`}`}</p>}
       {terms.kind === "copy" && !isRunning && (
-        <label className="ag-field">
-          <span className="zf-small">The wallet to copy</span>
-          <textarea className="ag-address" rows={2} value={terms.leader} placeholder="Paste a Solana address" autoComplete="off" spellCheck={false} onChange={(e) => setTerms({ ...terms, leader: e.target.value.trim() })} />
-        </label>
+        <LeaderField value={terms.leader} onChange={(leader) => setTerms({ ...terms, leader })} />
       )}
       {/* ST-C: the wallet's report card before it is copied (read-only, from Solana's own record) */}
       {terms.kind === "copy" && !isRunning && <LeaderCard wallet={terms.leader} sample={sample} />}
@@ -1106,12 +1134,14 @@ function JobSheet({ sheet, running, agentOn, sample, pocketUsd, busy, onStart, o
       {moved && <p className="zf-small ag-under">{moved}</p>}
       {/* test: every job says its rough cost before it runs, at the model's own price (fund-words.ts) */}
       {!isRunning && <p className="zf-small ag-under ag-cost">{jobCostLine()}</p>}
+      </div>
       <div className="ag-sheet-floor">
         {isRunning && running ? (
           <button className="zf-btn" onClick={() => void onStop(running)}>Stop this job</button>
         ) : (
           <button className="zf-btn" disabled={busy || !!problem || s.button === "Not yet"} onClick={() => onStart(terms)}>{s.button}</button>
         )}
+      </div>
       </div>
     </Sheet>
   );

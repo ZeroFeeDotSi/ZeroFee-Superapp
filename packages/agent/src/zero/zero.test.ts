@@ -195,7 +195,10 @@ test("A-12: every job's sheet says first what AgentZero would do, the most each 
   const copy = { ...terms("copy"), leader: "So1anaLeader1111111111111111111111111111111" } as const;
   const s = sheet(copy, { agentOn: true, pocketUsd: 20 });
   // the sheet says its own day limit once below, so no "3 steps, $20 most a day." line (e2e walk 3 Nov, QA test)
-  assert.deepEqual(s.lines.slice(0, 6), ["Here's what I'd do:", "1. Watch the wallet you picked on pump.fun, every 5 seconds.", "2. When it buys a coin, buy $5.00 of it.", "3. Sell it when it's up 50%.", "Never takes from your Safe.", "It spends at most $20.00 in any 24 hours."]);
+  assert.deepEqual(s.lines.slice(0, 6), ["Here's what I'd do:", "1. Watch the wallet you picked on pump.fun, every 5 seconds.", "2. When it buys a coin, buy $5.00 of it.", "3. Sell it when it's up 50%.", "It spends at most $20.00 in any 24 hours.", "Trades only from AgentZero's own wallet. Never your Safe or your wallets."]);
+  // copy review, 6 Nov: the Safe is said once; control: the sign-in job keeps its own line below
+  assert.ok(!s.lines.includes("Never takes from your Safe."));
+  assert.equal(s.lines.filter((l) => l.includes("Never your Safe")).length, 1);
   assert.equal(jobDryRun(copy).mostUsd, copy.perDayUsd, "the most equals the job's own day limit");
   assert.ok(!jobDryRun(terms("keep")).lines.includes("Never takes from your Safe."), "the keep job draws from the Safe: never says otherwise");
   assert.ok(jobDryRun(terms("pay-list")).lines.includes("Never anyone off your list."));
@@ -233,15 +236,16 @@ test("the pocket fix rows show only under the pocket refusal itself (QA, 3 Nov: 
   assert.deepEqual(pocketFix(good, 20), { ...good, perDayUsd: 20, perTradeUsd: Math.min(good.perTradeUsd, 20) });
 });
 
-test("D116 dead ends 13/14: on a real account (private route shut) Keep and Pay my list aren't offered; sample money offers all but Keep (control; hunt 5 Nov 040: the Sim's Keep moved nothing)", () => {
+test("D116 dead ends 13/14: while the private route is shut Keep and Pay my list aren't offered, on a real account or in the Sim (control: the jobs that run; hunt 5 Nov 040; gates note 6 Nov)", () => {
   assert.equal(AGENT_PRIVATE_ROUTE, false, "this test describes the route shut");
   assert.deepEqual(offeredJobs(false), ["copy", "sign-in"]);
-  assert.deepEqual(offeredJobs(true), ["copy", "pay-list", "sign-in"], "control: sample money");
+  assert.deepEqual(offeredJobs(true), ["copy", "sign-in"], "the Sim shows only jobs the app has");
+  assert.equal(jobOffered("pay-list", true), false);
   assert.equal(jobOffered("pay-list", false), false);
   assert.equal(jobOffered("keep", false), false);
   assert.equal(jobOffered("copy", false), true, "control");
-  assert.equal(jobsLine(false), "AgentZero does two jobs: copy a wallet and sign you in.");
-  assert.equal(jobsLine(true), "AgentZero does three jobs: copy a wallet, pay your list and sign you in.");
+  assert.equal(jobsLine(false), "AgentZero does two jobs: copy a wallet, and sign you in.");
+  assert.equal(jobsLine(true), "AgentZero does two jobs: copy a wallet, and sign you in.");
   assert.equal(NO_PAY_LINE, "AgentZero can't pay people yet: private payments are off. Use Send in Chat. Nothing moved.");
 });
 

@@ -23,6 +23,8 @@ import { amountOf, chainName, placeOf, receiveChainFor, titleOf, type Line } fro
 import { TrayBalance, TrayConvert } from "./icons.tsx";
 import { WalletProvider, WalletRuntimeContext, useWallet } from "./runtime.tsx";
 import { setHistory } from "@zerofee/shell-api/history-slot.ts";
+import { taskStore } from "@zerofee/shell-api/tasks.ts";
+import { sealJobs } from "@zerofee/shell-api/job-start.ts";
 import { ShellContext } from "@zerofee/shell-api/shell-context.ts";
 import { later } from "./later.tsx";
 import { FRESH, loadSetup, nextStep, saveSetup, type SetupState } from "./setup.ts";
@@ -33,7 +35,7 @@ const Coin = later<Parameters<typeof import("./screens/Coin.tsx").Coin>[0]>(
   () => <p className="zf-small" role="status">This didn't open. <button className="zf-link" onClick={() => location.reload()}>Try again</button></p>,
 );
 import { Home } from "./screens/Home.tsx";
-import { safeCoinRoute } from "./screens/safe-hot.ts";
+import { privateDoor, safeCoinRoute } from "./screens/safe-hot.ts";
 import { NavRow } from "./screens/NavRow.tsx";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { NATIVE_COINS, onDemoPage, privateOpen, webWallet } from "@zerofee/shell-api/release.ts";
@@ -43,6 +45,7 @@ import { OnYourPhone } from "@zerofee/shell-api/OnYourPhone.tsx";
 import { askedUsd, backLink, readBack, type BackTo } from "@zerofee/shell-api/back-to.ts";
 import { TEST_NOTE, dismissNote, isTestNote, noteDismissed } from "./test-note.ts";
 import { codeGate } from "./money/code-gate.ts";
+import { watchSwapEnds } from "./money/swap-ended.ts";
 /** The pickers (a network, a coin to convert or move): asked for when one opens, outside Home's first load (the speed
  *  budget); drawn the moment their code is here. */
 const pickers = codeGate(() => import("./screens/Sheets.tsx"));
@@ -137,6 +140,19 @@ function WalletScreens() {
     ));
   });
   useEffect(() => () => setHistory(null), []);
+  // a swap in place still running when the page went (a reload mid-swap, bug hunt item 3) is picked up from the core's own
+  // moves and followed to its end, once the job rows are back from Home's sealed store (sealJobs: until then this page has
+  // none); its code loads only when there is one
+  useEffect(() => {
+    void sealJobs(bridge).then(() => {
+      const pending = taskStore().list().filter((t) => t.app === "home" && t.state === "pending" && t.id.startsWith("swap:"));
+      if (pending.length) void import("./money/swap-inplace.ts").then((m) => m.resumeInplace({ bridge, tasks: shell.tasks, pending }), () => undefined);
+    }, () => undefined);
+  }, []);
+  // however it was followed, a swap in place's end reads the money again at once (real-tap proof, 6 Nov: after a reload nothing did)
+  const readAgain = useRef(refresh);
+  readAgain.current = refresh;
+  useEffect(() => watchSwapEnds(taskStore(), () => readAgain.current()), []);
   const asked = shell.requestedTab;
   const [tab, setTab] = useState<Tab>("balance");
   /** A Security place asked for ("security/protection"): that place inside Home; "security/activity": Activity's Account. */
@@ -368,6 +384,11 @@ function WalletScreens() {
   useEffect(() => {
     if (privateOpen() && !web && view.kind === "tabs" && pocket?.available && !pocket.ready) void ensurePrivate();
   }, [pocket?.available, pocket?.ready, view.kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A build with no relay can't use Private (ledger: pocket.available false), so a link to it lands on Home, as Home has
+  // no door there: never a "Set up" that can only fail (rule 1). Unread (null) isn't a no.
+  useEffect(() => {
+    if ((view.kind === "private" || view.kind === "toPrivate") && pocket && !privateDoor(pocket, privateOpen())) setView({ kind: "tabs" });
+  }, [pocket?.available, view.kind]); // eslint-disable-line react-hooks/exhaustive-deps
   // Once the journey offers Private, it stays step 2 until answered: setting the pocket up makes it "ready", which must
   // not skip the default question or drop Private from You're set.
   const privateOffered = useRef(false);

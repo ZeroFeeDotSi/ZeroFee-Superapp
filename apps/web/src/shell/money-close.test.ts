@@ -150,7 +150,7 @@ test("a price at 7 s lands (no \"didn't answer\"); one at 21 s has said \"1Click
     await wait(990);
     assert.ok(runtime.text().includes("Getting a price… 0:06"), runtime.text());
     await wait(20);
-    assert.ok(runtime.text().includes("About $0.50 in fees."), `the price at 7 s is shown\n${runtime.text()}`);
+    assert.ok(runtime.text().includes("Fees · about $0.50"), `the price at 7 s is shown\n${runtime.text()}`);
     assert.ok(!runtime.text().includes(consts.FEE_LATE_LINE), "a 7 s price never says it didn't answer");
     assert.ok(!/Getting a price/.test(runtime.text()), "the waiting line is gone");
     runtime.unmount();

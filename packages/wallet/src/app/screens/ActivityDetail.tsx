@@ -7,7 +7,7 @@ import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { intentsUrl, type TxProof } from "@zerofee/core/tx-proof";
 import { PROOF_LINE, proofLine } from "@zerofee/core/proof-line";
-import { PROOF_WORDS as W, type ProofEnd, type ProofPage } from "../proof.ts";
+import { PROOF_WORDS as W, type ProofEnd, type ProofPage, dayTime } from "../proof.ts";
 import type { Fact } from "../statement.ts";
 import { copyText } from "../copy-text.ts";
 
@@ -30,9 +30,11 @@ export interface DetailProps {
   facts?: readonly Fact[];
   /** Finding 61: it stopped on the way: the one tap that ends it (send it on, or bring it home). */
   ways?: readonly { label: string; run: () => void }[];
+  /** A NEAR wallet swap's page: what it was and its time on two lines ("6 Nov"). */
+  dayFirst?: boolean;
 }
 
-export function ActivityDetail({ title, line, usd, atIso, page, onClose, onBack, onProblem, payee, facts = [], ways = [] }: DetailProps) {
+export function ActivityDetail({ title, line, usd, atIso, page, onClose, onBack, onProblem, payee, facts = [], ways = [], dayFirst = false }: DetailProps) {
   const { openApp } = useShell();
   const [copied, setCopied] = useState<string | null>(null);
   const copy = (text: string) => void copyText(text).then((ok) => { if (!ok) return; setCopied(text); setTimeout(() => setCopied((c) => (c === text ? null : c)), 1500); });
@@ -51,7 +53,9 @@ export function ActivityDetail({ title, line, usd, atIso, page, onClose, onBack,
         <div className="wl-detail__hero">
           {usd && <p className="wl-detail__usd">{usd}</p>}
           <h2 className="wl-detail__title">{title}</h2>
-          <p className="wl-detail__sub">{[line, when(atIso)].filter(Boolean).join(" · ")}</p>
+          {dayFirst
+            ? <>{line && <p className="wl-detail__sub">{line}</p>}{atIso && <p className="wl-detail__sub">{dayTime(atIso)}</p>}</>
+            : <p className="wl-detail__sub">{[line, when(atIso)].filter(Boolean).join(" · ")}</p>}
         </div>
         {onProblem && <button className="zf-btn" onClick={onProblem}>{W.problem}</button>}
         {ways.map((w, i) => <button key={w.label} className={i === 0 ? "zf-btn" : "zf-btn zf-btn--quiet"} onClick={w.run} data-testid="detail-way">{w.label}</button>)}
@@ -68,14 +72,14 @@ export function ActivityDetail({ title, line, usd, atIso, page, onClose, onBack,
         {payee && <div className="wl-rows"><button className="wl-row wl-row-2 wl-pick" onClick={() => copy(payee)}><div><div className="t">Paid to</div><div className="d">{copied === payee ? `${W.copied} ${payee}` : payee}</div></div></button></div>}
         <div className="wl-rows" data-testid="proof-ends">
           {end(W.started, page.started, "s")}
-          {page.finished ? end(W.finished, page.finished, "f") : <div className="wl-row wl-row-2"><div><div className="t">{W.finished}</div><div className="d">{page.done ? W.doneNoLink : W.notYet}</div></div></div>}
+          {page.finished ? end(W.finished, page.finished, "f") : page.ended === null ? null : <div className="wl-row wl-row-2"><div><div className="t">{page.ended?.label ?? W.finished}</div><div className="d">{page.ended?.line ?? (page.done ? W.doneNoLink : W.notYet)}</div>{page.ended?.check && <div className="d" data-testid="detail-check">{page.ended.check}</div>}</div></div>}
         </div>
-        {page.steps.length > 1 && (
+        {(page.steps.length > 1 || (page.stepsShown && page.steps.length > 0)) && (
           <>
             <h3 className="zf-small wl-detail__head">{W.steps}</h3>
             {page.steps.map((s, i) => (
               <div className="wl-rows" key={i} data-testid="proof-step">
-                <div className="wl-row wl-row-2"><div><div className="t">{s.label}</div><div className="d">{[s.usd ? `$${s.usd}` : "", when(s.atIso)].filter(Boolean).join(" · ")}</div></div></div>
+                <div className="wl-row wl-row-2"><div><div className="t">{s.label}</div><div className="d">{[s.usd ? `$${s.usd}` : "", dayFirst && s.atIso ? dayTime(s.atIso) : when(s.atIso)].filter(Boolean).join(" · ")}</div></div></div>
                 {end(W.started, s.start, `s${i}`)}
                 {s.end ? end(W.finished, s.end, `f${i}`) : s.ended && <div className="wl-row wl-row-2" data-testid="proof-step-done"><div><div className="t">{W.finished}</div><div className="d">{W.doneNoLink}</div></div></div>}
               </div>

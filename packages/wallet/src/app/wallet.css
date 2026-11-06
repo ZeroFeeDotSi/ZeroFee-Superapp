@@ -131,7 +131,7 @@
 .wl-swap-slide > .wl-sheet-meta { flex: 1; min-width: 0; margin: 0; }
 .wl-swap-slide + .wl-sheet-meta { margin-top: 6px; }
 /* the keypad sits down by its button, as Trade's Buy: one space above it, never a gap above and another under it */
-.zf-sheet__content:has(> .zf-keypad + .wl-sheet-go) > .zf-keypad { margin-top: auto; padding-top: 12px; }
+.zf-sheet__content:has(> .zf-keypad + .wl-sheet-go, > .zf-keypad + .zf-fee) > .zf-keypad { margin-top: auto; padding-top: 12px; }
 .zf-sheet__content > .zf-keypad + .wl-sheet-go:not(.wl-sheet-go ~ .wl-sheet-go) { margin-top: 8px; }
 .wl-cap-range { text-align: center; margin: 2px 0 8px; }
 .wl-sheet-big { text-align: center; margin: 6px 0 18px; }
@@ -619,6 +619,7 @@
 .wl-detail__hero:has(.wl-detail__usd) { margin: 24px 0 8px; text-align: center; }
 .wl-detail__usd { margin: 0; color: var(--ink); font: 500 56px/60px var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
 .wl-detail__sub { margin: 0; color: var(--mute); font: 400 15px/20px var(--font); }
+.wl-detail__hero .wl-detail__sub + .wl-detail__sub { margin-top: 0; }
 .wl-detail__hero:has(.wl-detail__usd) .wl-detail__sub { margin-top: 8px; }
 .wl-detail .wl-detail__fig { color: var(--ink); font: 500 17px/22px var(--font); font-variant-numeric: tabular-nums; }
 .wl-detail .wl-row .r { gap: 8px; }
@@ -852,7 +853,8 @@
 .wl-site[aria-expanded="true"] + div[data-wallet] { background: none; box-shadow: none; border-radius: 0; }
 @media (prefers-reduced-motion: reduce) { .wl-site__chev { transition: none; } }
 
-/* who the fee goes to, one quiet line under the lit button (product decision, 5 Nov: we are zero fee; the design review's spec) */
+/* the web sheets' one quiet line */
 .wl-zerofee { text-align: center; margin: 8px 0 0; }
-.zf-sheet__content > .wl-sheet-go.wl-sheet-go:has(+ .wl-zerofee):not(.wl-sheet-go ~ .wl-sheet-go) { bottom: 52px; }
-.zf-sheet__content > .wl-sheet-go + .wl-zerofee { position: sticky; bottom: 0; z-index: 2; box-sizing: border-box; min-height: 52px; margin: 0; padding: 8px 0; background: var(--bg); }
+/* the fee block stands on the pinned button (the copy review, 6 Nov): pinned with it, its room held for the figure, so nothing moves when the figure lands */
+.zf-sheet__content > .zf-fee:has(+ .wl-sheet-go:not(.wl-sheet-go ~ .wl-sheet-go)) { position: sticky; bottom: 64px; z-index: 2; box-sizing: border-box; min-height: 62px; margin: auto 0 0; padding: 8px 0 0; background: var(--bg); }
+.zf-sheet__content > .zf-fee + .wl-sheet-go:not(.wl-sheet-go ~ .wl-sheet-go) { margin-top: 8px; }

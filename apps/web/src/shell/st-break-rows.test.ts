@@ -4,7 +4,7 @@
 // move or answer the Approve. Matrix: $ZEROFEE_HOME/screens/st-break-rows/MATRIX.md.
 //
 // (harness as site-add-fee.test.ts) ST3 (QA's rule: a fee figure only from a real quote, never a fixed or bounded number): the Browser's "Put money in"
-// sheet says "About $X in fees." only when the core's two dry 1Click quotes put the Add's cost over 2 % of it; under 2 %
+// sheet says "Fees · about $X" only when the core's two dry 1Click quotes put the Add's cost over 2 % of it; under 2 %
 // nothing; before the quote is back "Fees show once the swap service gives a price."; the price never signs, moves or
 // raises a sheet; only the money sheet (Wallet's bridge) and the Browser tab may ask it.
 import { after, before, test } from "node:test";

@@ -77,7 +77,7 @@ test("Swap's You pay is the same figure as Send's and Home's; Max stays what one
   assert.equal(one.part, undefined, "control: one part pays all of it, no line");
   const sheet = readFileSync(new URL("./money/SwapSheet.tsx", import.meta.url), "utf8");
   assert.match(sheet, /paysHere\(\{ networks: status\.networks, reserveUsd: status\.reserveUsd, roomUsd: status\.roomUsd, safe: balances, pocket: pocket\?\.available \? pocket\.rows : null, earning \}\)/);
-  assert.match(sheet, /\{pay\.part && <p className="zf-small wl-sheet-lead" data-testid="swap-part">\{pay\.part\}<\/p>\}/);
+  assert.match(sheet, /part: nothing \? SWAP_WORDS\.none : pay\?\.part \?\? null/, "the one sub-line slot says it (swap-floor.test.ts)");
 });
 
 test("the coin page shows the same figure (readSafeHeld), Sell keeps its own part with its line (control: no screen sums its own)", async () => {

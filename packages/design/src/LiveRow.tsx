@@ -5,7 +5,7 @@
 // go in its slots as they are (a coin's age chip, its price's glint, its coloured change).
 import type { CSSProperties, ReactNode, Ref } from "react";
 import "./liverow.css";
-export { progressOf } from "./live-row.ts";
+export { progressOf, timeSlot } from "./live-row.ts";
 
 import type { LiveRowState } from "./live-row.ts";
 export type { LiveRowState } from "./live-row.ts";
@@ -18,12 +18,14 @@ const Badge = ({ state }: { state: LiveRowState }) => (
   </span>
 );
 
-export function LiveRow({ mark, title, line, usd, when, state, p, onOpen, label, rowRef, className, style, onPointerDown }: {
+export function LiveRow({ mark, title, line, below, usd, when, state, p, onOpen, label, rowRef, className, style, onPointerDown }: {
   /** The coin's logo or the app's glyph. */
   mark: ReactNode;
   title: ReactNode;
   /** The one line under the title: the step and how long ("Making it private · 2 min"), or where the money is. */
   line?: ReactNode;
+  /** A second line under it (timeSlot: a going row's time, past its estimate). */
+  below?: ReactNode;
   usd?: ReactNode;
   /** The right column's second line ("2 h"). */
   when?: ReactNode;
@@ -45,6 +47,7 @@ export function LiveRow({ mark, title, line, usd, when, state, p, onOpen, label,
       <span className="zf-lrow__text">
         <span className="zf-lrow__t">{title}</span>
         {line && <span className="zf-lrow__d">{line}</span>}
+        {below && <span className="zf-lrow__d">{below}</span>}
       </span>
       {(usd || when) && (
         <span className="zf-lrow__r">

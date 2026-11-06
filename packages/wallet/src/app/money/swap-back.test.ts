@@ -36,9 +36,10 @@ test("Move: a Safe → wallet leg that leaves the wallet under the least a move 
 
 test("the Swap and Move sheets show those lines, and \"Hold to swap\" at $0 says \"Pick an amount.\" when pressed", () => {
   const swap = readFileSync(new URL("./SwapSheet.tsx", import.meta.url), "utf8");
-  assert.match(swap, /data-testid="swap-back"/);
-  assert.match(swap, /block !== SWAP_WORDS\.amount \|\| tried/, "the amount line shows once a press asked for it");
-  assert.match(swap, /if \(block === SWAP_WORDS\.amount\) return setTried\(true\);/, "a tap at $0 is heard, not swallowed by a disabled button");
+  assert.match(readFileSync(new URL("./swap-corridor.ts", import.meta.url), "utf8"), /id: "swap-back"/);
+  assert.match(swap, /swapSub\(\{ back,/);
+  assert.match(readFileSync(new URL("./swap-corridor.ts", import.meta.url), "utf8"), /o\.block !== SWAP_WORDS\.amount \|\| o\.tried/, "the amount line shows once a press asked for it");
+  assert.match(swap, /if \(on\.tap === "swap" && block === SWAP_WORDS\.amount\) return setTried\(true\);/, "a tap at $0 is heard, not swallowed by a disabled button");
   const move = readFileSync(new URL("../screens/MoveSheet.tsx", import.meta.url), "utf8");
   // the Move sheet's one note (footNote): "move-back" is its first kind
   assert.match(move, /footNote\(\{ back: shortLeg\(legs\) \|\| strandLeg\(now, legs\) \? \[\] : back,/);
@@ -53,7 +54,9 @@ test("QA (4 Nov): \"Solana's price isn't read yet\" is said on the Swap sheet wi
   assert.equal(saidOnSheet({ ...price, next: { kind: "open", label: "Finish my new rules", screen: "held/7" } }), false);
   const swap = readFileSync(new URL("./SwapSheet.tsx", import.meta.url), "utf8");
   assert.match(swap, /saidOnSheet\(end\.refused\) \? setStopped\(end\.refused\) : problem\(end\.refused, onUsd\)/, "said on the sheet, never pushed behind it");
-  assert.match(swap, /data-testid="swap-stopped">\{stoppedLine\(stopped\)\} <button className="zf-link" onClick=\{\(\) => void go\(\)\}>\{stopped\.next\.label\}<\/button>/, "its Try again asks again (the price with it)");
+  assert.match(swap, /const refused = stopped && !busy && !block \? stoppedLine\(stopped\) : null;/);
+  assert.match(swap, /data-testid="swap-stopped">\{refused\}<\/p>/);
+  assert.doesNotMatch(swap, /swap-stopped-next/, "its Try again is the one button (swap-floor.test.ts), asking again, the price with it");
   assert.match(swap, /<MoneySheet [^>]*onClose=\{made !== null \? finish : onClose\}/, "Close leaves (on the receipt, as Done)");
 });
 

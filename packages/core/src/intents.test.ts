@@ -761,7 +761,7 @@ test("product decision (5 Nov), QA's MUSTs 1 and 4: a Send's fill sheet is ONE F
   const payout = { recipient: PAYEE, recipientType: "DESTINATION_CHAIN", originAsset: `nep141:${USDC}`, destinationAsset: "nep141:sol.omft.near", amountIn: "250000000", amountOut: "1234567890", amountInUsd: "250.00", amountOutUsd: "247.5" };
   // the UI lead's ruling (5 Nov): this sheet's legs are "They get", "Your Safe sends", "Stays in Private"; the old
   // words are matched too, so a sheet still saying them fails below
-  const block = (lines: string[]) => lines.filter((l) => /^(They get|Your Safe sends|From Private|From your Safe|Stays in Private|Together|Network fees|Fees) · /.test(l));
+  const block = (lines: string[]) => lines.filter((l) => /^(They get|Your Safe sends|From Private|From your Safe|Stays in Private|Together|Fees) · /.test(l));
   // the core's own tag (bind-intent, demo-core intentOf): the move in its private.quoteIn door asked is a "move"
   const sheet = async (o: { units?: string; out?: typeof payout | null; extra?: Record<string, unknown>; tag?: "swap" | "move" | null; unnamed?: true }) => {
     const units = o.units ?? "300000000";
@@ -774,7 +774,7 @@ test("product decision (5 Nov), QA's MUSTs 1 and 4: a Send's fill sheet is ONE F
   const { w, asked } = await sheet({});
   // the UI lead's rulings (5 Nov) and QA's Sim walk: ONE "They get" line, the signed coin figure (the audit's MUST 4) then what
   // it is worth to them (the signed amountOutUsd) in brackets; the network fees named last
-  assert.deepEqual(block(w.lines), ["They get · 1.2345 SOL ($247.50)", "Your Safe sends · $300.00", "Stays in Private · $50.00", "Network fees · about $2.50"], String(w.lines));
+  assert.deepEqual(block(w.lines), ["They get · 1.2345 SOL ($247.50)", "Your Safe sends · $300.00", "Stays in Private · $50.00", "Fees · about $2.50"], String(w.lines));
   const cents = block(w.lines).map((l) => Math.round(Number(l.split("$").at(-1)!.replace(")", "")) * 100));
   const T = 25000; // the payout's amountIn, what leaves Private: $250.00
   assert.equal(cents[1], cents[2]! + T, "the lines add up: the Safe's figure is what stays plus what goes (Y = Z + T)");
@@ -791,7 +791,7 @@ test("product decision (5 Nov), QA's MUSTs 1 and 4: a Send's fill sheet is ONE F
   assert.ok(w.amount && w.tap === undefined, "money leaves on this sheet: Face ID's (no tap)");
   // the whole fill goes: no Stays line
   const exact = await sheet({ units: "250000000" });
-  assert.deepEqual(block(exact.w.lines), ["They get · 1.2345 SOL ($247.50)", "Your Safe sends · $250.00", "Network fees · about $2.50"]);
+  assert.deepEqual(block(exact.w.lines), ["They get · 1.2345 SOL ($247.50)", "Your Safe sends · $250.00", "Fees · about $2.50"]);
   // control: a zero-fee quote (worth all of T to them): no fees line
   const free = await sheet({ out: { ...payout, amountOutUsd: "250" } });
   assert.deepEqual(block(free.w.lines), ["They get · 1.2345 SOL ($250.00)", "Your Safe sends · $300.00", "Stays in Private · $50.00"], String(free.w.lines));
@@ -817,7 +817,7 @@ test("product decision (5 Nov), QA's MUSTs 1 and 4: a Send's fill sheet is ONE F
     return s.signer.describe({ ...intentsCall("mt_transfer", { receiver_id: DEPOSIT, token_id: `nep141:${USDC}`, amount: "300000000", approval: null }), sendFill: true } as TxRequest);
   };
   const mt = await inside(payout);
-  assert.deepEqual([mt.title, ...block(mt.lines)], ["Send $250.00 from your Safe", "They get · 1.2345 SOL ($247.50)", "Your Safe sends · $300.00", "Stays in Private · $50.00", "Network fees · about $2.50"], String(mt.lines));
+  assert.deepEqual([mt.title, ...block(mt.lines)], ["Send $250.00 from your Safe", "They get · 1.2345 SOL ($247.50)", "Your Safe sends · $300.00", "Stays in Private · $50.00", "Fees · about $2.50"], String(mt.lines));
   assert.deepEqual(mt.lines.slice(0, 2), [`To ${PAYEE}`, "Public on Solana."], "the full address first, then where it lands");
   await assert.rejects(inside(null), (e: any) => e.problem?.code === "security.send.unbound", "control: unbound, refused on this route too");
   // controls on the route itself (checkIntents): an mt_transfer on a quote that takes its deposit from outside, or paying

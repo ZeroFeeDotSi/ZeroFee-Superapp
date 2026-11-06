@@ -29,7 +29,7 @@ test("§5's lines, word for word", () => {
   assert.equal(W.meterLabel(0.034, 0.84), "AgentZero used $0.034 today and has $0.840 left. Open its wallet");
   assert.equal(W.meterLabel(0.034, null), "AgentZero used $0.034 today. Open its wallet");
   assert.equal(W.todayLine(0.034, 0), "Used today $0.034 · paid $0.000", "D37: no \"owed\"");
-  assert.equal(W.SETTLE_LINE, "Pays Anthropic after each reply, at Anthropic's price. ZeroFee takes nothing.");
+  assert.equal(W.SETTLE_LINE, "Pays after each reply, at Anthropic's price. ZeroFee passes it on and takes nothing.");
   assert.equal(W.REFUSE_LINE, "AgentZero needs more money to answer.");
   assert.equal(W.receiptTitle(12_000), "AgentZero paid 1.2¢ for a reply");
   assert.deepEqual([W.cents(20_000), W.cents(6_000), W.cents(123_456), W.cents(400), W.cents(1_500_000), W.cents(0)], ["2¢", "0.6¢", "12¢", "under 0.1¢", "$1.50", "0¢"]);

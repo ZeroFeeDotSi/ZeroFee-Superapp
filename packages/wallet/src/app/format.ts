@@ -8,6 +8,8 @@ import { fromUnits, toUnits, usdOf } from "../amount.ts";
 import type { Balance, Chain, Movement, PrivatePocket, Token } from "../types.ts";
 import { ThisDevice } from "@zerofee/shell-api/approval-words.ts";
 import { shortId } from "./money/send-words.ts";
+import { SERVICE_NAMES } from "@zerofee/core/services";
+import { NEAR_SWAP_CARD_LINE, NEAR_SWAP_CHECK, NEAR_SWAP_HEAD, NEAR_SWAP_UNFINISHED } from "../near-swap-words.ts";
 
 /** USDC on NEAR: Trading's own coin (ledger.ts TRADING_USDC), so its Adds read in dollars. */
 const USDC_ON_NEAR = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
@@ -137,9 +139,10 @@ export function receiveChainFor(link: string | undefined, chains: Chain[], token
 /** Hidden in one line; the rest one tap down (product decision, 2 Nov: one-liners). */
 export const PRIVATE_WORDS = "A wallet for private payments, up to $10,000 each.";
 export const PRIVATE_MORE = ["Future computers could break its key. Your Safe's key is built so they can't.", "Keep only small amounts in it.", "It pays when you hold the button. No Face ID."];
-/** What Private hides and from whom (audit P-1, gates grade 5 Nov; the Copywriter): the public, not the money going in,
- *  and not NEAR Intents' solver, which sees every payment. Never "private from everyone". */
-export const PRIVATE_SEEN = "Private from the public, except the money going in. NEAR Intents' solver sees every payment.";
+/** What Private hides and from whom (audit P-1, gates grade 5 Nov; the Copywriter): the public, not the money going in
+ *  or coming out (a payout lands on a public chain, PRIVATE_HOW; this line stands alone on the fill's sheet and the first
+ *  win), and not NEAR Intents' solver, which sees every payment. Never "private from everyone". */
+export const PRIVATE_SEEN = "Private from the public, except the money going in and coming out. NEAR Intents sees every payment.";
 /** What a Send through it hides, and what it doesn't (privacy audit, 4 Nov; D137: no wait between the steps): the middle
  *  is hidden, the step in and the step out are public and close in time, and money that sat there a while hides best. */
 export const PRIVATE_HOW = ["Only the middle of a send is hidden.", "Anyone can see money go in and come out, close in time.", "Money that sits here a while is the most private."];
@@ -411,8 +414,12 @@ export function whereNow(m: Movement, to: string): string {
   // Out of Private: a refund goes back to Private.
   if (m.kind === "private" && m.from === "private") return m.status === "moving" ? "on its way to your Safe" : m.status === "done" ? "in your Safe" : "still in your private balance";
   // S5: a payment from the private balance comes back there (its refund address, core private-pocket.ts), never the Safe
-  if (m.status === "refunded") return m.kind === "trading" ? "back in your NEAR wallet" : m.private && (m.kind === "pay" || m.kind === "transfer" || m.kind === "withdraw") ? "back in Private" : "back in your Safe";
+  if (m.status === "refunded") return m.kind === "trading" || (m.kind === "swap" && m.source === "private") ? "back in your NEAR wallet" : m.private && (m.kind === "pay" || m.kind === "transfer" || m.kind === "withdraw") ? "back in Private" : "back in your Safe";
   if (m.status === "problem" && UNCONFIRMED.has(m.problem?.code ?? "")) return "check your Safe";
+  // a NEAR wallet swap: its own end, never the swap case's "still in your private balance" (audit, 6 Nov: that could be untrue)
+  if (m.status === "problem" && (m.problem?.code === "ledger.swap.near-unread" || m.problem?.code === "ledger.swap.near-failed")) return "check your NEAR wallet";
+  // the same end on a job kept before these words: it holds the old problem, and the row must not say where the money is
+  if (m.status === "problem" && m.kind === "swap" && m.source === "private" && m.problem?.code === "ledger.convert.failed") return "check your NEAR wallet";
   if (m.status === "problem" && m.problem?.code === "ledger.transfer.part-returned") return "the rest is back in your Safe";
   if (m.kind === "trading" && m.from === "trading") return m.status === "moving" ? "on its way to your Safe" : m.status === "done" ? "in your Safe" : "still in your NEAR wallet";
   switch (m.kind) {
@@ -426,12 +433,12 @@ export function whereNow(m: Movement, to: string): string {
       // Always one of three places: the main balance, in flight, or Spending (a refund comes back to Spending).
       return m.status === "moving" ? "on its way to your NEAR wallet" : m.status === "done" ? "in your NEAR wallet" : "still in your Safe";
     // a swap in place (ledger.swap, kind "swap") is a conversion: its `to` is the coin's id, never a payee (Sim crawl
-    // cut 7: "with nep141:zec.omft.near"); one in Private stays in Private
+    // cut 7: "with nep141:zec.omft.near"); one in the NEAR wallet stays in the NEAR wallet (source "private" is its float, the copy review's ruling, 6 Nov)
     case "swap":
-      if (m.source === "private") return m.status === "moving" ? "with the swap service, converting" : m.status === "done" ? "in your private balance" : "still in your private balance";
+      if (m.source === "private") return m.status === "moving" ? `with ${SERVICE_NAMES.oneclick}, converting` : m.status === "done" ? "in your NEAR wallet" : "still in your NEAR wallet";
     // falls through: the Safe's
     case "convert":
-      return m.status === "moving" ? "with the swap service, converting" : m.status === "done" ? "in your Safe" : "with the swap service";
+      return m.status === "moving" ? `with ${SERVICE_NAMES.oneclick}, converting` : m.status === "done" ? "in your Safe" : `with ${SERVICE_NAMES.oneclick}`;
     default:
       // a record with no payee (never a bare "to"): where it is, without a name. A payee is "to" (the copy review's ruling, 5 Nov);
       // "with" is only a swap's partner
@@ -453,6 +460,24 @@ export function movementDollars(m: Movement, tokens: Map<string, Token>): string
   const usd = usdOf(m.amount, tokens.get(id)?.priceUsd, true);
   if (usd === undefined || !(Number(m.amount) > 0)) return null;
   return Number(usd) < 0.01 ? "under $0.01" : dollars(usd);
+}
+
+/**
+ * A swap's page, by how it ended (copy review, 6 Nov): never "Not finished yet" under "Finished". `ended`: its card (null: none
+ * while it runs), with where to look when nobody can prove where its money is. A NEAR wallet swap's sub-line is what it was,
+ * then the time on its own line. null: not a swap.
+ */
+export function swapDetail(m: Movement, tokens: Map<string, Token>, chains: Chain[], rows?: OwnRows): { ended: { label: string; line: string; check?: string } | null; line?: string; dayFirst?: true } | null {
+  if (m.kind !== "swap") return null;
+  const what = describe(m, tokens, chains, rows).detail.split(" · ")[0]!;
+  const near = m.source === "private" ? { line: what, dayFirst: true as const } : {};
+  if (m.status === "done") {
+    const paid = what.split(" to ")[0]!, into = tokens.get(m.to ?? "")?.symbol;
+    return { ended: { label: "Finished", line: `Swapped ${paid} for ${[m.amountOut, into].filter(Boolean).join(" ") || "the coin"}.` }, ...near };
+  }
+  if (m.status === "refunded") return { ended: { label: "Ended", line: `${SERVICE_NAMES.oneclick} couldn't swap it. Your money is ${whereNow(m, "")}.` }, ...near };
+  if (m.status === "problem") return { ended: m.source === "private" ? { label: "Ended", line: NEAR_SWAP_CARD_LINE, check: NEAR_SWAP_CHECK } : { label: "Ended", line: NEAR_SWAP_UNFINISHED }, ...near };
+  return { ended: null };
 }
 
 /** A site wallet's Take out, by the site's name (crawl F6; one word for the move: Take out). */
@@ -523,7 +548,7 @@ export function describe(m: Movement, tokens: Map<string, Token>, chains: Chain[
     case "convert": {
       // a swap in place (kind "swap", ledger.swap) reads as a conversion
       const into = tokens.get(m.to ?? "")?.symbol;
-      const title = m.status === "moving" ? "Converting" : m.status === "refunded" ? "Refunded" : m.status === "problem" ? "Not converted" : "Converted";
+      const title = m.status === "moving" ? "Converting" : m.status === "refunded" ? "Refunded" : m.status === "problem" ? (m.kind === "swap" ? NEAR_SWAP_HEAD : "Not converted") : "Converted";
       return { title, detail: `${into ? `${amount} to ${into}` : amount} · ${where}` };
     }
   }

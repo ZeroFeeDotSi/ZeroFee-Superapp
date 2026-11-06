@@ -26,6 +26,7 @@ import { ProblemError } from "@zerofee/core/problem";
 import { SAFE_FILL_OPEN } from "@zerofee/core/safe-fill-open";
 import { SAFE_SEND_FILL_OPEN } from "@zerofee/core/safe-send-fill-open";
 import { LEG_WORDS, SEND_LEG_WORDS, fillStepUsd, privateShort, splitLines } from "@zerofee/core/private-route";
+import { FEES_KEPT } from "@zerofee/core/zero-fee";
 import { AGENT_PRIVATE_ROUTE, AGENT_TOP_UP_OFF } from "@zerofee/core/agent-route";
 import { ownWalletWords } from "@zerofee/core/own-wallet-words";
 import { ed25519 } from "@noble/curves/ed25519.js";
@@ -400,7 +401,7 @@ const DEFAULT_TOKENS: MockToken[] = [
   { assetId: "nep245:v2_1.omni.hot.tg:56_11111111111111111111", chain: "bsc", symbol: "BNB", decimals: 18, contract: null, priceUsd: "744.17", name: "BNB", icon: "bnb" },
   // The NEAR coins Home's Swap buys in place (mock-float.ts SAMPLE_NEAR_COINS, at its prices): Home names and prices what
   // the NEAR wallet holds from this list, so a coin bought in the Sim shows on Home (QA's Sim crawl, 5 Nov).
-  ...Object.entries(SAMPLE_NEAR_COINS).filter(([id]) => id !== "nep141:eth.omft.near" && id !== "nep141:sol.omft.near").map(([assetId, c]): MockToken => ({ assetId, chain: "near", symbol: c.symbol, decimals: c.decimals, contract: assetId.slice(7), priceUsd: String(c.usd), name: c.symbol, icon: c.symbol.toLowerCase() })),
+  ...Object.entries(SAMPLE_NEAR_COINS).filter(([id]) => id !== "nep141:eth.omft.near" && id !== "nep141:sol.omft.near" && id !== "nep141:wrap.near").map(([assetId, c]): MockToken => ({ assetId, chain: "near", symbol: c.symbol, decimals: c.decimals, contract: assetId.slice(7), priceUsd: String(c.usd), name: c.symbol, icon: c.symbol.toLowerCase() })),
 ];
 
 /** An app's own words for a sheet (Trade's `why`, `label`): short, one line, no control characters. Else none. The core's words stay the title; these ride under it as a hint. */
@@ -657,7 +658,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
   /** A sample trade in a site's own wallet on Solana: its SOL into a sample coin (buy) or the coin back to SOL (sell).
    *  The Sim's sites (sim.site.trade) and AgentZero's copy job on sample money (account.agent.spend) trade through it,
    *  so a receipt is only ever for a trade that moved the wallet's money (QA 5 Nov: a $5 BONK receipt, nothing moved). */
-  const simTrade = (site: unknown, side: unknown, coinIn: unknown, usdIn: unknown) => {
+  const simSiteSol = (site: unknown) => {
     const s = siteWallet(String(site ?? ""));
     if (!s || !s.chains.includes("sol")) throw linkProblem("security.request.invalid", "site is a listed site with a Solana wallet");
     let w = subwallets.find((x) => x.kind === "site" && x.site === s.site && x.chain === "sol");
@@ -666,6 +667,15 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       w = { id: `sw-site-${s.site}-sol`, kind: "site", site: s.site, chain: "sol", address: base58(h), label: `${s.name} wallet` };
       subwallets.push(w);
     }
+    return w;
+  };
+  /** Dollars of SOL put into a site's sample wallet for one trade (AgentZero's wallet paying through it). */
+  const simSiteCash = (site: unknown, usd: number) => {
+    const w = simSiteSol(site);
+    walletNative.set(w.id, (walletNative.get(w.id) ?? 0n) + BigInt(Math.round((usd / solUsd()) * 1e9)));
+  };
+  const simTrade = (site: unknown, side: unknown, coinIn: unknown, usdIn: unknown) => {
+    const w = simSiteSol(site);
     const coin = coinIn as { token?: unknown; symbol?: unknown; name?: unknown; priceUsd?: unknown } | undefined;
     const token = String(coin?.token ?? ""), priceUsd = Number(coin?.priceUsd);
     if (!/^sim-[a-z0-9]{2,12}$/.test(token) || !(priceUsd > 0)) throw linkProblem("security.request.invalid", "coin is a sample coin { token: sim-…, symbol, name, priceUsd }");
@@ -1149,7 +1159,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         // and what a send hides and what it doesn't (privacy audit, 4 Nov): both steps are public, close in time
         // the network line after the fee, as the core's outsideLines (QA test: "Public on Solana." was missing);
         // the coin figure at most 4 decimals (042: "0.052526348 SOL")
-        return { title: `Send from your ${row}`, lines: [`To ${String(payee?.address ?? payee?.accountId ?? "")}`, ...(fee ? [`They get about $${fee.outUsd}`, `Network fees · about $${(Number(fee.inUsd) - Number(fee.outUsd)).toFixed(2)}`] : []), `Public on ${lands.network}.`, `First, ${coinSaid(amount, coin)} leaves your ${row} for your private balance. Anyone can see this step.`, `Then your private balance pays it as ${lands.coin}${lands.coin.endsWith("(RH)") ? "" : ` on ${lands.network}`}. Anyone can see this step too, soon after the first.`, SEND_MATCHED], warnings: [], effect: [], ...priced };
+        return { title: `Send from your ${row}`, lines: [`To ${String(payee?.address ?? payee?.accountId ?? "")}`, ...(fee ? [`They get about $${fee.outUsd}`, `Fees · about $${(Number(fee.inUsd) - Number(fee.outUsd)).toFixed(2)}`, FEES_KEPT] : []), `Public on ${lands.network}.`, `First, ${coinSaid(amount, coin)} leaves your ${row} for your private balance. Anyone can see this step.`, `Then your private balance pays it as ${lands.coin}${lands.coin.endsWith("(RH)") ? "" : ` on ${lands.network}`}. Anyone can see this step too, soon after the first.`, SEND_MATCHED], warnings: [], effect: [], ...priced };
       }
       // Home's Send from the Safe: the part already in the private balance, straight out (the core's Send sheet)
       case "ledger.sendFromSafe": {
@@ -1207,8 +1217,44 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
    *  raise's wait). A turn-on above it waits like a raise: on chain agent_revoke drops the waiting changes and agent_set
    *  waits a change's wait (contracts agent.rs agent_set, agent_revoke). The Sim's first turn-on stays at once. */
   let agentLastLimit: number | null = null;
+  /** What is really in AgentZero's sample wallet: taken from the Safe's USDC when it's funded, spent by its jobs, back in
+   *  the Safe on a Stop or a lower limit. (6 Nov: "Add $25.00 to AgentZero's wallet, From your Safe" moved nothing.) */
+  let agentHeldUsd = 0;
+  const safeUsdc = () => balances.filter((b) => b.tokenId === USDC_NEAR).reduce((t, b) => t + Number(b.amount), 0);
+  const cents = (n: number) => Math.round(n * 100) / 100;
+  /** The wallet's money follows its limit: a higher limit takes the difference from the Safe, a lower one gives it back. */
+  const agentLimitMoves = (was: number, now: number) => {
+    const add = cents(now - was);
+    if (add > 0) {
+      debit(USDC_NEAR, add);
+      agentHeldUsd = cents(agentHeldUsd + add);
+    } else if (add < 0) agentGivesBack(Math.min(agentHeldUsd, -add));
+    agentMoneyMoved();
+  };
+  /** Home reads the Safe again, and its wallets' row and total (home-reads.ts: Spending's parts follow spending.changed). */
+  const agentMoneyMoved = () => {
+    emit("ledger.balancesChanged", {});
+    emit("spending.changed", {});
+  };
+  const agentGivesBack = (usd: number) => {
+    if (!(usd > 0)) return;
+    const row = balances.find((b) => b.tokenId === USDC_NEAR && b.held === "ledger") ?? balances.find((b) => b.tokenId === USDC_NEAR);
+    if (row) {
+      const micro = toMicro(row.amount) + toMicro(usd.toFixed(6));
+      Object.assign(row, { amount: fromMicro(micro), usd: fromMicro(micro - (micro % 10_000n)) });
+    }
+    agentHeldUsd = cents(agentHeldUsd - usd);
+  };
+  /** The most a limit can take: never more than the Safe's USDC holds. */
+  const agentLimitFits = (was: number, now: number) => cents(Math.min(now, was + safeUsdc()));
   /** The agent changes held for their wait (agent_set, agent_set_budget), as the contract lists them. */
   const agentHeld = () => held.filter((h) => /^account\.agent\.set(Budget)?$/.test(heldChanges.get(h.id)?.method ?? ""));
+  /** The change still waiting, as the account has it: the page's row says this, so a Cancel in Waiting, a Stop or a reload
+   *  can't leave a promise behind. */
+  const agentWaiting = (): { waiting?: { usd: number; atIso: string } } => {
+    const h = agentHeld().at(-1);
+    return h ? { waiting: { usd: Number(heldChanges.get(h.id)?.p.limitUsd), atIso: h.readyAtIso } } : {};
+  };
   /** "Ask me first" as the core keeps it on the device (agent-private.ts readAskAbove): null is never. */
   let agentAskAbove: number | null = null;
   /** AgentZero's receipts' chain head (account.agent.receiptHead), apart from the app's own store. */
@@ -1475,7 +1521,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     const sendsUsd = Number(cents(fill * coinPx)) / 100, staysUsd = Number(cents(fill * coinPx) - cents(askedUsd)) / 100;
     // as the real core's fill sheet (send-fill.ts) and every outside sheet (the audit's D37 condition): the FULL address first,
     // unfolded, then where it lands in the copy review's words, then the split and what they get
-    return { title: `Send ${usd$(askedUsd)} from your Safe`, lines: [`To ${to}`, `Public on ${lands.network}.`, "Private is your money inside NEAR Confidential. Moves pay from it. The public can't see what's in it.", `${SEND_LEG_WORDS.gets} · ${gets} (${usd$(outUsd)})`, `${SEND_LEG_WORDS.sends} · ${usd$(sendsUsd)}`, ...(staysUsd > 0 ? [`${SEND_LEG_WORDS.stays} · ${usd$(staysUsd)}`] : []), ...(feesUsd > 0 ? [SEND_LEG_WORDS.fees(usd$(feesUsd))] : []), LEG_WORDS.seen, "NEAR Confidential moves it. ZeroFee takes nothing."], warnings: [], effect: [], ...more };
+    return { title: `Send ${usd$(askedUsd)} from your Safe`, lines: [`To ${to}`, `Public on ${lands.network}.`, "Private is your money inside NEAR Confidential. Moves pay from it. The public can't see what's in it.", `${SEND_LEG_WORDS.gets} · ${gets} (${usd$(outUsd)})`, `${SEND_LEG_WORDS.sends} · ${usd$(sendsUsd)}`, ...(staysUsd > 0 ? [`${SEND_LEG_WORDS.stays} · ${usd$(staysUsd)}`] : []), ...(feesUsd > 0 ? [SEND_LEG_WORDS.fees(usd$(feesUsd)), SEND_LEG_WORDS.kept] : []), LEG_WORDS.seen, ...(feesUsd > 0 ? [] : ["NEAR Confidential moves it. ZeroFee takes nothing."])], warnings: [], effect: [], ...more };
   };
   /** Whether a Send from the Safe takes the fill (as the ledger case below decides) and its fill would be held. */
   const sendFillHeld = (p: Record<string, unknown>): boolean => {
@@ -1644,12 +1690,18 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     if (CHANGE_ROW[method]) changeRows.unshift({ atIso: iso(0), title: CHANGE_ROW[method], lines: [], by: "This device", ok: true, txHash: `sample-change-${changeRows.length + 1}` });
     if (method === "account.agent.setBudget") {
       // a higher its wallet, after its wait: the people on it as they were asked then
-      if (agentRules) agentRules = { ...agentRules, limitUsd: Number(p.limitUsd), people: Array.isArray(p.people) ? (p.people as unknown[]).filter((x): x is string => typeof x === "string") : agentRules.people };
-      if (agentRules) agentLastLimit = agentRules.limitUsd;
+      if (agentRules) {
+        const limitUsd = agentLimitFits(agentRules.limitUsd, Number(p.limitUsd));
+        agentLimitMoves(agentRules.limitUsd, limitUsd);
+        agentRules = { ...agentRules, limitUsd, people: Array.isArray(p.people) ? (p.people as unknown[]).filter((x): x is string => typeof x === "string") : agentRules.people };
+        agentLastLimit = limitUsd;
+      }
     } else if (method === "account.agent.set") {
       // a turn-on that waited (above the last limit in force): AgentZero starts now, its spends of before the Stop gone
-      agentRules = { limitUsd: Number(p.limitUsd), since: Date.now(), paid: [], people: Array.isArray(p.people) ? (p.people as unknown[]).filter((x): x is string => typeof x === "string") : [] };
-      agentLastLimit = agentRules.limitUsd;
+      const limitUsd = agentLimitFits(0, Number(p.limitUsd));
+      agentLimitMoves(0, limitUsd);
+      agentRules = { limitUsd, since: Date.now(), paid: [], people: Array.isArray(p.people) ? (p.people as unknown[]).filter((x): x is string => typeof x === "string") : [] };
+      agentLastLimit = limitUsd;
     } else if (method === "account.secondDevice.pair") {
       if (!account.keys.some((k) => k.role === "second-device")) account.keys.push({ handle: LAPTOP_HANDLE, role: "second-device", kind: "development" });
     } else if (method === "account.secondDevice.setLimit") {
@@ -1847,11 +1899,14 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       // kill switch, and every payment a receipt in Activity. The contract's band rule is the core's on a real account.
       case "account.agent.view": {
         // Off: no limit, but still the sample's (AgentZero's sheets say "sample money" before it is turned on too).
-        if (!agentRules) return { limitUsd: 0, spentTodayUsd: "0.00", people: [], sample: true, ...(agentLastLimit !== null ? { lastLimitUsd: agentLastLimit } : {}) };
+        if (!agentRules) return { limitUsd: 0, spentTodayUsd: "0.00", people: [], sample: true, ...(agentLastLimit !== null ? { lastLimitUsd: agentLastLimit } : {}), ...agentWaiting() };
         const since = Date.now() - 86_400_000;
         const spent = agentRules.paid.filter((x) => x.at > since).reduce((t, x) => t + x.usd, 0);
-        return { limitUsd: agentRules.limitUsd, spentTodayUsd: spent.toFixed(2), onSinceIso: new Date(agentRules.since).toISOString(), people: agentRules.people, sample: true };
+        return { limitUsd: agentRules.limitUsd, spentTodayUsd: spent.toFixed(2), heldUsd: agentHeldUsd, onSinceIso: new Date(agentRules.since).toISOString(), people: agentRules.people, sample: true, ...agentWaiting() };
       }
+      // Home's row and total (packages/wallet agent-row.ts): what is really in AgentZero's sample wallet. None while it's off.
+      case "account.agent.balance":
+        return agentRules ? { usdcMicros: String(Math.round(agentHeldUsd * 1e6)) } : null;
       // AgentZero's receipts' chain head, kept apart from the app's store (the core keeps it in its vault: agent-receipt-head.ts).
       case "account.agent.receiptHead": {
         if (p.set !== undefined) receiptHead = p.set;
@@ -1868,6 +1923,9 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         // $50 showed at once while the sheet said 3 days). A new person on the list loosens it too (agent.rs
         // agent_set_budget: only a tightening runs at once), and so does a turn-on above the last limit in force.
         const was = agentRules;
+        // the money comes from the Safe (the funding job's "From your Safe"): none there, nothing is asked
+        const adds = cents(usd - (was?.limitUsd ?? 0));
+        if (adds > safeUsdc() + 1e-9) throw new ProblemError({ code: "agent.funds", whatHappened: `Your Safe has only ${dollarWords(safeUsdc(), true)} in USDC. Nothing moved.`, money: { state: "safe", where: "in your Safe" }, next: { kind: "fix-input", label: "Choose less", field: "limit" } } as Problem);
         const loosens = method === "account.agent.setBudget" && was ? usd > was.limitUsd + 1e-9 || people.some((x) => !was.people.includes(x)) : method === "account.agent.set" && !was && agentLastLimit !== null && usd > agentLastLimit + 1e-9;
         if (loosens) {
           if (options.decline) return { status: "declined" };
@@ -1877,6 +1935,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
           return { status: "waiting", txHash: "sample-tx", explorerUrl: NO_EXPLORER, id: h.id, readyAtIso: h.readyAtIso, needsSecondDevice: false } as TxOutcome;
         }
         if (options.decline) return { status: "declined" };
+        agentLimitMoves(was?.limitUsd ?? 0, usd);
         agentRules = { limitUsd: usd, since: Date.now(), paid: agentRules?.paid ?? [], people };
         agentLastLimit = usd;
         return signed();
@@ -1886,7 +1945,10 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         // agent_revoke: anything for AgentZero still waiting goes with it (agent.rs, audit F9), so no held raise or
         // person comes back unasked
         for (const h of agentHeld()) endHold(held.indexOf(h), "cancelled", {});
+        // what's left in its wallet goes back to the Safe with the Stop (the funding page: "You can take it back any time")
+        agentGivesBack(agentHeldUsd);
         agentRules = null;
+        agentMoneyMoved();
         agentReceipts.unshift({ atIso: iso(0), title: "Stopped AgentZero. Its key is gone", lines: [], by: "This device", ok: true, txHash: "sample-agent-off" });
         return signed();
       }
@@ -1913,25 +1975,26 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         if (!agentRules) throw new ProblemError({ code: "agent.off", whatHappened: "AgentZero is off. Nothing was sent.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } } as Problem);
         const since = Date.now() - 86_400_000;
         const spent = agentRules.paid.filter((x) => x.at > since).reduce((t, x) => t + x.usd, 0);
-        if (p.kind !== "sell" && (!(usd > 0) || spent + usd > agentRules.limitUsd + 1e-9)) throw new ProblemError({ code: "agent.limit.day", whatHappened: "That's more than is left in AgentZero's wallet. Nothing was sent.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } } as Problem);
+        if (p.kind !== "sell" && (!(usd > 0) || spent + usd > agentRules.limitUsd + 1e-9 || usd > agentHeldUsd + 1e-9)) throw new ProblemError({ code: "agent.limit.day", whatHappened: "That's more than is left in AgentZero's wallet. Nothing was sent.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } } as Problem);
         // A payment goes only to a listed person; a sample move into Spending or a sample trade has no payee.
         if ((p.kind === "pay" || p.kind === "pay-private") && !agentRules.people.includes(String(p.to ?? "").toLowerCase())) throw new ProblemError({ code: "agent.recipient", whatHappened: "Your account lets AgentZero pay only the people on your list. Nothing was sent.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } } as Problem);
         if (p.kind !== "pay" && p.kind !== "pay-private" && p.kind !== "top-up" && p.kind !== "buy" && p.kind !== "sell") throw new ProblemError({ code: "agent.kind", whatHappened: "AgentZero can't do that. Nothing was sent.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } } as Problem);
         if (trade) {
           const nothing = (line: string) => new ProblemError({ code: "agent.trade", whatHappened: `${line} Nothing moved.`, money: { state: "safe", where: "in your pump.fun wallet" }, next: { kind: "nothing", label: "OK" } } as Problem);
           if (!trade.token) throw nothing(`AgentZero can't trade ${trade.symbol || "that coin"} in the Sim.`);
-          const r = simTrade("pump", p.kind, trade, usd) as { status: string; haveUsd?: number };
-          if (r.status === "short") throw nothing(`Your sample pump.fun wallet has only ${dollarWords(r.haveUsd ?? 0, true)}.`);
+          // a buy spends AgentZero's wallet (its sheet: "Trades only from AgentZero's own wallet"), through the pump.fun
+          // wallet that keeps the coin; that wallet's own money stays as it was
+          if (p.kind === "buy") simSiteCash("pump", usd);
+          const r = simTrade("pump", p.kind, trade, usd) as { status: string };
           if (r.status !== "done") throw nothing(`AgentZero holds no ${trade.symbol} in your pump.fun wallet.`);
-          emit("ledger.balancesChanged", {});
+          if (p.kind === "buy") agentHeldUsd = cents(agentHeldUsd - usd);
+          agentMoneyMoved();
           changed();
         }
-        // a payment to a listed person leaves the Safe's USDC, as every other Sim move changes the Sim's money (hunt 5 Nov)
+        // a payment to a listed person leaves AgentZero's wallet (the funding took it from the Safe), and Home's total with it
         if (p.kind === "pay" || p.kind === "pay-private") {
-          const have = balances.filter((b) => b.tokenId === USDC_NEAR).reduce((t, b) => t + Number(b.amount), 0);
-          if (have + 1e-9 < usd) throw new ProblemError({ code: "agent.funds", whatHappened: `Your Safe has only ${dollarWords(have, true)} in USDC. Nothing was sent.`, money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } } as Problem);
-          debit(USDC_NEAR, usd);
-          emit("ledger.balancesChanged", {});
+          agentHeldUsd = cents(agentHeldUsd - usd);
+          agentMoneyMoved();
           changed();
         }
         if (p.kind !== "sell") agentRules.paid.push({ at: Date.now(), usd });
@@ -2256,7 +2319,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       case "subwallet.float.home": case "subwallet.float.move": case "subwallet.float.moves": case "subwallet.float.addStatus": case "subwallet.float.swapQuote": case "subwallet.float.swap":
         // as the core: Trade's (and ZeroFee's own screens); Home's Swap in Wallet may swap and price a swap, nothing else
         // (and AgentZero a dry swap price, quote_dry: nothing moves)
-        if (p.app !== undefined && p.app !== "trade" && !(p.app === "wallet" && (method === "subwallet.float.swap" || method === "subwallet.float.swapQuote" || method === "subwallet.float.balance" || method === "subwallet.float.move")) && !(p.app === "agent" && method === "subwallet.float.swapQuote")) throw securityProblems.requestNotAllowed("Only Trade can move Spending's money and start fast trading.");
+        if (p.app !== undefined && p.app !== "trade" && !(p.app === "wallet" && (method === "subwallet.float.swap" || method === "subwallet.float.swapQuote" || method === "subwallet.float.balance" || method === "subwallet.float.move" || method === "subwallet.float.moves")) && !(p.app === "agent" && method === "subwallet.float.swapQuote")) throw securityProblems.requestNotAllowed("Only Trade can move Spending's money and start fast trading.");
         return float.answer(method, p);
       // D143 (core approval-policy.ts): a hot key's signature never asks, so it is never declined: signed, or refused
       case "subwallet.signTx": return { signedTx: String(p.tx ?? "") };
@@ -2838,7 +2901,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     chatSeed: [...chatSample].map((x) => x.toString(16).padStart(2, "0")).join(""),
     chatNames,
     // QA (5 Nov): a reload turned AgentZero off (its wallet back to "Off") while its job ran on
-    agent: { rules: agentRules, lastLimit: agentLastLimit, receiptHead, receipts: agentReceipts, paidCount: agentPaidCount, askAbove: agentAskAbove },
+    agent: { rules: agentRules, lastLimit: agentLastLimit, heldUsd: agentHeldUsd, receiptHead, receipts: agentReceipts, paidCount: agentPaidCount, askAbove: agentAskAbove },
     simHeld: [...simHeld].map(([id, m]) => [id, [...m].map(([t, c]) => [t, { ...c, amount: c.amount.toString() }] as const)] as const),
   });
   type Snapshot = ReturnType<typeof snapshot>;
@@ -2895,6 +2958,9 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     if (x.agent) {
       agentRules = x.agent.rules ?? null;
       agentLastLimit = typeof x.agent.lastLimit === "number" ? x.agent.lastLimit : agentRules?.limitUsd ?? null;
+      // a sample kept before its wallet held money: what it may still spend comes out of the Safe now, once
+      if (typeof x.agent.heldUsd === "number") agentHeldUsd = x.agent.heldUsd;
+      else if (agentRules) agentLimitMoves(0, agentLimitFits(0, Math.max(0, agentRules.limitUsd - agentRules.paid.reduce((t: number, y: { usd: number }) => t + y.usd, 0))));
       receiptHead = x.agent.receiptHead ?? null;
       agentReceipts.splice(0, agentReceipts.length, ...(x.agent.receipts ?? []));
       agentPaidCount = Number(x.agent.paidCount) || 0;

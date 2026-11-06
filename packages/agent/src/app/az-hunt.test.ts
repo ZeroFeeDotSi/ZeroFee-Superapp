@@ -9,19 +9,19 @@ import { readFileSync } from "node:fs";
 import { AGENT_PRIVATE_ROUTE } from "@zerofee/core/agent-route";
 import { KEEP_NOT_YET, jobOffered, offeredJobs, parseList, pausedLine, pocketAtOnce, pocketWaitLine, runningList, termsProblem, type Job } from "../zero/jobs.ts";
 import { pausedUntil } from "./pocket-read.ts";
-import { KEEP_FROM_AGENT_OPEN } from "../zero/keep-read.ts";
+import { keepRuns } from "../zero/keep-read.ts";
 
 const app = readFileSync(new URL("./AgentApp.tsx", import.meta.url), "utf8");
 
-test("Keep is offered only where its route works, the Sim too (control: the pay list still runs on sample money)", () => {
-  assert.equal(jobOffered("keep", true), AGENT_PRIVATE_ROUTE, "Sim: hidden while the route is shut");
-  assert.equal(jobOffered("keep", false), AGENT_PRIVATE_ROUTE);
-  assert.equal(jobOffered("pay-list", true), true, "control");
+test("Keep and the pay list are offered only where their routes work, the Sim too (control: the copy job is offered)", () => {
+  assert.equal(jobOffered("keep", true), keepRuns(), "Sim: hidden while its route is shut");
+  assert.equal(jobOffered("keep", false), keepRuns());
+  assert.equal(jobOffered("pay-list", true), false, "6 Nov: real accounts can't run it, so the Sim doesn't show it");
   assert.equal(jobOffered("copy", true), true, "control");
-  if (!AGENT_PRIVATE_ROUTE) assert.deepEqual(offeredJobs(true), ["copy", "pay-list", "sign-in"]);
+  if (!AGENT_PRIVATE_ROUTE) assert.deepEqual(offeredJobs(true), ["copy", "sign-in"]);
   assert.equal(KEEP_NOT_YET, "AgentZero can't fill your SOL wallet privately yet.");
-  // QA: the Keep job is offered by AGENT_PRIVATE_ROUTE and its top-up runs by KEEP_FROM_AGENT_OPEN; they flip together
-  assert.equal(KEEP_FROM_AGENT_OPEN, AGENT_PRIVATE_ROUTE, "flip both flags together (agent-route.ts, keep-read.ts)");
+  // QA: neither flag alone may offer it: the offer reads keepRuns, which needs both (control in keep-read.test.ts)
+  assert.match(readFileSync(new URL("../zero/jobs.ts", import.meta.url), "utf8"), /kind === "keep" \? keepRuns\(\)/);
 });
 
 test("the Pocket money sheet says the chosen limit's own wait (control: unknown keeps the old line)", () => {
@@ -81,4 +81,72 @@ test("QA: a dispute pauses AgentZero's spending, and the screen says so (control
   assert.equal((app.match(/\.\.\.pausedUntil\(v\.disputeUntilNs\)/g) ?? []).length, 2);
   assert.equal(pausedLine(new Date(Date.UTC(2030, 10, 8, 12)).toISOString()), "Your laptop paused AgentZero's spending until Fri, Nov 8.");
   assert.match(app, /: on && agent\.pausedUntilIso \? pausedLine\(agent\.pausedUntilIso\) : on \? `Spent so far/);
+});
+
+test("the Sim's row reads what waits from the account; a real account keeps what this phone asked (a Cancel in Waiting, a Stop or a reload leaves no promise)", () => {
+  assert.match(app, /const raise = agent\?\.sample \? \(on \? agent\.waiting \?\? null : null\) : raiseKept;/);
+  assert.match(app, /const startsAt = agent\?\.sample \? \(on \? null : agent\.waiting\?\.atIso \?\? null\) : startsAtKept;/);
+  assert.match(app, /else setStartsAt\(r\.ok\.readyAtIso\);\n\s*await read\(\);\n\s*return true;/, "the row says so at once");
+  const stop = app.slice(app.indexOf("const stopJob = async"), app.indexOf("const others = jobs.filter"));
+  assert.match(stop, /setRaise\(null\);/, "a cancel with a job's stop");
+  assert.match(app, /agent\?\.waiting\?\.usd === choice\}/, "no second wait for the same amount");
+});
+
+test("hunt 013/014, 6 Nov: a second click before the redraw does nothing on every sheet that acts: Start, Stop this job, Stop AgentZero, Pay, Continue; the guard is let go after", () => {
+  assert.match(app, /const once = oneAtATime\(acting\);/);
+  for (const call of [/onStart=\{\(t\) => void once\(startJob\)\(t\)\}/, /onStop=\{onceStop\(stopJob\)\}/, /void onceStop\(stopAll\)\(\)/, /void once\(runAct\)\(sheet\)/]) assert.match(app, call);
+  assert.equal((app.match(/void once\(payOnce\)\(/g) ?? []).length, 2);
+  assert.doesNotMatch(app, /void (startJob|stopAll|payOnce|runAct)\(/, "control: no sheet calls one bare");
+});
+
+test("W9-5b: the funding receipt stops its clock and \"It keeps going\" once the core's answer landed it, on both paths (control: still going, both stay)", async () => {
+  const { receiptLeft } = await import("@zerofee/shell-api/job-steps.ts");
+  const { JOB_WORDS, watchShown } = await import("@zerofee/shell-api/job-start.ts");
+  const t = 1_000_000;
+  assert.equal(receiptLeft(t + 10_000, t, undefined, t + 1_000), "Landed early.");
+  assert.equal(watchShown(t + 1_000), false);
+  assert.equal(receiptLeft(t + 10_000, t), "About 10 s left.", "control");
+  assert.equal(watchShown(undefined), true, "control");
+  assert.match(app, /receiptLeft\(funded\.endsAt, Date\.now\(\), undefined, funded\.landedAt\)/);
+  assert.match(app, /\{watchShown\(funded\.landedAt\) && <p className="zf-receipt__line">\{JOB_WORDS\.watch\}<\/p>\}/);
+  assert.equal((app.match(/fundedLanded\(\);/g) ?? []).length, 2, "the Sim's limit and a real account's fill");
+  assert.ok(JOB_WORDS.watch.length > 0);
+});
+
+test("the funding page's amounts narrow only for the Sim's limit: a real account's fill adds any amount (control: addable itself)", () => {
+  assert.match(app, /addable\(FUND_AMOUNTS, on && pocketHere \? pocketUsd : 0\)/);
+});
+
+test("Stop is a kill switch: it runs while a hung Start holds the other gate; two clicks are still one Stop (control: the same gate swallows)", async () => {
+  const { oneAtATime } = await import("./one-at-a-time.ts");
+  const acting = { current: false };
+  const stopping = { current: false };
+  const once = oneAtATime(acting);
+  const onceStop = oneAtATime(stopping);
+  const hung = new Promise<void>(() => {});
+  let starts = 0;
+  let stops = 0;
+  void once(() => (starts++, hung))();
+  void once(async () => void starts++)();
+  assert.equal(starts, 1, "control: a second action behind the held gate is swallowed");
+  assert.equal(acting.current, true, "the hung Start still holds its gate");
+  let open!: () => void;
+  const stop = () => (stops++, new Promise<void>((r) => (open = r)));
+  const first = onceStop(stop)();
+  void onceStop(stop)();
+  assert.equal(stops, 1, "a Stop ran under a hung Start, and two clicks are one Stop");
+  open();
+  await first;
+  assert.equal(stopping.current, false, "its gate lets go when it ends");
+  await onceStop(async () => void stops++)();
+  assert.equal(stops, 2, "and a later Stop runs");
+});
+
+test("Both Stops have their own gate, and no other action's busy can shut Stop AgentZero's Approve", () => {
+  assert.match(app, /const onceStop = oneAtATime\(stopping\);/);
+  assert.match(app, /onStop=\{onceStop\(stopJob\)\}/);
+  assert.match(app, /<button className="zf-btn" disabled=\{stopBusy\} onClick=\{\(\) => void onceStop\(stopAll\)\(\)\}>Approve<\/button>/);
+  assert.doesNotMatch(app, /once\(stop(All|Job)\)/);
+  // its own Approve is off only while its own Stop runs (the walk: enabled under the core's sheet, it was still a target)
+  assert.match(app, /const stopAll = async \(\) => \{\n\s*setBusy\(true\);\n\s*setStopBusy\(true\);\n\s*const r = await bridge\.call<TxOutcome>\("account\.agent\.revoke"\);\n\s*setBusy\(false\);\n\s*setStopBusy\(false\);/);
 });

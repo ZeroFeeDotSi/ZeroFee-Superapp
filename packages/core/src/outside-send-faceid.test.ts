@@ -78,7 +78,7 @@ test("QA's ruling: a Send to an outside address asks Face ID every time, at any 
 test("QA's ruling: the outside sheet's lines say what they get and the fee from 1Click's signed dollars, and warn over 5 %", async () => {
   const { outsideLines, OUTSIDE_WORDS } = await import("./subwallets.ts");
   const nine = outsideLines(STRANGER, "3.00", "2.71");
-  assert.deepEqual(nine.lines, [`To ${STRANGER}`, "They get about $2.71", "Network fees · about $0.29", "Anyone can see it land."]);
+  assert.deepEqual(nine.lines, [`To ${STRANGER}`, "They get about $2.71", "Fees · about $0.29", "NEAR Intents and the network keep this. ZeroFee takes nothing.", "Anyone can see it land."]);
   assert.deepEqual(nine.warnings, [{ kind: "large-amount", text: "9.7% goes to fees. On a bigger send, fees are a smaller part." }]);
   // controls: 2 % warns nothing; no signed figure says only the address (never a made-up one)
   assert.deepEqual(outsideLines(STRANGER, "100", "98").warnings, []);
@@ -86,7 +86,7 @@ test("QA's ruling: the outside sheet's lines say what they get and the fee from 
   assert.deepEqual(outsideLines(STRANGER, "3", "4"), { lines: [`To ${STRANGER}`, "Anyone can see it land."], warnings: [] }, "out over in: not a fee, said as nothing");
   assert.equal(OUTSIDE_WORDS.declined("SOL wallet"), "You said no. Nothing left your SOL wallet.");
   // the copy review's ruling (5 Nov): the payee's side said by its network; the full address stays on the sheet (security)
-  assert.deepEqual(outsideLines(STRANGER, "3", "2.71", "Ethereum").lines, [`To ${STRANGER}`, "They get about $2.71", "Network fees · about $0.29", "Public on Ethereum."]);
+  assert.deepEqual(outsideLines(STRANGER, "3", "2.71", "Ethereum").lines, [`To ${STRANGER}`, "They get about $2.71", "Fees · about $0.29", "NEAR Intents and the network keep this. ZeroFee takes nothing.", "Public on Ethereum."]);
   assert.deepEqual(outsideLines(STRANGER, "3", undefined, "Solana").lines, [`To ${STRANGER}`, "Public on Solana."]);
   assert.equal(OUTSIDE_WORDS.seen(null), "Anyone can see it land.", "control: a network not known, the plain form");
   // a payee paid into their private balance: "Private.", never "Public on NEAR." (the copy review's ruling, 5 Nov)

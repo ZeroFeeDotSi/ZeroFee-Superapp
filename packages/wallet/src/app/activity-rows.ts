@@ -5,6 +5,7 @@ import type { Movement } from "../types.ts";
 import { statusWords } from "./hub.ts";
 import { SAFE_LEG_MIN_USD } from "@zerofee/core/float-floors";
 import { swapLabel } from "./money/swap-follow.ts";
+import { isInplaceRow } from "./money/inplace-activity.ts";
 import { carried } from "@zerofee/shell-api/job-carry.ts";
 import { SLOW_MS, moveTrack, rowTitle, sendFrom, sendTrack, withCarry, type Folded, type LiveTrack } from "./money/live-steps.ts";
 
@@ -28,7 +29,8 @@ export const nameOf = (s: SpendingActivity): string => { const t = jobOf(s); ret
 /** A Spending row's dollars: its job's figure (what was asked, the receipt's), else the row's own. */
 export const usdOf = (s: SpendingActivity): string | undefined => carried(`move:${s.id}`)?.usd ?? (s.askedUsd ? `$${s.askedUsd}` : s.usd ? `$${s.usd}` : undefined);
 /** A Spending row's second line: its job's (the same as Home's), else each leg's words and the move's state. */
-export const lineOf = (s: SpendingActivity): string => { const t = jobOf(s); return (t && jobLine(t)) || legsLine(s); };
+// a swap in place that came back: its name already says where the money is (copy review, 6 Nov: not twice on one row)
+export const lineOf = (s: SpendingActivity): string => { if (isInplaceRow(s) && s.status === "refunded") return "Refunded"; const t = jobOf(s); return (t && jobLine(t)) || legsLine(s); };
 
 /** The same move in the ledger and in Spending, by its id (review, 1 Nov: matched by time, two moves a minute apart
  *  could swap rows, and the two sides showed different amounts). A Top up's row carries the ledger movement's id; a Put

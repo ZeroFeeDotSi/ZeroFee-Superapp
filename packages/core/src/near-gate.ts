@@ -26,6 +26,7 @@ export const NEAR_GATE: { open: boolean } = Object.freeze({
     nearOpen = v === true;
   },
 });
-export const NEAR_CLOSED = "NEAR coins open soon.";
+/** Trade's own line for the same fact (trade runtime NEAR_NOT_TRADED): never a promise with no date (gates grade). */
+export const NEAR_CLOSED = "Trade doesn't buy or sell NEAR coins.";
 /** The NEAR coin wallet's name (3 Nov, Rhea trades): public, apart from "your NEAR wallet" (Spending's cash, D129). */
 export const NEAR_COIN_WALLET = "NEAR coin wallet";

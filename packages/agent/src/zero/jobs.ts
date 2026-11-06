@@ -14,16 +14,23 @@ import { AGENT_PRIVATE_ROUTE, AGENTZERO_WALLET } from "@zerofee/core/agent-route
 import { ownWalletWords } from "@zerofee/core/own-wallet-words";
 import { dryRun, type DryStep } from "@zerofee/core/dry-run";
 import { waitWords } from "@zerofee/core/time-words";
+import { keepRuns } from "./keep-read.ts";
 
 export type JobKind = "copy" | "keep" | "pay-list" | "sign-in";
 
 /** The order the jobs are listed in (AZ2). */
 export const JOB_ORDER: readonly JobKind[] = ["copy", "keep", "pay-list", "sign-in"];
-/** D116 drop, don't degrade: a job that can't finish on a real account isn't offered there. Keep and Pay my list move
- *  money only by the private route (D89, D91), shut until route A is proven. Keep is offered only where its route works
- *  end to end, the Sim too (hunt 5 Nov, 040: the Sim's keep job said "moved $10" and nothing moved); a Sim pay list
- *  pays from the Sim's own Safe. */
-export const jobOffered = (kind: JobKind, sample: boolean): boolean => AGENT_PRIVATE_ROUTE || (kind !== "keep" && (sample || kind !== "pay-list"));
+/**
+ * Can a pay list pay anyone, end to end, on a real account? It moves money only by the private route (D89, D91), shut
+ * until route A is proven, and it needs AgentZero's key on the Safe, which the core refuses with AgentZero's own wallet on
+ * (agent-door.ts SAFE_KEY_DOORS). Today no. Its relay's copy: apps/quotes/agentzero-chat.mjs PAY_LIST_OFFERED (a test
+ * holds them equal). Fix path: a payment from AgentZero's own wallet by route A, proven with real money; then this goes true.
+ */
+export const payListRuns = (walletOn: boolean = AGENTZERO_WALLET, route: boolean = AGENT_PRIVATE_ROUTE): boolean => route && !walletOn;
+/** D116 drop, don't degrade, end to end or hidden: a job that can't finish on a real account isn't offered, the Sim too, or
+ *  the Sim shows a job the app doesn't have. Keep: keep-read.ts keepRuns (hunt 5 Nov, 040: "moved $10", nothing moved). Pay
+ *  my list: payListRuns (a real account can't pay anyone; gates note, 6 Nov). */
+export const jobOffered = (kind: JobKind, _sample: boolean): boolean => (kind === "keep" ? keepRuns() : kind === "pay-list" ? payListRuns() : true);
 /**
  * Can this job start on this account? Its wallet is release 10's (AgentZero's own key with a daily limit). A new
  * account runs release 9, and no update to 10 is offered (D57; the core's rulesInfo offers none from release 9), so
@@ -52,7 +59,7 @@ export const jobsLine = (sample: boolean, pocket = true): string => {
   const words: Record<JobKind, string> = { copy: "copy a wallet", keep: "keep money in your SOL wallet", "pay-list": "pay your list", "sign-in": "sign you in" };
   const ks = offeredJobs(sample, pocket).map((k) => words[k]);
   const count = ["no", "one", "two", "three", "four"][ks.length] ?? String(ks.length);
-  return `AgentZero does ${count} job${ks.length === 1 ? "" : "s"}: ${ks.length > 1 ? `${ks.slice(0, -1).join(", ")} and ${ks.at(-1)}` : ks.join("")}.`;
+  return `AgentZero does ${count} job${ks.length === 1 ? "" : "s"}: ${ks.length > 1 ? `${ks.slice(0, -1).join(", ")}, and ${ks.at(-1)}` : ks.join("")}.`;
 };
 /** A job asked for (words, Chat) that isn't offered here. */
 export const NOT_OFFERED_LINE = "AgentZero can't do that job yet.";
@@ -245,7 +252,7 @@ export function jobDryRun(j: JobTerms) {
         { words: `When it buys a coin, buy ${usd(j.perTradeUsd)} of it.`, usd: j.perDayUsd },
         { words: `Sell it when it's up ${j.sellAtPct}%.`, usd: 0 },
       );
-      never = ["Never takes from your Safe."];
+      // startSheet's "Trades only from AgentZero's own wallet. Never your Safe or your wallets." says it (copy review, 6 Nov)
       break;
     case "keep":
       steps.push({ words: `Watch ${KEEP_WALLET[j.wallet ?? "sol"]}.`, usd: 0 }, { words: `When it drops under ${usd(j.keepUsd)}, move money from your Safe to fill it.`, usd: j.perDayUsd });
@@ -279,7 +286,8 @@ export function startSheet(j: JobTerms, opts: { agentOn: boolean; pocketUsd: num
       lines.push(
         capLine(j.perDayUsd),
         // P3/P4: a real account trades from AgentZero's own pocket, inside one day the person approves with Face ID.
-        opts.sample ? "Sample money only. Pays from the sample pump.fun wallet." : "Trades only from AgentZero's own wallet. Never your Safe or your wallets.",
+        ...(opts.sample ? ["Sample money only."] : []),
+        "Trades only from AgentZero's own wallet. Never your Safe or your wallets.",
         // the Sim (sample money) drops it (product decision, 5 Nov): no line about tabs or devices there
         ...(opts.sample ? [] : [OPEN_LINE]),
       );
@@ -289,9 +297,9 @@ export function startSheet(j: JobTerms, opts: { agentOn: boolean; pocketUsd: num
     case "keep":
       // step 2 already says when it moves money (e2e walk 3 Nov, QA test: said twice)
       lines.push(...dayLine(j, opts), ...(opts.sample ? [] : [OPEN_LINE]));
-      // The move into Spending goes only through the core's private path (D89), shut until route A is proven; until then
-      // it runs on sample money only. Once open, starting it loosens AgentZero's budget, so it waits the safety wait.
-      if (!opts.sample && !AGENT_PRIVATE_ROUTE) {
+      // A keep job saved before can still open here. Its fill runs only where keepRuns says (D89 and its own wallet's route);
+      // once open, starting it loosens AgentZero's budget, so it waits the safety wait.
+      if (!opts.sample && !keepRuns()) {
         // no its wallet line on this path: the job's own day limit, once (review of 9193522f)
         if (!dayLine(j, opts).length) lines.push(capLine(j.perDayUsd));
         lines.push(KEEP_NOT_YET, "Stop it any time.");

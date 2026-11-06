@@ -74,7 +74,7 @@ test("a second job on the same money is refused before it calls the core; once t
   const go = runJob({ tasks, title: "Add $5.00 to your private balance", safe: true, money: ["safe"], call: first.call, declined: () => false, made: () => {}, onApproval: sheets().on });
   const second = await runJob({ tasks, title: "Send $5.00", safe: true, onAnswer: true, money: ["safe", "private"], call: async () => { calls++; return { ok: {} }; }, declined: () => false, made: () => {} });
   assert.ok("refused" in second);
-  assert.equal(second.refused.whatHappened, "Another job is using this money. Nothing moved. Try again once it's signed.");
+  assert.equal(second.refused.whatHappened, "Another job is using this money, so nothing moved. Try again once that job is signed.");
   assert.equal(calls, 0, "never asked the core");
   const other = await runJob({ tasks, title: "Move it home", safe: false, money: ["private-x"], call: async () => { calls++; return { ok: {} }; }, declined: () => false, made: () => {} });
   assert.ok("ok" in other, "control: other money goes");

@@ -62,7 +62,7 @@ export const meterLabel = (usedUsd: number, leftUsd: number | null): string => `
 export const todayLine = (usedUsd: number, paidUsd: number): string => `Used today ${usd3(usedUsd)} · paid ${usd3(paidUsd)}`;
 /** How AgentZero pays for its thinking (D37, the copywriter 4 Nov): after each reply, and only replies it has money for; at
  *  Anthropic's price with nothing added (product decision, 5 Nov: we are zero fee). */
-export const SETTLE_LINE = "Pays Anthropic after each reply, at Anthropic's price. ZeroFee takes nothing.";
+export const SETTLE_LINE = "Pays after each reply, at Anthropic's price. ZeroFee passes it on and takes nothing.";
 /** D37: a message refused before Claude is asked, because AgentZero's money doesn't cover it (Add money beside it). */
 export const REFUSE_LINE = "AgentZero needs more money to answer.";
 /** A small cost in cents, as people read it ("1.2¢"); a dollar or more as dollars (`money`). */

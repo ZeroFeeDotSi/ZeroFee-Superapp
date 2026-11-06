@@ -115,6 +115,6 @@ test("the product Perps tile line may say Confidential, only that exact line in 
 
 test("the protocols' own names, 1Click and NEAR Intents, may be on screen (product decision, 5 Nov: name who is paid); other spellings and the bare word stay banned (controls)", () => {
   const f = "packages/wallet/src/app/money/x.tsx";
-  for (const ok of ["1Click prices it.", "NEAR Intents doesn't swap one of these coins.", "Paid to NEAR Intents' solver directly.", "1Click didn't sign this price. Nothing moved.", "1Click priced different coins. Nothing moved.", "NEAR Intents", "1Click"]) assert.deepEqual(bannedIn(f, ok).filter((b) => b.word === "1Click" || b.word === "intents").map((b) => b.word), [], ok);
+  for (const ok of ["NEAR Intents and the network keep this. ZeroFee takes nothing.", "1Click prices it.", "NEAR Intents doesn't swap one of these coins.", "Paid to NEAR Intents' solver directly.", "1Click didn't sign this price. Nothing moved.", "1Click priced different coins. Nothing moved.", "NEAR Intents", "1Click"]) assert.deepEqual(bannedIn(f, ok).filter((b) => b.word === "1Click" || b.word === "intents").map((b) => b.word), [], ok);
   for (const bad of ["Your intents balance.", "Intents is fast.", "Swap with 1Click today.", "NEAR Intents couldn't be faster, try it now", "1Click can't see what you buy."]) assert.ok(bannedIn(f, bad).some((b) => b.word === "1Click" || b.word === "intents"), bad);
 });

@@ -8,10 +8,13 @@ import "./receipt.css";
 
 const TICK = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>;
 const CROSS = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>;
+/** The money came back: LiveRow's own "back" arrow, neutral. On a mark only: a full receipt has no such state. */
+const BACK = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 6L4.8 10.8l4.8 4.8M5.3 10.8H14.4a4.8 4.8 0 010 9.6H12" /></svg>;
+type MarkState = ReceiptState | "back";
 
 /** The object alone, small, for a row in a thread (AgentZero's money card, 5 Nov): the same coin, ring and badge at
  *  48 px, the same states. The words are the row's own. Decorative: the row says the state in words. */
-export function ReceiptMark({ state, icon, size = 48 }: { state: ReceiptState; icon: ReactNode; size?: number }) {
+export function ReceiptMark({ state, icon, size = 48 }: { state: MarkState; icon: ReactNode; size?: number }) {
   return (
     <div className="zf-receipt zf-receipt--mark" data-state={state} aria-hidden="true" style={{ ["--ring" as string]: `${size}px`, ["--coin" as string]: `${Math.round(size * 0.54)}px`, ["--badge" as string]: `${Math.round(size * 0.375)}px` }}>
       <Obj state={state} icon={icon} />
@@ -19,12 +22,12 @@ export function ReceiptMark({ state, icon, size = 48 }: { state: ReceiptState; i
   );
 }
 
-function Obj({ state, icon }: { state: ReceiptState; icon: ReactNode }) {
+function Obj({ state, icon }: { state: MarkState; icon: ReactNode }) {
   return (
     <div className="zf-receipt__obj">
       <svg className="zf-receipt__ring" viewBox="0 0 128 128" aria-hidden="true"><circle cx="64" cy="64" r="62" pathLength="1" /></svg>
       <div className="zf-receipt__coin">{icon}</div>
-      <span className="zf-receipt__badge" aria-hidden="true">{state === "refused" ? CROSS : TICK}</span>
+      <span className="zf-receipt__badge" aria-hidden="true">{state === "back" ? BACK : state === "refused" ? CROSS : TICK}</span>
     </div>
   );
 }

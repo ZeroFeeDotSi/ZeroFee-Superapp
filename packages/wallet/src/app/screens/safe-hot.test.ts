@@ -140,6 +140,8 @@ test("Home draws the door under the Safe's coins and WalletApp routes it: Privat
   assert.match(home, /const door = web \|\| kid \|\| !a\.onPrivate \? null : privateDoor\(pocket, true\);/);
   const app = readFileSync(new URL("../WalletApp.tsx", import.meta.url), "utf8");
   assert.match(app, /privateOpen\(\) && !web \? \{ onPrivate: openPrivate \}/);
+  // a build with no relay: a link to Private lands on Home, as Home has no door there (control: unread stays where it is)
+  assert.match(app, /\(view\.kind === "private" \|\| view\.kind === "toPrivate"\) && pocket && !privateDoor\(pocket, privateOpen\(\)\)\) setView\(\{ kind: "tabs" \}\);/);
   assert.match(app, /if \(privateOpen\(\) && !web && view\.kind === "tabs" && pocket\?\.available && !pocket\.ready\) void ensurePrivate\(\);/);
 });
 

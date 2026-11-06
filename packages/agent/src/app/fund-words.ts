@@ -1,6 +1,7 @@
 // The words of AgentZero's wallet in the Jobs app (product decision, 5 Nov: "we can't say $20 in 24 hours, it scares people; we are ZERO
 // FEE"). No daily price and no "one day" anywhere: AgentZero's wallet is money the person puts in and may take back; a job
-// costs what the model company and the chain charge, paid to them directly; ZeroFee takes nothing.
+// costs what the model company and the chain charge. A reply's payment goes through ZeroFee's receiving account (core
+// agent-pay.ts ZEROFEE_RECEIVE), at Anthropic's price with nothing added, so the words never say it goes straight to Anthropic.
 //
 // The price the funding page shows is Anthropic's own, for the model AgentZero thinks with by default (chat/model.ts
 // DEFAULT_CHOICE: Claude Sonnet 5.5, D158). Read from the primary source on 5 Nov 2026:
@@ -42,13 +43,19 @@ export const FUND_TITLE = "AgentZero's wallet";
 /** The page's one lit button, and the amounts it adds (the Sim's top-up). */
 export const ADD_BUTTON = "Add money to AgentZero's wallet";
 export const FUND_AMOUNTS = [10, 25, 50] as const;
+/** The amounts this page can still offer: a wallet that holds $25 can go to $50, never "add" its way down to $10 (the
+ *  button says Add, the job said "Add $10.00", and the wallet fell). The one in force stays, marked and off. */
+export const addable = (amounts: readonly number[], inForceUsd: number): number[] => amounts.filter((c) => c >= inForceUsd - 1e-9);
+/** The Sim: a Stop gives back what's left in AgentZero's wallet (the funding took it from the Safe). */
+export const STOP_BACK_LINE = (usd: number): string => `The $${usd.toFixed(2)} in its wallet goes back to your Safe.`;
+export const STOP_BACK_DONE = (usd: number): string => `The $${usd.toFixed(2)} in its wallet went back to your Safe.`;
 
 /** The pocket row's title: the wallet and what is in it. */
 /** the copy review's S14 words (train 17), the same as AgentZero's row on Home's Hot side: "Its wallet · $12.00" / "Its wallet · empty". */
 export const walletRow = (usd: number): string => (usd > 0.004 ? `Its wallet · $${usd.toFixed(2)}` : "Its wallet · empty");
 
 /** A job's rough cost, on its sheet before Start (test): the funding page's figure, at the model's own price. */
-export const jobCostLine = (): string => `Costs about ${cents(jobUsd())}, paid to ${FUND_MODEL_NAME}.`;
+export const jobCostLine = (): string => `Usually under ${cents(jobUsd())}, at Anthropic's price for ${FUND_MODEL_NAME}.`;
 
 /** Funding as a job (QA's Sim test Nov: no "Job created.", no time, no word of where the $10 came from): AgentZero's
  *  wallet is its limit on your Safe's account (account.agent.set / setBudget), so the money it may spend is your Safe's,
@@ -78,12 +85,13 @@ export function fundLines(): { what: string[]; cost: string[]; who: string[] } {
     ],
     // UI audit 5 Nov: the answer first (what a job costs), then where it comes from; no token counts on the page
     cost: [
-      `A job usually costs about ${cents(job)}.`,
+      `A job usually costs under ${cents(job)}.`,
       `That is what ${FUND_MODEL_NAME} costs to think it through, at Anthropic's own price: ${price(FUND_PRICE.input)} for each million tokens read, ${price(FUND_PRICE.output)} for each million written.`,
       `Tokens it has read before cost ${price(FUND_PRICE.cacheRead)} for each million.`,
     ],
     who: [
-      "You pay Anthropic for the model, at its own price.",
+      "You pay Anthropic's own price for the model.",
+      "It goes through ZeroFee's account, which pays Anthropic.",
       "Each move pays the chain's own network fee.",
       "ZeroFee takes nothing.",
     ],

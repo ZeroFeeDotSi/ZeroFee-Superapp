@@ -70,7 +70,7 @@ test("Pocket money's row while a raise waits: both figures, never the new one al
   assert.equal(readRaise(JSON.stringify({ usd: -1, atIso: "x" })), null);
   assert.match(app, /if \(on\) setRaise\(\{ usd, atIso: r\.ok\.readyAtIso \}\);\s*else setStartsAt\(r\.ok\.readyAtIso\);/, "on: the raise waits, the limit stays; off: AgentZero starts then");
   assert.match(app, /on && raiseShown\(raise, on, pocketUsd\) \? `Goes up to \$\{dollars\(raise!\.usd\)\} on /);
-  assert.match(app, /\{walletRow\(on \? Math\.max\(0, Math\.round\(\(pocketUsd - Math\.max\(today, agent\.spentUsd\)\) \* 100\) \/ 100\) : 0\)\}/, "the title: what AgentZero's wallet holds, never a daily price (product decision, 5 Nov)");
+  assert.match(app, /\{walletRow\(on \? agent\.heldUsd \?\? Math\.max\(0, Math\.round\(\(pocketUsd - Math\.max\(today, agent\.spentUsd\)\) \* 100\) \/ 100\) : 0\)\}/, "the title: what AgentZero's wallet holds, never a daily price (product decision, 5 Nov)");
 });
 
 test("Sim: Ask me first is read and kept, so its ✓ shows (Never by default, as the core); asking less often asks first (control: asking more often, at once)", async () => {

@@ -127,9 +127,25 @@ export function ago(at: number, now = Date.now()): string {
   return new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+/** What a coin's page says when nothing names it (the ledger's word for the same coin). */
+export const UNNAMED_COIN = "An unnamed coin";
+/** A contract id, or an address cut short, where a name belongs: "xrp.omft.near", "nep141:…", "0x1234…abcd", 32 or more
+ *  letters and digits. `address`: the coin's own, so any spelling of it counts. */
+export function isRawCoinId(s: string, address?: string): boolean {
+  const t = s.trim().toLowerCase();
+  const own = address?.trim().toLowerCase();
+  if (own && (t === own || t === own.replace(/^nep\d+:/, ""))) return true;
+  return /^nep\d+:/.test(t) || /…/.test(t) || /^0x[0-9a-f]{4,}/.test(t) || /^\S+\.(near|tg)$/.test(t) || /^[0-9a-z]{32,}$/.test(t);
+}
+/** A coin page's headline: its name, else its symbol, never an id; nothing to call it: UNNAMED_COIN. */
+export function coinHeadline(name: string | undefined, symbol: string | undefined, address?: string): string {
+  const said = (s: string | undefined) => (s && s.trim() && !isRawCoinId(s, address) ? s : undefined);
+  return said(name) ?? said(symbol) ?? UNNAMED_COIN;
+}
+
 /** GeckoTerminal's dex id in words: "pumpswap" -> "PumpSwap", "raydium-clmm" -> "Raydium". */
 export function dexName(dex: string): string {
-  const known: Record<string, string> = { pumpswap: "PumpSwap", "pump-fun": "pump.fun", raydium: "Raydium", "raydium-clmm": "Raydium", "raydium-launchlab": "LaunchLab", "meteora-dbc": "Meteora", "meteora-damm-v2": "Meteora", meteora: "Meteora", orca: "Orca", "four-meme": "four.meme", "pons-v2": "Pons", "rhea-finance": "Rhea", "ref-finance": "Rhea", "near-intents": "" };
+  const known: Record<string, string> = { "near-intents": "NEAR Intents", pumpswap: "PumpSwap", "pump-fun": "pump.fun", raydium: "Raydium", "raydium-clmm": "Raydium", "raydium-launchlab": "LaunchLab", "meteora-dbc": "Meteora", "meteora-damm-v2": "Meteora", meteora: "Meteora", orca: "Orca", "four-meme": "four.meme", "pons-v2": "Pons", "rhea-finance": "Rhea", "ref-finance": "Rhea" };
   if (known[dex]) return known[dex];
   // the big families by their own names, whatever version or chain GeckoTerminal adds ("pancakeswap-v3-bsc" → PancakeSwap)
   const family = ([["pancakeswap", "PancakeSwap"], ["uniswap", "Uniswap"], ["sushiswap", "SushiSwap"], ["aerodrome", "Aerodrome"], ["raydium", "Raydium"], ["meteora", "Meteora"], ["flap", "Flap"], ["hood-fun", "hood.fun"], ["robinfun", "RobinFun"]] as const).find(([k]) => dex.startsWith(k));

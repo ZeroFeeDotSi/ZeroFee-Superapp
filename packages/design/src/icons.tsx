@@ -31,6 +31,8 @@ export const TrayActivity = () => P("M5 7h14M5 12h14M5 17h9");
 /** Security: a shield with the mark's stroke through it. */
 export const AppSecurity = () => P("M12 3.5 5 6.2v5.3c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6.2L12 3.5ZM9 14.5l6-6");
 /** Home (Job 1: Wallet with Security inside it): a house, one hairline. */
+/** Swap: Home's action, its job's row, and that job's row in the Activity centre. */
+export const ActSwap = () => P("M5 9h13l-3.5-3.5M19 15H6l3.5 3.5");
 export const AppHome = () => P("M4 11.2 12 4.5l8 6.7M6.5 9.4V19.5h11V9.4M10 19.5v-5h4v5");
 /** Wallet: the ZeroFee mark (a circle, one stroke through it), where the money is. */
 export const AppWallet = TrayOverview;

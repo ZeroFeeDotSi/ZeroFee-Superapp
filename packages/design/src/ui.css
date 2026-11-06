@@ -8,6 +8,8 @@
 .zf-display { font: var(--t-display); letter-spacing: var(--tr-title, -.022em); margin: 0; text-wrap: balance; }
 .zf-body { font: var(--t-body); color: var(--ink-2); margin: 0; text-wrap: pretty; }
 .zf-small { font: var(--t-small); color: var(--mute); margin: 0; text-wrap: pretty; }
+/* a money sheet's fee block (the copy review, 6 Nov): the figure, then who keeps it, together, centred, right above the button */
+.zf-fee { display: flex; flex-direction: column; justify-content: flex-end; text-align: center; color: var(--mute); margin: 0; }
 
 .zf-btn {
   appearance: none; border: 0; width: 100%; height: 56px; border-radius: 28px; background: var(--ink); color: var(--bg);

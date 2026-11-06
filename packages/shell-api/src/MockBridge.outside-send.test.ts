@@ -18,7 +18,7 @@ test("the Sim: a wallet's Send to an outside address shows the outside sheet; a 
   assert.equal(seen.length, 1);
   assert.equal(seen[0]!.words.title, "Send from your SOL wallet");
   assert.equal(seen[0]!.words.lines[0], `To ${STRANGER}`, "the full address");
-  assert.match(seen[0]!.words.lines[2] ?? "", /^Network fees · about \$\d+\.\d\d$/);
+  assert.match(seen[0]!.words.lines[2] ?? "", /^Fees · about \$\d+\.\d\d$/);
   yes = true;
   const went = await send(STRANGER);
   assert.ok(!("problem" in went && went.problem.code === "ledger.signature.declined"), "a yes goes on to the send (the Sim's empty wallet may then say it's short)");

@@ -3,6 +3,7 @@
 // fill's switch is safe-fill-open.ts. Loaded only with the route's own code, never in Home's first load.
 import type { Problem } from "./problem.ts";
 import { INFLOW_GAP_BPS } from "./inflow-grid.ts";
+import { FEES_KEPT } from "./zero-fee.ts";
 
 /** The payout couldn't go and came back to Private, its refund address (the copywriter, 5 Nov): never "failed". The
  *  route's steps are job-steps.ts's (privateMoveSteps), the one source for every job's words. S5 (the copy review's Sim walk, 5 Nov:
@@ -19,12 +20,12 @@ export const LANDED_MISSES = 3;
  *  $20.00", "Together · $32.50" (core intents.ts splitLines; the Sim's sheet the same). */
 export const LEG_WORDS = { private: "From Private", safe: "From your Safe", stays: "Stays in Private", together: "Together", seen: "Anyone can see the Safe's part.", other: (usd: string) => `The other ${usd} follows in a second step.`, adds: (usd: string) => `Your Safe adds ${usd} to Private first.` } as const;
 /** A Send's fill sheet, its legs block (the UI lead's rulings, 5 Nov; QA's Sim walk: the brackets are what the payee's
- *  coin is worth, the quote's amountOutUsd, and the payout's network fees are named last, "Network fees · about $0.40",
+ *  coin is worth, the quote's amountOutUsd, and the payout's network fees are named last, "Fees · about $0.40",
  *  the same form as every outside sheet's, send-words.ts OUTSIDE_WORDS.fees): what they get first, once, the signed coin figure
  *  then the payout's dollars, then what the Safe sends and what stays in Private: "They get · 1.2345 SOL ($40.00)", "Your
  *  Safe sends · $50.00", "Stays in Private · $10.00" (core send-fill.ts and intents.ts; the Sim's sheet the same). No
  *  "Together" on this sheet; the Move's split block (splitLines) keeps it. */
-export const SEND_LEG_WORDS = { gets: "They get", sends: "Your Safe sends", stays: LEG_WORDS.stays, fees: (usd: string) => `Network fees · about ${usd}` } as const;
+export const SEND_LEG_WORDS = { gets: "They get", sends: "Your Safe sends", stays: LEG_WORDS.stays, fees: (usd: string) => `Fees · about ${usd}`, kept: FEES_KEPT } as const;
 /** The split block, as Private's money really goes (QA's Sim re-check, 5 Nov: "From Private · $15.00" while Private fell
  *  $10.00; "From Private · $5.00" while it rose $0.26): Private pays its own share and then the fill's payout, and the Safe's
  *  fill lands in Private first, so Private's own part is the Move less the Safe's fill, never its gross share. More than

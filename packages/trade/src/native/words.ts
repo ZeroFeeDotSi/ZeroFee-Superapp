@@ -54,8 +54,8 @@ export const NATIVE_COPY = {
   source: "Prices and charts from CoinGecko and GeckoTerminal.",
   notice: (eta?: number) => `Buys and sells happen inside your Safe${eta ? ` · about ${eta} s today` : ""}`,
   // the sheet
-  about: (amount: string, symbol: string, fee: string) => `About ${amount} ${symbol} · ${fee} fee`,
-  aboutCash: (dollars: string, fee: string) => `About ${dollars} · ${fee} fee`,
+  about: (amount: string, symbol: string) => `About ${amount} ${symbol}`,
+  aboutCash: (dollars: string) => `About ${dollars}`,
   atLeast: (what: string, eta?: number) => `At least ${what}${eta ? ` · about ${eta} s` : ""}`,
   paysWith: "Pays with USDC in your Safe",
   paysInto: "The dollars go to your Safe as USDC",

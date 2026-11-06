@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { LEG_SEC, TIME_WORDS, receiptLeft } from "@zerofee/shell-api/job-steps.ts";
 import { SAFE_LEG_MIN_USD } from "@zerofee/core/float-floors";
-import { floorOf, floorSay, routeSec, aboutTime, swapBlock, SWAP_WORDS, type SwapRoute, swapStays, PRIVATE_PAYS } from "./swap-corridor.ts";
+import { floorOf, routeSec, aboutTime, swapBlock, SWAP_WORDS, type SwapRoute, swapStays, PRIVATE_PAYS } from "./swap-corridor.ts";
 import { firstPayLine } from "./send-guard.ts";
 
 const src = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
@@ -36,32 +36,20 @@ test("rule 2: Swap's receipt says the route's time left, from the same table as 
   assert.match(src("../../../../shell-api/src/job-run.ts"), /\.\.\.\(a\.etaSec \? \{ etaSec: a\.etaSec \} : \{\}\)/, "runJob hands it to startJob");
 });
 
-test("one floor line, the route's own figure: under $2.09 the Safe → a wallet says only the Safe's words; the NEAR wallet's own $2 is its control", () => {
+test("the least, said only under it (the UI reviewer's ruling, 6 Nov): under $2.09 the Safe → a wallet refuses in the Safe's words; the NEAR wallet's own $2 is its control", () => {
   const safeOut: SwapRoute = { kind: "topup", coin: "USDC", to: "sol" };
   for (const usd of [1, 1.99, 2, 2.08]) {
-    const said = floorSay(safeOut, usd, null)!;
+    const said = swapBlock({ route: safeOut, usd, most: 100 })!;
     assert.equal(said, SWAP_WORDS.safeSwapLeast, `$${usd}`);
-    assert.equal(swapBlock({ route: safeOut, usd, most: 100 }), floorOf(safeOut).under, `$${usd}: the why line is the floor line, so the sheet draws it once`);
     assert.deepEqual(said.match(/\$\d+(\.\d+)?/g), [`$${SAFE_LEG_MIN_USD.toFixed(2)}`], "one figure only");
   }
-  assert.equal(SWAP_WORDS.safeSwapLeast, "Swap at least $2.09 from your Safe.", "the copy review's ruling, 5 Nov");
-  assert.equal(floorSay({ kind: "safe" }, 2, null), SWAP_WORDS.safeSwapLeast, "inside the Safe: the same words");
-  assert.equal(floorSay(safeOut, 0, null), SWAP_WORDS.leastFromSafe, "nothing typed yet: the route's least, as before");
-  assert.equal(floorSay(safeOut, 2.09, null), SWAP_WORDS.leastFromSafe, "control: at the least, no 'under' line");
+  assert.equal(SWAP_WORDS.safeSwapLeast, "Swaps start at $2.09.", "the UI reviewer's ruling, 6 Nov");
+  assert.equal(swapBlock({ route: { kind: "safe" }, usd: 2, most: 100 }), SWAP_WORDS.safeSwapLeast, "inside the Safe: the same words");
+  assert.equal(swapBlock({ route: safeOut, usd: 2.09, most: 100 }), null, "control: at the least, no refusal");
   const nearOut: SwapRoute = { kind: "topup", coin: "USDC", to: "near" };
-  assert.equal(floorSay(nearOut, 1.5, null), SWAP_WORDS.least, "control: the Safe → the NEAR wallet's least is $2, said as $2");
-  assert.equal(swapBlock({ route: nearOut, usd: 1.5, most: 100 }), SWAP_WORDS.least);
-  const sheet = src("./SwapSheet.tsx");
-  assert.match(sheet, /\{block && block !== floor\.under && /, "the why line never repeats the floor's");
-});
-
-test("the copy review's ruling (5 Nov): over the floor, no fee-size line; the floor's line carries the quote's own fee, \"Fees about $0.29.\" (controls: no quote, no fee; under the floor, the floor's words)", () => {
-  const safeOut: SwapRoute = { kind: "topup", coin: "USDC", to: "sol" };
-  assert.equal(floorSay(safeOut, 5, 0.29), `${SWAP_WORDS.leastFromSafe} Fees about $0.29.`);
-  assert.doesNotMatch(floorSay(safeOut, 5, 0.29)!, /drops under|or more and/, "never the fee-size line");
-  assert.equal(floorSay(safeOut, 5, null), SWAP_WORDS.leastFromSafe, "control: no quote yet, no fee");
-  assert.equal(floorSay(safeOut, 2, 0.29), SWAP_WORDS.safeSwapLeast, "under the floor the floor wins");
-  assert.equal(floorSay(null, 5, 0.29), null, "no route, no line");
+  assert.equal(swapBlock({ route: nearOut, usd: 1.5, most: 100 }), SWAP_WORDS.least, "control: the Safe → the NEAR wallet's least is $2, said as $2");
+  assert.equal(floorOf(safeOut).under, SWAP_WORDS.safeSwapLeast);
+  assert.ok(!("leastFromSafe" in SWAP_WORDS) && !("leastInSafe" in SWAP_WORDS), "the standing lines are gone");
 });
 
 test("rule 8: Send's first payment names who, the wallet it comes from, and the next step (the copy review's words; controls: another warn, a repeat)", () => {

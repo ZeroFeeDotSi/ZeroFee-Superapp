@@ -239,7 +239,8 @@ test("QA control: a first sign-in with no tap and no approved session is the per
 });
 
 test("d: AgentZero's sign-in row is in Activity, under AgentZero, with the copy review's words, and in AgentZero's receipts", () => {
-  const at = Date.UTC(2026, 10, 5, 8, 0, 0);
+  // a minute ago, never a fixed date: the task store keeps a row for a day (KEPT_MS), so a fixed date fails once it's a day old
+  const at = Date.now() - 60_000;
   agentSignInRow("gmgn.ai", "GMGN", at);
   const row = taskStore().list().find((t) => t.id === `signin:gmgn.ai:${at}`);
   assert.ok(row, "the row is kept");

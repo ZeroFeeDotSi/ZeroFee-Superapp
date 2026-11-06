@@ -92,10 +92,10 @@ test("a site's own wallet (pump.fun, GMGN) is listed with its dollars and its wa
   assert.match(form, /source\.cant && source\.back && onBack\s*\? <button[^\n]*data-testid="send-move-back">\{SEND_CANT\.siteButton\}<\/button>/);
 });
 
-test("the fee before the tap: \"Network fees · about $0.29\" and, over 5 %, the plain warning; the core's sheet says the same words (controls: 2 % warns nothing; nothing known, nothing said)", async () => {
+test("the fee before the tap: \"Fees · about $0.29\" and, over 5 %, the plain warning; the core's sheet says the same words (controls: 2 % warns nothing; nothing known, nothing said)", async () => {
   const { feeLines } = await import("./send-words.ts");
-  assert.deepEqual(feeLines({ inUsd: "3.00", outUsd: "2.71" }), { fees: "Network fees · about $0.29", high: "9.7% goes to fees. On a bigger send, fees are a smaller part." });
-  assert.deepEqual(feeLines({ inUsd: "100", outUsd: "98" }), { fees: "Network fees · about $2.00", high: null });
+  assert.deepEqual(feeLines({ inUsd: "3.00", outUsd: "2.71" }), { fees: "Fees · about $0.29", high: "9.7% goes to fees. On a bigger send, fees are a smaller part." });
+  assert.deepEqual(feeLines({ inUsd: "100", outUsd: "98" }), { fees: "Fees · about $2.00", high: null });
   assert.equal(feeLines(null), null);
   assert.equal(feeLines({ inUsd: "3", outUsd: "4" }), null);
   const { outsideLines } = await import("@zerofee/core/subwallets");

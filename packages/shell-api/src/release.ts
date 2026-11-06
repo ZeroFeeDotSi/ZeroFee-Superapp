@@ -27,10 +27,14 @@ export const FREE_BUILD: boolean = (import.meta as { env?: Record<string, string
 /**
  * Is Private open here? In every build but the free one: the release (its Sim, its extension), the phone, testnet. The
  * web wallet has no Safe, so WalletApp sends its Private to the On your phone page before it asks this.
- * The free build: BLOCKED, so Private isn't offered there (drop, don't degrade). Its every move in or out is a
- * confidential 1Click quote, and 1Click gives those only under a partner key (a person's own 1Click sign-in is refused,
- * "Invalid token", FREE-BUILD.md); the free build has no relay to hold one. Fix path: Settings takes the person's own
- * 1Click partner key, as Add your RPC takes their node; with one saved, this answers true there too.
+ * The free build: a real limit, not a lock on a working path. Its every move in or out is a confidential 1Click quote,
+ * and 1Click gives those only under a partner key (a person's own 1Click sign-in is refused, "Invalid token",
+ * FREE-BUILD.md on feat/free-zero-cost); a key in the app could be read by anyone (apps/quotes/README.md), and the free
+ * build has no relay to hold one. So Private isn't offered there (drop, don't degrade). What opens it today: the
+ * person's own relay holding their own partner key (README, "Your own relay"), the same code as the release.
+ * Any build with no relay, free or not, already shows nothing: the ledger answers pocket.available false, so Home has no
+ * door (safe-hot.ts privateDoor) and a link to Private lands on Home (WalletApp). VITE_ZEROFEE_FREE is set by no script
+ * on main yet (build-free.sh is on feat/free-zero-cost).
  */
 export const privateOpen = (free = FREE_BUILD) => !free;
 

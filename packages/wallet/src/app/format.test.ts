@@ -125,7 +125,7 @@ test("activity rows in plain words, ending with where the money is now; a label 
   assert.deepEqual(describe(m({ kind: "pay", status: "waiting", from: "usdc", to: "kiosk.near", label: "Kiosk", amount: "900" }), tokens, chains), { title: "On hold · Kiosk", detail: "900 USDC to kiosk.near · nothing has moved yet" }, "held is never shown as paid");
   assert.deepEqual(describe(m({ kind: "convert", status: "refunded", from: "usdc", to: "sol", amount: "40" }), tokens, chains), { title: "Refunded", detail: "40 USDC to SOL · back in your Safe" });
   assert.equal(describe(m({ kind: "deposit", status: "done", from: "sol", to: "sol", amount: "0.05" }), tokens, chains).detail, "0.05 SOL from Solana · in your Safe");
-  assert.equal(describe(m({ kind: "convert", status: "moving", from: "usdc", to: "sol", amount: "40" }), tokens, chains).detail, "40 USDC to SOL · with the swap service, converting");
+  assert.equal(describe(m({ kind: "convert", status: "moving", from: "usdc", to: "sol", amount: "40" }), tokens, chains).detail, "40 USDC to SOL · with NEAR Intents, converting");
   const problem = (code: string) => ({ code, whatHappened: "", money: { state: "not-involved" as const }, next: { kind: "nothing" as const, label: "OK" } });
   assert.equal(describe(m({ kind: "transfer", status: "problem", from: "usdc", to: "bob.near", problem: problem("ledger.hold.cancelled") }), tokens, chains).detail, "1 USDC · still in your Safe");
   assert.equal(describe(m({ kind: "transfer", status: "problem", from: "usdc", to: "bob.near", problem: problem("ledger.send.unread") }), tokens, chains).detail, "1 USDC · check your Safe", "never a promise the ledger can't keep");

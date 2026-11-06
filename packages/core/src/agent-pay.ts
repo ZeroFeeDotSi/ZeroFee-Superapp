@@ -315,7 +315,7 @@ export class AgentPay {
    * refunds to AgentZero's own account, a fair minimum, in date. Then the core's sheet (`approve`), then one plain
    * ft_transfer to the deposit address. Refused while a reply's payment was just sent. AgentZero keeps its NEAR (fees).
    */
-  empty(safe: string, approve: (usd: number) => Promise<boolean>): Promise<{ tx: string; micros: number } | { declined: true }> {
+  empty(safe: string, approve: (usd: number, getsUsd: number | null) => Promise<boolean>): Promise<{ tx: string; micros: number } | { declined: true }> {
     return this.one(async () => {
       if (!/^[a-z0-9._-]{2,64}$/.test(safe)) throw refused("There's no Safe to move it to yet.");
       // a payment just sent may still be landing; one older has landed or never will (its nonce goes to this move then)
@@ -340,7 +340,9 @@ export class AgentPay {
         const q = parseQuote(await this.d.relay.status(deposit, got?.zerofeeStatusTag).catch(() => null), deposit, this.d.quoteKey, this.now());
         const why = homeRefusal(q, { from, safe, held, nowMs: this.now() });
         if (why) throw refused(`${why} Nothing moved.`);
-        if (!(await approve(Number(held) / 1e6).catch(() => false))) return { declined: true } as const;
+        // what the Safe gets, from the signed quote only: USDC in, USDC out; a quote that doesn't say gives no figure
+        const out = q?.amountOut && /^\d{1,30}$/.test(q.amountOut) && BigInt(q.amountOut) <= held ? Number(q.amountOut) / 1e6 : null;
+        if (!(await approve(Number(held) / 1e6, out).catch(() => false))) return { declined: true } as const;
         const actions: CoreAction[] = [{ kind: "call", method: "ft_transfer", args: enc.encode(JSON.stringify({ receiver_id: deposit, amount: held.toString() })), gas: PAY_GAS, depositYocto: 1n }];
         const tx: UnsignedTx = { signerId: from, publicKey, nonce: key.nonce + 1n, receiverId: USDC_CONTRACT, blockHash: block.hash, actions };
         const bytes = serialize(tx);

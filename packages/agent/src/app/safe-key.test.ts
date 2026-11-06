@@ -19,6 +19,6 @@ test("the screen hides the Pocket money section and Turn on, and a job skips the
   assert.match(app, /\{!noPocket && pocketHere && \(<>\n\s*<div className="zf-label ag-section">Wallet<\/div>/);
   // test: where the Safe's key isn't offered, the Fund button opens the own wallet's fill (fillOwn), never Turn on
   assert.match(app, /\) : !offersTurnOn\(pocket\) \? null : !pocketHere \? \(\n[^\n]*\n\s*<button className="zf-btn" disabled=\{busy\} data-testid="ag-fund-own"/);
-  assert.match(app, /\{pocketHere \? \(\n\s*<button className="zf-btn" disabled=\{busy \|\| \(on && Math\.round\(pocketUsd\) === choice\)\} onClick=\{\(\) => void setPocket\(choice, runningList\(jobs\), needsAnyAddress\(jobs\), true\)/, "the Safe-key Add only where it is offered");
+  assert.match(app, /\{pocketHere \? \(\n\s*<button className="zf-btn" disabled=\{busy \|\| !\(choice > \(on \? pocketUsd : 0\)\) \|\| agent\?\.waiting\?\.usd === choice\} onClick=\{\(\) => void setPocket\(choice, runningList\(jobs\), needsAnyAddress\(jobs\), true\)/, "the Safe-key Add only where it is offered");
   assert.match(app, /\} else if \(!on && pocketHere && terms\.kind !== "sign-in" && !\(await setPocket\(choice\)\)\) return;/);
 });

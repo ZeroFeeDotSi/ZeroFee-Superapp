@@ -8,15 +8,16 @@ import { timeLeft } from "@zerofee/shell-api/job-steps.ts";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { ReceiptMark } from "@zerofee/design/Receipt.tsx";
 import "@zerofee/design/receipt.css";
-import { LiveRow, progressOf, type LiveRowState } from "@zerofee/design/LiveRow.tsx";
+import { LiveRow, progressOf, timeSlot, type LiveRowState } from "@zerofee/design/LiveRow.tsx";
 import { shortElapsed, tickEvery } from "@zerofee/design/time.ts";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import type { Bridge } from "@zerofee/core/bridge";
 import type { Movement } from "../../types.ts";
-import { endGone, endLine, rowTitle, publishTracks, keptTrack, SLOW_MS, startingTracks, stillGoing, watchLive, type LiveStep, type LiveTrack, type LiveWatch, type StopGo } from "./live-steps.ts";
+import { isHomeSwapRow } from "./swap-ended.ts";
+import { FOLD_AFTER_MS, FOLD_MS, endFace, endGone, endLine, oneLine, rowTitle, trackMark, publishTracks, keptTrack, SLOW_MS, startingTracks, stillGoing, watchLive, type LiveStep, type LiveTrack, type LiveWatch, type StopGo } from "./live-steps.ts";
 import type { HomeWallet } from "@zerofee/shell-api/money.ts";
 import { taskStore } from "@zerofee/shell-api/tasks.ts";
-import { sealJobs } from "@zerofee/shell-api/job-start.ts";
+import { JOB_WORDS, sealJobs } from "@zerofee/shell-api/job-start.ts";
 import { ActAdd, ActMove, ActSend, ActSwap } from "../icons.tsx";
 import { watchAddsOnWay, type AddOnWay } from "./adds-on-way.ts";
 import { swapLabel } from "./swap-follow.ts";
@@ -24,7 +25,7 @@ import { swapLands } from "@zerofee/shell-api/job-carry.ts";
 import { ownSlot } from "../overlay-slot.ts";
 import "./live.css";
 
-export { endLine, publishTracks, rowTitle, taskOf, watchLive } from "./live-steps.ts";
+export { FOLD_AFTER_MS, FOLD_MS, endLine, publishTracks, rowTitle, taskOf, watchLive } from "./live-steps.ts";
 export type { LiveTrack } from "./live-steps.ts";
 
 /** Activity's feed: it reads the Adds on their way itself (Home already holds them). */
@@ -40,10 +41,12 @@ function followLive(bridge: Bridge, movements: () => Movement[], on: (t: LiveTra
  * paint. It follows the work in flight itself; `onCovered` hands back the rows a card stands for (drawn once). The
  * tracker is drawn over the whole app through `overlay` (Wallet's own sheets' place), else in place.
  */
-export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz }: { bridge: Bridge; feed: { current: { adds?: AddOnWay[]; movements: Movement[] } }; only?: string; overlay?: ((node: ReactNode) => void) | undefined; onCovered?: (ids: ReadonlySet<string>) => void; buzz?: () => void }) {
+export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz, swaps = "all" }: { /** Swap in place's rows: Home draws them all; Activity lists an ended one itself, and the centre's Now holds a going one. */ swaps?: "all" | "going" | "none"; bridge: Bridge; feed: { current: { adds?: AddOnWay[]; movements: Movement[] } }; only?: string; overlay?: ((node: ReactNode) => void) | undefined; onCovered?: (ids: ReadonlySet<string>) => void; buzz?: () => void }) {
   const [tracks, setTracks] = useState<LiveTrack[]>([]);
   // jobs just made (job-start.ts): their rows at once, before the core's own row for them comes
-  const [starting, setStarting] = useState<LiveTrack[]>(() => startingTracks(taskStore().list()));
+  const [allStarting, setStarting] = useState<LiveTrack[]>(() => startingTracks(taskStore().list()));
+  const swapRows = useMemo(() => allStarting.filter((s) => isHomeSwapRow(s.id) && (swaps === "all" || (swaps === "going" && !s.end))), [allStarting, swaps]);
+  const starting = useMemo(() => allStarting.filter((s) => !isHomeSwapRow(s.id) || swapRows.includes(s)), [allStarting, swapRows]);
   useEffect(() => { const s = taskStore(); const read = () => setStarting(startingTracks(s.list())); read(); return s.subscribe(read); }, []);
   // the job rows live in Home's sealed store, never plain localStorage (job-start.ts sealJobs; QA, 5 Nov)
   useEffect(() => void sealJobs(bridge), [bridge]);
@@ -73,6 +76,7 @@ export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz 
   const onNext = (go: StopGo) => {
     setOpened(null);
     if (go.kind === "private") shell.openApp("wallet", "private");
+    else if (go.kind === "swap") shell.openMoney({ kind: "swap", wallet: "near" });
     else if (go.kind === "move") shell.openMoney({ kind: "move", from: "safe", to: go.to as HomeWallet, ...(go.usd ? { usd: go.usd } : {}) });
     else shell.openMoney({ kind: "send", ...(go.wallet ? { wallet: go.wallet } : {}) });
   };
@@ -93,7 +97,14 @@ export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz 
   // a job just made shows at once on whichever tab is up (Sim re-check: the Safe tab never drew one, so a Private ->
   // NEAR wallet Move had no Home line); its own row, once the core makes it, takes its place by id. A done one is never
   // drawn again from here: its own row said Done and folded (a Safe Move's row keeps its id in the store for the hour)
-  const list = [...starting.filter((s) => !s.end?.ok && !tracks.some((t) => t.id === s.id)), ...tracks.filter((t) => (only === "all" || (only === "hot" ? t.wallets.some((w) => w !== "safe") : t.wallets.includes(only))) && !folded.has(t.id))];
+  // a swap in place's row has no core row after it: done, it holds and folds here (startingTracks' window)
+  useEffect(() => {
+    if (!swapRows.some((s) => s.end?.ok)) return;
+    const t = setTimeout(() => setStarting(startingTracks(taskStore().list())), FOLD_AFTER_MS + FOLD_MS);
+    (t as unknown as { unref?: () => void }).unref?.();
+    return () => clearTimeout(t);
+  }, [allStarting]);
+  const list = [...starting.filter((s) => !s.end?.ok && !tracks.some((t) => t.id === s.id)), ...tracks.filter((t) => (only === "all" || (only === "hot" ? t.wallets.some((w) => w !== "safe") : t.wallets.includes(only))) && !folded.has(t.id)), ...swapRows.filter((s) => s.end?.ok)];
   return (
     <>
       {list.length > 0 && (
@@ -106,10 +117,6 @@ export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz 
     </>
   );
 }
-
-/** A finished row holds this long (motion --m-hold-ms), then leaves in FOLD_MS (opacity and a 4 px rise, live.css). */
-export const FOLD_AFTER_MS = 2500;
-export const FOLD_MS = 200;
 
 /** An Add still on its way after SLOW_MS: it isn't ended (it lands whenever 1Click delivers), but the row says so. */
 const slowAdd = (t: LiveTrack, now: number) => !t.end && t.kind === "add" && Number.isFinite(t.startMs) && now - t.startMs >= SLOW_MS;
@@ -147,7 +154,7 @@ export const UNSHOWN_STATUS = "On its way";
 export function rowState(t: LiveTrack, now: number): LiveRowState {
   if (t.end?.ok) return "done";
   if (t.end?.slow || slowAdd(t, now)) return "slow";
-  if (t.end) return /came back/i.test(t.end.line) ? "back" : "stopped";
+  if (t.end) return endFace(t.end);
   return "going";
 }
 
@@ -176,7 +183,7 @@ export function LiveRows({ tracks, onOpen }: { tracks: readonly LiveTrack[]; onO
         const title = rowTitle(t), line = rowLine(t, now), parts = rowParts(t, now);
         return (
           <li key={t.id}>
-            <LiveRow mark={<Mark />} title={title} line={parts.words} {...(parts.time ? { when: parts.time } : {})} state={rowState(t, now)} p={t.end && !t.end.ok && !stillGoing(t) ? undefined : progressOf(t.steps, !!t.end?.ok)}
+            <LiveRow mark={<Mark />} title={title} line={parts.words} {...timeSlot(parts.time)} state={rowState(t, now)} p={t.end && !t.end.ok && !stillGoing(t) ? undefined : progressOf(t.steps, !!t.end?.ok)}
               onOpen={() => onOpen(t)} label={`${title}. ${line}. Open its steps`} rowRef={(el) => { rows.current.set(t.id, el); }} />
           </li>
         );
@@ -213,13 +220,13 @@ export function LiveTracker({ track: t, onClose, onNext }: { track: LiveTrack; o
   const now = useNow(stillGoing(t) ? [t.startMs] : []);
   // the head's spaced capitals fit a short title, "MOVE $5.00" (its last step names where it goes)
   return (
-    <Sheet title={rowTitle(t).replace(/ to your .+$/, "")} onClose={onClose}>
+    <Sheet title={t.bar ?? rowTitle(t).replace(/ to your .+$/, "")} onClose={onClose}>
       <div className="lv-tracker">
         <div className="lv-tracker__head">
-          <ReceiptMark state={!t.end ? "away" : t.end.ok ? "landed" : stillGoing(t) ? "away" : "refused"} size={72} icon={<span className="zf-receipt__disc">{KIND_MARK[t.kind]()}</span>} />
-          <p className="lv-tracker__title">{rowTitle(t)}</p>
+          <ReceiptMark state={trackMark(t)} size={72} icon={<span className="zf-receipt__disc">{KIND_MARK[t.kind]()}</span>} />
+          <p className="lv-tracker__title" data-testid="tracker-title">{t.made && !t.end ? `${JOB_WORDS.created} ${rowTitle(t)}` : rowTitle(t)}</p>
         </div>
-        <p className="lv-tracker__status" role="status">{!t.end ? rowLine(t, now) : t.end.ok ? rowLine(t, now) : t.end.unshown ? UNSHOWN_STATUS : stillGoing(t) ? `Slower than usual · ${shortElapsed(now - t.startMs)}` : "Stopped"}</p>
+        {!(t.end && !t.end.ok && t.end.head) && <p className="lv-tracker__status" role="status">{!t.end ? oneLine(rowLine(t, now)) : t.end.ok ? rowLine(t, now) : t.end.unshown ? UNSHOWN_STATUS : stillGoing(t) ? `Slower than usual · ${shortElapsed(now - t.startMs)}` : "Stopped"}</p>}
         <ol className="lv-steps">
           {t.steps.map((s, i) => (
             <li key={i} className={`lv-step is-${s.state}`}>

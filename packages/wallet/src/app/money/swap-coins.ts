@@ -25,11 +25,19 @@ export const COIN_WHY = {
   bscClosed: "BNB Chain swaps are closed right now. Your BNB is still in your BNB wallet.",
   /** any other direction not open */
   notHere: "This swap direction isn't open yet. Your coin stays where it is.",
+  /** Paying with the NEAR wallet's cash, the Safe's NEAR row (bug hunt item 6): it would land in the Safe. */
+  safeNear: "That coin lives in your Safe. Pick one from your NEAR wallet.",
+  /** A NEAR coin from anything but the NEAR wallet's cash (item 7: it said "NEAR coins aren't in Swap yet."). */
+  fromNear: "Pay with the USDC in your NEAR wallet.",
 } as const;
+
 
 /** Why routeOf found no route between two places, in routeOf's own order. */
 const placeWhy = (pay: SwapPlace, get: SwapPlace, open: (c: "bsc" | "pair") => boolean): string =>
   (pay === "bsc" || get === "bsc") && !open("bsc") ? COIN_WHY.bscClosed : get === "safe-near" ? COIN_WHY.noSafeNear : COIN_WHY.notHere;
+
+/** NEAR itself as a coin of the NEAR wallet (wNEAR, the list's id): "You get" offers it when its cash pays (item 6). */
+export const NEAR_IN_WALLET: PickCoin = { chain: "near", address: "wrap.near", symbol: "NEAR", name: "Your NEAR wallet", icon: "near" };
 
 /** The chains a coin trades on inside its wallet (trade/src/swap-door.ts SWAP_TRADE_CHAINS). */
 const TRADE_CHAINS: readonly PickChain[] = ["sol", "hood"];
@@ -40,16 +48,18 @@ const nativeOf = (c: PickCoin): string | null => (c.place === "sol" || c.place =
 export function coinRoute(pay: PickCoin, get: PickCoin, open: (c: "bsc" | "pair") => boolean): CoinRoute | { why: string } {
   if (pay.place && get.place) {
     if (pay.place === get.place) return { why: COIN_WHY.same };
+    if (pay.place === "near" && get.place === "safe-near") return { why: COIN_WHY.safeNear };
     const route = routeOf(pay.place, get.place, open);
     return route ? { kind: "place", route } : { why: placeWhy(pay.place, get.place, open) };
   }
   // NEAR Intents in place (product decision, 5 Nov): the NEAR wallet's cash and a NEAR coin, one intent in its private balance
   const inplace = inplaceOf(pay, get);
   if (inplace) return inplace;
-  // two NEAR coins: through cash (two intents); any other NEAR coin pair isn't offered (Rhea waits for NEAR_TRADES)
+  // two NEAR coins: through cash (two intents); any other NEAR coin pair isn't offered (Rhea waits for its proof: trade runtime MARKET)
   if (!pay.place && pay.chain === "near" && !get.place && get.chain === "near") return { why: COIN_WHY.nearPair };
-  // a coin on NEAR (not a place): Trade doesn't buy or sell NEAR coins (trade runtime MARKET has no NEAR)
-  if ((!pay.place && pay.chain === "near") || (!get.place && get.chain === "near")) return { why: COIN_WHY.nearCoins };
+  // a NEAR coin got: only the NEAR wallet's cash buys it in place; a NEAR coin paid: only into that cash
+  if (!get.place && get.chain === "near") return { why: COIN_WHY.fromNear };
+  if (!pay.place && pay.chain === "near") return { why: COIN_WHY.nearPair };
   if (pay.chain !== get.chain) return { why: COIN_WHY.crossChain };
   if (!TRADE_CHAINS.includes(pay.chain)) return { why: COIN_WHY.notHere };
   const a = nativeOf(pay), b = nativeOf(get);

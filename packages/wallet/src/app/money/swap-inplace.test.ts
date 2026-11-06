@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import type { Bridge } from "@zerofee/core/bridge";
 import { coinRoute, placeCoin } from "./swap-coins.ts";
 import { SWAP_COIN, ROW_USDC } from "./swap-corridor.ts";
-import { INPLACE_WORDS, inplaceLine, inplaceOf, inplaceUnits, nearCoinId, nearHeldRows, runInplaceJob, tapDetail, type InplaceQuote } from "./swap-inplace.ts";
+import { INPLACE_WORDS, inplaceArrives, inplaceFee, inplaceOf, inplaceUnits, nearCoinId, nearHeldRows, runInplaceJob, tapDetail, type InplaceQuote } from "./swap-inplace.ts";
 import type { PickCoin } from "./coin-pick.ts";
 
 const place = (p: Parameters<typeof placeCoin>[0]) => placeCoin(p, SWAP_COIN[p])!;
@@ -31,12 +31,13 @@ test("what it pays: dollars of cash; a share of the coin held; Max is all of it"
   assert.equal(inplaceUnits("sell", 5, false), null, "no coin held: nothing to sell");
 });
 
-test("the line names NEAR Intents and 1Click, with the quote's fee and 1Click's own time; no time when it gives none", () => {
-  assert.equal(inplaceLine("buy", Q), "NEAR Intents swaps it in your NEAR wallet. NEAR Intents prices it: fees $0.10, about 10 s.");
+test("the one fee form, with the quote's own figure; 1Click's own time where the amount shows; no time when it gives none", () => {
+  assert.equal(inplaceFee("buy", Q), "Fees · about $0.10");
+  assert.ok(inplaceArrives("buy", Q, "ZEC").endsWith(" About 10 s."));
   assert.equal(tapDetail(Q), "NEAR Intents says about 10 s");
   const { etaSeconds: _e, ...noTime } = Q;
   assert.equal(tapDetail(noTime), undefined, "never a number of ours");
-  assert.ok(!inplaceLine("buy", noTime).includes(" s."), "no time of ours");
+  assert.ok(!inplaceArrives("buy", noTime, "ZEC").includes(" s."), "no time of ours");
 });
 
 test("the job: ONE call (subwallet.float.swap), no withdraw or chain deposit; done on the move's end, its time measured", async () => {
@@ -60,8 +61,8 @@ test("a refunded or refused swap says where the money is", async () => {
   assert.deepEqual(said, [INPLACE_WORDS.refunded]);
 });
 
-test("You pay's NEAR coins: named and priced from 1Click's list; cash, no price and dust left out", () => {
-  const tokens: Record<string, { symbol: string; decimals: number; priceUsd?: string }> = { "nep141:wrap.near": { symbol: "wNEAR", decimals: 24, priceUsd: "3" }, "nep141:x.near": { symbol: "X", decimals: 0 } };
-  const rows = nearHeldRows([{ tokenId: "nep141:wrap.near", amount: "2000000000000000000000000" }, { tokenId: ROW_USDC, amount: "5000000" }, { tokenId: "nep141:x.near", amount: "5" }], (id) => tokens[id]);
-  assert.deepEqual(rows.map((r) => [r.symbol, r.heldUsd, r.held.raw]), [["wNEAR", 6, "2000000000000000000000000"]]);
+test("You pay's NEAR coins: named and priced from 1Click's list; one with no price kept (it sells whole); cash and dust left out", () => {
+  const tokens: Record<string, { symbol: string; decimals: number; priceUsd?: string }> = { "nep141:wrap.near": { symbol: "wNEAR", decimals: 24, priceUsd: "3" }, "nep141:x.near": { symbol: "X", decimals: 0 }, "nep141:d.near": { symbol: "D", decimals: 0, priceUsd: "0.001" } };
+  const rows = nearHeldRows([{ tokenId: "nep141:wrap.near", amount: "2000000000000000000000000" }, { tokenId: ROW_USDC, amount: "5000000" }, { tokenId: "nep141:x.near", amount: "5" }, { tokenId: "nep141:d.near", amount: "3" }, { tokenId: "nep141:sol.omft.near", amount: "1000000000" }], (id) => tokens[id] ?? (id === "nep141:sol.omft.near" ? { symbol: "SOL", decimals: 9, priceUsd: "100" } : undefined));
+  assert.deepEqual(rows.map((r) => [r.symbol, r.heldUsd, r.held.raw, r.held.usd]), [["wNEAR", 6, "2000000000000000000000000", 6], ["X", undefined, "5", null], ["SOL", 100, "1000000000", 100]]);
 });

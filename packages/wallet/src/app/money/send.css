@@ -192,8 +192,10 @@
    its text starts where the From label's text does (the card's 16px inner gutter). */
 .wl-send2__part { margin: 6px 0 0; padding: 0 0 0 16px; font: 400 13px/18px var(--font); color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; box-sizing: border-box; }
 
-/* who the fee goes to, under the Send button (product decision, 5 Nov: we are zero fee): the floor's last line */
-.wl-send2__floor > .wl-zerofee { box-sizing: border-box; min-height: 52px; margin: 0; padding: 8px 0; }
+/* the fee block right above the Send button (the copy review, 6 Nov): its room held for the figure, so the button never moves */
+.wl-send2__floor > .zf-fee { min-height: 54px; }
+/* the button ends the floor now: its air under it, level with Swap's and Move's pinned button */
+.wl-send2__floor:has(> .zf-fee) { padding-bottom: 24px; }
 
 /* ── a16 (Sim re-walk, 5 Nov): Send is one column that can never overlap itself ─────────────────────────
    The card, the dollars, the chips, the one sub-line and the keypad are one box that takes what is left of the screen;
@@ -222,7 +224,6 @@
 .wl-send2 .zf-keypad { overflow: clip; overflow-clip-margin: 12px; }
 .wl-send2:has(.wl-send2__nets) .zf-keypad button { height: auto; min-height: 0; }
 .wl-send2__floor { position: relative; flex: none; display: flex; flex-direction: column; gap: 8px; padding-top: 4px; background: var(--bg); }
-.wl-send2__floor > .wl-zerofee { min-height: 36px; padding: 0; }   /* its two lines of 13/18, no air: the floor is tight */
 .wl-send2__floor::before { content: ""; position: absolute; left: calc(-1 * var(--gutter, 24px)); right: calc(-1 * var(--gutter, 24px)); bottom: 100%; height: 20px; background: linear-gradient(to top, var(--bg), color-mix(in srgb, var(--bg) 0%, transparent)); pointer-events: none; }
 .wl-send2__floor > .wl-hold { width: 100%; }
 /* a chip over what can go now ($50 with $20 ready): dimmed, never hidden; a tap on it still says why (the cap line) */

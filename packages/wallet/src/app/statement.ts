@@ -57,7 +57,7 @@ export function ledgerRow(m: Movement, tokens: Map<string, Token>, chains: Chain
   const { title, details } = (({ title, detail }) => ({ title, details: detail }))(describe(m, tokens, chains, mine));
   const coin = movementSymbol(m, tokens);
   const hidden = m.private === true || m.kind === "private" || m.id.startsWith("hidden-row:");
-  const own = m.private ? "Private balance" : "Safe";
+  const own = m.private ? "Private balance" : m.kind === "swap" && m.source === "private" ? "NEAR wallet" : "Safe";
   let from = own, to = "", way: StatementRow["way"] = 0;
   if (m.kind === "deposit") { from = m.from ? chainName(chains, m.from) : ""; to = m.into && m.into !== "safe" ? WALLET[m.into]! : "Safe"; way = 1; }
   // a send or pay into the person's own row (a Swap from Hidden) moved money between their own places: not "went out"

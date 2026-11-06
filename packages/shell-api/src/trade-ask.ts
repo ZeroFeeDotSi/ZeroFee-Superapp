@@ -12,6 +12,8 @@
 // module is shared code in the app's one bundle, so that rule binds first-party code by convention: no app outside
 // the bundle can reach it, and Trade itself never trades on an ask without the person's tap.
 
+import { NATIVE_COINS } from "./release.ts";
+
 export type TradeAskChain = "sol" | "hood" | "bsc" | "near";
 export interface TradeAsk {
   side: "buy" | "sell";
@@ -45,12 +47,17 @@ const ADDRESS: Record<TradeAskChain, RegExp> = {
   near: /^[a-z0-9._-]{2,64}$/,
 };
 
+/** AgentZero's no on a NEAR coin (copy review, 6 Nov). It sends you to Trade only where Trade can buy one: NATIVE_COINS on.
+ *  Off (the Sim, public source builds), Trade's own page refuses a NEAR coin too, so it says only the no. Trade's own
+ *  refusal keeps its own words (trade runtime NEAR_NOT_TRADED, the core's NEAR_CLOSED). */
+export const agentNearLine = (side: "buy" | "sell" = "buy", native: boolean = NATIVE_COINS): string => (native ? `I don't trade NEAR coins yet. You can ${side} them yourself in Trade.` : "I don't trade NEAR coins yet.");
+
 /** Why an ask can't open, or null when it can. `listed`: the chains Trade lists in this build (checked before the
  *  person is switched to Trade). Pure. */
 export function askRefusal(a: Partial<TradeAsk> | null | undefined, listed?: readonly string[]): string | null {
   if (!a || (a.side !== "buy" && a.side !== "sell")) return "Say buy or sell.";
   if (!a.chain || !(a.chain in ADDRESS)) return "Trade doesn't trade on that chain.";
-  if (listed && !listed.includes(a.chain)) return "Trade doesn't trade on that chain yet.";
+  if (listed && !listed.includes(a.chain)) return a.chain === "near" ? agentNearLine(a.side) : "Trade doesn't trade on that chain yet.";
   if (typeof a.address !== "string" || !ADDRESS[a.chain].test(a.address)) return "Name the coin by its address on its chain.";
   if (a.from !== "agentzero") return "Only AgentZero fills in a trade.";
   if (a.side === "buy") {

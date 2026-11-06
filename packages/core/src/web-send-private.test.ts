@@ -55,7 +55,7 @@ test("one confidential quote, the core's own: SOL wallet to the payee, refunded 
   );
   assert.equal(shown.length, 1, "the outside sheet, once (the web: the password with Approve)");
   assert.equal(shown[0]!.tap, undefined, "never one tap");
-  assert.deepEqual(shown[0]!.lines, [`To ${PAYEE}`, "They get about $9.00", "Network fees · about $0.20", "Public on Solana."]);
+  assert.deepEqual(shown[0]!.lines, [`To ${PAYEE}`, "They get about $9.00", "Fees · about $0.20", "NEAR Intents and the network keep this. ZeroFee takes nothing.", "Public on Solana."]);
   assert.equal(shown[0]!.amount, "0.05 SOL");
   assert.equal(sent.length, 1, "the wallet paid 1Click's address");
   assert.equal(r.sent.status, "done");
@@ -124,10 +124,11 @@ test("decision A through the web door (QA's privacy review, 5 Nov): a private Se
   const { WORDS, PASSWORD, until } = await import("./testing/web-core.ts");
   const real = globalThis.fetch;
   const asked: any[] = [];
+  let inUsd = "9.20";
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     const u = String(url);
     if (u.endsWith("/v0/quote")) { asked.push(JSON.parse(String(init!.body))); return new Response(JSON.stringify({ quote: { depositAddress: DEPOSIT }, zerofeeStatusTag: "tag-for-this-quote-0001" }), { status: 201 }); }
-    if (u.includes("/v0/status?")) { const req = asked.at(-1); return new Response(JSON.stringify({ status: "PENDING_DEPOSIT", quoteResponse: signedQuote({ quoteRequest: req, quote: { depositAddress: DEPOSIT, amountIn: req.amount, amountInUsd: "9.20", amountOut: "49000000", amountOutUsd: "9.00", minAmountOut: "48500000", deadline: DEADLINE } }) }), { status: 200 }); }
+    if (u.includes("/v0/status?")) { const req = asked.at(-1); return new Response(JSON.stringify({ status: "PENDING_DEPOSIT", quoteResponse: signedQuote({ quoteRequest: req, quote: { depositAddress: DEPOSIT, amountIn: req.amount, amountInUsd: inUsd, amountOut: "49000000", amountOutUsd: "9.00", minAmountOut: "48500000", deadline: DEADLINE } }) }), { status: 200 }); }
     if (u.endsWith("/v0/deposit/submit")) return new Response("{}", { status: 200 });
     throw new Error(`unexpected ${u}`);
   }) as typeof fetch;
@@ -139,15 +140,18 @@ test("decision A through the web door (QA's privacy review, 5 Nov): a private Se
     const sheets: { id: string; words: PlainWords; password?: boolean }[] = [];
     core.on<{ id: string; words: PlainWords; password?: boolean }>("approval.needed", (e) => sheets.push(e));
     const okr = (r: any) => { if ("problem" in r) throw new Error(r.problem.code); return r.ok; };
+    const code = (r: any) => ("problem" in r ? r.problem.code : null);
     okr(await core.call("account.web.import", { words: WORDS }));
     const go = core.call<{ sent: { status: string } }>("subwallet.sendPrivate", { app: "wallet", chain: "sol", to: PAYEE, toTokenId: SOL, amount: "0.05" }); // $9.20, under the cap
     await until(() => sheets.length === 1);
     assert.equal(sheets[0]!.password, true, "the web's sheet asks the password");
-    assert.deepEqual(sheets[0]!.words.lines, [`To ${PAYEE}`, "They get about $9.00", "Network fees · about $0.20", "Public on Solana."]);
+    assert.deepEqual(sheets[0]!.words.lines, [`To ${PAYEE}`, "They get about $9.00", "Fees · about $0.20", "NEAR Intents and the network keep this. ZeroFee takes nothing.", "Public on Solana."]);
     const none = await core.call("approval.answer", { id: sheets[0]!.id, approve: true });
     assert.equal("problem" in none && none.problem.code, "security.web.password", "Approve with no password: refused");
+    assert.equal(tries, 0, "an empty one isn't a try");
     const wrong = await core.call("approval.answer", { id: sheets[0]!.id, approve: true, password: "wrong password here" });
     assert.equal("problem" in wrong && wrong.problem.code, "security.web.password", "a wrong one: refused");
+    assert.equal(tries, 1, "a wrong one is counted");
     assert.equal(sent.length, 0, "nothing moved before the right password");
     okr(await core.call("approval.answer", { id: sheets[0]!.id, approve: true, password: PASSWORD }));
     assert.equal(okr(await go).sent.status, "done");
@@ -157,6 +161,29 @@ test("decision A through the web door (QA's privacy review, 5 Nov): a private Se
     const before = tries;
     assert.equal(okr(await core.call("subwallet.sendPrivate", { app: "wallet", chain: "sol", to: own, toTokenId: SOL, amount: "0.05" })).sent.status, "done");
     assert.deepEqual([sheets.length, tries - before, sent.length], [1, 0, 2], "own wallet: sent with no sheet and no password");
+    // own wallet, over the cap: the cap's own sheet, with the password; a no sends nothing
+    inUsd = "500.00";
+    const over = core.call<{ sent: { status: string } }>("subwallet.sendPrivate", { app: "wallet", chain: "sol", to: own, toTokenId: SOL, amount: "0.05" });
+    await until(() => sheets.length === 2);
+    assert.equal(sheets[1]!.password, true, "over the cap: the sheet takes the password");
+    okr(await core.call("approval.answer", { id: sheets[1]!.id, approve: false }));
+    assert.equal(okr(await over).sent.status, "declined");
+    assert.equal(sent.length, 2, "nothing moved on a no");
+    // an outside address, over the cap: one sheet, the password its ask; wrong and none move nothing, the right one pays
+    const outside = core.call<{ sent: { status: string } }>("subwallet.sendPrivate", { app: "wallet", chain: "sol", to: PAYEE, toTokenId: SOL, amount: "0.05" });
+    await until(() => sheets.length === 3);
+    assert.equal(sheets[2]!.password, true, "outside, over the cap: the sheet takes the password");
+    assert.equal(sheets[2]!.words.lines[0], `To ${PAYEE}`, "outside: the outside sheet, its full address");
+    const triesOver = tries;
+    assert.equal(code(await core.call("approval.answer", { id: sheets[2]!.id, approve: true })), "security.web.password");
+    assert.equal(tries, triesOver, "over the cap too, an empty one isn't a try");
+    assert.equal(code(await core.call("approval.answer", { id: sheets[2]!.id, approve: true, password: "wrong password here" })), "security.web.password");
+    assert.equal(tries, triesOver + 1, "over the cap too, a wrong one is counted");
+    assert.equal(sent.length, 2, "nothing moved before the right password");
+    okr(await core.call("approval.answer", { id: sheets[2]!.id, approve: true, password: PASSWORD }));
+    assert.equal(okr(await outside).sent.status, "done");
+    assert.equal(sent.length, 3, "the right password: paid");
+    assert.equal(sheets.length, 3, "the password was the ask: no second sheet");
   } finally {
     globalThis.fetch = real;
   }

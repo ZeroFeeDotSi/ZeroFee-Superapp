@@ -77,3 +77,69 @@ test("gates grade MUST 4: a keep job runs only where its route does: route A AND
   const routeAAlone = (route: boolean) => route;
   assert.notEqual(routeAAlone(true), keepRuns(true, true, false));
 });
+
+test("gates grade: nothing offers Keep while it can't run: its sheet, the jobs list, the words, AgentZero's chat tool and its tool's answer", async () => {
+  const { jobOffered, jobsLine, offeredJobs, startSheet, defaultTerms } = await import("./jobs.ts");
+  const { CANNOT_LINE } = await import("./rulebox.ts");
+  const { chatTools } = await import("../chat/tools.ts");
+  const { JOB_SCHEMA } = await import("./rulebox.ts");
+  const relay = await import("../../../../apps/quotes/agentzero-chat.mjs");
+  assert.equal(keepRuns(), false, "today");
+  assert.equal(jobOffered("keep", false), false);
+  assert.equal(jobOffered("keep", true), false, "the Sim too");
+  assert.ok(!offeredJobs(true).includes("keep") && !offeredJobs(false).includes("keep"));
+  for (const line of [jobsLine(true), jobsLine(false), CANNOT_LINE]) assert.doesNotMatch(line, /keep money/i, line);
+  assert.equal(relay.KEEP_JOB_OFFERED, keepRuns(), "the relay's copy (it imports nothing from the app)");
+  for (const [name, tools] of [["app", chatTools(JOB_SCHEMA)], ["relay", relay.chatTools(JOB_SCHEMA)]] as const) {
+    const t = (tools as { name: string; description: string; input_schema: { properties: Record<string, { enum?: string[] }>; required: string[] } }[]).find((x) => x.name === "propose_job")!;
+    assert.doesNotMatch(t.description, /keep money/i, name);
+    assert.deepEqual(t.input_schema.properties.job!.enum, ["copy", "sign-in", "none"], name);
+    assert.ok(!("keep_usd" in t.input_schema.properties) && !t.input_schema.required.includes("keep_usd"), name);
+    assert.ok(JSON.stringify(JOB_SCHEMA).includes("keep_usd"), "control: the job box's own reading is untouched");
+  }
+  // control: with the route on, the tool offers it again, in both copies, the same words
+  const on = (tools: unknown) => (tools as { name: string; description: string; input_schema: unknown }[]).find((x) => x.name === "propose_job")!;
+  assert.match(on(chatTools(JOB_SCHEMA, true, true)).description, /keep money in the person's chosen wallet/);
+  assert.deepEqual(on(chatTools(JOB_SCHEMA, true, true, true)).input_schema, JOB_SCHEMA);
+  assert.deepEqual(JSON.parse(JSON.stringify(chatTools(JOB_SCHEMA, true, true, true))), JSON.parse(JSON.stringify(relay.chatTools(JOB_SCHEMA, true, true, true))));
+  // a keep job saved before: its sheet says it can't fill, and its button can't start it
+  const sheet = startSheet(defaultTerms("keep"), { agentOn: true, pocketUsd: 20 } as never);
+  assert.equal(sheet.button, "Not yet");
+});
+
+test("gates note, 6 Nov: nothing offers the pay list while it can't run: the jobs list, the words, AgentZero's chat tool in both copies, the Sim's relay words (controls: a running route offers it; the job box's own reading untouched)", async () => {
+  const { jobOffered, jobStarts, jobsLine, offeredJobs, payListRuns } = await import("./jobs.ts");
+  const { CANNOT_LINE, JOB_SCHEMA } = await import("./rulebox.ts");
+  const { chatTools } = await import("../chat/tools.ts");
+  const relay = await import("../../../../apps/quotes/agentzero-chat.mjs");
+  const sim = await import("../../../../apps/quotes/agentzero-sim.mjs");
+  assert.equal(payListRuns(), false, "today");
+  assert.equal(payListRuns(true, true), false, "route A flipped alone: the core still refuses AgentZero's key on the Safe");
+  assert.equal(payListRuns(false, true), true, "control: the wallet off and the route on");
+  assert.equal(payListRuns(false, false), false);
+  assert.equal(relay.PAY_LIST_OFFERED, payListRuns(), "the relay's copy (it imports nothing from the app)");
+  for (const sample of [true, false]) {
+    assert.equal(jobOffered("pay-list", sample), false);
+    assert.equal(jobStarts("pay-list", { sample, pocket: true }), false);
+    assert.ok(!offeredJobs(sample).includes("pay-list"));
+    assert.doesNotMatch(jobsLine(sample), /pay your list/);
+  }
+  assert.doesNotMatch(CANNOT_LINE, /pay your list/);
+  for (const [name, tools] of [["app", chatTools(JOB_SCHEMA)], ["relay", relay.chatTools(JOB_SCHEMA)]] as const) {
+    const t = (tools as { name: string; description: string; input_schema: { properties: Record<string, { enum?: string[] }>; required: string[] } }[]).find((x) => x.name === "propose_job")!;
+    assert.doesNotMatch(t.description, /pay a list/, name);
+    assert.ok(!t.input_schema.properties.job!.enum!.includes("pay-list"), name);
+    assert.ok(!("people" in t.input_schema.properties) && !t.input_schema.required.includes("people"), name);
+    assert.ok(!(tools as { name: string }[]).some((x) => x.name === "propose_payment"), `${name}: no payment tool`);
+  }
+  assert.ok(JSON.stringify(JOB_SCHEMA).includes("people"), "control: the job box's own reading is untouched");
+  assert.doesNotMatch(sim.SIM_SYSTEM, /paying a list/);
+  const on = (tools: unknown) => (tools as { name: string; description: string }[]).find((x) => x.name === "propose_job")!;
+  assert.match(on(chatTools(JOB_SCHEMA, true, false, true)).description, /pay a list of people/, "control: a route that runs offers it");
+  assert.deepEqual(JSON.parse(JSON.stringify(chatTools(JOB_SCHEMA, true, false, true))), JSON.parse(JSON.stringify(relay.chatTools(JOB_SCHEMA, true, false, true))), "both copies, the same words");
+});
+
+test("gates note, 6 Nov: a model naming the pay list from an older tool list gets no sheet (control: the sign-in job does)", async () => {
+  const src = (await import("node:fs")).readFileSync(new URL("../chat/turn.ts", import.meta.url), "utf8");
+  assert.match(src, /\(r\.terms\.kind === "pay-list" && !payListRuns\(\)\)\) return no\(NOT_OFFERED_LINE\);/);
+});

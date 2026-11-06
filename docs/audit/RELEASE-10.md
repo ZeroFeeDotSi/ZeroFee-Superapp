@@ -213,12 +213,13 @@ to 128 24-hour rows): 6.278 Tgas with a live quote, 5.046 without (the app's EXE
 |---|---|---|---|
 | `release/account_policy-10.wasm` (round 4c, the pin) | `44e440247bd8316de013bb604403d9ae751a422748b005f92cd2c3c289d0b244` | `5dvbBjU2boghQtkkoCUJeBofaheUwLjLUwnvMydC6Tf9` | 361,940 |
 
-After the merge with main (fix/contract-b4-main): the wasm reproduces to the same `44e44024…c2b0244`. `contracts/` tree differs from 07e780329's `2d952747b554…` only in main's path redaction of the four `proofs/runs/run-r8-sandbox-rehearsal*.txt` logs (not build inputs; the audit's ruling, 5 Nov); every source, Cargo and test file is identical. New `contracts/` tree: `e962f5f6e968c4f2d04d4adce80d62d019e3e4a6`.
 | `release/account_policy-10-short-waits.wasm` (round 4c) | `4fe834e2a99a1ac33b8d8994e771afd2d12795144daa3cb907b50ee44dc2a400` | `6NvaDuhkYJVK6WMdywp4gqno9j6LpABeizNkiu429PYs` | 361,941 |
 | `release/previous/account_policy-10-before-r4.wasm` (round 2) | `f070cd45603b86e552e2da2287effa2ff8411f48f0ec3bfb008d0ec5e146f6d6` | `HBacNykNbFZ1PtZawdtV8b5xA9iyWSWDp8eHrm2mwdim` | 345,834 |
 | `release/previous/account_policy-10-before-r4-short-waits.wasm` | `583e7e752cd09cb36bd8262e89c4c9c8b2e45e91aa01dcbf50653297f49781ac` | `6wU9YptPjjA1ZYN6FXHiM8egjjxC5tzRvnVyDk4ZVJwD` | 345,832 |
 | `release/previous/account_policy-10-before-r2.wasm` (round 1) | `5fb691b1eb9d44e3c37ffafe8d602e7c35ce9c8c97b1fc115423fcd38bbc98aa` | `7SdCPVynVHqeqo9AnLxqZ8Wfu4SYi63e4cJ7kkgGihYD` | 339,534 |
 | `release/previous/account_policy-10-before-r2-short-waits.wasm` | `9a73101b0422930ad9b14a28a59399667043d27ab1580442891b693f804c3f52` | `BPuYmPa8nQDT2sNMuYmCGBHDiBSdLfvNe2seCctDofkm` | 339,532 |
+
+After the merge with main (fix/contract-b4-main): the wasm reproduces to the same `44e44024…c289d0b244`. `contracts/` tree differs from 07e780329's `2d952747b554…` only in main's path redaction of the four `proofs/runs/run-r8-sandbox-rehearsal*.txt` logs (not build inputs; the audit's ruling, 5 Nov); every source, Cargo and test file is identical (in this public export, comments and proof-log labels under `contracts/` are also rewritten: no code changes, and the wasm reproduces the same hash). New `contracts/` tree: `e962f5f6e968c4f2d04d4adce80d62d019e3e4a6`.
 
 Round 2's evidence (5 Nov, on the source as committed):
 

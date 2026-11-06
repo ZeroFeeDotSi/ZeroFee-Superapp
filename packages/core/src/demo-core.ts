@@ -1367,8 +1367,8 @@ export class DemoCore implements Bridge {
         if (p.app !== "wallet") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Only your own Send in Home sends from your chain wallets.")));
         // Wallet's Send offers only its rows' own coins: SOL on Solana, ETH on Robinhood Chain (review L)
         if (p.app === "wallet" && ((p.chain !== "sol" && p.chain !== "hood") || p.token !== undefined)) return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Your Send sends only a wallet's own coin: SOL on Solana, ETH on Robinhood Chain.")));
-        // decision A: on the web, an outside address needs the password typed on the Send sheet, checked as the lock's is
-        // (passwordFirst: none typed is refused uncounted, a wrong one counts toward the wait); either sends nothing
+        // The web door refuses this call (web-wallet.ts: its only Send is subwallet.sendPrivate, the HARD RULE). Should it
+        // ever reach here on the web, decision A still holds: an outside address needs the password (passwordFirst)
         return this.ready().then(() => this.subwallets.sendPlain(p.chain, p.to, p.amount, p.token, p.app === "chat" ? "ZeroFee Chat" : "ZeroFee", String(p.app), this.web ? () => this.web!.passwordFirst(p.password) : undefined));
       // The web wallet's private Send (QA's real path for WEB_SEND_OPEN, 5 Nov): one confidential 1Click quote from
       // the SOL or ETH (RH) wallet straight to the payee, the core's own quote and sheet (subwallets.sendPrivate). Wallet's
@@ -1546,15 +1546,16 @@ export class DemoCore implements Bridge {
       case "subwallet.float.move":
         return this.ready().then(() => this.tradeOnly(p, 1)).then(() => this.subwallets.floatMove(p.id));
       // A NEAR coin bought or sold inside Spending (TN2, D74): Trade's, and Home's Swap (Wallet, V4 step 5, D111). The
-      // session covers Trade's stamped calls only (coverSwap); Wallet's swap always raises the core's own sheet, and a
-      // session it names is dropped, never started.
+      // tap is the yes: floatSwap raises no sheet for either (subwallets.ts; only AgentZero's agentSwap can). A session only
+      // ever starts for Trade's stamped calls; one Wallet names is dropped, never started.
       case "subwallet.float.swapQuote":
         // AgentZero may ask a dry price too (quote_dry): display only, nothing kept, signed or moved, no address back
         return this.ready().then(() => (p.app === "agent" ? undefined : this.tradeOnly(p, 1))).then(() => this.subwallets.floatSwapQuote(p.side, p.coin, p.amount));
       case "subwallet.float.swap":
         return this.ready().then(() => this.tradeOnly(p, 1)).then(() => this.subwallets.floatSwap(p.side, p.coin, p.amount, p.atLeast, p.key, { app: p.app === undefined ? undefined : String(p.app) }, p.app === "wallet" ? undefined : p.session));
+      // read only: Trade's, and Home's (its Activity lists the swaps in place; a reload picks up a swap still running)
       case "subwallet.float.moves":
-        return this.ready().then(() => this.tradeOnly(p)).then(() => this.subwallets.floatMoveList());
+        return this.ready().then(() => this.tradeOnly(p, 1)).then(() => this.subwallets.floatMoveList());
       // The Safe's swap in place (product decision, 5 Nov, safe-swap.ts): the quote the core asks for itself, for Home's Swap and
       // Trade's native coins (through ledger.swap); the Safe's own sheet then checks its one mt_transfer against it
       case "subwallet.safeSwapQuote":

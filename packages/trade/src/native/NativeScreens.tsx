@@ -19,11 +19,12 @@ import { sheetsHeard } from "@zerofee/shell-api/approval-answered.ts";
 import { onOwnApproval } from "@zerofee/shell-api/job-run.ts";
 import { TimeLeft } from "@zerofee/wallet/app/money/JobMade.tsx";
 import { safeCanSell } from "@zerofee/core/band-coins";
+import { feesFigure, intentsKept } from "@zerofee/core/zero-fee";
 import { faceIdBandUsd } from "@zerofee/core/spending";
 import type { Candle, Range } from "../market/types.ts";
 import { relayBase } from "../market/relay.ts";
 import { Chart } from "../app/Chart.tsx";
-import { compactUsd, listPrice, moveWords, pct, price, usd } from "../app/format.ts";
+import { coinHeadline, compactUsd, isRawCoinId, listPrice, moveWords, pct, price, usd } from "../app/format.ts";
 import { Search } from "../app/icons.tsx";
 import { useOnline, OFFLINE_SHORT } from "../app/online.ts";
 import { coinRoute } from "../app/requests.ts";
@@ -210,14 +211,14 @@ export function NativeCoinPage({ assetId, symbol: seedSymbol, buy }: { assetId: 
   const stats = ([[W.worth, row?.marketCap ?? facts?.marketCapUsd ?? row?.fdv ?? facts?.fdvUsd], [W.liquidity, facts?.liquidityUsd], [W.tradedToday, facts?.volume24hUsd ?? row?.volume24h]] as const)
     .filter(([, v]) => reading || (v !== undefined && v > 0)) as [string, number | undefined][];
   const chain = row ? chainWords(row.blockchain) : "";
-  const name = row?.name && row.name !== symbol ? row.name : symbol;
+  const name = coinHeadline(row?.name, symbol, assetId);
   if (gone && !row) return <div className="tr-coin cp"><p className="zf-body nc-gone">{W.notListed}</p></div>;
   return (
     <div className="tr-coin cp zf-enter nc-page" data-testid="native-coin" data-asset={assetId}>
       {/* Trenches' head: the coin in its own light, its name once, its symbol and chain under it */}
       <div className="tr-coin-head">
         <span className="zf-halo is-on cp-logo">{logo(row, false) && <img className="zf-halo__light" src={logo(row, false)} alt="" />}<CoinIcon symbol={symbol} {...(logo(row, false) ? { src: logo(row, false)! } : {})} size={48} /></span>
-        <div><div className="tr-sym">{name}</div><div className="zf-small cp-where">{name !== symbol ? `${symbol} · ${chain}` : chain}</div></div>
+        <div><div className="tr-sym">{name}</div><div className="zf-small cp-where">{name !== symbol && symbol && !isRawCoinId(symbol, assetId) ? `${symbol} · ${chain}` : chain}</div></div>
       </div>
       <div className="tr-price"><span>{shownPrice !== undefined ? price(shownPrice) : <span className="zf-shimmer cp-price-sk" aria-label={W.loadingPrice} />}</span></div>
       <div className="zf-small tr-change">{scrub ? new Date(scrub.t).toLocaleString() : moved ? <><span className={`cp-move cp-move--${moved.dir}`}>{moveWords(moved.usd, moved.pct)}</span> <span className="tr-mute">{RANGE_WORDS[range]}</span></> : " "}</div>
@@ -343,7 +344,7 @@ export function NativeTradeSheet({ side, row, price: px, held, onClose }: { side
     return () => { clearTimeout(t); clearInterval(again); };
   }, [amt, side, row.assetId, view, again]);
   const q = quote.for === amt ? quote.q : undefined;
-  const fee = q ? feeText(q) : "";
+  const figure = q && !capped ? feesFigure(Number(q.feeUsd)) : null;
   const eta = q?.etaSeconds ? Math.round(q.etaSeconds) : undefined;
   const usdText = usd(side === "buy" ? Number(value) || 0 : usdIn);
   const title = side === "buy" ? buyTitle(usdText, row.symbol) : sellTitle(usdText, row.symbol);
@@ -397,7 +398,7 @@ export function NativeTradeSheet({ side, row, price: px, held, onClose }: { side
         ) : (<>
           <div className="tp-coin">{coinLogo}</div>
           <div className="tp-amt" aria-label={big} style={{ ["--fs" as string]: `${big.length <= 4 ? 84 : big.length <= 6 ? 70 : big.length <= 8 ? 58 : 46}px` }}><span className={`tp-amt-n${side === "buy" && !isPositive(value) ? " zero" : ""}`}>{big}</span></div>
-          <p className="tp-get" aria-live="polite" data-testid="native-about">{capped ? capped : q ? (side === "buy" ? W.about(trimAmount(q.amountOut), row.symbol, fee) : W.aboutCash(usd(Number(q.amountOut)), fee)) : quote.problem && quote.for === amt ? quote.problem : " "}</p>
+          <p className="tp-get" aria-live="polite" data-testid="native-about">{capped ? capped : q ? (side === "buy" ? W.about(trimAmount(q.amountOut), row.symbol) : W.aboutCash(usd(Number(q.amountOut)))) : quote.problem && quote.for === amt ? quote.problem : " "}</p>
           <p className="zf-small nc-least" data-testid="native-least">{q && !capped ? W.atLeast(side === "buy" ? `${trimAmount(q.minOut)} ${row.symbol}` : usd(Number(q.minOut)), eta) : " "}</p>
           <p className="tp-pay nc-pay">{side === "buy" ? W.paysWith : W.paysInto}</p>
           {side === "buy" ? (
@@ -417,6 +418,11 @@ export function NativeTradeSheet({ side, row, price: px, held, onClose }: { side
           )}
           <p className="zf-small nc-who" data-testid="native-who">{W.who}</p>
           <div className="tp-floor">
+            {/* the fee block, right above the button (the copy review, 6 Nov): the figure is this quote's */}
+            <div className="zf-fee">
+              {figure && <p className="zf-small" data-testid="native-fee">{figure}</p>}
+              <p className="zf-small" data-testid="native-paid">{intentsKept(!!figure)}</p>
+            </div>
             <button className="zf-btn tr-press tp-go" disabled={!online || !q || !amt || !!capped} onClick={() => void go()}>{online ? title : OFFLINE_SHORT}</button>
           </div>
         </>)}
@@ -424,4 +430,3 @@ export function NativeTradeSheet({ side, row, price: px, held, onClose }: { side
     </MoneySheet>
   );
 }
-const feeText = (q: SafeQuote): string => { const f = Number(q.feeUsd); return Number.isFinite(f) && f >= 0.01 ? usd(f) : "under $0.01"; };

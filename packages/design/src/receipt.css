@@ -23,6 +23,9 @@
 .zf-receipt[data-state="refused"] .zf-receipt__badge { background: var(--down); color: #fff; animation: zf-receipt-badge var(--dur-base) var(--ease-out) forwards;
   /* on the coin at its own size (no ring to sit on): the badge's centre at the coin's lower-right edge */
   right: calc(50% - var(--coin, 64px) / 2 - var(--badge, 34px) / 3); bottom: calc(50% - var(--coin, 64px) / 2 - var(--badge, 34px) / 3); }
+/* back: a true refund, nothing went wrong with the money: the same place and motion, neutral, no red */
+.zf-receipt[data-state="back"] .zf-receipt__badge { background: var(--ink); color: var(--bg); animation: zf-receipt-badge var(--dur-base) var(--ease-out) forwards;
+  right: calc(50% - var(--coin, 64px) / 2 - var(--badge, 34px) / 3); bottom: calc(50% - var(--coin, 64px) / 2 - var(--badge, 34px) / 3); }
 /* the job's object (Job created, 5 Nov): a raised disc, never a bare glyph at 104 px; the glyph sits at 46 % of it, in ink */
 .zf-receipt__disc { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; background: var(--disc); box-shadow: var(--disc-shadow); color: var(--ink); }
 .zf-receipt__disc > * { width: 46%; height: 46%; }
@@ -48,7 +51,7 @@
   .zf-receipt__coin { transition: none; }
   .zf-receipt[data-state="landed"] .zf-receipt__ring circle { animation: none; stroke-dashoffset: 0; }
   .zf-receipt__badge { animation: none !important; }
-  .zf-receipt[data-state="landed"] .zf-receipt__badge, .zf-receipt[data-state="refused"] .zf-receipt__badge { transform: scale(1); opacity: 1; }
+  .zf-receipt[data-state="landed"] .zf-receipt__badge, .zf-receipt[data-state="refused"] .zf-receipt__badge, .zf-receipt[data-state="back"] .zf-receipt__badge { transform: scale(1); opacity: 1; }
 }
 
 /* the mark alone (ReceiptMark): the object at row size (48: coin 26 → 42, ring 48, badge 18), the same states; the ring
@@ -56,5 +59,5 @@
 .zf-receipt--mark { display: block; flex: none; }
 .zf-receipt--mark .zf-receipt__ring circle { stroke-width: 7; }
 .zf-receipt--mark .zf-receipt__badge { right: -2px; bottom: -2px; box-shadow: 0 0 0 2px var(--bg); }
-.zf-receipt--mark[data-state="refused"] .zf-receipt__badge { right: calc(50% - var(--coin) / 2 - var(--badge) / 3); bottom: calc(50% - var(--coin) / 2 - var(--badge) / 3); }
+.zf-receipt--mark[data-state="refused"] .zf-receipt__badge, .zf-receipt--mark[data-state="back"] .zf-receipt__badge { right: calc(50% - var(--coin) / 2 - var(--badge) / 3); bottom: calc(50% - var(--coin) / 2 - var(--badge) / 3); }
 .zf-receipt--mark .zf-receipt__badge svg { width: 55%; height: 55%; stroke-width: 3.2; }

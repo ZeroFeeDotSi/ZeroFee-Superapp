@@ -11,7 +11,6 @@
 // - "Ask someone to pay you" (Request) is one quiet line at the bottom, its code loaded with that tap.
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ADD_USED, type AddAddress, type AddChain, type AddTo } from "@zerofee/core/add-outside";
-import { ADD_PAID } from "@zerofee/core/zero-fee";
 import { QrCode } from "@zerofee/design/QrCode.tsx";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { useWallet } from "../runtime.tsx";
@@ -320,8 +319,6 @@ function QrPage({ row, to, a, onEnd, onChange }: { row: AddRow; to: AddTo; a: Ad
       <p className="wl-qrfull__only">{W.only(row.symbol, row.network, leastWords(a.minAmountIn, a.decimals))}</p>
       <p className="zf-small wl-qrfull__until">{W.until(untilWords(a.untilIso), to)}</p>
       <p className="zf-small wl-qrfull__foryou" data-testid="qr-for-you">{W.forYou}</p>
-      {/* who gets the fee (product decision, 5 Nov: we are zero fee): the address is NEAR Intents' bridge's, its fee comes out of what arrives */}
-      <p className="zf-small wl-zerofee" data-testid="add-paid">{ADD_PAID}</p>
     </div>
   );
 }

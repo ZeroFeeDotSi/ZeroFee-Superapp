@@ -19,7 +19,14 @@ export interface ProofPage {
   swaps: string[];
   /** It ended (done or came back), whether or not its last transaction was kept: never "Not finished yet" then. */
   done?: true;
+  /** How it ended, when its own words say more than Finished / Done (a swap, copy review 6 Nov). null: no card while it runs. */
+  ended?: { label: string; line: string; check?: string } | null;
+  /** Its steps shown even when it has one (a swap in place: a tap on its running row opens its steps). */
+  stepsShown?: true;
 }
+
+/** "6 Nov": a swap's page (copy review, 6 Nov). Other pages keep their own form. */
+export const dayTime = (iso: string): string => (Number.isFinite(Date.parse(iso)) ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }) : "");
 
 /** The words (VOICE, a five-year-old reads them): new ones are in design-review/COPY-PROOF-2026-11-03.md. */
 export const PROOF_WORDS = {

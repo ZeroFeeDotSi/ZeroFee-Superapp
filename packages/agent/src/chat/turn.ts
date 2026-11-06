@@ -41,7 +41,8 @@ import { SIM_HISTORY, SIM_PATH, SIM_REAL_LINE, SIM_RESTED_LINE, SIM_REST_CODES, 
 import { wantsSite } from "./site-ask.ts";
 import { memoryContext, memoryRefusal, type MemoryKind, type MemoryLine } from "../zero/memory.ts";
 import { readRoutine, type RoutineTerms } from "../zero/routines.ts";
-import { POCKET_CHOICES, isNearName } from "../zero/jobs.ts";
+import { NOT_OFFERED_LINE, POCKET_CHOICES, isNearName, payListRuns } from "../zero/jobs.ts";
+import { keepRuns } from "../zero/keep-read.ts";
 import type { PriceAsk, QuoteAsk, SkillHands } from "./skills.ts";
 import { ALL_WORDS, PLACE_WORD, SHOWN, moveLeast, addSheet, moveSheet, requestSheet, sendSheet, swapSheet, tradeSheet, tradeWant, type HomePlace, type HomeSheet } from "./home-ask.ts";
 import { maskMessages, unmaskInput, unmaskStream } from "./standins.ts";
@@ -542,6 +543,8 @@ async function runTool(name: string, input: Record<string, unknown>, words: stri
     case "propose_job": {
       const r = checkReading(input, words);
       if (r.kind !== "job") return no(r.kind === "cannot" ? r.line : "That isn't one of AgentZero's jobs.");
+      // a job that can't run isn't shown as if it could (keep-read.ts keepRuns), even if the model names it from an older tool list
+      if ((r.terms.kind === "keep" && !keepRuns()) || (r.terms.kind === "pay-list" && !payListRuns())) return no(NOT_OFFERED_LINE);
       if (r.terms.kind !== "sign-in" && r.terms.perDayUsd > POCKET_MAX_USD) return no(overLimitLine(r.terms.perDayUsd));
       return { result: "Shown to the person to approve.", state: "done", sheet: { kind: "job", terms: r.terms } };
     }

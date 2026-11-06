@@ -19,34 +19,37 @@ const ok = async <T,>(r: Promise<{ ok: T } | { problem: unknown }>): Promise<T> 
 };
 const coins = async (m: ReturnType<typeof createMockBridge>) => ok(m.call<{ symbol: string; usd: number | null; amount: string }[]>("subwallet.coins", { id: "sw-site-pump-sol" }));
 
-test("the copy job's buy on sample money really trades the pump.fun wallet: its SOL down by the dollars, the coin up, the money changed; control: a wallet too small refuses, no receipt, nothing counted", async () => {
+test("the copy job's buy on sample money really trades: AgentZero's wallet down by the dollars, the coin up in the pump.fun wallet, that wallet's own SOL as it was, the money changed; control: more than its wallet holds refuses, no receipt, nothing counted", async () => {
   const m = createMockBridge({ latencyMs: 0, float: { priceUsd: () => 100, held: { "sw-site-pump-sol": String(250_000_000) } } }); // 0.25 SOL = $25
   let changed = 0;
   m.on("ledger.balancesChanged", () => changed++);
-  await ok(m.call("account.agent.set", { limitUsd: 50, people: [] }));
-  // (the sample pump.fun wallet is made on its first trade, holding $25 of SOL)
+  await ok(m.call("account.agent.set", { limitUsd: 25, people: [] }));
+  const heldNow = async () => (await ok(m.call<{ heldUsd: number }>("account.agent.view"))).heldUsd;
+  assert.equal(await heldNow(), 25);
   const r = await ok(m.call<{ status: string }>("account.agent.spend", { kind: "buy", usd: 5, coin: "BONK", title: "AgentZero bought $5.00 of BONK" }));
   assert.equal(r.status, "done");
+  assert.equal(await heldNow(), 20, "$5 left its wallet");
   const after = await coins(m);
-  assert.equal(after.find((c) => c.symbol === "SOL")!.usd, 20, "$25 less the $5 bought");
+  assert.equal(after.find((c) => c.symbol === "SOL")!.usd, 25, "the pump.fun wallet's own SOL stays");
   assert.ok(after.some((c) => c.symbol === "BONK" && c.usd !== null && Math.abs(c.usd - 5) < 0.01 && c.amount !== "0"), JSON.stringify(after));
   assert.ok(changed > 0, "Home reads the money again");
   const view = await ok(m.call<{ spentTodayUsd: string }>("account.agent.view"));
   assert.equal(view.spentTodayUsd, "5.00");
-  // control: $30 more than the $20 left in the wallet: refused in words, nothing counted, no receipt
+  // control: $30 more than the $20 left in its wallet: refused in words, nothing counted, no receipt
   const receipts = (await ok(m.call<unknown[]>("account.activity", { limit: 50 }))).length;
   const big = await m.call("account.agent.spend", { kind: "buy", usd: 30, coin: "BONK", title: "AgentZero bought $30.00 of BONK" });
-  assert.ok("problem" in big && /pump\.fun wallet has only \$20.*Nothing moved\./.test((big.problem as { whatHappened: string }).whatHappened), JSON.stringify(big));
+  assert.ok("problem" in big && /more than is left in AgentZero's wallet\. Nothing was sent\./.test((big.problem as { whatHappened: string }).whatHappened), JSON.stringify(big));
   assert.equal((await ok(m.call<unknown[]>("account.activity", { limit: 50 }))).length, receipts, "no receipt for a trade that didn't happen");
   assert.equal((await ok(m.call<{ spentTodayUsd: string }>("account.agent.view"))).spentTodayUsd, "5.00", "nothing counted");
-  assert.equal((await coins(m)).find((c) => c.symbol === "SOL")!.usd, 20, "nothing moved");
+  assert.equal(await heldNow(), 20, "nothing moved");
   // control: a coin the Sim has no sample of: refused, nothing moved
   const odd = await m.call("account.agent.spend", { kind: "buy", usd: 1, coin: "ZZZ" });
   assert.ok("problem" in odd && /Nothing moved\./.test((odd.problem as { whatHappened: string }).whatHappened));
-  // the sell brings it back, and needs no day's dollars
+  assert.equal(await heldNow(), 20);
+  // the sell brings it back into the pump.fun wallet, and needs no day's dollars
   const sold = await ok(m.call<{ status: string }>("account.agent.spend", { kind: "sell", usd: 0, coin: "BONK", title: "AgentZero sold its BONK" }));
   assert.equal(sold.status, "done");
-  assert.ok(Math.abs((await coins(m)).find((c) => c.symbol === "SOL")!.usd! - 25) < 0.02);
+  assert.ok(Math.abs((await coins(m)).find((c) => c.symbol === "SOL")!.usd! - 30) < 0.02);
 });
 
 test("a reload keeps AgentZero on (its pocket money, what it spent, its receipts) and the site wallet's coins; control: a fresh storage starts off", async () => {
@@ -123,8 +126,7 @@ test("QA: the Sim's trade (MockBridge simTrade, its buy and sell for AgentZero) 
 test("test, 5 Nov (preview 2w6ijfoh6): after a reload a site wallet that bought kept its coin but got its SOL back ($32.47 from $27.47); a count below the seeded SOL is restored too (control: no reload, the same figure)", async () => {
   const storage = memory();
   const a = createMockBridge({ latencyMs: 0, float: { priceUsd: () => 100, held: { "sw-site-pump-sol": String(250_000_000) } }, persist: { storage } });
-  await ok(a.call("account.agent.set", { limitUsd: 50, people: [] }));
-  await ok(a.call("account.agent.spend", { kind: "buy", usd: 5, coin: "BONK", title: "AgentZero bought $5.00 of BONK" }));
+  await ok(a.call("sim.site.trade", { site: "pump", side: "buy", usd: 5, coin: { token: "sim-bonk", symbol: "BONK", name: "Bonk", priceUsd: 0.00002 } }));
   const sol = async (m: ReturnType<typeof createMockBridge>) => (await coins(m)).find((c) => c.symbol === "SOL")!.usd;
   assert.equal(await sol(a), 20, "control: before the reload");
   a.flush();

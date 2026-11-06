@@ -123,7 +123,7 @@ test("the gate (real core sign path): a Send's fill, quoted INTENTS and paid by 
   assert.equal(s.shown.length, 1, "one sheet, Face ID's");
   const w = s.shown[0]!;
   assert.equal(w.title, "Send $250.00 from your Safe");
-  assert.deepEqual(w.lines.filter((l) => /^(They get|Your Safe sends|From your Safe|Stays in Private|Together|Network fees) · /.test(l)), ["They get · 1.2345 SOL ($247.50)", "Your Safe sends · $300.00", "Stays in Private · $50.00", "Network fees · about $2.50"]);
+  assert.deepEqual(w.lines.filter((l) => /^(They get|Your Safe sends|From your Safe|Stays in Private|Together|Fees) · /.test(l)), ["They get · 1.2345 SOL ($247.50)", "Your Safe sends · $300.00", "Stays in Private · $50.00", "Fees · about $2.50"]);
   assert.equal(w.lines.filter((l) => /They get/.test(l)).length, 1, `"They get" said exactly once: ${String(w.lines)}`);
   // the full address first, unfolded, then where it lands (the audit's D37 condition, the copy review's words)
   assert.deepEqual(w.lines.slice(0, 2), [`To ${PAYEE}`, "Public on Solana."], String(w.lines));

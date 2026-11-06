@@ -4,6 +4,8 @@
 import { JOB_SCHEMA } from "../zero/rulebox.ts";
 import { SERVICE_NAMES } from "@zerofee/core/services";
 import { AGENTZERO_WALLET } from "@zerofee/core/agent-route";
+import { keepRuns } from "../zero/keep-read.ts";
+import { payListRuns } from "../zero/jobs.ts";
 
 /** 1Click, by the name people look up, from the one place that holds it (core services.ts; the relay's copy spells it). */
 const ONE = SERVICE_NAMES.oneclick;
@@ -14,7 +16,7 @@ export const CHAT_MAX_TOKENS = 4_000;
 export const chatSystem = (wallet: boolean): string => [
   "You are AgentZero, the helper inside ZeroFee, a wallet. Answer in short, plain words a child can read.",
   "Keep replies short and plain: short paragraphs, a list only when it helps, no tables.",
-  "AgentZero has its own wallet, which the person funds; it spends at most $50 in 24 hours for its own jobs. Never say a price per day: ZeroFee takes nothing; the person pays Anthropic for the model and the chain its network fee. A job above that: say plainly it's over the limit; never offer it. The person's own send, swap, move, add and request are theirs, on Home's own sheet with their Face ID: that limit isn't for them.",
+  "AgentZero has its own wallet, which the person funds; it spends at most $50 in 24 hours for its own jobs. Never say a price per day: ZeroFee takes nothing; the person pays Anthropic's price for the model, through ZeroFee's account, and the chain its network fee. A job above that: say plainly it's over the limit; never offer it. The person's own send, swap, move, add and request are theirs, on Home's own sheet with their Face ID: that limit isn't for them.",
   "Routines (\"every Friday move …\", \"tell me if SOL drops 20%\") are read by ZeroFee itself, not by a tool: one you see in the conversation was really shown on a sheet.",
   "A send needs an amount in dollars and who gets it: a NEAR name (it ends in .near) or an address on SOL, ETH (RH) or NEAR. If either is missing or unclear, ask one short question instead. Pass an address exactly as the person wrote it; never make one up or change a letter.",
   "Asked for two or more things in one go (\"swap, then send half, then tell me what's left\"): call plan with action make and each thing as a short step, in order, in the person's words; then do the first with its own tool. ZeroFee carries on with the next after each one lands. One sheet at a time.",
@@ -59,8 +61,17 @@ const ACT_WORDS = "Only for an act AgentZero does as its own job, never the pers
 const AGENT_ACT_WORDS = "Propose a send, swap, move, pay or trade from AgentZero's own wallet. The person approves it on a sheet. Place: agent (AgentZero's wallet), the only place AgentZero acts from. It never acts from the person's Safe or wallets.";
 export const actPlaces = (wallet: boolean): string[] => (wallet ? AGENT_PLACES : TODAY_PLACES);
 export const ACT_PLACES = actPlaces(AGENTZERO_WALLET);
-export const chatTools = (jobSchema: unknown, wallet: boolean = AGENTZERO_WALLET) => [
-  { name: "propose_job", description: wallet ? "Propose one of AgentZero's jobs (copy a wallet on pump.fun, buying from AgentZero's own wallet; keep money in the person's chosen wallet, filled from AgentZero's wallet; pay a list of people; sign in to sites). The person approves it on a sheet." : "Propose one of AgentZero's jobs (copy a wallet on pump.fun, buying from the person's SOL wallet; keep money in their SOL wallet, filled from their Safe; pay a list of people; sign in to sites). The person approves it on a sheet.", input_schema: jobSchema },
+/** The job's schema with only the jobs that can run: one that can't isn't a choice the model has (keepRuns, payListRuns). */
+const onlyRunning = (schema: unknown, keep: boolean, payList: boolean): unknown => {
+  const s = schema as { properties?: Record<string, { enum?: string[] }>; required?: string[] } | undefined;
+  if (!s?.properties?.job?.enum || (keep && payList)) return schema;
+  const gone = [...(keep ? [] : ["keep_usd"]), ...(payList ? [] : ["people"])];
+  const properties = Object.fromEntries(Object.entries(s.properties).filter(([k]) => !gone.includes(k)));
+  const jobs = s.properties.job.enum.filter((k) => (keep || k !== "keep") && (payList || k !== "pay-list"));
+  return { ...s, properties: { ...properties, job: { ...s.properties.job, enum: jobs } }, ...(s.required ? { required: s.required.filter((k) => !gone.includes(k)) } : {}) };
+};
+export const chatTools = (jobSchema: unknown, wallet: boolean = AGENTZERO_WALLET, keep: boolean = keepRuns(), payList: boolean = payListRuns()) => [
+  { name: "propose_job", description: `Propose one of AgentZero's jobs (copy a wallet on pump.fun, buying from ${wallet ? "AgentZero's own wallet" : "the person's SOL wallet"}; ${keep ? (wallet ? "keep money in the person's chosen wallet, filled from AgentZero's wallet; " : "keep money in their SOL wallet, filled from their Safe; ") : ""}${payList ? "pay a list of people; " : ""}sign in to sites). The person approves it on a sheet.`, input_schema: onlyRunning(jobSchema, keep, payList) },
   { name: "stop_job", description: "Ask the person to stop one of AgentZero's running jobs.", input_schema: { type: "object", properties: { kind: { type: "string", enum: KINDS } }, required: ["kind"], additionalProperties: false } },
   {
     name: "send",
@@ -101,7 +112,7 @@ export const chatTools = (jobSchema: unknown, wallet: boolean = AGENTZERO_WALLET
   { name: "move", description: "Open Home's Move, filled in: dollars between the person's Safe and their wallets, any way. all: true moves everything. The person approves with Face ID.", input_schema: { type: "object", properties: { from: { type: "string", enum: HOME_FROM }, to: { type: "string", enum: HOME_FROM }, usd: { type: "number" }, all: { type: "boolean" } }, required: ["from", "to"], additionalProperties: false } },
   { name: "add", description: "Open Home's Add: a one-time private address to add money with. On a coin, or on a place (to: safe for \"add money to my Safe\").", input_schema: { type: "object", properties: { coin: { type: "string", enum: ["SOL", "ETH", "NEAR", "USDC"] }, to: { type: "string", enum: HOME_FROM } }, additionalProperties: false } },
   { name: "request", description: "Open Home's Request, filled in: ask someone to pay the person dollars, by a link the person shares.", input_schema: { type: "object", properties: { usd: { type: "number" }, coin: { type: "string", enum: HOME_COINS }, from: { type: "string", description: "Who is asked: their NEAR name or address, exactly as the person wrote it" }, note: { type: "string" } }, required: ["usd"], additionalProperties: false } },
-  { name: "trade", description: "Open Trade's own Buy or Sell page for a coin, filled in. ZeroFee finds the coin in Trade's market and shows which one; the person approves there. A buy is in dollars (usd), a sale a share of what they hold (pct, 1 to 100).", input_schema: { type: "object", properties: { side: { type: "string", enum: ["buy", "sell"] }, coin: { type: "string", description: "The coin's ticker, like BONK, or its address exactly as the person wrote it" }, chain: { type: "string", enum: ["sol", "near", "hood"] }, usd: { type: "number" }, pct: { type: "number" } }, required: ["side", "coin"], additionalProperties: false } },
+  { name: "trade", description: "Open Trade's own Buy or Sell page for a coin, filled in. ZeroFee finds the coin in Trade's market and shows which one; the person approves there. A buy is in dollars (usd), a sale a share of what they hold (pct, 1 to 100). AgentZero doesn't trade NEAR coins: for one, don't call this, say \"I don't trade NEAR coins yet.\"", input_schema: { type: "object", properties: { side: { type: "string", enum: ["buy", "sell"] }, coin: { type: "string", description: "The coin's ticker, like BONK, or its address exactly as the person wrote it" }, chain: { type: "string", enum: ["sol", "hood"] }, usd: { type: "number" }, pct: { type: "number" } }, required: ["side", "coin"], additionalProperties: false } },
   { name: "plan", description: "The chat's plan. make: keep the person's several asks as steps, in order, in their words (2 to 6), then do the first. start: run a plan ZeroFee showed, on the person's yes. again: show the step it's on once more, on their new words. next: go past the step it's on. drop: end it. Each money step is Home's own sheet on the person's Face ID.", input_schema: { type: "object", properties: { action: { type: "string", enum: ["make", "start", "again", "next", "drop"] }, steps: { type: "array", items: { type: "string" }, maxItems: 6 } }, required: ["action"], additionalProperties: false } },
   { name: "read_receipts", description: "Read AgentZero's latest receipts (what it did and why).", input_schema: { type: "object", properties: {}, additionalProperties: false } },
   { name: "read_meter", description: "Read what's left in AgentZero's wallet for jobs, and what AgentZero's thinking (its replies) cost and paid today.", input_schema: { type: "object", properties: {}, additionalProperties: false } },

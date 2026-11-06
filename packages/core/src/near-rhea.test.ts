@@ -248,7 +248,7 @@ test("Ready NEAR for trading (the door): the room, then the NEAR in, sent in ord
     await assert.rejects(nearRheaAdd(no.c, "all"), (e: { problem?: { more?: unknown } }) => /Rhea didn.t take it/.test(String(e.problem?.more)));
     await assert.rejects(nearRheaAdd(w.c, "1e24"), (e: { problem?: { code: string } }) => e.problem?.code === "security.request.invalid" || /invalid/.test(e.problem?.code ?? ""));
   } finally { NEAR_GATE.open = false; }
-  await assert.rejects(nearRheaAdd(world().c, "all"), (e: { problem?: { more?: unknown } }) => /open soon/.test(String(e.problem?.more)), "the gate shut: refused");
+  await assert.rejects(nearRheaAdd(world().c, "all"), (e: { problem?: { more?: unknown } }) => /doesn't buy or sell NEAR coins/.test(String(e.problem?.more)), "the gate shut: refused");
 });
 
 test("Put away: the wallet's NEAR on Rhea comes out first (withdraw, as wNEAR), then the payment; spendable counts it; none taken when the wallet has enough (control)", async () => {

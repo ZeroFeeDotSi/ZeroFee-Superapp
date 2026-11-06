@@ -32,19 +32,19 @@ import { useWallet } from "../runtime.tsx";
 import { useMoveProblem } from "../screens/Spending.tsx";
 import { dollars } from "../format.ts";
 import { SHEET_NEEDS, useServices } from "../services.ts";
-import { SWAP_COIN, coinFigure, routeSec, feeHigh, floorOf, floorSay, SWAP_MIN_USD, SWAP_WORDS, arrivesWith, backLine, coinName, feesLine, type SwapPrice, privateLine, getsFor, mostOn, payFor, paysHere, routeOf, saidOnSheet, swapBlock, swapKey, type PayHere, type SwapPlace, type SwapRoute, swapStays, SWAP_PLACES } from "./swap-corridor.ts";
+import { SWAP_COIN, coinFigure, routeSec, feeHigh, floorOf, SWAP_MIN_USD, SWAP_WORDS, arrivesWith, backLine, coinName, feesLine, paidLine, type SwapPrice, privateLine, getsFor, mostOn, payFor, paysHere, routeOf, saidOnSheet, swapBlock, swapFloor, swapKey, swapSub, type PayHere, type SwapPlace, type SwapRoute, swapStays, SWAP_PLACES } from "./swap-corridor.ts";
 import { MOVE_WORDS, safeSigns } from "../screens/move-split.ts";
 import { SAFE_FILL_OPEN } from "@zerofee/core/safe-fill-open";
 import { CoinPicker } from "./CoinPicker.tsx";
 import { stoppedLine } from "./swap-refused.ts";
 import { CoinSwap } from "./CoinSwap.tsx";
 import { InplaceSwap } from "./InplaceSwap.tsx";
-import { nearHeldRows, type InplaceHeld } from "./swap-inplace.ts";
+import { nearCash, nearHeldRows, type InplaceHeld } from "./swap-inplace.ts";
 import { LiveTracker } from "./LiveTrack.tsx";
 import type { LiveTrack } from "./live-steps.ts";
 import { PLACE_CHAIN, siteRows, type ListedWallet, type PickCoin } from "./coin-pick.ts";
 import { SiteBackSheet } from "./SiteMoney.tsx";
-import { coinRoute, placeCoin } from "./swap-coins.ts";
+import { NEAR_IN_WALLET, coinRoute, placeCoin } from "./swap-coins.ts";
 import "./move-swap.css";
 
 type Held = NonNullable<SpendingActivity["held"]>;
@@ -113,7 +113,7 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   const [coinGet, setCoinGet] = useState<PickCoin | null>(null);
   // a coin swap's tap: this sheet is its tracker from then on (Close leaves it running; Home's Jobs row follows it)
   const [track, setTrack] = useState<LiveTrack | null>(null);
-  /** "Who can see this?" (R3): the honest privacy line one tap away, never a grey paragraph under the keypad */
+  /** "Who can see this?" (R3): the honest privacy line one tap away, its own full-screen sheet (D135), so the floor never grows */
   const [who, setWho] = useState(false);
   const [usd, setUsd] = useState(prefill?.usd ?? "");
   // Finding 37: an amount the person didn't type key by key (a chip, Max, the one it opened with) is typed over by the first key
@@ -137,7 +137,9 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   // isn't read yet" went to the shell's screen behind this sheet for 4 minutes; each hold lined up another, so after Close
   // Back and Try again showed the next copy). Its Try again asks again (the price too); Close leaves
   const [stopped, setStopped] = useState<Problem | null>(null);
-  const onUsd = (v: string) => { setLine(null); setStopped(null); setTried(false); setUsd(v); };
+  // QA's condition (6 Nov): any edit, the amount or a coin, ends a refusal: its line goes, the button reads Swap again
+  const edited = () => { setLine(null); setStopped(null); setTried(false); };
+  const onUsd = (v: string) => { edited(); setUsd(v); };
   // what it really brings and what it costs, from 1Click's dry quotes (UI's mainnet rehearsal, 3 Nov: "at least 1.4")
   const price = useSwapPrice(bridge, pay?.place ?? null, get, amount, !route || !!block);
   const name = coinName;
@@ -149,6 +151,8 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   const [nearRaw, setNearRaw] = useState<{ tokenId: string; amount: string }[] | null>(null);
   useEffect(() => { let on = true; void bridge.call<{ tokens?: { tokenId: string; amount: string }[] }>("subwallet.float.balance").then((r) => { if (on && "ok" in r && Array.isArray(r.ok?.tokens)) setNearRaw(r.ok.tokens); }).catch(() => undefined); return () => { on = false; }; }, [bridge]);
   const nearHeld = useMemo(() => nearHeldRows(nearRaw, (id) => tokens.get(id)), [nearRaw, tokens]);
+  // the NEAR wallet's cash, its one figure (bug hunt item 4: it showed $48.54 of $50.00, the move-out fee room)
+  const cash = useMemo(() => nearCash(nearRaw), [nearRaw]);
 
   // the job (bug report, 5 Nov: every waiting money flow is instant): from a wallet it is made at the tap; from the Safe
   // on this swap's own Face ID yes (job-run.ts). "Job created." here (the receipt), its row on Home and in Activity, the
@@ -203,10 +207,15 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   const finish = () => { closed.current = true; const f = follow.current; follow.current = null; if (f) onDone("", f); else onDone(""); };
 
   // the picker's rows for Home's places: what can pay (with what each holds), or every place a coin can land in
-  const placeRows = (which: "pay" | "get"): PickCoin[] => (which === "pay" ? pays.map((p) => placeCoin(p.place, SWAP_COIN[p.place], p.usd)) : SWAP_PLACES.map((p) => placeCoin(p, SWAP_COIN[p]))).filter((c): c is PickCoin => c !== null);
-  const payPick: PickCoin | null = coinPay ?? (pay ? placeCoin(pay.place, SWAP_COIN[pay.place], pay.usd) : null);
+  // (NEAR itself as the NEAR wallet's coin whenever its cash pays, bug hunt item 6)
+  const placeRows = (which: "pay" | "get"): PickCoin[] => (which === "pay" ? pays.map((p) => placeCoin(p.place, SWAP_COIN[p.place], p.usd))
+    : [...SWAP_PLACES.map((p) => placeCoin(p, SWAP_COIN[p])), ...(payPick?.place === "near" ? [NEAR_IN_WALLET] : [])]).filter((c): c is PickCoin => c !== null);
+  // nothing else to pay with but a coin the NEAR wallet holds (its cash all spent by a Max): the sheet opens on that coin,
+  // so what was bought can always be sold
+  const paying = coinPay ?? (pay ? null : nearHeld[0] ?? null);
+  const payPick: PickCoin | null = paying ?? (pay ? placeCoin(pay.place, SWAP_COIN[pay.place], pay.usd) : null);
   // a coin paid gets its wallet's own coin by default: SOL, ETH (RH), or the NEAR wallet's cash (Swap in place)
-  const getPick: PickCoin | null = coinGet ?? (coinPay && (coinPay.chain === "sol" || coinPay.chain === "hood" || coinPay.chain === "near") ? placeCoin(coinPay.chain, SWAP_COIN[coinPay.chain]) : get ? placeCoin(get, SWAP_COIN[get]) : null);
+  const getPick: PickCoin | null = coinGet ?? (paying && (paying.chain === "sol" || paying.chain === "hood" || paying.chain === "near") ? placeCoin(paying.chain, SWAP_COIN[paying.chain]) : get ? placeCoin(get, SWAP_COIN[get]) : null);
   const coinWhy = (which: "pay" | "get") => (c: PickCoin): string | null => {
     if (which === "pay") return null;
     if (!payPick) return null;
@@ -214,7 +223,7 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
     return "why" in r ? r.why : null;
   };
   const picked = (which: "pay" | "get", c: PickCoin) => {
-    setPicking(null); setLine(null);
+    setPicking(null); edited();
     if (which === "pay") {
       if (c.site) return setSitePay(c.site);
       setUsd("");
@@ -225,13 +234,21 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
     }
     if (c.place) { setCoinGet(null); setGetPlace(c.place); } else setCoinGet(c);
   };
-  const coinTrade = (coinPay || coinGet) && payPick && getPick ? coinRoute(payPick, getPick, open) : null;
+  const coinTrade = (paying || coinGet) && payPick && getPick ? coinRoute(payPick, getPick, open) : null;
+  // what the floor and the sub-line slot say, and what the one button does (swapFloor, swapSub): pure, so each state is a test
+  const said = line ?? services.line ?? slowLine ?? null;
+  const refused = stopped && !busy && !block ? stoppedLine(stopped) : null;
+  const on = swapFloor({ again: refused ? stopped!.next.label : null, block, tried, said: !!said, priceDown: price.late || !!price.said });
+  const stays = !block ? swapStays(route, amount, sends) : null;
+  const nothing = !!route && most < 0.01;
+  const sub = swapSub({ back, arrives: route && !block ? arrivesWith(route, get!, amount, priceOf(get!, status, tokens), price.cost) : null, part: nothing ? SWAP_WORDS.none : pay?.part ?? null });
   const list = (which: "pay" | "get") => (
     <CoinPicker bridge={bridge} title={which === "pay" ? SWAP_WORDS.pay : SWAP_WORDS.get} start={(which === "pay" ? payPick : getPick ?? payPick)?.chain ?? (PLACE_CHAIN[pay?.place ?? "near"] ?? "near")}
       places={which === "pay" ? [...placeRows("pay"), ...sites] : placeRows("get")} {...(which === "pay" ? { nearHeld } : {})} search={which === "get"} why={coinWhy(which)} onPick={(c) => picked(which, c)} onClose={() => setPicking(null)} />
   );
 
-  if (track) return <LiveTracker track={track} onClose={() => onDone("")} />;
+  // Swap again (a refund's next tap): this sheet, with the coins it had
+  if (track) return <LiveTracker track={track} onClose={() => onDone("")} onNext={() => setTrack(null)} />;
   if (sitePay) return <SiteBackSheet wallet={sitePay.id} name={sitePay.name} safeUsd={null} onBack={() => setSitePay(null)} onClose={onClose} onDone={(l) => onDone(l)} />;
   // the picker is its own full-screen sheet over Swap's (D135, sheet-stack.ts): its Close comes back here
   return (<>
@@ -242,8 +259,9 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
         <CoinSwap bridge={bridge} tasks={tasks} pay={payPick} get={getPick} chain={coinTrade.chain} payAddress={coinTrade.pay} getAddress={coinTrade.get}
           most={coinPay ? coinPay.heldUsd ?? 0 : pay?.most ?? 0} onPickPay={() => setPicking("pay")} onPickGet={() => setPicking("get")} onTrack={setTrack} />
       ) : "kind" in coinTrade && coinTrade.kind === "inplace" ? (
-        <InplaceSwap bridge={bridge} tasks={tasks} pay={payPick} get={getPick} route={coinTrade} {...(coinTrade.side === "sell" && coinPay && "held" in coinPay ? { held: (coinPay as PickCoin & { held: InplaceHeld }).held } : {})}
-          most={coinPay ? coinPay.heldUsd ?? 0 : pays.find((p) => p.place === "near")?.most ?? 0} onPickPay={() => setPicking("pay")} onPickGet={() => setPicking("get")} onTrack={setTrack} />
+        <InplaceSwap bridge={bridge} tasks={tasks} pay={payPick} get={getPick} route={coinTrade} {...(coinTrade.side === "sell" && paying && "held" in paying ? { held: (paying as PickCoin & { held: InplaceHeld }).held } : {})}
+          {...(coinTrade.side === "buy" && cash ? { cashRaw: cash.raw } : {})}
+          most={coinTrade.side === "sell" ? paying?.heldUsd ?? 0 : cash ? cash.usd : pays.find((p) => p.place === "near")?.usd ?? 0} onPickPay={() => setPicking("pay")} onPickGet={() => setPicking("get")} onTrack={setTrack} />
       ) : (
         <>
           <button className="wl-swap-pick" onClick={() => setPicking("pay")} aria-label={`${SWAP_WORDS.pay}: ${payPick.symbol}`}><span className="zf-small">{SWAP_WORDS.pay}</span><span className="zf-body wl-sw-name">{payPick.symbol}</span></button>
@@ -258,53 +276,63 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
         </>
       ) : (
         <>
-          <button className="wl-swap-pick" onClick={() => setPicking("pay")} aria-label={`${SWAP_WORDS.pay}: ${name(pay.place)}`}>
-            <span className="zf-small">{SWAP_WORDS.pay}</span><CoinIcon symbol={SWAP_COIN[pay.place].symbol} icon={SWAP_COIN[pay.place].icon} size={28} />
-            {/* R3 (the design review §4.4): the coin over where it sits, two lines, never wrapped mid-phrase */}
-            <span className="zf-body wl-sw-name">{SWAP_COIN[pay.place].label}<span className="zf-small wl-sw-where">{SWAP_COIN[pay.place].where}</span></span>
-            <span className="zf-small">{dollars(pay.usd.toFixed(2))}</span><svg className="wl-sw-chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
-          </button>
-          <button className="wl-swap-pick" onClick={() => setPicking("get")} aria-label={`${SWAP_WORDS.get}: ${get ? name(get) : SWAP_WORDS.pick}`}>
-            <span className="zf-small">{SWAP_WORDS.get}</span>
-            {get ? <><CoinIcon symbol={SWAP_COIN[get].symbol} icon={SWAP_COIN[get].icon} size={28} /><span className="zf-body wl-sw-name">{SWAP_COIN[get].label}<span className="zf-small wl-sw-where">{SWAP_COIN[get].where}</span></span></> : <span className="zf-body">{SWAP_WORDS.pick}</span>}
-            <svg className="wl-sw-chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
-          </button>
-          <div className="wl-swap-amount" style={{ ["--w" as string]: `${Math.max(1, (usd || "0").length) + 0.3}ch` }}>
-            <MoneyAmount usd={usd} onUsd={onUsd} label={`Dollars of ${SWAP_COIN[pay.place].label} to swap`} />
-          </div>
-          {/* what arrives, the one line under the dollars (G3); its space is there from the first frame, so nothing jumps */}
-          <p className="zf-small wl-sw-arrives" data-testid="swap-arrives">{route && !block ? arrivesWith(route, get!, amount, priceOf(get!, status, tokens), price.cost) : ""}</p>
-          {/* the design review §4.4, the Buy pattern: chips then the keypad, no range slider; Max is the most it can swap */}
-          <div className="wl-swap-chips" role="group" aria-label={`Amount, up to $${most.toFixed(2)}`}>
-            {["10", "25", "50"].map((d) => <button key={d} type="button" className="zf-chip" onClick={() => { setPreset(true); onUsd(d); }} disabled={Number(d) > most || Number(d) < floor.usd}>{`$${d}`}</button>)}
-            <button type="button" className="zf-chip wl-swap-all" onClick={() => { setPreset(true); onUsd(most.toFixed(2)); }} disabled={most < floor.usd} aria-label={`Max, $${most.toFixed(2)}`}>{SWAP_WORDS.max}</button>
-          </div>
-          {/* one floor line, the route's own figure (the copy review's walks, 5 Nov): under it its words, over it the fee's size if said */}
-          {route && <p className="zf-small wl-sheet-lead" data-testid="swap-floor">{floorSay(route, amount, !block ? price.cost?.feeUsd ?? null : null)}</p>}
-          {pay.part && <p className="zf-small wl-sheet-lead" data-testid="swap-part">{pay.part}</p>}
-          <Keypad value={padBase(usd || "0", preset)} decimals={2} onChange={(v) => { setPreset(false); onUsd(v === "0" ? "" : v); }} />
-          {route && !block && price.waiting && <p className="zf-small wl-sheet-lead" role="status" data-testid="swap-price-wait">{quoteWaitLine(price.waitedMs)}</p>}
-          {route && !block && (price.late || price.said) && <p className="zf-small wl-sheet-lead" role="status" data-testid="swap-price-late">{price.late ? SWAP_PRICE_LATE : price.said} <button className="zf-link" onClick={price.again}>Try again</button></p>}
-          {!block && swapStays(route, amount, sends) && <p className="zf-small wl-sheet-lead" data-testid="swap-stays">{swapStays(route, amount, sends)}</p>}
-          {back && <p className="zf-small wl-sheet-lead" data-testid="swap-back">{back}</p>}
-          {privateLine(route) && (
-            <div className="wl-mv-who">
-              <button type="button" className="wl-mv-who__q" aria-expanded={who} onClick={() => setWho((w) => !w)} data-testid="swap-who">{MOVE_WORDS.who}</button>
-              {who && <p className="zf-small wl-mv-foot" data-testid="swap-private">{privateLine(route)}</p>}
+          {/* the UI reviewer's ruling (6 Nov), Send's shape (a16): the first frame shows everything, no scroll. The card, the
+              dollars, the chips, ONE sub-line slot and the keypad share a box whose keypad gives (56 pt rows down to 30); the
+              floor under it is its own box, so it can never cover a key, and nothing sits under the button */}
+          <div className="wl-swap2">
+            <div className="wl-swap2__scroll">
+              <div className="wl-swap2__card">
+                <button className="wl-swap-pick" onClick={() => setPicking("pay")} aria-label={`${SWAP_WORDS.pay}: ${name(pay.place)}`}>
+                  <span className="zf-small">{SWAP_WORDS.pay}</span><CoinIcon symbol={SWAP_COIN[pay.place].symbol} icon={SWAP_COIN[pay.place].icon} size={28} />
+                  {/* R3 (the design review §4.4): the coin over where it sits, two lines, never wrapped mid-phrase */}
+                  <span className="zf-body wl-sw-name">{SWAP_COIN[pay.place].label}<span className="zf-small wl-sw-where">{SWAP_COIN[pay.place].where}</span></span>
+                  <span className="zf-small">{dollars(pay.usd.toFixed(2))}</span><svg className="wl-sw-chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
+                </button>
+                <button className="wl-swap-pick" onClick={() => setPicking("get")} aria-label={`${SWAP_WORDS.get}: ${get ? name(get) : SWAP_WORDS.pick}`}>
+                  <span className="zf-small">{SWAP_WORDS.get}</span>
+                  {get ? <><CoinIcon symbol={SWAP_COIN[get].symbol} icon={SWAP_COIN[get].icon} size={28} /><span className="zf-body wl-sw-name">{SWAP_COIN[get].label}<span className="zf-small wl-sw-where">{SWAP_COIN[get].where}</span></span></> : <span className="zf-body">{SWAP_WORDS.pick}</span>}
+                  <svg className="wl-sw-chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
+                </button>
+              </div>
+              <div className="wl-swap-amount" style={{ ["--w" as string]: `${Math.max(1, (usd || "0").length) + 0.3}ch` }}>
+                <MoneyAmount usd={usd} onUsd={onUsd} label={`Dollars of ${SWAP_COIN[pay.place].label} to swap`} />
+              </div>
+              {/* the design review §4.4, the Buy pattern: chips then the keypad, no range slider; Max is the most it can swap */}
+              <div className="wl-swap-chips" role="group" aria-label={`Amount, up to $${most.toFixed(2)}`}>
+                {["10", "25", "50"].map((d) => <button key={d} type="button" className="zf-chip" onClick={() => { setPreset(true); onUsd(d); }} disabled={Number(d) > most || Number(d) < floor.usd}>{`$${d}`}</button>)}
+                <button type="button" className="zf-chip wl-swap-all" onClick={() => { setPreset(true); onUsd(most.toFixed(2)); }} disabled={most < floor.usd} aria-label={`Max, $${most.toFixed(2)}`}>{SWAP_WORDS.max}</button>
+              </div>
+              {/* the one sub-line slot: its height is kept, so a line coming or going moves nothing */}
+              <div className="wl-swap2__sub" data-testid="swap-sub">{sub && <p className="zf-small" data-testid={sub.id}>{sub.text}</p>}</div>
+              <Keypad value={padBase(usd || "0", preset)} decimals={2} onChange={(v) => { setPreset(false); onUsd(v === "0" ? "" : v); }} />
             </div>
-          )}
-          <SheetLine text={line ?? services.line ?? slowLine ?? null} />
-          {stopped && !busy && <p className="zf-small wl-sheet-lead" role="alert" data-testid="swap-stopped">{stoppedLine(stopped)} <button className="zf-link" onClick={() => void go()}>{stopped.next.label}</button></p>}
-          {block && block !== floor.under && (block !== SWAP_WORDS.amount || tried) && <p className="zf-small wl-mv-why" role="status" data-testid="swap-why">{block}</p>}
-          {/* the tap IS the swap (product decision, 5 Nov: no hold, no confirm); the Safe's routes still ask Face ID on its own sheet */}
-          <button type="button" className={`zf-btn wl-sheet-go${block === SWAP_WORDS.amount ? " is-idle" : ""}`} data-testid="swap-go" disabled={busy || services.down || (!!block && block !== SWAP_WORDS.amount)}
-            onClick={(e) => { if (block === SWAP_WORDS.amount) return setTried(true); tapBurst(e.currentTarget, () => void bridge.call("device.haptic", { kind: "tap" }).catch(() => undefined)); void go(); }}>{SWAP_WORDS.title}</button>
-          {/* who the fee goes to, under the button (product decision, 5 Nov: we are zero fee; the design review's spec): the quote's own figure, or none */}
-          {route && !block && <p className="zf-small wl-zerofee" data-testid="swap-fees">{price.fees}</p>}
+            <div className="wl-swap2__floor">
+              {/* line 1, one slot: a refusal in its place while it stands, else the privacy line with its link at the end */}
+              <div className="wl-swap2__line" data-testid="swap-line">
+                {on.line === "stopped" && <p className="zf-small" role="alert" data-testid="swap-stopped">{refused}</p>}
+                {on.line === "why" && <p className="zf-small" role="status" data-testid="swap-why">{block}</p>}
+                {on.line === "said" && <SheetLine text={said} />}
+                {on.line === "price" && <p className="zf-small" role="status" data-testid="swap-price-late">{price.late ? SWAP_PRICE_LATE : price.said}</p>}
+                {on.line === "stays" && <p className="zf-small">{stays && <span data-testid="swap-stays">{stays} </span>}{privateLine(route) && <button type="button" className="zf-link wl-swap2__who" onClick={() => setWho(true)} data-testid="swap-who">{MOVE_WORDS.who}</button>}</p>}
+              </div>
+              {/* line 2, the fee block, right above the button (the copy review, 6 Nov); a refusal never takes its place */}
+              {route && (
+                <div className="zf-fee">
+                  {price.waiting ? <p className="zf-small" role="status" data-testid="swap-price-wait">{quoteWaitLine(price.waitedMs)}</p> : price.figure && <p className="zf-small" data-testid="swap-fee">{price.figure}</p>}
+                  <p className="zf-small" data-testid="swap-paid">{price.paid}</p>
+                </div>
+              )}
+              {/* the tap IS the swap (product decision, 5 Nov: no hold, no confirm); the Safe's routes still ask Face ID on its own
+                  sheet. One button: after a refusal it reads Try again and asks again; never a second grey one */}
+              <button type="button" className={`zf-btn wl-sheet-go${on.tap === "swap" && block === SWAP_WORDS.amount ? " is-idle" : ""}`} data-testid="swap-go" disabled={busy || (on.tap === "swap" && (nothing || services.down || (!!block && block !== SWAP_WORDS.amount)))}
+                onClick={(e) => { if (on.tap === "price") return price.again(); if (on.tap === "swap" && block === SWAP_WORDS.amount) return setTried(true); tapBurst(e.currentTarget, () => void bridge.call("device.haptic", { kind: "tap" }).catch(() => undefined)); void go(); }}>{on.label}</button>
+            </div>
+          </div>
         </>
       )}
     </MoneySheet>
     {picking && list(picking)}
+    {who && <MoneySheet title={MOVE_WORDS.who} onClose={() => setWho(false)}><p className="zf-body wl-sheet-lead" data-testid="swap-private">{privateLine(route)}</p></MoneySheet>}
   </>);
 }
 
@@ -318,7 +346,7 @@ export const SWAP_PRICE_LATE = "NEAR Intents didn't answer.";
  * answer or QUOTE_WAIT_MS passed; `said` when it came back refused at once (its own words, never "didn't answer"). The
  * same price asked again within PRICE_KEPT_MS is the one kept.
  */
-function useSwapPrice(bridge: Bridge, from: SwapPlace | null, to: SwapPlace | null, usd: number, off: boolean): { cost: SwapPrice | null; fees: string; late: boolean; said: string | null; waiting: boolean; waitedMs: number; again: () => void } {
+function useSwapPrice(bridge: Bridge, from: SwapPlace | null, to: SwapPlace | null, usd: number, off: boolean): { cost: SwapPrice | null; figure: string | null; paid: string; late: boolean; said: string | null; waiting: boolean; waitedMs: number; again: () => void } {
   const [cost, setCost] = useState<SwapPrice | null>(null);
   const [late, setLate] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
@@ -357,5 +385,5 @@ function useSwapPrice(bridge: Bridge, from: SwapPlace | null, to: SwapPlace | nu
     }, 300);
     return () => { live = false; clearTimeout(t); clearTimeout(slow); };
   }, [bridge, from, to, usd, off, tries]);
-  return { cost, fees: feesLine(usd, cost), late, said, waiting, waitedMs, again: () => setTries((n) => n + 1) };
+  return { cost, figure: feesLine(cost), paid: paidLine(cost), late, said, waiting, waitedMs, again: () => setTries((n) => n + 1) };
 }

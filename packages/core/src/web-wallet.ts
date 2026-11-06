@@ -59,8 +59,9 @@ const WEB_METHODS = new Set([
   "subwallet.list", "subwallet.balances", "subwallet.coins", "subwallet.read", // the three wallets' reads
   "subwallet.float.balance", "subwallet.add.onWay", // Home's reads (fork B): the NEAR wallet's cash, money on its way in
   "subwallet.create", // only the three wallets (and, with WEB_TRADE, Trade's), checked below
-  "subwallet.send", // Wallet's own Send, SOL or ETH (RH) only, checked below
-  // Wallet's own private Send (QA's real path, 5 Nov): one confidential 1Click quote, the core's own, checked below
+  // Wallet's own private Send (QA's real path, 5 Nov): one confidential 1Click quote, the core's own, checked
+  // below. Never subwallet.send: that is a public transfer from the wallet (the HARD RULE, every money move through
+  // NEAR Confidential), and no screen on the web asks for it, so here it is refused like the Safe.
   "subwallet.sendPrivate", "subwallet.sendPrivate.status",
   "subwallet.sendCoins", // the web Send's tokens held (W4), Wallet's own read, checked below
 ]);
@@ -97,7 +98,6 @@ export function webAllows(method: string, p: Record<string, unknown>, trade: boo
   if (TRADE_METHODS.has(method)) return trade && p.app === "trade";
   if (SWAP_IN_PLACE.has(method)) return p.app === "wallet";
   if (!WEB_METHODS.has(method)) return false;
-  if (method === "subwallet.send") return p.app === "wallet" && (p.chain === "sol" || p.chain === "hood") && p.token === undefined;
   if (method === "subwallet.sendPrivate") return p.app === "wallet" && (p.chain === "sol" || p.chain === "hood");
   if (method === "subwallet.sendPrivate.status") return p.app === "wallet";
   if (method === "subwallet.sendCoins") return p.app === "wallet";

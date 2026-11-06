@@ -19,6 +19,7 @@ test("a send names only the amount said; none said, none named (control: a plain
   assert.doesNotMatch(all, /filled in/);
   assert.equal(sendAmount("send $5 to kim.near"), ", filled in with $5", "control");
   assert.equal(sendAmount("send 5 sol"), "", "control: no dollar sign, no figure made up");
+  assert.equal(sendAmount("please send $2.50 to kim.near"), ", filled in with $2.50", "6 Nov: never \"$2.5\"");
 });
 
 test("a buy names no coin and no amount it didn't read (control: a typed how-to still gets the one line)", async () => {
@@ -31,6 +32,9 @@ test("a buy names no coin and no amount it didn't read (control: a typed how-to 
 test("the cost answer is about AgentZero's answers only (control: 'how much do you cost' still gets it)", async () => {
   assert.doesNotMatch(await say("how much does it cost to send $1000?"), /my answers cost nothing/);
   assert.match(await say("how much do you cost?"), /my answers cost nothing/, "control");
+  // 6 Nov: any "how much did" got the chat's cost; a coin's price too
+  for (const w of ["how much did I spend today?", "how much was BTC yesterday?", "how much did I make?", "what does bitcoin cost?"]) assert.equal(await say(w), SIM_ONLY_STARTERS, w);
+  for (const w of ["what does it cost?", "does this cost anything?", "how much does an answer cost?", "what do you cost?"]) assert.match(await say(w), /my answers cost nothing/, `control: ${w}`);
 });
 
 test("the balance answer hears its common phrasings (control: an odd ask still gets the one line)", async () => {
@@ -56,15 +60,23 @@ test("the menu's settings page is \"Jobs and limits\" (the real AgentZero test's
   assert.doesNotMatch(menu + appSrc, /AgentZero settings/);
 });
 
-test("a payment typed in the Sim chat gets the way on (the pay list, by the menu's name), never the one dead-end line; control: an odd ask still gets it", async () => {
+test("a payment typed in the Sim chat gets the way on (Send, by its place), never the one dead-end line and never a pay list that isn't there; control: an odd ask still gets it", async () => {
   const { simReply, SIM_ONLY_STARTERS } = await import("./sim-chat.ts");
   const said = (r: { text?: string }[]) => r.map((p) => p.text ?? "").join("\n");
   const pay = said((await simReply("Pay $5 to coffee.near for my coffee", async () => null)) as { text?: string }[]);
-  assert.match(pay, /I can pay people on your pay list\./);
-  assert.match(pay, /Make your list in the menu, under Jobs and limits\./);
+  assert.match(pay, /I can't pay people yet\./);
+  assert.match(pay, /Nothing was paid\. To try it here, go to Home and tap Send\./);
+  assert.doesNotMatch(pay, /pay list|Make your list/);
   assert.doesNotMatch(pay, new RegExp(SIM_ONLY_STARTERS.replace(/[.?]/g, "\\$&")));
-  const menu = readFileSync(new URL("./ChatsMenu.tsx", import.meta.url), "utf8");
-  assert.match(menu, /<span>Jobs and limits<\/span>/, "the place the line names is the menu's row");
   const odd = said((await simReply("sing me a song", async () => null)) as { text?: string }[]);
   assert.equal(odd, SIM_ONLY_STARTERS);
+});
+
+test("a typed move, swap or sell gets the way on, naming no amount or coin it didn't read (6 Nov; control: the Move suggestion keeps its own answer, an odd ask the one line)", async () => {
+  assert.match(await say("move $10 from my Safe to my SOL wallet"), /I'd open Move for you\.[\s\S]*Nothing moved\. To try it here, go to Home and tap Move\./);
+  assert.match(await say("swap 1 sol to usdc"), /I'd open Swap for you\.[\s\S]*Nothing was swapped\./);
+  assert.match(await say("sell all my coins"), /I'd open Trade for you\.[\s\S]*Nothing was sold\./);
+  for (const w of ["move $10 from my Safe to my SOL wallet", "swap 1 sol to usdc", "sell all my coins"]) assert.doesNotMatch(await say(w), /\$10|1 sol|all my/, w);
+  assert.match(await say("Move $5 from my Safe to my SOL wallet"), /filled in: \$5 from your Safe to your SOL wallet/, "control");
+  assert.equal(await say("moved to a new city"), SIM_ONLY_STARTERS, "control");
 });

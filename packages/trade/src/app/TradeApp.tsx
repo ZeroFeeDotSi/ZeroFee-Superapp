@@ -18,7 +18,7 @@ import { addRowLine, takeOutRowLine } from "./approval.ts";
 import type { ChainId, Side } from "../types.ts";
 import { Forward, TrayDiscover, TrayPerps } from "./icons.tsx";
 import { PERPS_ON, tabOf, trayTabs, type TradeTab } from "../perps/flag.ts";
-import { readRequest, segOfRequest, type TradeSeg } from "./requests.ts";
+import { nearCoinNative, readRequest, segOfRequest, type TradeSeg } from "./requests.ts";
 import { MARKET, TradeProvider, TradeRuntimeContext, useFloat, useTrade } from "./runtime.tsx";
 import { Activity } from "./screens/Activity.tsx";
 import { Bought } from "./screens/Bought.tsx";
@@ -34,7 +34,7 @@ import { amount as fmtAmount, usd } from "./format.ts";
 import { Settings } from "./screens/Settings.tsx";
 import { TradeSheet } from "./screens/TradeSheet.tsx";
 import { OFFLINE_WORDS, useOnline } from "./online.ts";
-import { askLine, askStart, tradeAsks, type TradeAsk } from "@zerofee/shell-api/trade-ask.ts";
+import { agentNearLine, askLine, askStart, tradeAsks, type TradeAsk } from "@zerofee/shell-api/trade-ask.ts";
 import { backLink, readBack, type BackTo } from "@zerofee/shell-api/back-to.ts";
 import { fundAsk } from "./fund-ask.ts";
 import { NATIVE_COINS, webWallet } from "@zerofee/shell-api/release.ts";
@@ -66,6 +66,11 @@ type Seg = TradeSeg;
 // tabOf (perps/flag.ts): a tab another app asked for by its older name still opens; "home" is the market now.
 /** `ask`: the ask (trade-ask.ts) this coin page was opened for: a new ask on the same coin opens it afresh. */
 type View = { kind: "tabs" } | { kind: "coin"; seed: CoinRow; ask?: number; /** opened by another app (Home's Hot coin row): its Back goes there */ back?: BackTo } | { kind: "native"; assetId: string; symbol: string; buy?: boolean; /** opened by another app (Home's Safe row): its Back goes there */ back?: BackTo } | { kind: "done"; rec: TradeRecord } | { kind: "receive"; chain: ChainId } | { kind: "settings" } | { kind: "trades" };
+/** A coin's page from Trade's own lists: a NEAR coin's is the Safe's own with NATIVE_COINS on (requests.ts nearCoinNative, the one switch). */
+const coinView = (seed: CoinRow): View => {
+  const native = nearCoinNative(seed, NATIVE_COINS);
+  return native ? { kind: "native", ...native } : { kind: "coin", seed };
+};
 /** `start`: the amount a Buy sheet reopens at. `back`: the Buy sheet a Top up was opened from, reopened when it ends. */
 type BuyBack = { side: Side; coin: CoinDetail; value: string };
 type SheetState = null | { kind: "trade"; side: Side; coin: CoinDetail; start?: string; asked?: number } | { kind: "move" } | { kind: "receive" };
@@ -109,7 +114,7 @@ function TradeScreens() {
       const a = tradeAsks.take();
       if (!a) return;
       if (asked) tradeAsks.end(asked.seq, { went: false });
-      if (!MARKET.includes(a.ask.chain)) { tradeAsks.end(a.seq, { went: false, refused: "Trade doesn't trade on that chain yet." }); return; }
+      if (!MARKET.includes(a.ask.chain)) { tradeAsks.end(a.seq, { went: false, refused: a.ask.chain === "near" ? agentNearLine(a.ask.side) : "Trade doesn't trade on that chain yet." }); return; }
       setSheet(null);
       setAsked(a);
       // the coin in the market's own form (a checksummed 0x is lower case there): held, sending and the position all match
@@ -125,6 +130,7 @@ function TradeScreens() {
       const r = readRequest(t);
       setSheet(null);
       // test (5 Nov): a coin page opened from Home's Hot side went Back to Trade's list; Back goes to the app that asked
+      // a link names a coin held in a wallet (Home's Hot row): its own page, never the Safe's, and never a Safe page named by a link's symbol
       if ("coin" in r) { const back = readBack(shell.requestedLink); setView({ kind: "coin", seed: r.coin, ...(back ? { back } : {}) }); }
       // a Safe coin (Home's Safe rows): its page with the switch on, else the market, never an error
       // Home's coin page (QA's QA re-check, item 10: its Back landed on Trade): Back goes to the app that asked
@@ -211,7 +217,7 @@ function TradeScreens() {
     const onPage = view.kind === "coin" && view.ask === asked.seq && (asked.opened ? sheet?.kind === "trade" && sheet.asked === asked.seq : !sheet);
     if (!onPage) endAsk({ went: false });
   }, [asked, view, sheet]);
-  const openCoin = (seed: CoinRow) => setView({ kind: "coin", seed });
+  const openCoin = (seed: CoinRow) => setView(coinView(seed));
   /** Buy or Sell, the person's own tap on the coin page. */
   const openTrade = (side: Side, coin: CoinDetail) => setSheet({ kind: "trade", side, coin });
   /** The page an ask named, opened by the coin page once the coin is read: at the ask's amount, marked as filled in. A

@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { NATIVE, PICK_CHAINS, foldLine, siteRows, heldRows, looksLikeAddress, matches, pickKey, pickRows, splitRows, type PickCoin } from "./coin-pick.ts";
-import { COIN_WHY, coinRoute, placeCoin, tradeArrives } from "./swap-coins.ts";
+import { COIN_WHY, NEAR_IN_WALLET, coinRoute, placeCoin, tradeArrives } from "./swap-coins.ts";
 import { SWAP_COIN } from "./swap-corridor.ts";
 import { coinAsk, paidLine, priceLate, runTradeJob, trackOf, tradeSteps, type CoinQuote } from "./swap-trade.ts";
 
@@ -53,7 +53,7 @@ test("routes: a wallet's coin ↔ a coin in it, and coin ↔ coin, are trades; b
 
 test("hidden, each with its one line: NEAR coins, a coin to another chain, the same coin, a pair no core path finishes", () => {
   const why = (a: PickCoin, b: PickCoin, o = open) => { const r = coinRoute(a, b, o); return "why" in r ? r.why : "offered"; };
-  assert.equal(why(place("safe-usdc"), coin("near", "token.near", "TKN")), COIN_WHY.nearCoins, "the Safe's NEAR coins: not in place yet");
+  assert.equal(why(place("safe-usdc"), coin("near", "token.near", "TKN")), COIN_WHY.fromNear, "the Safe's NEAR coins: only the NEAR wallet's cash buys them in place");
   assert.equal(why(coin("sol", BONK, "BONK"), place("near")), COIN_WHY.crossChain);
   assert.equal(why(coin("sol", BONK, "BONK"), coin("hood", RH, "HOOD")), COIN_WHY.crossChain);
   assert.equal(why(place("hood"), coin("sol", BONK, "BONK")), COIN_WHY.crossChain);
@@ -67,6 +67,12 @@ test("hidden, each with its one line: NEAR coins, a coin to another chain, the s
   assert.equal(why(place("safe-near"), place("safe-usdc")), "offered", "control: E7 with the pair open");
   assert.equal(why(place("safe-near"), place("safe-usdc"), () => false), COIN_WHY.notHere, "a direction not open: the fallback");
   assert.equal(why(place("sol"), coin("sol", BONK, "BONK")), "offered", "control");
+  // bug hunt, 4 Nov, items 6 and 7: from the NEAR wallet's cash, the Safe's NEAR says where it lands; from the Safe or a
+  // chain's wallet, a NEAR coin says what does buy it; a NEAR coin paid into a chain's wallet: through cash first
+  assert.equal(why(place("near"), place("safe-near")), COIN_WHY.safeNear);
+  assert.equal(why(place("sol"), coin("near", "token.near", "TKN")), COIN_WHY.fromNear);
+  assert.equal(why(coin("near", "token.near", "TKN"), place("sol")), COIN_WHY.nearPair);
+  assert.equal(why(place("near"), NEAR_IN_WALLET), "offered", "control: NEAR itself, bought into the NEAR wallet in place");
   for (const w of Object.values(COIN_WHY)) assert.ok(w.length <= 90 && !/\bwe\b/i.test(w) && !/doesn't have this coin/.test(w), w);
 });
 
@@ -83,12 +89,12 @@ test("what arrives: 'About' the exchange's own quote, no four decimals (design r
 });
 
 test("the lines name who gets the fee (the exchange, the network's own figure; product decision, 5 Nov: ZeroFee takes nothing), and who didn't answer", () => {
-  assert.equal(paidLine({ ...ONE, feeUsd: 0 }), "Jupiter's fee is in the price. Solana gets its own network fee. ZeroFee takes nothing.", "no figure: none made up");
-  assert.equal(paidLine(ONE), "Jupiter's fee is in the price. Solana's network gets under a cent. ZeroFee takes nothing.", "a fee under a cent is still a fee");
-  assert.equal(paidLine({ ...TWO, feeUsd: 0.013 }), "PumpSwap and Jupiter's fees are in the price. Solana's network gets about $0.01. ZeroFee takes nothing.");
-  assert.equal(paidLine({ ...TWO, chain: "hood", legs: [TWO.legs[1]!, TWO.legs[1]!], feeUsd: 0.25 }), "Jupiter's fee is in the price. Robinhood Chain's network gets about $0.25. ZeroFee takes nothing.", "one exchange named once");
+  assert.equal(paidLine({ ...ONE, feeUsd: 0 }), "The pools Jupiter picks keep a fee, in the price. Solana gets its own network fee. ZeroFee takes nothing.", "no figure: none made up");
+  assert.equal(paidLine(ONE), "The pools Jupiter picks keep a fee, in the price. Solana's network gets under a cent. ZeroFee takes nothing.", "a fee under a cent is still a fee");
+  assert.equal(paidLine({ ...TWO, feeUsd: 0.013 }), "PumpSwap and the pools Jupiter picks keep a fee, in the price. Solana's network gets about $0.01. ZeroFee takes nothing.");
+  assert.equal(paidLine({ ...TWO, chain: "hood", legs: [TWO.legs[1]!, TWO.legs[1]!], feeUsd: 0.25 }), "The pools Jupiter picks keep a fee, in the price. Robinhood Chain's network gets about $0.25. ZeroFee takes nothing.", "one exchange named once");
   const sheet = readFileSync(new URL("./CoinSwap.tsx", import.meta.url), "utf8");
-  assert.match(sheet, /data-testid="swap-go"[\s\S]{0,400}<\/button>\n\s*\{[^\n]*\n?\s*\{!block && price\.q && <p className="zf-small wl-zerofee" data-testid="swap-paid">\{paidLine\(price\.q\)\}<\/p>\}/, "under the button");
+  assert.match(sheet, /\{!block && price\.q && <div className="zf-fee"><p className="zf-small" data-testid="swap-paid">\{paidLine\(price\.q\)\}<\/p><\/div>\}\n\s*<button [^\n]*data-testid="swap-go"/, "right above the button");
   assert.equal(priceLate(null), "The exchange didn't answer.");
   assert.equal(priceLate(ONE), "Jupiter didn't answer.");
 });

@@ -19,7 +19,9 @@
 /* the sheet: under the amount, the floor's one promise, where the money comes from, then who can see it, quiet */
 .nc-sheet .nc-least { margin: 2px 0 0; min-height: 18px; text-align: center; color: var(--mute); font-variant-numeric: tabular-nums; }
 .nc-sheet .nc-pay { margin: 10px 0 0; color: var(--mute); }
-.nc-sheet .nc-who { margin: 12px 4px 4px; text-align: center; color: var(--mute); line-height: 1.4; }
+.nc-sheet .nc-who { margin: 4px 4px 0; text-align: center; color: var(--mute); line-height: 1.4; }
+/* the fee block's figure takes a line: the Buy's keypad rows are a little smaller, so its button stays on an 844 pt screen */
+.nc-sheet .tp-pad .zf-keypad { grid-auto-rows: 50px; }
 
 /* the receipt: the shared object, then two rows (who swaps it, what ZeroFee takes) on the hairline system */
 .nc-job { width: 100%; }

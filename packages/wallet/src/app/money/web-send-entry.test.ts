@@ -357,7 +357,7 @@ test("launch A7: the real quotes' sheet before the password: $5 says they get ab
       assert.equal(e.sheets.length, 1, `$${amount}: the sheet, once`);
       const sheet = e.sheets[0]!;
       assert.equal(sheet.password, true, `$${amount}: the password is asked on this very sheet`);
-      assert.deepEqual(sheet.words.lines, [`To ${SOL_PAYEE}`, `They get about $${get}`, `Network fees · about $${fees}`, "Public on Solana."], `$${amount}: what they get and the fees, before the password`);
+      assert.deepEqual(sheet.words.lines, [`To ${SOL_PAYEE}`, `They get about $${get}`, `Fees · about $${fees}`, "NEAR Intents and the network keep this. ZeroFee takes nothing.", "Public on Solana."], `$${amount}: what they get and the fees, before the password`);
       assert.deepEqual((sheet.words.warnings ?? []).map((w) => w.text), warn ? [warn] : [], `$${amount}: ${warn ? "the high-fee warning" : "no warning"}`);
       assert.equal(sheet.words.amount, `${amount} USDC`);
       assert.equal(e.solSent.length, 0, `$${amount}: nothing signed on a No`);

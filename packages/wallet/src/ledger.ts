@@ -1275,6 +1275,15 @@ export function createLedgerService(d: LedgerDeps): Bridge {
       // a Safe swap's own tag (intents-swap.ts): only with it does the status say what arrived
       const s = await apis.status(depositAddress, via, m.statusTag).catch(() => null);
       const status = s?.status ?? "";
+      // the page's own fast read may have ended it first (intents-swap.ts watchSafe, Activity starts this next to it): its
+      // end stays as it wrote it, never overwritten by this older copy, never back to moving
+      const kept = m.kind === "swap" ? (await loadMovements()).find((x) => x.id === m.id)?.status : undefined;
+      if (kept === "done" || kept === "refunded" || kept === "problem") {
+        clearInterval(timer);
+        tracking.delete(m.id);
+        emit("ledger.balancesChanged", {});
+        return;
+      }
       const end = (patch: Partial<Movement>) => {
         clearInterval(timer);
         tracking.delete(m.id);

@@ -408,6 +408,8 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
           {/* the keypad sits on the button, in the thumb's reach; a sale has its three shares and no keypad (review 6, 14) */}
           {side === "buy" && <div className="tp-pad"><Keypad value={padBase(value, fresh)} decimals={2} onRefuse={() => { feel.failed(); setRefused((n) => n + 1); }} onChange={(v) => { feel.key(); setFresh(false); instant.current = false; setValue(v); }} /></div>}
           <div className={`tp-floor${side === "sell" ? " tp-floor--sell" : ""}`}>
+            {/* who gets the fee, right above the button (the copy review, 6 Nov): the exchange, the network's figure from the quote */}
+            {q && !quote.problem && <div className="zf-fee"><p className="zf-small" data-testid="trade-paid">{paidLine(q, CHAINS[coin.chain].name)}</p></div>}
             {gasComing && (
               <button className="zf-btn tr-press" disabled={queued === intent} onClick={(e) => press(e.currentTarget)}>{queued === intent ? "Selling as soon as the fee lands…" : label2}</button>
             )}
@@ -424,8 +426,6 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
             {short && shortBuyNow !== undefined && (
               <button className="zf-btn tr-press tp-go" onClick={() => { feel.key(); setFresh(true); instant.current = true; setValue(String(shortBuyNow)); }}>{`Buy $${shortBuyNow.toLocaleString("en-US")} instead`}</button>
             )}
-            {/* who gets the fee, under the button (product decision, 5 Nov: we are zero fee): the exchange, the network's figure from the quote */}
-            {q && !quote.problem && <p className="zf-small" data-testid="trade-paid">{paidLine(q, CHAINS[coin.chain].name)}</p>}
           </div>
         </>)}
       </div>

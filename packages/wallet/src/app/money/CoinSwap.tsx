@@ -112,10 +112,10 @@ export function CoinSwap({ bridge, tasks, pay, get, chain, payAddress, getAddres
       {!block && price.waiting && <p className="zf-small wl-sheet-lead" role="status" data-testid="swap-price-wait">{quoteWaitLine(price.waitedMs)}</p>}
       {!block && (price.late || price.said) && <p className="zf-small wl-sheet-lead" role="status" data-testid="swap-price-late">{price.late ? priceLate(null) : price.said} <button className="zf-link" onClick={price.again}>Try again</button></p>}
       {block && (block !== SWAP_WORDS.amount || tried) && <p className="zf-small wl-mv-why" role="status" data-testid="swap-why">{block}</p>}
+      {/* who gets the fee, right above the button (the copy review, 6 Nov): the exchange, and the network's figure from the quote */}
+      {!block && price.q && <div className="zf-fee"><p className="zf-small" data-testid="swap-paid">{paidLine(price.q)}</p></div>}
       <button type="button" className="zf-btn wl-sheet-go" data-testid="swap-go" disabled={block !== SWAP_WORDS.amount && (!!block || !price.q)}
         onClick={(e) => (block === SWAP_WORDS.amount ? setTried(true) : go(e.currentTarget))}>{SWAP_WORDS.title}</button>
-      {/* who gets the fee, under the button (product decision, 5 Nov: we are zero fee): the exchange, and the network's figure from the quote */}
-      {!block && price.q && <p className="zf-small wl-zerofee" data-testid="swap-paid">{paidLine(price.q)}</p>}
     </>
   );
 }

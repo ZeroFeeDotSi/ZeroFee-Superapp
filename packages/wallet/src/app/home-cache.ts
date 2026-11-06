@@ -10,6 +10,7 @@ import type { SpendingStatus, SpendingWallet } from "@zerofee/core/spending";
 import type { Balance, Chain, Movement, PrivatePocket, Token } from "../types.ts";
 import { earnParts, paintState, type EarnPart } from "./format.ts";
 import { tradingUsd, type HeldCoin } from "./trading.ts";
+import { nearOwnCoins, type NearOwnCoin } from "./near-coins.ts";
 import { withKept } from "./screens/home-view.ts";
 
 /** What Wallet reads of Earn's Position (@zerofee/earn/types.ts). */
@@ -158,6 +159,10 @@ export interface WalletView {
   heldFailed: boolean;
   trading: string | null;
   tradingPartial: boolean;
+  /** The NEAR wallet's own coins (near-coins.ts: bought in place or by Trade), null until its balance is read. */
+  nearOwn: NearOwnCoin[] | null;
+  /** One of them has no price: the figure leaves it out, and Home says so. */
+  tradingUncounted: boolean;
   settled: boolean;
   complete: boolean;
   /** The total as kept on this phone (shown at once while the parts are read). */
@@ -179,7 +184,8 @@ export function viewOf(f: FreshReads, cache: HomeSnapshot | null, kept: { at: nu
   const k = kept ?? cache?.spending ?? null;
   const { s: spending, stale } = withKept(live, k?.s ?? null);
   const earning = earnParts(positions ?? [], tokens?.get("nep141:wrap.near")?.priceUsd);
-  const parts = spending && spending.loaded && !spending.unread ? tradingUsd(spending, held, wallets) : null;
+  const nearOwn = m.nearCoins ? nearOwnCoins(m.nearCoins, (id) => tokens?.get(id)) : null;
+  const parts = spending && spending.loaded && !spending.unread ? tradingUsd(spending, held, wallets, nearOwn) : null;
   const tradingPartial = !parts || parts.partial;
   const { settled, complete } = paintState({ balances: balances !== null, tokens: tokens !== null, chains: chains !== null, positions: positions !== null, trading: m.tradingRead && (spending === null || !tradingPartial), pocket: pocket !== null });
   return {
@@ -187,7 +193,7 @@ export function viewOf(f: FreshReads, cache: HomeSnapshot | null, kept: { at: nu
     spendingAt: stale === "all" || stale.length ? k?.at ?? null : null,
     // money between the Safe and the wallets is counted once, by the engine: its totalUsd holds a move on its way (an Add
     // until the wallets have it, a move home until it lands: trade float-core.ts inFlight, addsOnWay), so it is never added here
-    held, nearCoins: m.nearCoins, wallets, heldFailed: f.heldFailed, trading: parts ? parts.usd : null, tradingPartial, settled, complete,
+    held, nearCoins: m.nearCoins, wallets, heldFailed: f.heldFailed, trading: parts ? parts.usd : null, tradingPartial, nearOwn, tradingUncounted: !!parts?.uncounted, settled, complete,
     lastTotal: cache?.total ?? null,
   };
 }

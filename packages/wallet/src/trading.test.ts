@@ -155,8 +155,8 @@ test("the job's states: held by the protection it waits (nothing moved); a no is
   await ok<Movement>(failed.ledger, "ledger.toTrading", { amount: "10" });
   const f = await ended;
   // a Top up's refund goes to Spending's cash (the Add quote's refundTo), never "your balance": its Spending row's words
-  assert.deepEqual([f.status, f.problem?.code, f.problem?.money], ["problem", "ledger.topup.failed", { state: "on-the-way", where: "with the swap service. It ends up in your NEAR wallet" }]);
-  assert.equal(f.problem?.more, `The swap service is still finishing it (its id: ${f.depositAddress}) · if not, the money comes back to your NEAR wallet`);
+  assert.deepEqual([f.status, f.problem?.code, f.problem?.money], ["problem", "ledger.topup.failed", { state: "on-the-way", where: "with NEAR Intents. It ends up in your NEAR wallet" }]);
+  assert.equal(f.problem?.more, `NEAR Intents is still finishing it (its id: ${f.depositAddress}) · if not, the money comes back to your NEAR wallet`);
   assert.ok(f.depositAddress, "control: the id it names is the Top up's own deposit address");
   assert.doesNotMatch(`${f.problem?.whatHappened} ${f.problem?.more}`, /your Safe|conversion/, "never Convert's words");
 });

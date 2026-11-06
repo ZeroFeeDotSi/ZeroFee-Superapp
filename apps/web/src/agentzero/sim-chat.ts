@@ -38,21 +38,26 @@ export const SIM_ANSWERS: Readonly<Record<(typeof SIM_STARTERS)[number], readonl
 /** QA (5 Nov): the questions people type most in the Sim, each with its sample answer (the copywriter's). */
 /** hunt 5 Nov (005): each answer is true for any ask it matches. A send names only the dollar amount the person said
  *  ({amount}; none said, none named), a buy names no coin or amount ("buy 1000000 BONK with everything" got "$2 of the
- *  top coin"), the cost answer is only about AgentZero's own answers (never "how much does it cost to send $1000?"), and
+ *  top coin"), the cost answer is only about AgentZero's own answers (never "how much does it cost to send $1000?", "how much did I
+ *  spend?" or "what does bitcoin cost?"), and
  *  the balance answer hears its common phrasings ("What is my balance?", "How much money do I have?"). */
 export const SIM_TYPED: readonly { key: string; test: RegExp; lines: readonly string[] }[] = [
   { key: "buy", test: /^(please )?buy\b/, lines: ["I'd open Trade for you.", "You pick the coin and how much, then tap Buy.", "Nothing was bought. To try it here, open Trade."] },
-  // UX hunt 5 Nov (G9, 076): "Pay $5 to coffee.near for my coffee" got the one line, a dead end; the way on is the pay list
-  { key: "pay", test: /^(please )?pay\b/, lines: ["I can pay people on your pay list.", "I pay only when you tap Pay.", "Nothing was paid. Make your list in the menu, under Jobs and limits."] },
+  // UX hunt 5 Nov (G9, 076): "Pay $5 to coffee.near for my coffee" got the one line, a dead end; the way on is Send (no pay
+  // list while AgentZero can't pay anyone: jobs.ts payListRuns)
+  { key: "pay", test: /^(please )?pay\b/, lines: ["I can't pay people yet.", "You can pay them yourself with Send.", "Nothing was paid. To try it here, go to Home and tap Send."] },
+  { key: "sell", test: /^(please )?sell\b/, lines: ["I'd open Trade for you.", "You pick the coin and how much, then tap Sell.", "Nothing was sold. To try it here, open Trade."] },
+  { key: "move", test: /^(please )?move\b/, lines: ["I'd open Move for you.", "You check how much and where it goes, then tap Approve.", "Nothing moved. To try it here, go to Home and tap Move."] },
+  { key: "swap", test: /^(please )?swap\b/, lines: ["I'd open Swap for you.", "You pick the coins and how much, then tap Approve.", "Nothing was swapped. To try it here, go to Home and tap Swap."] },
   { key: "send", test: /^(please )?send\b/, lines: ["I'd open Send for you{amount}.", "You check who gets it and how much, then tap Approve.", "Nothing was sent. To try it here, go to Home and tap Send."] },
-  { key: "cost", test: /^(?!.*\b(send|sending|sent|buy|buying|sell|selling|swap|swapping|move|moving|trade|trading|pay|paying)\b).*\b(cost|costs|how much (did|does|was))\b/, lines: ["Here in the Sim, my answers cost nothing.", "On the iPhone app, each answer costs a little.", "I pay it from my own wallet, at Claude's price."] },
+  { key: "cost", test: /^(?!.*\b(send|sending|sent|buy|buying|sell|selling|swap|swapping|move|moving|trade|trading|pay|paying)\b).*(\b(you|your|it|this|that|agentzero|agentzero's|answers?|replies|reply|asking|chat|chatting)\b.*\b(cost|costs)\b|\b(cost|costs)\b.*\b(you|agentzero|an answer|each answer|to ask|to chat|to use)\b)/, lines: ["Here in the Sim, my answers cost nothing.", "On the iPhone app, each answer costs a little.", "I pay it from my own wallet, at Claude's price."] },
   { key: "money", test: /^(show|what's|whats|what is|how much is|tell me) (me )?(all )?(of )?my (money|balance|wallets?|total)$|^my (money|balance)$|^how much (money )?(do i have|have i got)$/, lines: ["You have {total} in all.", "Go to Home to see what is in your Safe, your wallets and Private."] },
 ];
 /** The dollar amount a send names ("send $50000 to ..." gives ", filled in with $50,000"), or nothing. */
 export function sendAmount(words: string): string {
   const m = /^(?:please )?send\s+\$\s?(\d[\d,]*(?:\.\d{1,2})?)\b/i.exec(words.trim());
   const n = m ? Number(m[1]!.replace(/,/g, "")) : NaN;
-  return Number.isFinite(n) && n > 0 ? `, filled in with $${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "";
+  return Number.isFinite(n) && n > 0 ? `, filled in with $${n.toLocaleString("en-US", Number.isInteger(n) ? {} : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
 }
 const plain = (w: string) => w.trim().toLowerCase().replace(/[\s?.!]+$/g, "").replace(/\s+/g, " ").replace(/[’‘]/g, "'");
 /** The suggestion these words are (as tapped, or typed the same), or null. */

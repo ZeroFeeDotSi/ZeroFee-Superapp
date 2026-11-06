@@ -177,7 +177,7 @@ test("a page that ended says Done where its last link would be, never 'Not finis
   assert.equal(spendingPage(s as never).done, true);
   assert.equal(spendingPage({ ...s, status: "on-its-way" } as never).done, undefined, "control");
   const detail = (await import("node:fs")).readFileSync(new URL("./screens/ActivityDetail.tsx", import.meta.url), "utf8");
-  assert.match(detail, /\{page\.done \? W\.doneNoLink : W\.notYet\}/);
+  assert.match(detail, /\(page\.done \? W\.doneNoLink : W\.notYet\)/);
   assert.equal(PROOF_WORDS.doneNoLink, "Done.");
 });
 

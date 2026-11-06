@@ -47,7 +47,7 @@ test("finding 13: without pocket money the cannot sheet lists and says only the 
   // S4 (540847cc re-test, k-agentzero): "what did I spend today?" got "AgentZero does one job: sign you in.", which
   // answers nothing; it now says plainly what AgentZero can't and can do on this account
   assert.equal(jobsLine(false, false), "AgentZero can't do jobs on this account yet. It can sign you in to sites.");
-  assert.equal(jobsLine(true, false), "AgentZero does three jobs: copy a wallet, pay your list and sign you in.", "control: sample money lists every job it offers (Keep only where its route works)");
+  assert.equal(jobsLine(true, false), "AgentZero does two jobs: copy a wallet, and sign you in.", "control: sample money lists every job it offers (Keep and the pay list only where their routes work)");
   assert.deepEqual(offeredJobs(false), ["copy", "sign-in"], "control: pocket money on");
   assert.match(src, /offeredJobs\(agent\?\.sample === true, !noPocket\)\.map/);
   assert.match(src, /jobsLine\(agent\?\.sample === true, !noPocket\)/);

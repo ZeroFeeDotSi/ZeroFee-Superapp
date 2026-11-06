@@ -13,7 +13,7 @@ export function shortId(id: string): string {
 /** The fee before the tap (QA, 5 Nov): the core's outside sheet's own words (subwallets.ts OUTSIDE_WORDS, a
  *  test holds them equal), spelled here so Send's chunk doesn't load the core. Over SEND_FEE_WARN the plain warning. */
 export const SEND_FEE = {
-  fees: (usd: string) => `Network fees · about $${usd}`,
+  fees: (usd: string) => `Fees · about $${usd}`,
   high: (pct: string) => `${pct}% goes to fees. On a bigger send, fees are a smaller part.`,
 } as const;
 export const SEND_FEE_WARN = 0.05;

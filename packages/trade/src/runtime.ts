@@ -37,10 +37,11 @@ export const CHAIN_NAME: Record<ChainId, string> = { sol: "Solana", bsc: "BNB Ch
  *  coins trade inside Spending's private balance rather than from a wallet of their own. */
 export const LISTED: ChainId[] = [...OFFERED, "near"];
 /** The chains whose coins Trade's market buys and sells: the trading chains. Not NEAR (gates grade, 5 Nov: the old
- *  NEAR_TRADES flag, a dead "open soon" for a Rhea route never built, is gone): a NEAR coin the Safe holds trades on
- *  the Safe's own coin page with NEAR Intents, once that ships (shell-api release.ts NATIVE_COINS). Its page here still shows its chart and
- *  facts, and says plainly that Trade doesn't buy or sell it (NEAR_NOT_TRADED). The one switch: a chain is in MARKET or
- *  it isn't (the Sim-only site may add "near" here, on its sample NEAR wallet). */
+ *  NEAR flag, a dead "open soon", is gone). A NEAR coin has one switch, NATIVE_COINS (shell-api release.ts): on, its page
+ *  is the Safe's own, trading with NEAR Intents (app/requests.ts nearCoinNative); off, its page here shows its chart and
+ *  facts, and says plainly that Trade doesn't buy or sell it (NEAR_NOT_TRADED). Rhea trades from the NEAR coin wallet
+ *  (near/route.ts, built) are a different path: they wait for their real-money proof, behind this list and the core's own
+ *  NEAR_GATE (near-gate.ts). */
 export const MARKET: ChainId[] = LISTED.filter((c) => c !== "near");
 /** A coin page on a chain not in MARKET, in place of Buy, and AgentZero's refusal for one (the Copywriter, 5 Nov). */
 export const NEAR_NOT_TRADED = "Trade doesn't buy or sell NEAR coins.";

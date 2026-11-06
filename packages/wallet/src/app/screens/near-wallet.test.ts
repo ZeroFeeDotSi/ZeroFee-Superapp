@@ -14,7 +14,11 @@ test("finding 43: no Add where Add can't fill; the NEAR wallet's row says what i
   assert.match(acts, /!wallet \|\| wallet === "safe" \|\| ADD_OPEN\[wallet\] \? \[\{ word: "Add"/, "Add only on the Safe and an open wallet");
   assert.doesNotMatch(acts, /^\s*\{ word: "Add"/m, "control: never an unconditional Add");
   assert.match(home, /nearLine: "Cash",/);
-  assert.match(home, /r\.chain === "near" \? \(nearCoin \? `\$\{coins\(nearCoin\.amount, 4\)\} NEAR` : HOME_WORDS\.nearLine\)/, "the NEAR row's line");
+  assert.match(home, /r\.chain === "near" \? \(cashOf \? `\$\{HOME_WORDS\.nearLine\} \$\{\$\(cashOf\.usd\)\}` : HOME_WORDS\.nearLine\)/, "the NEAR row's line");
+  // swap-in-place re-crawl (5 Nov): with a coin bought in it, the line is its cash's own figure, never the row's total;
+  // hidden amounts hide it (control: no bought coin, no "Cash" sub-row, the line is "Cash" alone)
+  assert.match(home, /const cashOf = r\.chain === "near" && !hide \? r\.coins\.find\(\(c\) => c\.symbol === "Cash"\) \?\? \(r\.coins\.length \? \{ usd: "0\.00" \} : undefined\) : undefined;/, "all its cash spent, a coin held: \"Cash $0.00\", never \"Cash\" beside the coins' total");
+  assert.match(home, /const subs = mine\.length \|\| inNear\.length \? \[\.\.\.\(Number\(cash\) >= 0\.01 \? \[\{ key: "near:cash", symbol: "Cash"/, "the Cash sub-row exists only beside bought coins");
   assert.match(home, /if \(web\) a\.onAdd\(c\); else a\.onMove\("safe", c\);/, "the phone's Add beside a wallet is Move, set to it");
 });
 

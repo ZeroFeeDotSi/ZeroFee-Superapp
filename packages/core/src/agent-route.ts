@@ -2,8 +2,8 @@
 // quote the core makes itself, funded by an mt_transfer inside NEAR Intents ("route A"). Route A hasn't been proven on
 // mainnet (tools/wallet/PROOF.md step 2). Until the test dust run prints "RESULT: route A WORKS." this stays false and
 // AgentZero pays nobody: it says so. Its own module so screens can read it without the core's chain code.
-// Flips together with KEEP_FROM_AGENT_OPEN (packages/agent zero/keep-read.ts): this flag alone offers the Keep job
-// (jobs.ts jobOffered), that one lets its top-up run (QA, 5 Nov; pinned in agent app/az-hunt.test.ts).
+// The Keep job needs this and KEEP_FROM_AGENT_OPEN (packages/agent zero/keep-read.ts keepRuns): this flag alone doesn't
+// offer it (jobs.ts jobOffered reads keepRuns).
 export const AGENT_PRIVATE_ROUTE = false;
 export const AGENT_PRIVATE_OFF = "AgentZero can't pay this privately yet. Nothing was sent.";
 export const AGENT_TOP_UP_OFF = "AgentZero can't fill your SOL wallet privately yet. Nothing moved.";

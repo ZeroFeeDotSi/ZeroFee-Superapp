@@ -37,6 +37,10 @@ export const SWAP_QUOTE_TTL_MS = 30_000;
  *  follow (every 10 s, until it ends). The NEAR wallet's: its move every 250 ms for 10 minutes, then every 10 s. */
 export const SAFE_WATCH_MS = 400, SAFE_WATCH_FOR_MS = 10 * 60_000;
 export const PRIVATE_WATCH_MS = 250, SLOW_WATCH_MS = 10_000;
+/** The core's answer for a move it doesn't hold (security-problems.ts floatMoveUnknown). */
+const MOVE_UNKNOWN = "security.float.unknown-move";
+/** How long the core keeps a move (float-moves.ts KEEP_MS). A job starts no later than its move, so a real let-go is always this old. */
+const MOVE_KEPT_MS = 7 * 86_400_000;
 
 export type SwapSource = "safe" | "private";
 export interface SwapJob extends Movement { source: SwapSource }
@@ -202,26 +206,41 @@ export function createIntentsSwap(d: IntentsSwapDeps) {
     d.follow(job, dep);
   }
 
-  /** The NEAR wallet's swap ends on its move's own end (the core's read of 1Click's status): every 250 ms for 10 minutes,
-   *  then every 10 s until it ends (B3: never "moving" forever). */
+  /** The NEAR wallet's swaps a reader follows now: Activity resumes a moving job on its every read, and one job has one reader. */
+  const following = new Set<string>();
+  /** The NEAR wallet's swap ends on its move's own end (the core's read of 1Click's status): every 250 ms for its first
+   *  10 minutes, then every 10 s until it ends (B3: never "moving" forever). A move the core has let go (a week old) ends
+   *  here, in words that say neither safe nor lost. */
   async function watchPrivate(job: SwapJob, moveId: string, caller: Caller, tapMs: number, decimals?: number) {
-    const t0 = d.now();
-    for (;;) {
-      await sleep(d.now() - t0 < SAFE_WATCH_FOR_MS ? PRIVATE_WATCH_MS : SLOW_WATCH_MS);
-      const r = await d.bridgeFor(caller).call<{ status: string; settled?: { amountOut?: string } }>("subwallet.float.move", { id: moveId }).catch(() => null);
-      if (!r || !("ok" in r) || r.ok.status === "pending") continue;
-      const status: Movement["status"] = r.ok.status === "done" ? "done" : r.ok.status === "refunded" ? "refunded" : "problem";
-      // what arrived: 1Click's settled figure as the core read it, never the quote
-      const out = r.ok.settled?.amountOut;
-      const got = out && /^\d{1,40}$/.test(out) && decimals !== undefined ? { amountOut: fromUnits(out, decimals) } : {};
-      const end = status === "done" ? { settledMs: Date.now() - tapMs, ...got } : status === "problem" ? { problem: walletProblems.convertFailed() } : {};
-      await d.remember({ ...job, status, updatedAtIso: d.iso(), ...end });
-      return;
-    }
+    if (following.has(job.id)) return;
+    following.add(job.id);
+    const t0 = Date.parse(job.startedAtIso);
+    let unread = false;
+    try {
+      for (;;) {
+        await sleep(!unread && d.now() - t0 < SAFE_WATCH_FOR_MS ? PRIVATE_WATCH_MS : SLOW_WATCH_MS);
+        const r = await d.bridgeFor(caller).call<{ status: string; settled?: { amountOut?: string } }>("subwallet.float.move", { id: moveId }).catch(() => null);
+        if (r && "problem" in r && r.problem.code === MOVE_UNKNOWN) {
+          // a week old: the core let it go, and no later read can answer. Younger: a missing or unreadable record reads the
+          // same, and the move may still be live, so this job keeps reading (resume only takes moving jobs: an end is for good)
+          if (d.now() - t0 >= MOVE_KEPT_MS) return void (await d.remember({ ...job, status: "problem", updatedAtIso: d.iso(), problem: walletProblems.nearSwapUnread() }));
+          unread = true;
+          continue;
+        }
+        if (!r || !("ok" in r) || r.ok.status === "pending") continue;
+        const status: Movement["status"] = r.ok.status === "done" ? "done" : r.ok.status === "refunded" ? "refunded" : "problem";
+        // what arrived: 1Click's settled figure as the core read it, never the quote
+        const out = r.ok.settled?.amountOut;
+        const got = out && /^\d{1,40}$/.test(out) && decimals !== undefined ? { amountOut: fromUnits(out, decimals) } : {};
+        const end = status === "done" ? { settledMs: Date.now() - tapMs, ...got } : status === "problem" ? { problem: walletProblems.nearSwapFailed() } : {};
+        await d.remember({ ...job, status, updatedAtIso: d.iso(), ...end });
+        return;
+      }
+    } finally { following.delete(job.id); }
   }
 
-  /** A reload (B3): a NEAR wallet swap still moving is followed again by its move id, at the slow pace. A Safe swap is
-   *  followed by the ledger from its deposit address (resumeQuotes). */
+  /** A reload (B3): a NEAR wallet swap still moving is followed again by its move id, at the pace of its age. A Safe swap
+   *  is followed by the ledger from its deposit address (resumeQuotes). */
   async function resume(job: Movement) {
     if (job.kind !== "swap" || job.status !== "moving" || job.source !== "private" || !job.id.startsWith("swap:") || !job.caller) return;
     const to = job.to ? await d.coin(job.to) : null;

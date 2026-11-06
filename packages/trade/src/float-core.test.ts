@@ -676,7 +676,7 @@ test("a Top up that ends other than done says where its money is, never a bare f
   assert.deepEqual([row(a.id).status, row(a.id).where], ["refunded", "reserve"], "1Click's refund is in Trading's cash (the Add quote's refund address), not the Safe");
   assert.match(row(a.id).note!, /sent it back to your NEAR wallet/);
   assert.deepEqual([row(b.id).status, row(b.id).where], ["failed", "in-flight"]);
-  assert.match(row(b.id).note!, new RegExp(`The swap service is still finishing it \\(its id: ${"2".repeat(64)}\\)`), "still with the swap service: said with its id");
+  assert.match(row(b.id).note!, new RegExp(`NEAR Intents is still finishing it \\(its id: ${"2".repeat(64)}\\)`), "still with the swap service: said with its id");
   assert.deepEqual([row(c.id).status, row(c.id).stayed, row(c.id).note], ["failed", true, "It didn't go through, so the money never left your Safe"]);
   assert.deepEqual([row(e.id).status, row(e.id).stayed], ["failed", true]);
   assert.match(row(e.id).note!, /stayed in your Safe/);

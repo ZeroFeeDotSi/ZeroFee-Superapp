@@ -446,9 +446,11 @@ export class FloatMoves {
       const v = JSON.parse(new TextDecoder().decode(raw));
       // Before float.balance the record was the list of moves alone.
       if (Array.isArray(v)) return { base: {}, kept: v };
-      return { base: v?.base && typeof v.base === "object" ? v.base : {}, kept: Array.isArray(v?.kept) ? v.kept : [], ...(typeof v?.checkedAtMs === "number" ? { checkedAtMs: v.checkedAtMs } : {}) };
+      if (!Array.isArray(v?.kept)) throw new Error("no moves in it");
+      return { base: v?.base && typeof v.base === "object" ? v.base : {}, kept: v.kept, ...(typeof v?.checkedAtMs === "number" ? { checkedAtMs: v.checkedAtMs } : {}) };
     } catch {
-      return { base: {}, kept: [] };
+      // never an empty book: "no such move" would read as "Nothing moved", and the next write would wipe the record
+      throw refused("ZeroFee can't read your NEAR wallet's record. Nothing moved.");
     }
   }
 
@@ -1292,7 +1294,7 @@ export class FloatMoves {
     const usd = side === "buy" ? Number(units) / 1e6 : (Number(units) / 10 ** px.decimals) * px.usd;
     // what Spending holds of what it pays with, by the core's own count: never a quote for money that isn't there
     const held = await this.counted(from);
-    // a sale of ALL of a coin Spending holds goes at any size (its sheet says most of it goes on fees), so a coin is never
+    // a sale of ALL of a coin Spending holds goes at any size (AgentZero's sheet says most of it goes on fees; Home's and Trade's show the quote's fee), so a coin is never
     // stuck under the floor; a buy or a part of a coin under it is refused, named
     const wholeSale = side === "sell" && units === held;
     if (usd < SWAP_MIN_USD && !wholeSale) throw new ProblemError(securityProblems.requestNotAllowed(`A trade under $${SWAP_MIN_USD} would mostly go on fees.`));
@@ -1304,7 +1306,7 @@ export class FloatMoves {
     if (!Number.isFinite(scaled)) throw new ProblemError(securityProblems.partnerUnreachable("NEAR Intents"));
     const floor = side === "buy" ? BigInt(scaled) * 10n ** BigInt(Math.max(0, px.decimals - 15)) : BigInt(scaled);
     // at least 1 unit back: a quote paying 0 is refused even where the fair floor rounds to nothing (Low 1). Below about
-    // $0.11 that is all the floor guards; the sale's own sheet (sheetOnly, 'Most of this goes on fees.') is the protection.
+    // $0.11 that is all the floor guards; AgentZero's sheet (sheetOnly, 'Most of this goes on fees.') or the quote's fee on Home's and Trade's own sheet is the protection.
     const least = [BigInt(atLeast), floor, 1n].reduce((a, b) => (a > b ? a : b));
     const at = new Date(this.now()).toISOString();
     const k: Kept = {
@@ -1326,6 +1328,10 @@ export class FloatMoves {
       if (typeof depositAddress !== "string" || !/^[0-9a-f]{64}$/.test(depositAddress)) throw refused("NEAR Intents gave no address to pay. Nothing moved.");
       k.depositAddress = depositAddress;
       if (typeof raw?.zerofeeStatusTag === "string" && /^[A-Za-z0-9_-]{16,128}$/.test(raw.zerofeeStatusTag)) k.tag = raw.zerofeeStatusTag;
+      // KEEP BEFORE SIGN (QA, 5 Nov): the move is kept, pending, with its deposit address, BEFORE the signed
+      // quote is read, the yes is asked or anything is signed. A page that goes from here on (a reload, a crash) leaves
+      // a move the app finds again by its key (Home's resumeInplace, Trade's journal) and follows by its address, so a
+      // swap that may have been signed is never shown as failed or as nothing. Held by float-swap.test.ts "keep before sign".
       await this.keep(k);
       // the transfer to approve and the quote as 1Click signed it, read together (never the app's word, nor the answer above)
       const [gen, signedQuote] = await Promise.all([relay.generateIntent(float.address, depositAddress), relay.status(depositAddress, k.tag)]);

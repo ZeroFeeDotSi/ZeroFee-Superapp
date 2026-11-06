@@ -7,7 +7,7 @@ import { safeSends } from "@zerofee/core/spending";
 import { readFileSync } from "node:fs";
 import { addOnWayLine } from "./adds-on-way.ts";
 import { HOME_LEG_MIN_USD, PAIR_MIN_USD } from "@zerofee/core/float-floors";
-import { fairLine, feeHigh, floorOf, ROW_USDC, SWAP_COIN, SWAP_PLACES, SWAP_WORDS, arrives, arrivesLine, arrivesWith, feesLine, leastFair, coinFigure, coinName, privateLine, getsFor, mostOn, payFor, paysHere, routeOf, routeSec, swapBlock, type SwapPlace, swapStays as grid } from "./swap-corridor.ts";
+import { fairLine, feeHigh, floorOf, ROW_USDC, SWAP_COIN, SWAP_PLACES, SWAP_WORDS, arrives, arrivesLine, arrivesWith, feesLine, paidLine, leastFair, coinFigure, coinName, privateLine, getsFor, swapFloor, mostOn, payFor, paysHere, routeOf, routeSec, swapBlock, type SwapPlace, swapStays as grid } from "./swap-corridor.ts";
 import { LEG_SEC } from "@zerofee/shell-api/job-steps.ts";
 import { MOVE_WORDS } from "../screens/move-split.ts";
 
@@ -153,7 +153,7 @@ test("Home's one line for an Add on its way: dollars and coin from 1Click's sign
 
 test("UI's AgentZero walk (5): Swap's Hold to swap says the least before the Approve for a leg that would stop on the way (control: at the least it can go)", () => {
   const most = 100;
-  assert.equal(swapBlock({ route: { kind: "topup", coin: "USDC", to: "sol" }, usd: 2, most }), "Swap at least $2.09 from your Safe.");
+  assert.equal(swapBlock({ route: { kind: "topup", coin: "USDC", to: "sol" }, usd: 2, most }), "Swaps start at $2.09.");
   assert.equal(swapBlock({ route: { kind: "topup", coin: "USDC", to: "sol" }, usd: 2.09, most }), null, "control: at the least");
   assert.equal(swapBlock({ route: { kind: "topup", coin: "USDC", to: "near" }, usd: 2, most }), null, "the NEAR wallet: nothing moves on");
   assert.equal(swapBlock({ route: { kind: "home", from: "sol" }, usd: 2.5, most }), "From a wallet to your Safe, swaps start at $2.59.");
@@ -175,10 +175,9 @@ test("UI's mainnet rehearsal (10): what a $2 SOL → USDC swap really brings com
   assert.equal(arrivesWith(home, "safe-usdc", 2, 1, { arrivesUsd: 1.98, feeUsd: 0.02 }), "About 1.98 USDC arrives, at least 1.4. About 1 min.");
   assert.equal(arrivesWith(home, "safe-usdc", 2, 1, null), "At least 1.4 USDC arrives. About 1 min.", "control: no price back yet");
   // QA (5 Nov): the real figure before the tap; product decision, 5 Nov: never scary, who gets it, ZeroFee takes nothing
-  assert.equal(feesLine(2, { arrivesUsd: 1.45, feeUsd: 0.55 }), "About $0.55 of your $2 goes to NEAR Intents and the network. ZeroFee takes nothing.");
+  assert.equal(feesLine({ arrivesUsd: 1.45, feeUsd: 0.55 }), "Fees · about $0.55");
   assert.ok(feeHigh(2, { arrivesUsd: 1.45, feeUsd: 0.55 }) && !feeHigh(20, { arrivesUsd: 19.45, feeUsd: 0.55 }), "control: under 5 % is not over");
-  assert.equal(feesLine(20, { arrivesUsd: 19.45, feeUsd: 0.55 }), "About $0.55 of your $20 goes to NEAR Intents and the network. ZeroFee takes nothing.");
-  // fees = $0.54 fixed + 0.42 %: under 5 % from $12
+    // fees = $0.54 fixed + 0.42 %: under 5 % from $12
   assert.equal(leastFair(2, 0.55, { usd: 50, feeUsd: 0.75 }), 12);
   assert.equal(fairLine(2, { arrivesUsd: 1.45, feeUsd: 0.55 }, { usd: 50, feeUsd: 0.75 }), "Swap $12 or more and the fee drops under 5%.");
   assert.equal(fairLine(20, { arrivesUsd: 19.45, feeUsd: 0.55 }, { usd: 50, feeUsd: 0.75 }), null, "control: under 5 %, nothing more said");
@@ -224,20 +223,25 @@ test("R3 (the design review §4.4): Swap's pickers say the coin over where it si
   const sheet = readFileSync(new URL("./SwapSheet.tsx", import.meta.url), "utf8");
   assert.match(sheet, /<span className="zf-body wl-sw-name">\{SWAP_COIN\[pay\.place\]\.label\}<span className="zf-small wl-sw-where">\{SWAP_COIN\[pay\.place\]\.where\}<\/span><\/span>/);
   assert.doesNotMatch(sheet, /wl-sw-where"> · \{SWAP_COIN\[(pay\.place|get)\]|aria-hidden="true">▾</, "control: the wrapped phrase and the ▾ glyph (the list's one-line rows keep theirs)");
-  assert.match(sheet, /<p className="zf-small wl-sw-arrives" data-testid="swap-arrives">\{route && !block \? arrivesWith\(/, "always rendered, so nothing jumps");
-  assert.match(sheet, /\{who && <p className="zf-small wl-mv-foot" data-testid="swap-private">\{privateLine\(route\)\}<\/p>\}/);
+  assert.match(sheet, /<div className="wl-swap2__sub" data-testid="swap-sub">/, "the one slot, always rendered, so nothing jumps");
+  assert.match(sheet, /arrives: route && !block \? arrivesWith\(/);
+  assert.match(sheet, /\{who && <MoneySheet title=\{MOVE_WORDS\.who\} onClose=\{\(\) => setWho\(false\)\}><p className="zf-body wl-sheet-lead" data-testid="swap-private">\{privateLine\(route\)\}<\/p><\/MoneySheet>\}/);
   assert.doesNotMatch(sheet, /\{privateLine\(route\) && <p className="zf-small wl-sheet-lead">/, "control: the grey paragraph");
   // never a standing line; only once a press at $0 asked (a UI test, 4 Nov: $0 did nothing and said nothing)
-  assert.match(sheet, /\{block && block !== floor\.under && \(block !== SWAP_WORDS\.amount \|\| tried\) && <p className="zf-small wl-mv-why"/);
+  assert.equal(swapFloor({ again: null, block: SWAP_WORDS.amount, tried: false, said: false, priceDown: false }).line, "stays");
+  assert.equal(swapFloor({ again: null, block: SWAP_WORDS.amount, tried: true, said: false, priceDown: false }).line, "why");
   const css = readFileSync(new URL("./move-swap.css", import.meta.url), "utf8");
-  assert.match(css, /\.wl-sw-arrives \{ min-height: 40px;/);
+  assert.match(css, /\.wl-swap2__sub \{ min-height: 18px;/);
   assert.match(css, /\.wl-swap-chips \.zf-chip\.wl-swap-all \{ height: 32px; padding: 0 12px; font: 600 15px\/20px var\(--font\); \}/, "Max is the same chip as the others");
 });
 
 test("finding 48: Swap says the fee whenever priced; what it can't pay with is simply not listed (drop, don't degrade)", () => {
-  assert.equal(feesLine(3, { arrivesUsd: 2.87, feeUsd: 0.13 }), "About $0.13 of your $3 goes to NEAR Intents and the network. ZeroFee takes nothing.");
-  assert.equal(feesLine(3, { arrivesUsd: 3, feeUsd: 0 }), "Under a cent goes to NEAR Intents and the network. ZeroFee takes nothing.");
-  assert.equal(feesLine(3, null), "Any fee goes to NEAR Intents and the network. ZeroFee takes nothing.", "control: no price yet, no figure said");
+  // the copy review's fee line: the figure, and under the button who keeps it, one zero-fee line
+  assert.equal(feesLine({ arrivesUsd: 2.87, feeUsd: 0.13 }), "Fees · about $0.13");
+  assert.equal(paidLine({ arrivesUsd: 2.87, feeUsd: 0.13 }), "NEAR Intents and the network keep this. ZeroFee takes nothing.");
+  assert.equal(feesLine({ arrivesUsd: 3, feeUsd: 0 }), "Fees · under a cent");
+  assert.equal(feesLine(null), null, "control: no price yet, no figure said");
+  assert.equal(paidLine(null), "Any fee goes to NEAR Intents and the network. ZeroFee takes nothing.", "control: no price yet, who is paid alone, never 'this'");
   // drop, don't degrade (QA's Sim walk, 5 Nov): what Swap can't pay with is not listed, never apologised for
   const sheet = readFileSync(new URL("./SwapSheet.tsx", import.meta.url), "utf8");
   const corridor = readFileSync(new URL("./swap-corridor.ts", import.meta.url), "utf8");
@@ -249,20 +253,20 @@ test("finding 48: Swap says the fee whenever priced; what it can't pay with is s
   // the copy review's ruling (5 Nov): an empty From list, one line
   assert.equal(SWAP_WORDS.nothing, "Nothing in your Safe can be swapped yet.");
   assert.match(sheet, /\{balances === null \? "Reading your money…" : SWAP_WORDS\.nothing\}<\/p>\n\s*<button className="zf-btn zf-btn--quiet wl-sheet-go" onClick=\{onClose\}>Close<\/button>/, "control: the empty sheet says that one line, then Close");
-  assert.match(sheet, /data-testid="swap-go"[\s\S]{0,600}\{route && !block && <p className="zf-small wl-zerofee" data-testid="swap-fees">\{price\.fees\}<\/p>\}/, "who gets the fee, under the button, whenever a route is picked");
+  assert.match(sheet, /\{route && \(\n\s*<div className="zf-fee">\n[^\n]*data-testid="swap-fee"[^\n]*\n\s*<p className="zf-small" data-testid="swap-paid">\{price\.paid\}<\/p>\n\s*<\/div>\n\s*\)\}[\s\S]{0,400}data-testid="swap-go"/, "the figure and who gets the fee, right above the button, whenever a route is picked");
 });
 
 test("QA (5 Nov): each route's floor said once, plainly; no chip or Max under it; fees over 5 % said plainly before the tap", () => {
-  assert.equal(floorOf({ kind: "home", from: "sol" }).line, SWAP_WORDS.leastToSafe);
-  assert.deepEqual(floorOf({ kind: "move", from: "sol", to: "hood" }), { usd: PAIR_MIN_USD, line: SWAP_WORDS.leastPair, under: SWAP_WORDS.leastPair });
+  assert.equal(floorOf({ kind: "home", from: "sol" }).under, SWAP_WORDS.leastToSafe);
+  assert.deepEqual(floorOf({ kind: "move", from: "sol", to: "hood" }), { usd: PAIR_MIN_USD, under: SWAP_WORDS.leastPair });
   assert.equal(floorOf({ kind: "home", from: "sol" }).usd, HOME_LEG_MIN_USD);
-  assert.deepEqual(floorOf({ kind: "home", from: "near" }), { usd: 2, line: SWAP_WORDS.least, under: SWAP_WORDS.least }, "control: the NEAR wallet's floor is Swap's own");
+  assert.deepEqual(floorOf({ kind: "home", from: "near" }), { usd: 2, under: SWAP_WORDS.least }, "control: the NEAR wallet's floor is Swap's own");
   const sheet = readFileSync(new URL("./SwapSheet.tsx", import.meta.url), "utf8");
-  assert.equal(sheet.match(/data-testid="swap-floor"/g)?.length, 1, "said once");
+  assert.doesNotMatch(sheet, /data-testid="swap-floor"/, "the UI reviewer's ruling: no standing floor line; the refusal says it under the least");
   assert.match(sheet, /disabled=\{Number\(d\) > most \|\| Number\(d\) < floor\.usd\}/);
   assert.match(sheet, /disabled=\{most < floor\.usd\}/, "Max under the floor is never offered");
-  assert.match(sheet, /data-testid="swap-floor">\{floorSay\(route, amount, !block \? price\.cost\?\.feeUsd \?\? null : null\)\}/, "the copy review's ruling: the floor's one line carries the quote's own fee, never a fee-size line; was: the size where it falls under, plainly, in the floor's one line (product decision, 5 Nov: never scary; S9)");
+  assert.match(sheet, /data-testid="swap-fee">\{price\.figure\}/, "the copy review's fee line: the quote's own figure, over the button");
   assert.doesNotMatch(sheet, /data-testid="swap-fair"/, "never a second figure beside the floor (S9)");
-  assert.doesNotMatch(sheet, /role: "alert" \} : \{\}\)\} data-testid="swap-fees"/, "control: the fee line is no alarm");
+  assert.doesNotMatch(sheet, /role: "alert" \} : \{\}\)\} data-testid="swap-fee"/, "control: the fee line is no alarm");
   assert.doesNotMatch(sheet, /HoldGo|onPointerDown/, "the tap IS the swap");
 });

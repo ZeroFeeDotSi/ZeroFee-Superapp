@@ -127,13 +127,18 @@ export const awayUsd = (s: SpendingStatus): number => Math.round((allAwayUsd(s) 
  * (subwallet.coins), so nothing is counted twice. `partial`: a part not read yet, or read and unreadable: the screens say
  * "Updating…", never $0 (review M2).
  */
-export function tradingUsd(s: SpendingStatus, held: HeldCoin[] | null, wallets: SpendingWallet[] | null): { usd: string; partial: boolean } {
+/**
+ * `own`: the NEAR wallet's own coins as its balance holds them (near-coins.ts nearOwnCoins: a coin bought in place, or by
+ * Trade): when read, they are the NEAR coins counted (Trade's positions name only what Trade bought, so a coin bought in
+ * place was in neither figure: bug hunt, 4 Nov). `uncounted`: one of them has no price and is left out.
+ */
+export function tradingUsd(s: SpendingStatus, held: HeldCoin[] | null, wallets: SpendingWallet[] | null, own: readonly { usd: string | null }[] | null = null): { usd: string; partial: boolean; uncounted?: true } {
   // each chain's own coin (a closed one's, BNB's, only while it holds money, as its row: Home.tsx homeRows), and the coins
   // held where a row shows them (NEAR, SOL, ETH (RH) always; BNB with its row); a closed chain's coins the engine counts
   // and Trade lists none of are never left off (review L6)
   const listed = s.networks.filter((n) => !(n.closed || n.network === "bsc") || num(n.cashUsd) + num(n.coinsUsd) >= 0.01), shown = ["near", "sol", "hood", ...listed.map((n) => n.network)];
   const cash = listed.map((n) => n.cashUsd);
-  const coinsHeld = (held ?? []).filter((h) => shown.includes(h.chain)).map((h) => h.usd);
+  const coinsHeld = [...(held ?? []).filter((h) => shown.includes(h.chain) && !(own && h.chain === "near")).map((h) => h.usd), ...(own ?? []).map((c) => c.usd)];
   const closedCoins = listed.filter((n) => n.closed && !(held ?? []).some((h) => h.chain === n.network)).map((n) => n.coinsUsd);
   // AgentZero's own wallet counts as a site's does (QA 5 Nov: its $1.99 was counted nowhere on Home)
   const sites = (wallets ?? []).filter((w) => w.role === "site" || w.role === "agent");
@@ -141,5 +146,5 @@ export function tradingUsd(s: SpendingStatus, held: HeldCoin[] | null, wallets: 
   // never a NEAR-only figure (D111): an answer missing Solana's or Robinhood's row is a part not read
   // a coin with no price is left out, as the Safe leaves out coins it can't price; only a part not read is "updating…"
   const partial = !["sol", "hood"].every((c) => s.networks.some((n) => n.network === c)) || held === null || wallets === null || sites.some((w) => w.unread);
-  return { usd, partial };
+  return { usd, partial, ...(own?.some((c) => c.usd === null) ? { uncounted: true as const } : {}) };
 }

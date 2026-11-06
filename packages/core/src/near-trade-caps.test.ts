@@ -113,7 +113,7 @@ test("shut (every phone until the test run): no NEAR coin trade or account is si
   const { w } = setup();
   NEAR_GATE.open = false;
   try {
-    await assert.rejects(w.nearTrade(buyOf(NEAR)), (e: { problem?: { more?: string } }) => /open soon/.test(e.problem?.more ?? ""));
-    await assert.rejects(w.nearRegister(COIN, 4276), (e: { problem?: { more?: string } }) => /open soon/.test(e.problem?.more ?? ""));
+    await assert.rejects(w.nearTrade(buyOf(NEAR)), (e: { problem?: { more?: string } }) => /doesn't buy or sell NEAR coins/.test(e.problem?.more ?? ""));
+    await assert.rejects(w.nearRegister(COIN, 4276), (e: { problem?: { more?: string } }) => /doesn't buy or sell NEAR coins/.test(e.problem?.more ?? ""));
   } finally { NEAR_GATE.open = true; }
 });

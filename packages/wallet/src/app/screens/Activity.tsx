@@ -14,11 +14,14 @@ import { EarlierHistory } from "@zerofee/shell-api/EarlierHistory.tsx";
 import { taskStore } from "@zerofee/shell-api/tasks.ts";
 import { webWallet } from "@zerofee/shell-api/release.ts";
 import { Waiting } from "../Waiting.tsx";
-import { ago, describe, movementDollars, ownRowOf, ownRows, payeeOf } from "../format.ts";
+import { ago, describe, movementDollars, ownRowOf, ownRows, payeeOf, swapDetail } from "../format.ts";
 import { Bang, SmallCheck } from "../icons.tsx";
 import type { Movement } from "../../types.ts";
 import { useWallet } from "../runtime.tsx";
 import { activityRows, lineOf, nameOf, onScreen, rowTicked, stoppedWays, usdOf } from "../activity-rows.ts";
+import { inplaceDetail, inplaceJobDetail, inplaceRowOf, inplaceRows, isInplaceRow, type FloatSwapMove, type InplaceRow } from "../money/inplace-activity.ts";
+import { isHomeSwapRow, watchSwapEnds } from "../money/swap-ended.ts";
+import { SWAP_AGAIN } from "../../near-swap-words.ts";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { NavRow } from "./NavRow.tsx";
 import { ownSlot } from "../overlay-slot.ts";
@@ -60,23 +63,32 @@ async function openAdd(bridge: ReturnType<typeof useWallet>["bridge"], id: strin
 export function Activity({ onProblem, onHeld, onStatement, statementFailed, overlay, openId, onDone }: { /** In the Activity centre: ✕ on a row's page closes the centre too (its ‹ goes back to the list). */ onDone?: () => void;  onProblem: (p: Problem) => void; onHeld: (held: NonNullable<Movement["held"]>) => void; onStatement: () => void; statementFailed: boolean; overlay?: (node: ReactNode) => void; openId?: string }) {
   const { bridge, activity, tokens, chains, spending, wallets } = useWallet();
   const shell = useShell();
-  const [all, setMoves] = useState<SpendingActivity[]>([]);
+  const [moved, setMoves] = useState<SpendingActivity[]>([]);
+  // the NEAR wallet's swaps in place (bug hunt, 4 Nov, item 2), from the core's own record of its moves
+  const [swaps, setSwaps] = useState<InplaceRow[] | null>(null);
   useEffect(() => {
     let live = true;
     if (!spending) return () => { live = false; };
     // its rows follow spending.changed, as Home's do: one source, never "On its way" here while Home says Done
-    // (QA's UX hunt, 5 Nov)
-    const read = () => void bridge.call<SpendingActivity[]>("spending.activity").then((r) => live && "ok" in r && setMoves(r.ok), () => undefined);
+    // (QA's UX hunt, 5 Nov); the swaps in place with them, and each swap's own end
+    const read = () => {
+      void bridge.call<SpendingActivity[]>("spending.activity").then((r) => live && "ok" in r && setMoves(r.ok), () => undefined);
+      void bridge.call<FloatSwapMove[]>("subwallet.float.moves").then((r) => live && "ok" in r && Array.isArray(r.ok) && setSwaps(inplaceRows(r.ok, (id) => tokens.get(id))), () => undefined);
+    };
     read();
     const off = bridge.on("spending.changed", read);
-    return () => { live = false; off(); };
+    // and a swap's end, however it was followed (real-tap proof, 6 Nov: a reloaded job's end left this list without it)
+    const offSwaps = watchSwapEnds(taskStore(), read);
+    return () => { live = false; off(); offSwaps(); };
   }, [bridge, spending]);
+  const all = swaps?.length ? [...moved, ...swaps] : moved;
   // D137: what is in flight on top, its steps live (the same cards as Home's); the rows below are the record
   const [Live, setLive] = useState<typeof LiveModule.LiveHome | null>(null);
   const feed = useRef({ movements: activity ?? [] });
   feed.current = { movements: activity ?? [] };
   useEffect(() => { let on = true; void import("../money/LiveTrack.tsx").then((m) => on && setLive(() => m.LiveHome), () => undefined); return () => { on = false; }; }, []);
-  const liveTop = Live ? <Live bridge={bridge} feed={feed} overlay={overlay} /> : null;
+  // a swap in place: its one row is the centre's Now there (`onDone`: this is the centre), its going row here on Activity's own page; ended, the list's
+  const liveTop = Live ? <Live bridge={bridge} feed={feed} overlay={overlay} swaps={onDone ? "none" : "going"} /> : null;
   // a job's steps, the same as its Jobs row (live-steps.ts, in the cards' own chunk): its page lists them all
   const [Steps, setSteps] = useState<typeof import("../money/live-steps.ts") | null>(null);
   useEffect(() => { let on = true; void import("../money/live-steps.ts").then((m) => on && setSteps(m), () => undefined); return () => { on = false; }; }, []);
@@ -124,7 +136,8 @@ export function Activity({ onProblem, onHeld, onStatement, statementFailed, over
   const ledgerPage = (m: Movement) => {
     const { title, detail: line } = describe(m, tokens, chains, own);
     const payee = m.private && m.kind === "pay" && !ownRowOf(m, own) ? payeeOf(m) : "";
-    return { title, line, ...(movementDollars(m, tokens) ? { usd: movementDollars(m, tokens)! } : {}), atIso: m.updatedAtIso, page: movementPage(m), ...(m.problem ? { onProblem: () => onProblem(m.problem!) } : {}), ...(payee ? { payee } : {}), facts: movementFacts(m, tokens, chains, own) };
+    const swap = swapDetail(m, tokens, chains, own);
+    return { title, line, ...(movementDollars(m, tokens) ? { usd: movementDollars(m, tokens)! } : {}), atIso: m.updatedAtIso, page: swap ? { ...movementPage(m), ended: swap.ended } : movementPage(m), ...(m.problem ? { onProblem: () => onProblem(m.problem!) } : {}), ...(payee ? { payee } : {}), facts: movementFacts(m, tokens, chains, own), ...(swap?.line ? { line: swap.line } : {}), ...(swap?.dayFirst ? { dayFirst: true } : {}), };
   };
   // finding 61: a site's Add that stopped in the NEAR wallet: its page offers the one tap that ends it
   const waysOf = (s: (typeof moves)[number]) => stoppedWays(s, wallets).map((w) => ({
@@ -136,9 +149,27 @@ export function Activity({ onProblem, onHeld, onStatement, statementFailed, over
       void bridge.call("spending.makeReady", { network: w.network, usd: w.usd, ...(w.wallet ? { wallet: w.wallet } : {}) }).then((r) => { if ("problem" in r) onProblem(r.problem); });
     },
   }));
-  const spendingOf = (s: (typeof moves)[number]) => ({ title: nameOf(s), line: lineOf(s), ...(usdOf(s) ? { usd: usdOf(s)! } : {}), atIso: s.atIso, page: withTrackSteps(spendingPage(s, activity), Steps?.moveTrack(s)), facts: spendingFacts(s), ...(s.stoppedShort ? { ways: waysOf(s) } : {}) });
+  // a swap in place's page; a true refund's next tap is Swap again (copy review, 6 Nov)
+  const inplacePageOf = (s: InplaceRow) => {
+    const { again, ...d } = inplaceDetail(s);
+    return again ? { ...d, ways: [{ label: SWAP_AGAIN, run: () => { setShown(null); onDone?.(); shell.openMoney({ kind: "swap", wallet: "near" }); } }] } : d;
+  };
+  const spendingOf = (s: (typeof moves)[number]) => ({ title: nameOf(s), line: lineOf(s), ...(usdOf(s) ? { usd: usdOf(s)! } : {}), atIso: s.atIso, page: withTrackSteps(spendingPage(s, activity), Steps?.moveTrack(s)), facts: spendingFacts(s), ...(isInplaceRow(s) ? inplacePageOf(s as InplaceRow) : {}), ...(s.stoppedShort ? { ways: waysOf(s) } : {}) });
   // the Activity centre's task, once: "move:<row id>" or "send:<movement id>"
-  if (openId && asked.current !== openId) {
+  // a swap in place's job (its running row's tap): its own page, once the core's record is read, kept up as that record changes;
+  // never reopened once closed
+  if (openId && isHomeSwapRow(openId)) {
+    if (swaps) {
+      const s = swaps.find((x) => x.id === inplaceRowOf(openId));
+      const job = s ? null : taskStore().list().find((t) => t.app === "home" && t.id === openId);
+      const at = `${openId}:${s?.status ?? job?.state ?? ""}`;
+      if (asked.current !== at && (s || job)) {
+        const first = asked.current === undefined;
+        asked.current = at;
+        if (first || shown) queueMicrotask(() => show(s ? spendingOf(s) : inplaceJobDetail(job!)));
+      }
+    }
+  } else if (openId && asked.current !== openId) {
     asked.current = openId;
     const id = openId.replace(/^(move|send):/, "");
     // from the whole record: a job still going (its card above, no row below) opens its page too

@@ -1,5 +1,5 @@
 // ST3 (QA's rule: a fee figure only from a real quote, never a fixed or bounded number): the Browser's "Put money in"
-// sheet says "About $X in fees." only when the core's two dry 1Click quotes put the Add's cost over 2 % of it; under 2 %
+// sheet says "Fees · about $X" only when the core's two dry 1Click quotes put the Add's cost over 2 % of it; under 2 %
 // nothing; before the quote is back "Fees show once the swap service gives a price."; the price never signs, moves or
 // raises a sheet; only the money sheet (Wallet's bridge) and the Browser tab may ask it.
 import { after, before, test } from "node:test";
@@ -77,7 +77,7 @@ async function sheet(bridge: Bridge, props: Record<string, unknown> = {}): Promi
 }
 
 test("ST3: over 2 % the sheet says the cost from the quote; under 2 % nothing (control); never a sign, a move or a sheet", async () => {
-  for (const [fee, line] of [[0.31, "About $0.31 in fees."], [0.21, "About $0.21 in fees."], [0.2, null], [0.12, null]] as const) {
+  for (const [fee, line] of [[0.31, "Fees · about $0.31"], [0.21, "Fees · about $0.21"], [0.2, null], [0.12, null]] as const) {
     const { bridge, asked } = priced(fee);
     try {
       const shown = await sheet(bridge);
@@ -131,7 +131,7 @@ test("ST3 review Low: a site's wallet on another network (GMGN's BNB) is not pri
     try {
       const lines = (await sheet(bridge, { network })).split("\n");
       assert.equal(asked.some((a) => a.method === "subwallet.site.addCost"), priced_, network);
-      assert.equal(lines.includes("About $0.50 in fees."), priced_, network);
+      assert.equal(lines.includes("Fees · about $0.50"), priced_, network);
       assert.ok(!lines.includes(FEE_WAIT_LINE), `${network}: no waiting line`);
     } finally {
       runtime.unmount();

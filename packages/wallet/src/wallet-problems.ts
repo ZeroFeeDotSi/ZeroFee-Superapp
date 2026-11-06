@@ -4,6 +4,7 @@
 // NEAR Intents' bridge; never "we can't", never "the service that holds your coins" (no service holds them, D37).
 import type { MoneyState, Problem } from "@zerofee/core/problem";
 import { SERVICE_NAMES, serviceProblem, type Fault, type Service } from "@zerofee/core/services";
+import { NEAR_SWAP_UNFINISHED, NEAR_SWAP_UNSURE } from "./near-swap-words.ts";
 
 /** A payout to a NEAR account NEAR Intents didn't take (nearPayoutClosed): its code, spelled here so Home's first load
  *  never pulls send-to.ts's chain table in (speed budget); send-to.ts says it again for the Send sheet. */
@@ -360,15 +361,31 @@ export const walletProblems = {
     next: { kind: "nothing", label: "Done" },
     more: `${ONE_CLICK} stopped it. Your coins come back to your Safe when it sends them.`,
   }),
+  /** A NEAR wallet swap 1Click ended FAILED: its docs promise a refund only for REFUNDED, so this says where to look, never that
+   *  the money is back (the core's where: "float" on FAILED is its assumption, not a read of the balance). */
+  nearSwapFailed: (): Problem => ({
+    code: "ledger.swap.near-failed",
+    whatHappened: NEAR_SWAP_UNFINISHED,
+    money: NEAR_SWAP_UNSURE,
+    next: { kind: "nothing", label: "Done" },
+  }),
+  /** A NEAR wallet swap a week old whose move the core has let go (float-moves.ts KEEP_MS): nobody can read its end now, and it
+   *  may have swapped, refunded or still be with 1Click, so this says neither safe nor lost (format.ts whereNow points there). */
+  nearSwapUnread: (): Problem => ({
+    code: "ledger.swap.near-unread",
+    whatHappened: "This swap is more than a week old, so ZeroFee can't read how it ended.",
+    money: NEAR_SWAP_UNSURE,
+    next: { kind: "nothing", label: "Done" },
+  }),
   /** 1Click's FAILED for a Top up (ledger.toTrading): its refund goes to the Add quote's refundTo, Spending's own cash
    *  (packages/core float-moves.ts quoteAdd), never the Safe's balance. The words are its Spending row's (packages/trade
    *  float-core.ts addEnd, 512f3d3f): one story in Wallet's Activity and in Spending's. */
   topUpFailed: (depositAddress?: string): Problem => ({
     code: "ledger.topup.failed",
     whatHappened: "Your move to your NEAR wallet hasn't landed yet. Activity shows it.",
-    money: { state: "on-the-way", where: "with the swap service. It ends up in your NEAR wallet" },
+    money: { state: "on-the-way", where: `with ${ONE_CLICK}. It ends up in your NEAR wallet` },
     next: { kind: "nothing", label: "Done" },
-    more: `The swap service is still finishing it${depositAddress ? ` (its id: ${depositAddress})` : ""} · if not, the money comes back to your NEAR wallet`,
+    more: `${ONE_CLICK} is still finishing it${depositAddress ? ` (its id: ${depositAddress})` : ""} · if not, the money comes back to your NEAR wallet`,
   }),
 
   // Quotes

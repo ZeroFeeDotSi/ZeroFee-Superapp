@@ -69,7 +69,7 @@ test("done: Hidden's wallet made, priced, the Approve answered, the move followe
   const w = wallet({ "ledger.privateSetup": { ok: {} }, "ledger.quoteToPrivate": { ok: { id: "pq1" } }, "ledger.toPrivate": { ok: { id: "m1", status: "moving" } }, "ledger.activity": [{ ok: [{ id: "m1", status: "moving" }] }, { ok: [{ id: "m1", status: "done" }] }] });
   const s = await show(w);
   assert.match(runtime.text(), /Try Private/);
-  assert.match(runtime.text(), /Private from the public, except the money going in\. NEAR Intents' solver sees every payment\./, "the honest line (P-1), on the screen");
+  assert.match(runtime.text(), /Private from the public, except the money going in and coming out\. NEAR Intents sees every payment\./, "the honest line (P-1), on the screen");
   runtime.press(/^Hide \$2$/);
   await settle();
   assert.match(runtime.text(), /You did it/);

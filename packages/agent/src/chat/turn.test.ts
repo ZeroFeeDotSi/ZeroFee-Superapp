@@ -420,6 +420,11 @@ test("over the $50 day limit: said plainly, never a sheet (real-Claude walk: \"$
   assert.ok((await run("Pay $5 to kim.near", { ownKey: OWN, anthropicFetch: anthropic([]).f })).some((e) => e.kind === "needs-you"));
   const ok = anthropic([toolSse("tu_3", "propose_job", { job: "copy", leader: null, per_trade_usd: null, per_day_usd: 50, sell_at_pct: null, keep_usd: null, people: [] })]);
   assert.ok((await run("Copy a wallet on pump.fun, $50 each day", { ownKey: OWN, anthropicFetch: ok.f })).some((e) => e.kind === "needs-you"));
+  // gates grade: a Keep job can't run (keep-read.ts keepRuns), so the model naming it shows no sheet, and it's told so
+  const keep = anthropic([toolSse("tu_4", "propose_job", { job: "keep", leader: null, per_trade_usd: null, per_day_usd: 50, sell_at_pct: null, keep_usd: 50, people: [] }), textSse("It can't do that.")]);
+  const k = await run("Keep $50 in my SOL wallet", { ownKey: OWN, anthropicFetch: keep.f });
+  assert.ok(!k.some((e) => e.kind === "needs-you"), "no Keep sheet");
+  assert.equal((k.find((e) => e.kind === "step" && (e as { state: string }).state === "refused") as { why: string }).why, "AgentZero can't do that job yet.");
 });
 
 test("each refused money ask says so to the device, for its receipt (hidden words, over the limit, a refused tool); control: a plain answer and an allowed sheet don't", async () => {

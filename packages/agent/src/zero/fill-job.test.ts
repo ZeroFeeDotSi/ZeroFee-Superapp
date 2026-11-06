@@ -57,7 +57,7 @@ test("the funding page's Add on a real account is the real fill, a job at the ta
   assert.equal(FILL_FROM, "From your NEAR wallet");
   // the own wallet (pocketHere false) has its Fund button; the Safe-key Add stays only where that key is offered
   assert.match(app, /\) : !offersTurnOn\(pocket\) \? null : !pocketHere \? \(\n[^\n]*\n\s*<button className="zf-btn" disabled=\{busy\} data-testid="ag-fund-own" onClick=\{\(\) => setSheet\(\{ kind: "pocket" \}\)\}>\{FUND_BUTTON\}<\/button>/);
-  assert.match(app, /\{pocketHere \? \(\n\s*<button className="zf-btn" disabled=\{busy \|\| \(on && Math\.round\(pocketUsd\) === choice\)\} onClick=\{\(\) => void setPocket\(choice, runningList\(jobs\), needsAnyAddress\(jobs\), true\)/);
+  assert.match(app, /\{pocketHere \? \(\n\s*<button className="zf-btn" disabled=\{busy \|\| !\(choice > \(on \? pocketUsd : 0\)\) \|\| agent\?\.waiting\?\.usd === choice\} onClick=\{\(\) => void setPocket\(choice, runningList\(jobs\), needsAnyAddress\(jobs\), true\)/);
 });
 
 test("whole path: fillJob -> the core's real agent door -> its Fund sheet -> its answer; the job row exists before the core answers (control: the old Add is refused by the same core)", async () => {

@@ -13,6 +13,7 @@ import { HOME_PROOF } from "./home-proof.ts";
 import { HOT_ROOT, hotPath, hotSecret } from "./hot-keys.ts";
 import type { FloatMove, FloatRelay, PerpsKit } from "./float-moves.ts";
 import { privateBalances } from "./oneclick-account.ts";
+import { FEES_KEPT, feesFigure, intentsPaid } from "./zero-fee.ts";
 import type { PocketMoves } from "./pocket-moves.ts";
 import { ProblemError, type Problem } from "./problem.ts";
 import { securityProblems } from "./security-problems.ts";
@@ -134,9 +135,10 @@ export function fillWords(usd: number, from: FillSource, feesUsd = 0): PlainWord
   return { title: "Fund AgentZero's wallet", lines: [`$${usd.toFixed(2)} moves from ${name} to AgentZero.`, ...(feesUsd > 0 ? [`$${feesUsd.toFixed(2)} of it is NEAR, for AgentZero's sending fees.`] : []), "AgentZero spends only what you put here, one reply at a time. Your Safe and wallets stay yours."], warnings: [], effect: [] };
 }
 
-/** "Move all to my Safe"'s sheet (Face ID on the phone). */
-export function emptyWords(usd: number): PlainWords {
-  return { title: "Move AgentZero's money to your Safe", lines: [`All of AgentZero's $${usd.toFixed(2)} moves to your Safe through Private.`, "AgentZero keeps its little NEAR for sending fees."], warnings: [], effect: [] };
+/** "Move all to my Safe"'s sheet (Face ID on the phone). `getsUsd`: the signed quote's own figure; no figure in the quote, none here. */
+export function emptyWords(usd: number, getsUsd: number | null = null): PlainWords {
+  const paid = getsUsd === null ? [intentsPaid()] : [`Your Safe gets about $${getsUsd.toFixed(2)}`, feesFigure(usd - getsUsd)!, FEES_KEPT];
+  return { title: "Move AgentZero's money to your Safe", lines: [`All of AgentZero's $${usd.toFixed(2)} moves to your Safe. Anyone can see the two are linked.`, ...paid, "AgentZero keeps its little NEAR for sending fees."], warnings: [], effect: [] };
 }
 
 
@@ -273,7 +275,7 @@ export async function walletFill(k: WalletKit, from: unknown, amount: unknown, k
 export async function walletEmpty(k: WalletKit, _key: unknown): Promise<{ tx: string; micros: number } | { declined: true }> {
   const safe = k.o.mainAccount ? await k.o.mainAccount() : null;
   if (!safe) throw new ProblemError(securityProblems.subwalletRefused("There's no Safe to move it to yet."));
-  return (await payerOf(k)).empty(safe, (usd) => k.o.approve(emptyWords(usd)));
+  return (await payerOf(k)).empty(safe, (usd, getsUsd) => k.o.approve(emptyWords(usd, getsUsd)));
 }
 
 /**

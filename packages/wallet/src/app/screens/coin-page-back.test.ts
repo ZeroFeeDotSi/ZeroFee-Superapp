@@ -22,5 +22,5 @@ test("test: a coin page opened from Home's Hot side (a wallet's coin row) carrie
   const trade = readFileSync(new URL("../../../../trade/src/app/TradeApp.tsx", import.meta.url), "utf8");
   assert.match(trade, /if \("coin" in r\) \{ const back = readBack\(shell\.requestedLink\); setView\(\{ kind: "coin", seed: r\.coin, \.\.\.\(back \? \{ back \} : \{\}\) \}\); \}/);
   assert.match(trade, /<PushedFrame name=\{view\.seed\.symbol\} onBack=\{\(\) => \{ const back = view\.back; [^\n]*setView\(\{ kind: "tabs" \}\); if \(back\) shell\.openApp\(back\.app, back\.tab\); \}\}>/);
-  assert.match(trade, /const openCoin = \(seed: CoinRow\) => setView\(\{ kind: "coin", seed \}\);/, "control: Trade's own lists open a coin with no back");
+  assert.match(trade, /const openCoin = \(seed: CoinRow\) => setView\(coinView\(seed\)\);/, "control: Trade's own lists open a coin with no back");
 });

@@ -64,6 +64,14 @@ export function segOfRequest(t: string | undefined): TradeSeg | undefined {
   return undefined;
 }
 
+/** A NEAR coin's page has one switch (gates grade: NEAR_TRADES folded into NATIVE_COINS). On: the Safe's own coin page, Buy
+ *  and Sell through NEAR Intents, which says itself when the Safe can't trade the coin. Off: null, Trade's page with its
+ *  chart and NEAR_NOT_TRADED. Rhea trades from the NEAR coin wallet are another path, behind MARKET and the core's NEAR_GATE. */
+export function nearCoinNative(seed: { chain: ChainId; address: string; symbol: string }, native: boolean): { assetId: string; symbol: string } | null {
+  if (!native || seed.chain !== "near") return null;
+  return { assetId: seed.address.startsWith("nep141:") ? seed.address : `nep141:${seed.address}`, symbol: seed.symbol };
+}
+
 /** The one entry other apps open a coin page by (product decision, 5 Nov, item 4): a Safe coin by its 1Click asset id, a Hot coin
  *  by its chain and address. Pass it to shell.openApp("trade", …). */
 export function coinRoute(c: { chain: ChainId | "intents"; assetId: string; symbol?: string }): string {

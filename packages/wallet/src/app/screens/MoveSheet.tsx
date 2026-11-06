@@ -26,7 +26,7 @@ import { ActMove, PrivateMark, TabSafe } from "../icons.tsx";
 import { TimeLeft } from "../money/JobMade.tsx";
 import { HOME_PROOF } from "@zerofee/core/home-proof";
 import { SAFE_FILL_OPEN } from "@zerofee/core/safe-fill-open";
-import { intentsPaid } from "@zerofee/core/zero-fee";
+import { intentsKept } from "@zerofee/core/zero-fee";
 import "../money/move-swap.css";
 import "@zerofee/design/receipt.css";
 
@@ -361,10 +361,11 @@ export function MoveSheet(p: { status: SpendingStatus;
       {running
         ? <button className="zf-btn wl-sheet-go" onClick={close}>{MOVE_WORDS.done}</button>
         : <>
-            {block && block !== MOVE_WORDS.untouched && <p className="zf-small wl-mv-why" role="status" data-testid="move-why">{block}{short && <> <button type="button" className="zf-chip" data-testid="move-leave" onClick={leave}>{MOVE_WORDS.leave(PLACE_NAME[leavePlace(short)])}</button></>}</p>}
+            {/* one place over the button: why it can't go yet, or the fee block (the copy review, 6 Nov); its figure is the Fees row above */}
+            {block && block !== MOVE_WORDS.untouched
+              ? <p className="zf-small wl-mv-why" role="status" data-testid="move-why">{block}{short && <> <button type="button" className="zf-chip" data-testid="move-leave" onClick={leave}>{MOVE_WORDS.leave(PLACE_NAME[leavePlace(short)])}</button></>}</p>
+              : <div className="zf-fee"><p className="zf-small" data-testid="move-paid">{intentsKept(!block && !!cost && !!costed)}</p></div>}
             <button className={`zf-btn wl-sheet-go${busy ? " is-busy" : ""}`} aria-busy={busy || undefined} disabled={busy || !!block || services.down} onClick={() => void go()}>{busy ? MOVE_WORDS.moving : MOVE_WORDS.go}</button>
-            {/* who the fee goes to, under the button (product decision, 5 Nov: we are zero fee); its figure is the Fees row above */}
-            <p className="zf-small wl-zerofee" data-testid="move-paid">{intentsPaid()}</p>
           </>}
     </MoneySheet>
   );

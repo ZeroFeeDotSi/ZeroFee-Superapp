@@ -15,6 +15,7 @@ export type MoneyState =
   | { state: "on-the-way"; where: string; etaSeconds?: number } // moving between places, expected to land by itself
   | { state: "coming-back"; where: string; etaSeconds?: number } // a refund is under way, by itself
   | { state: "needs-you"; where: string } //         nothing will happen until the user does the next step
+  | { state: "unsure"; where: string; check: string } // nobody can read where it is now: the places it can be, and where to look first
   | { state: "not-involved" }; //                    no money is touched (e.g. a typo in the backup words)
 
 export type NextStep =

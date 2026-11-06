@@ -179,7 +179,7 @@ export const serviceOf = (p: Problem | null | undefined): Service | null => (p?.
 /** A Problem as one line on a sheet: what happened, then where the money is ("1Click didn't answer. Your money is in your Safe."). */
 export function problemLine(p: Problem): string {
   const m = p.money;
-  const where = m.state === "safe" ? ` Your money is ${m.where}.` : m.state === "on-the-way" ? ` Your money is on its way, ${m.where}.` : m.state === "coming-back" ? ` Your money is coming back, ${m.where}.` : m.state === "needs-you" ? ` Your money is ${m.where}.` : "";
+  const where = m.state === "safe" ? ` Your money is ${m.where}.` : m.state === "on-the-way" ? ` Your money is on its way, ${m.where}.` : m.state === "coming-back" ? ` Your money is coming back, ${m.where}.` : m.state === "needs-you" ? ` Your money is ${m.where}.` : m.state === "unsure" ? ` Your money is ${m.where}. ${m.check}` : "";
   return `${p.whatHappened}${where}`.replace(/\.\./g, ".");
 }
 

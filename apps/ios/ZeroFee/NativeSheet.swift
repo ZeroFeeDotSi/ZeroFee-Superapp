@@ -15,7 +15,7 @@ struct NativeSheetView: View {
   /** The small line under the buttons: what Approve does on this phone. */
   let footer: String
   /** Face ID, then the chip signs. Nil when signed (the sheet closes); otherwise what to say, and the sheet stays. */
-  let approve: @MainActor () async -> String?
+  let approve: @MainActor () async -> ChipKey.Refused?
   let notNow: @MainActor () -> Void
   /** Approve asks Face ID (every chip sheet, and the Safe's). False only for the core's one-tap sheet of a hot key (D143). */
   var faceId = true
@@ -25,7 +25,7 @@ struct NativeSheetView: View {
   @State private var armed = false
   @State private var reachedEnd = false
   @State private var busy = false
-  @State private var note: String?
+  @State private var note: ChipKey.Refused?
 
   private static let gutter: CGFloat = 28
   private let hair = Color.primary.opacity(0.12)
@@ -117,7 +117,8 @@ struct NativeSheetView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 16) {
                   Text(e.token).foregroundStyle(.secondary)
                   Spacer(minLength: 0)
-                  Text("\(e.before) → \(e.after)").monospacedDigit().multilineTextAlignment(.trailing)
+                  // an empty `before`: a row that says only where it ends (separate steps' "Your Safe after", 53), no arrow
+                  Text(e.before.isEmpty ? e.after : "\(e.before) → \(e.after)").monospacedDigit().multilineTextAlignment(.trailing)
                 }
                 .font(.system(size: 15))
                 .padding(.vertical, 12)
@@ -150,8 +151,14 @@ struct NativeSheetView: View {
           Text("Read to the end to approve.").font(.system(size: 12.5)).foregroundStyle(.secondary)
         }
         if let note {
-          Text(note).font(.system(size: 13)).foregroundStyle(Color.red).multilineTextAlignment(.center)
+          Text(note.what).font(.system(size: 13)).foregroundStyle(Color.red).multilineTextAlignment(.center)
         }
+        // a refusal that says Close (too many steps): Close is the one lit button, nothing to approve again
+        if note?.next == .close {
+          Button(action: notNow) { Text("Close").font(.system(size: 16, weight: .medium)).frame(maxWidth: .infinity, minHeight: 52) }
+            .foregroundStyle(Color(uiColor: .systemBackground))
+            .background(Color.primary, in: Capsule())
+        } else {
         Button {
           busy = true
           note = nil
@@ -160,7 +167,8 @@ struct NativeSheetView: View {
             busy = false
           }
         } label: {
-          Label(faceId ? (busy ? "Waiting for Face ID…" : "Approve with Face ID") : "Approve", systemImage: faceId ? "faceid" : "checkmark")
+          // a timed-out Face ID (copy review, 6 Nov): the button says Try again, never the sentence
+          Label(faceId ? (busy ? "Waiting for Face ID…" : note?.next == .tryAgain ? "Try again" : "Approve with Face ID") : "Approve", systemImage: faceId ? "faceid" : "checkmark")
             .font(.system(size: 16, weight: .medium))
             .frame(maxWidth: .infinity, minHeight: 52)
         }
@@ -172,6 +180,7 @@ struct NativeSheetView: View {
           .foregroundStyle(Color.primary)
           .frame(minHeight: 44)
           .disabled(busy)
+        }
         Text(footer)
           .font(.system(size: 11.5))
           .foregroundStyle(.secondary)
@@ -284,6 +293,65 @@ extension Host {
   }
 
   /**
+   * key.signSet { id, words, txs: [{ bytes, summary }] (1 to 4), pairHash? }: ONE sheet and ONE Face ID for every
+   * transaction of one Safe action (D3, the audit's R3/R5). Each tx is decoded here against this phone's chip key, must say what
+   * its own summary says, and is hashed here; the sheet shows every tx's checked lines in order. Approve signs them back
+   * to back under that one Face ID (ChipKey.signMany). `pairHash` (the core's hash of the Private payment) is echoed
+   * exactly, never signed or read here: an extra check only; the core binds that payment by leg 1's paid address and its
+   * own hash. More than 4 or none: refused, never split.
+   * -> { signatures: [base64], pairHash? } | { declined: true } | a problem (nothing signed).
+   */
+  func signSetOnSheet(_ p: [String: Any]) async -> Reply {
+    let refused = { (what: String) in problem("security.key.refused", what) }
+    guard !Self.sheetOpen else { return refused("Another approval is open, so ZeroFee didn't approve this one. Your money hasn't moved.") }
+    guard let txs = p["txs"] as? [[String: Any]], !txs.isEmpty else { return refused("ZeroFee couldn't read what to approve, so it didn't approve it. Your money hasn't moved.") }
+    guard txs.count <= ChipKey.maxHashes else { return refused("This has more steps than one Face ID covers, so ZeroFee stopped it. Your money hasn't moved.") }
+    let pairHash = p["pairHash"] as? String
+    if p["pairHash"] != nil, !(pairHash.map(Self.isPairHash) ?? false) {
+      return refused("ZeroFee couldn't read what to approve, so it didn't approve it. Your money hasn't moved.")
+    }
+    guard let words = SheetWords(p["words"]) else { return refused("This sheet couldn't show what you'd approve, so ZeroFee didn't approve it. Your money hasn't moved.") }
+    let publicKey: Data
+    do {
+      guard let raw = try ChipKey.publicRaw() else { return refused("This phone has no account key yet.") }
+      publicKey = raw
+    } catch {
+      return refused("This phone's secure chip didn't answer, so ZeroFee didn't approve it. Your money hasn't moved.")
+    }
+    var hashes: [Data] = []
+    var checked: [String] = []
+    for tx in txs {
+      guard let b64 = tx["bytes"] as? String, b64.utf8.count <= (NearTx.maxBytes + 2) / 3 * 4, let bytes = Data(base64Encoded: b64) else {
+        return refused("ZeroFee couldn't read what to approve, so it didn't approve it. Your money hasn't moved.")
+      }
+      guard let decoded = NearTx.decode(bytes, publicKey: publicKey) else {
+        return refused("This phone's key can't approve that, so ZeroFee didn't. Your money hasn't moved.")
+      }
+      // iOS audit finding 1, per tx: the bytes, read here, must say what their own summary says
+      guard let summary = NearTx.summary(tx["summary"]), NearTx.matches(decoded, summary) else {
+        return refused("What ZeroFee was asked to approve didn't match what it would sign, so it didn't. Your money hasn't moved.")
+      }
+      hashes.append(NearTx.hash(bytes))
+      checked.append(contentsOf: decoded.checked)
+    }
+    #if DEBUG
+    NSLog("[zf-host] native sheet %@ opened (%d steps)", String(describing: p["id"] ?? "?"), hashes.count)
+    #endif
+    guard let signatures = await presentSheet(words, footer: "Approved inside this phone's secure chip", checked: checked, approve: { try await ChipKey.signMany(hashes: hashes) }) else {
+      return ok(["declined": true])
+    }
+    guard signatures.count == hashes.count else { return refused("This phone's secure chip didn't answer, so ZeroFee didn't approve it. Your money hasn't moved.") }
+    var out: [String: Any] = ["signatures": signatures.map { $0.base64EncodedString() }]
+    if let pairHash { out["pairHash"] = pairHash }
+    return ok(out)
+  }
+
+  /** 64 lowercase hex: the core's sha256 of the Private payment it holds for this sheet. */
+  nonisolated static func isPairHash(_ s: String) -> Bool {
+    s.utf8.count == 64 && s.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
+  }
+
+  /**
    * key.signAlertsProof { accountId, email, deadline, nonce (base64) }: the relay's email-alerts proof (AlertsProof),
    * built here from those parts with this build's own relay as its recipient, never taken whole from the core; shown on
    * this sheet and signed after its Face ID. → { signature } | { declined: true } | a problem (nothing signed).
@@ -345,9 +413,9 @@ extension Host {
             finish(try await approve())
             return nil
           } catch let refused as ChipKey.Refused {
-            return refused.what
+            return refused
           } catch {
-            return "The secure chip didn't approve it. Try again, or tap Not now."
+            return ChipKey.Refused(what: "The secure chip didn't approve it. Try again, or tap Not now.")
           }
         },
         notNow: { finish(nil) },
@@ -401,7 +469,8 @@ extension Host {
       once.sheet = sheet
       var top: UIViewController = controller
       while let next = top.presentedViewController { top = next }
-      top.present(sheet, animated: true)
+      // an approval sheet takes the page's Getting-ready sheet's place without motion (the copy review's W2): no slide up
+      top.present(sheet, animated: !approval)
       Task { @MainActor in
         try? await Task.sleep(for: Self.sheetTimeout)
         finish(nil)

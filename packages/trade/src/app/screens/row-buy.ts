@@ -26,7 +26,8 @@ export interface RowBuy {
 export function rowBuyLine(b: RowBuy, symbol: string): string {
   if (b.phase === "away") return b.got ? `On its way · about ${b.got}` : "On its way";
   if (b.phase === "landed") return `Bought · ${b.got ?? symbol}`;
-  if (b.phase === "checking") return "Sent · still checking";
+  // the copy review's row word (7 Nov) for a trade no read can place yet
+  if (b.phase === "checking") return "Not confirmed yet";
   return `Didn't buy · ${b.why ?? "Nothing left your wallet."}`;
 }
 

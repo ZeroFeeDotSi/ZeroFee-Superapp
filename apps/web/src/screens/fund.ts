@@ -268,6 +268,27 @@ export const asShown = (v: FundView): FundView => {
 /** The checklist shows instead of the address once anything has happened. */
 export const showsChecklist = (v: FundView): boolean => v.state !== "waiting" && v.state !== "expired";
 
+/**
+ * Back from a coin's page (Add SOL, Add NEAR, Add ETH: its address, or its run-out page), by its arrow, the browser's Back
+ * or Escape (all three run the page's one onBack: PushedFrame's button and its useBack): one step, to the coins, at once.
+ * The product decision, 6 Nov: the arrow seemed to do nothing, because Back first asked the core for the coins again, and on
+ * mainnet that read asks the chain and NEAR's price before it answers. Now the list already read shows at the tap and is
+ * read again behind it; no list read yet (an address kept from before), the coins' own frame at once, the list as it comes.
+ */
+export const fundBack = (held: boolean): { to: "coins" | "loading"; reread: true } => ({ to: held ? "coins" : "loading", reread: true });
+
+/** What a read of the coins does when it answers. Asked by the coins' own screen (`quiet` false: the first look, another
+ *  coin): show them, or its Problem. Read again behind a Back (`quiet`): on the coins or their frame it shows them; a
+ *  failed read under a list already shown keeps that list; anywhere else (a coin tapped meanwhile) it only keeps the list,
+ *  never pulling the person back. */
+export function coinsAnswer(at: string, held: boolean, ok: boolean, quiet: boolean): "show" | "keep" | "problem" | "nothing" {
+  const here = at === "coins" || at === "loading";
+  if (!quiet) return ok ? "show" : "problem";
+  if (!here) return ok ? "keep" : "nothing";
+  if (ok) return "show";
+  return held ? "nothing" : "problem";
+}
+
 /** The apps may show (with the bar over them) only once money is seen: before it, every app would be a door to nothing. */
 export const mayGoToApp = (v: FundView): boolean => showsChecklist(v) && !nothingSeen(v);
 

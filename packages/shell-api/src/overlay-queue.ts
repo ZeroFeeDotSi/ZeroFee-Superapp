@@ -28,6 +28,9 @@ export interface OverlayQueue {
   finish(app: string, step: NextStep): boolean;
   /** How many items this app has lined up (the showing one included). */
   count(app: string): number;
+  /** What a Problem said is over (a trade not confirmed yet that then landed or provably didn't): that Problem (by its
+   *  code and words), showing or lined up, is taken off and its askers hear `step`. False when it wasn't there. */
+  drop(app: string, problem: Problem, step: NextStep): boolean;
 }
 
 export function createOverlayQueue(): OverlayQueue {
@@ -56,6 +59,13 @@ export function createOverlayQueue(): OverlayQueue {
     },
     count(app) {
       return lines.get(app)?.length ?? 0;
+    },
+    drop(app, problem, step) {
+      const l = lines.get(app), i = l?.findIndex((e) => same(e.item, { kind: "problem", problem })) ?? -1;
+      if (!l || i < 0) return false;
+      const [entry] = l.splice(i, 1);
+      for (const done of entry!.done) done(step);
+      return true;
     },
   };
 }

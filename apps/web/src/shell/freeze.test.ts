@@ -20,7 +20,7 @@ test("while a recovery waits with no second device: this phone can cancel it, th
     canStop: true,
     text: "Someone started moving your account to a new device.",
     who: "This device can stop it.",
-    count: { untilIso: later, before: "It finishes in ", after: " unless you stop it.", atZero: "It can finish now unless you stop it." },
+    count: { untilIso: later, before: "Finishes in ", after: " unless you stop it.", atZero: "It can finish now unless you stop it." },
     also: `Payments wait until [${later}]. Not you? Stop it, then get new words.`,
   });
 });

@@ -32,7 +32,7 @@ test("not enough money: the hero marks thousands; the short state says the walle
   assert.match(short, /`Move money to \$\{walletName\}`/);
   assert.match(short, /webWallet\(\) \? `Add \$\{COIN\[chain\]\}`/, "the web wallet has no Move: Add (a web test)");
   const sheet = readFileSync(new URL("./TradeSheet.tsx", import.meta.url), "utf8");
-  assert.match(sheet, /Buy \$\$\{shortBuyNow\.toLocaleString\("en-US"\)\} instead/, "the smaller buy is the page's button");
+  assert.match(sheet, /Buy \$\{usd\(shortBuyNow\)\} instead/, "the smaller buy is the page's button, with cents (T2-5)");
 });
 
 test("the Buy page says what its wallet can spend as that, never as the wallet's balance (UI, 4 Nov: $148.22 beside AgentZero's $149.22; control: the figure is the wallet less its fee reserve)", async () => {

@@ -544,6 +544,7 @@ test("a NEAR coin to a NEAR account: storage is paid first if the receiver has n
   const { ledger, core } = setup({ holdings: { ledger: { [USDC]: "5000000" } } });
   const m = await ok<Movement>(ledger, "ledger.withdraw", { tokenId: USDC, amount: "2", toAddress: "newbie.near", chain: "near" });
   assert.deepEqual(core.signed.map((r) => [r.receiverId, (r.actions[0] as { method: string }).method]), [[USDC.slice(7), "storage_deposit"], ["intents.near", "ft_withdraw"]]);
+  assert.equal(core.requests.length, 1, "both steps on one sheet (fix/safe-steps-one-faceid, 7 Nov)");
   assert.deepEqual(args(core.signed[1]), { token: USDC.slice(7), receiver_id: "newbie.near", amount: "2000000" }, "no msg, so a refusal comes back");
   assert.equal(m.status, "done");
 });
@@ -833,13 +834,19 @@ test("route B from the ledger: 1Click's NEAR address gets its storage, then an f
   assert.deepEqual(args(core.signed[1]), { token: "wrap.near", receiver_id: QUOTE_ADDRESS, amount: "200000000000000000000000" });
 });
 
-test("route B from NEAR on the account: one wrap.near transaction pays the quote", async () => {
-  const { ledger, core } = convertSetup({ routes: { intents: true, nearOrigin: true }, holdings: { nearYocto: 2n * NEAR } });
-  const q = await ok<Quote>(ledger, "ledger.quoteConvert", { from: "near", to: USDC, amount: "0.2" });
-  await ok(ledger, "ledger.convert", { quoteId: q.id });
-  assert.equal(core.signed.length, 1);
-  assert.equal(core.signed[0].receiverId, "wrap.near");
-  assert.deepEqual(core.signed[0].actions.map((a) => (a as { method: string }).method), ["storage_deposit", "storage_deposit", "near_deposit", "ft_transfer"]);
+test("route B from NEAR on the account: one wrap.near transaction pays the quote; the account's own storage step only while it isn't set up on wrap.near", async () => {
+  for (const [what, holdings, want] of [
+    ["not set up", { nearYocto: 2n * NEAR, unregistered: ["wrap.near"] }, ["storage_deposit", "storage_deposit", "near_deposit", "ft_transfer"]],
+    ["set up already: left out", { nearYocto: 2n * NEAR }, ["storage_deposit", "near_deposit", "ft_transfer"]],
+    ["its read failed: kept", { nearYocto: 2n * NEAR, storageReadFails: true }, ["storage_deposit", "storage_deposit", "near_deposit", "ft_transfer"]],
+  ] as const) {
+    const { ledger, core } = convertSetup({ routes: { intents: true, nearOrigin: true }, holdings: holdings as Holdings });
+    const q = await ok<Quote>(ledger, "ledger.quoteConvert", { from: "near", to: USDC, amount: "0.2" });
+    await ok(ledger, "ledger.convert", { quoteId: q.id });
+    assert.equal(core.signed.length, 1, what);
+    assert.equal(core.signed[0].receiverId, "wrap.near", what);
+    assert.deepEqual(core.signed[0].actions.map((a) => (a as { method: string }).method), want, what);
+  }
 });
 
 test("convert refuses if the real quote promises less than the one shown; nothing is signed", async () => {
@@ -889,11 +896,16 @@ test("on an account that can't chain steps, a held first step that runs later ne
   const core = fakeCore({ accountId: ME, sign: "waiting" });
   const ledger = createLedgerService({ bridge: core, chain: fakeNear(ME, { ledger: { [USDC]: "5000000" } }), apis: createApis(replayFetch()), readCall: ran });
   const m = await ok<Movement>(ledger, "ledger.withdraw", { tokenId: USDC, amount: "2", toAddress: "newbie.near", chain: "near" });
-  assert.deepEqual([m.status, core.signed.length], ["waiting", 1], "the storage step was held; the withdraw was never asked");
+  assert.deepEqual([m.status, core.signed.length], ["waiting", 1], "the storage step was held; the withdraw was never sent");
+  // the audit's C2 (7 Nov): one sheet for both; the core's hold on step 1 drops the rest (unsent), so the end below is the truth
+  assert.deepEqual(core.requests.map((r) => r.apart), [true]);
   const ended = update(ledger, (x) => x.id === m.id);
   core.emit("account.waiting.ended", { id: m.held!.id, ended: "ran", txHash: "storageRan", explorerUrl: "" });
   const row = await ended;
   assert.deepEqual([row.status, row.problem?.code], ["problem", "ledger.hold.part-sent"]);
+  // the audit's C2 MUST (7 Nov): never a Done-only dead end; one choice, the Send's own sheet again (a new Face ID)
+  assert.deepEqual(row.problem?.next, { kind: "open", label: "Finish the move", screen: "money/send" });
+  assert.deepEqual([row.problem?.money, row.problem?.more], [{ state: "safe", where: "in your Safe" }, "Step 1: Done. The rest: Not sent."]);
 });
 
 test("a hold ended on another device is settled from the account's history when activity is read", async () => {

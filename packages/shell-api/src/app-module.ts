@@ -57,6 +57,12 @@ export interface AppContext {
    */
   showProblem(problem: Problem): Promise<NextStep>;
   /**
+   * Takes a Problem this app showed off the screen once what it said is over (Trade: "not confirmed yet", then the chain
+   * answered): its showProblem resolves with `{ kind: "nothing" }`. False when it isn't showing or lined up. Optional so
+   * older hosts and tests that build a context by hand still type.
+   */
+  endProblem?(problem: Problem): boolean;
+  /**
    * A tx.request came back `waiting` (the account's protection is holding it): pass the outcome here and the shell shows
    * its one Waiting screen (what it is, the countdown, cancel; send when ready). Apps never run or cancel held requests.
    */

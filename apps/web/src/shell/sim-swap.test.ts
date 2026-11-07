@@ -54,7 +54,7 @@ test("Sim: Home's Swap of the Safe's USDC for SOL lands SOL, reads Swap from the
   const usdc0 = await s.safeUsdc();
   assert.equal(await s.sol(), 0);
   // SwapSheet's swapWords("10", "USDC", "SOL")
-  const words = "Swap $10 of USDC for SOL";
+  const words = "Swap $10.00 of USDC for SOL";
   // SwapSheet's ask for this route (askOf "topup"), then the name it gives the row at the core's answer
   const r = await s.ask<SpendingActivity>("spending.topUp", { usd: 10, swap: "USDC", legs: [{ network: "sol", usd: 10 }], key: "simswap-usdc-sol-01" });
   nameSwap(r.id, words, "0.0644 SOL");

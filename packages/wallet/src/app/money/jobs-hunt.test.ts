@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createMockBridge } from "@zerofee/shell-api/MockBridge.ts";
+import { simClock } from "@zerofee/shell-api/testing/sim-clock.ts";
 import { ProblemError } from "@zerofee/core/problem";
 import { createSpendingService, type SpendingActivity } from "@zerofee/core/spending";
 import { bridgeWallets, createCoreFloat, type CoreFloatDeps } from "@zerofee/trade/float-core.ts";
@@ -38,11 +39,12 @@ test("B3: the time left in words, counting down; past the estimate it never blam
   }
   assert.equal(timeLeft(undefined, T), TIME_WORDS.none);
   assert.equal(receiptLeft(T + 240_000, T), "About 4 min left.");
-  assert.equal(receiptLeft(T + 40_000, T), "About 40 s left.");
+  assert.equal(receiptLeft(T + 40_000, T), "About 40 seconds left.");
   assert.equal(receiptLeft(undefined, T), "This job has no time estimate.");
   // control: the rows never count the time spent while a job runs (Home's rows and the Activity centre)
   const live = src("./LiveTrack.tsx");
-  assert.match(live, /return `\$\{step\?\.label \?\? "On its way"\} · \$\{timeLeft\(t\.endsAt, now, t\.startMs\)\}`;/);
+  // fix/move-leg-steps (copy review): the step's words through cardStep (no figure the title shows)
+  assert.match(live, /return `\$\{step \? cardStep\(step\.label, t\.title\) : "On its way"\} · \$\{timeLeft\(t\.endsAt, now, t\.startMs\)\}`;/);
   assert.doesNotMatch(live, /"On its way"\} · \$\{shortElapsed/);
   const centre = src("../../../../shell-api/src/TaskCentre.tsx");
   assert.match(centre, /const left = timeLeft\(t\.endsAt, now, t\.startedAt\);/);
@@ -92,7 +94,9 @@ test("M4: the core says what went on to the wallets when the Safe sent more (the
   const PX = { sol: 150, hood: 3000, bsc: 600 } as const;
   const nativeUsd = async (c: keyof typeof PX) => PX[c];
   const run = async (usd: number, network = "sol") => {
-    const mock = createMockBridge({ latencyMs: 0, settleMs: 20, float: { moveMs: 10 }, hiddenStart: { usdc: "5", near: "0" }, safeFillOpen: true } as never);
+    // the Sim's steps held on the test's clock (it reads only the core's answer to the tap): none lands mid-call on a busy machine
+    const clock = simClock();
+    const mock = createMockBridge({ latencyMs: 0, settleMs: 20, timers: clock.timers, float: { moveMs: 10, timers: clock.timers }, hiddenStart: { usdc: "5", near: "0" }, safeFillOpen: true } as never);
     for (const chain of ["sol", "hood", "bsc"]) await mock.call("subwallet.create", { kind: "trade", chain });
     const kept = new Map<string, unknown>();
     const call: CoreFloatDeps["call"] = async (method, params) => { const r = await mock.call<any>(method, params); if ("problem" in r) throw new ProblemError(r.problem); return r.ok as never; };
@@ -134,13 +138,15 @@ test("M7: the Sim lands nothing while the page is offline; back online, it lands
   Object.defineProperty(globalThis, "navigator", { value: nav, configurable: true });
   g.addEventListener = (_e: string, f: () => void) => void waiting.push(f);
   try {
-    const mock = createMockBridge({ latencyMs: 0, settleMs: 10, hiddenStart: { usdc: "50", near: "0" } } as never);
+    const clock = simClock();
+    const mock = createMockBridge({ latencyMs: 0, settleMs: 10, timers: clock.timers, hiddenStart: { usdc: "50", near: "0" } } as never);
     await mock.call("subwallet.create", { kind: "trade", chain: "sol" });
     const sol = ((await mock.call<any>("subwallet.list", {})) as any).ok.find((w: { chain: string }) => w.chain === "sol");
     const r = await mock.call<any>("ledger.moveFromPrivate", { parts: [{ wallet: sol.id, usd: 5 }], label: "Move $5.00" });
     assert.ok("ok" in r, JSON.stringify(r));
     const status = async () => (((await mock.call<any>("ledger.activity", {})) as any).ok as { id: string; status: string }[]).find((x) => x.id.startsWith("pocket-send:"))?.status;
-    await new Promise((res) => setTimeout(res, 60));
+    // the pay's 10 ms step falls due on the test's clock (it was a 60 ms wall wait), with the page offline
+    await clock.advance(60);
     assert.notEqual(await status(), "done", "offline: not Done");
     assert.ok(waiting.length > 0, "it waits for the page to be back online");
     nav.onLine = true;

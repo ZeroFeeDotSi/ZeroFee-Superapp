@@ -111,7 +111,8 @@ export interface WalletSource {
   refresh: () => void;
   /** `tap`: the person's own click on the Add button (D143: a fill starts only from a trusted tap on that amount). */
   /** `made`: the fill's job exists (its Face ID said yes, or the core answered): the sheet says "Job created." */
-  fund: (usd: number, tap: unknown, made?: () => void) => Promise<Done>;
+  /** `made`: the job exists (its id: the receipt follows this job's own rows) */
+  fund: (usd: number, tap: unknown, made?: (job: string) => void) => Promise<Done>;
   empty: () => Promise<Done>;
   setCap: (usd: number) => Promise<Done>;
   /** The relay's word on what AgentZero owes (a call's closing line, with its own cost; or the 402). */
@@ -468,7 +469,7 @@ export function useAgentWallet(bridge: Bridge): WalletSource {
     })();
     return () => void (live = false);
   }, [bridge, refresh, settle, token]);
-  const fund = useCallback(async (usd: number, tap: unknown, made?: () => void): Promise<Done> => {
+  const fund = useCallback(async (usd: number, tap: unknown, made?: (job: string) => void): Promise<Done> => {
     // the core's floor as last read (it checks again and says its own reason by name)
     if (fillMin.min !== null && !(usd >= fillMin.min - 1e-9)) return { line: fillFloor(fillMin.min, fillMin.fees) };
     const feesWereLow = feesLowNow.current || walletNow.current === null;
@@ -480,7 +481,7 @@ export function useAgentWallet(bridge: Bridge): WalletSource {
       tasks: tasksRef.current ?? undefined, title: `Add $${usd.toFixed(2)} to AgentZero's wallet`, usd: `$${usd.toFixed(2)}`, etaSec: LEG_SEC.nearToSafe, safe: false, money: ["agent", "row:near"],
       call: async () => (await fillOnTap(bridge, tap, String(Math.round(usd * 1e6)), moveKey("agent-fill"))) as never,
       declined: (r) => "ok" in r && r.ok?.declined === true,
-      made: () => made?.(),
+      made: (j) => made?.(j.id),
     });
     if ("declined" in end) { walletTask(tasksRef.current, "fill", usd, { declined: true }); return { declined: true }; }
     if ("refused" in end) { const line = lineOf({ problem: end.refused } as never); walletTask(tasksRef.current, "fill", usd, { line }); return { line }; }

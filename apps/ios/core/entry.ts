@@ -21,7 +21,7 @@ import { setHoodProxy } from "@zerofee/core/hood-proxy";
 import { DemoCore } from "@zerofee/core/demo-core";
 import { MAIL_SERVICE } from "@zerofee/core/mail-service";
 import { relayBase } from "@zerofee/core/relay";
-import { signatureIsValid, type AccountKey, type DeviceKeys, type SheetRequest } from "@zerofee/core/device-key";
+import { setSignatures, signatureIsValid, type AccountKey, type DeviceKeys, type SheetRequest, type SheetSetRequest } from "@zerofee/core/device-key";
 import { ProblemError } from "@zerofee/core/problem";
 import { phoneProblem } from "@zerofee/core/security-problems";
 import type { Network, PlainWords } from "@zerofee/core/signer";
@@ -35,7 +35,7 @@ interface NativeHost {
   /** The native approval sheet for these words (JSON PlainWords), with Face ID: done(true) only if approved. */
   approve(words: string, done: (approved: boolean) => void): void;
   /** The chip key: "info" | "create" | "sign" ({ id, words, bytes }); done gets the JSON { ok } | { problem } Swift answers. */
-  key(op: "info" | "create" | "sign" | "signAlertsProof" | "signChatName" | "approval-state" | "approval-reset" | "approval-confirm" | "proof", params: string, done: (result: string) => void): void;
+  key(op: "info" | "create" | "sign" | "signSet" | "signAlertsProof" | "signChatName" | "approval-state" | "approval-reset" | "approval-confirm" | "proof", params: string, done: (result: string) => void): void;
   /** One of the app's own files for the core (the account contract's code), base64; "" if there is none. */
   resource(name: string): string;
   /** An event for the page (JSON payload). */
@@ -80,7 +80,7 @@ let chain: RpcChain | null = null;
 
 const fromB64 = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
-function keyCall<T>(op: "info" | "create" | "sign" | "signAlertsProof" | "signChatName" | "approval-state" | "approval-reset" | "approval-confirm" | "proof", params: Record<string, unknown> = {}): Promise<{ ok: T } | { problem: { whatHappened: string } }> {
+function keyCall<T>(op: "info" | "create" | "sign" | "signSet" | "signAlertsProof" | "signChatName" | "approval-state" | "approval-reset" | "approval-confirm" | "proof", params: Record<string, unknown> = {}): Promise<{ ok: T } | { problem: { whatHappened: string } }> {
   return new Promise((resolve) => native.key(op, JSON.stringify(params), (r) => resolve(JSON.parse(r))));
 }
 
@@ -97,14 +97,34 @@ class ChipKey implements AccountKey {
   async signHash(): Promise<Uint8Array> {
     throw new Error("On this phone the secure chip signs only on its own approval sheet.");
   }
-  /** Swift's sheet, Face ID, then the chip signs sha256(bytes). Null = Not now. Checked here before anything uses it. */
-  async signOnSheet({ id, words, bytes, summary }: SheetRequest): Promise<Uint8Array | null> {
-    const r = await keyCall<{ signature?: string; declined?: true }>("sign", { id, words, bytes: toB64(bytes), summary });
+  /** Swift's sheet, ONE Face ID, then the chip signs sha256(bytes) (key.signSet: one sheet's steps under one unlock, D3).
+   *  `pairHash` (the core's hash of the Private payment) rides along and must come back exactly: an extra check only;
+   *  the core releases that payment by leg 1's paid address and its own hash (dev-signer releasePair), never by this.
+   *  Null = Not now. Checked here before anything uses it. */
+  async signOnSheet(req: SheetRequest): Promise<Uint8Array | null> {
+    const { id, words, bytes, summary } = req;
+    const asked = (req as { pairHash?: unknown }).pairHash;
+    const pairHash = typeof asked === "string" ? asked : undefined;
+    const r = await keyCall<{ signatures?: unknown; pairHash?: unknown; declined?: true }>("signSet", { id, words, txs: [{ bytes: toB64(bytes), summary }], ...(pairHash ? { pairHash } : {}) });
     if ("problem" in r) throw new Error(r.problem.whatHappened);
-    if (r.ok.declined || !r.ok.signature) return null;
-    const signature = fromB64(r.ok.signature);
+    if (r.ok.declined) return null;
+    const first = Array.isArray(r.ok.signatures) && r.ok.signatures.length === 1 ? r.ok.signatures[0] : undefined;
+    if (typeof first !== "string") return null;
+    // an extra check: Swift's echo of the pair's hash must be exact, or nothing is used. The binding itself is the core's:
+    // leg 1's paid address and its own pair.hash (dev-signer releasePair)
+    if (pairHash !== undefined && r.ok.pairHash !== pairHash) throw new Error("What the phone signed didn't match what you approved, so ZeroFee didn't use it. Your money hasn't moved.");
+    const signature = fromB64(first);
     if (!signatureIsValid(sha256(bytes), signature, this.publicKey)) throw new Error("The chip's signature didn't check out, so it wasn't used.");
     return signature;
+  }
+  /** Separate steps of one action (TxRequest.apart): every tx to key.signSet at once, ONE sheet, ONE Face ID; Swift decodes
+   *  and checks each, refuses more than 4 (never splits) and ends the context on the last signature. A signature per tx
+   *  must come back, each checked against its own tx's hash, or none is used. Null = Not now. */
+  async signSetOnSheet(req: SheetSetRequest): Promise<Uint8Array[] | null> {
+    const { id, words, txs, pairHash } = req;
+    const r = await keyCall<{ signatures?: unknown; pairHash?: unknown; declined?: true }>("signSet", { id, words, txs: txs.map((t) => ({ bytes: toB64(t.bytes), summary: t.summary })), ...(pairHash ? { pairHash } : {}) });
+    if ("problem" in r) throw new Error(r.problem.whatHappened);
+    return setSignatures(txs, r.ok, this.publicKey, pairHash);
   }
   /** The relay's email-alerts proof: Swift builds and shows it (AlertsProof), the chip signs. Checked by the core. */
   async signAlertsProof({ accountId, email, deadline, nonce }: { accountId: string; email: string; deadline: string; nonce: Uint8Array }): Promise<Uint8Array | null> {
@@ -153,8 +173,10 @@ const chipKeys: DeviceKeys = {
 
 /** Every event the core sends, passed to the page through Swift (approval.needed never: the sheet is Swift's own).
  *  recovery.renewed too: Browser's engine drops the old words' wallets on it, and the shell says the new words are in
- *  (security review 2 Nov: without it the phone's Browser kept signing from the replaced words' wallet). */
-const EVENTS = ["recovery.started", "recovery.status", "recovery.renewed", "account.waiting.ended", "subwallet.session.ended", "account.create.step"];
+ *  (security review 2 Nov: without it the phone's Browser kept signing from the replaced words' wallet). job.signed: the
+ *  last signature of a Safe action is made, so the page says "Job created." then and never before (D7). approval.asked:
+ *  a job's chip sheet is about to show (its key only, never the words), so that job's row waits on the Face ID (audit). */
+const EVENTS = ["recovery.started", "recovery.status", "recovery.renewed", "account.waiting.ended", "subwallet.session.ended", "account.create.step", "job.signed", "approval.asked"];
 
 const answer = (done: (json: string) => void, value: unknown) => done(JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? v.toString() : v)));
 

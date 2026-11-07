@@ -23,7 +23,7 @@ export function logoAddressOk(chain: string, a: unknown): chain is LogoChain {
 
 /** The relay this build talks to (VITE_ZEROFEE_RELAY), or undefined. */
 export function buildRelay(): string | undefined {
-  return relayBase((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_RELAY);
+  return relayBase(import.meta.env?.VITE_ZEROFEE_RELAY);
 }
 
 /** The coin's logo url on the relay, by chain and address only; undefined with no relay or an address it wouldn't take.

@@ -29,7 +29,7 @@ test("a send to someone's address: To is the address, short, with Copy holding i
 
 test("a pay into the person's own SOL wallet: To names the wallet, Copy has its address", () => {
   const f = facts(mv({ id: "pay:b", kind: "pay", from: USDC, to: MY_SOL, amount: "10", private: true }));
-  assert.equal(f.From!.value, "Private balance");
+  assert.equal(f.From!.value, "Private");
   assert.match(f.To!.value, /^Your .*SOL/);
   assert.equal(f.To!.copy, MY_SOL);
 });

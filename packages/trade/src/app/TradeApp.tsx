@@ -203,6 +203,7 @@ function TradeScreens() {
     if (screen === "wallets") { setSheet(null); seeWallets(); return true; }
     if (screen === "settings") { setSheet(null); setView({ kind: "settings" }); return true; }
     if (screen === "search") { setSheet(null); setView({ kind: "tabs" }); setTab("trade"); return true; }
+    if (screen === "activity") { setSheet(null); setView({ kind: "tabs" }); setTab("activity"); return true; }
     return false;
   };
   const onProblem = async (p: Problem): Promise<NextStep> => {

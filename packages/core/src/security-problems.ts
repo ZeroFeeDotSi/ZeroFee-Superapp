@@ -15,6 +15,9 @@ export function unexpectedDetails(where?: string, error?: unknown): string {
   return ["Details for ZeroFee: security.unexpected", where ? where.replace(/[^\w.-]/g, "").slice(0, 60) : "", error === undefined ? "" : said].filter(Boolean).join(" · ");
 }
 const noMoney: MoneyState = { state: "not-involved" };
+/** A plain throw in a call that can move money (money-calls.ts): nobody can say if it left. The ledger's says the same. */
+export const UNKNOWN_WORDS = "ZeroFee hit a problem on its side. Check Activity before you try again.";
+export const UNKNOWN_MONEY: MoneyState = { state: "unsure", where: "in your own wallets, or on its way", check: "Activity shows what moved." };
 
 /** "30 seconds", "5 minutes", "1 hour": a wait in plain words (the lock screen's own way, UnlockGate.tsx). */
 function waitIn(ms: number): string {
@@ -175,6 +178,30 @@ export const securityProblems = {
     money: { state: "on-the-way", where: "on the NEAR network", etaSeconds: 30 },
     next: { kind: "wait", label: "Wait" },
     more: `Follow it here: ${explorerUrl}`,
+  }),
+  /** The fence (the audit's C1, 7 Nov): the note of the highest nonce signed couldn't be read or kept, so nothing was signed.
+   *  the copy review's words (7 Nov). */
+  nonceNotKept: (): Problem => ({
+    code: "security.sign.not-kept",
+    whatHappened: "ZeroFee couldn't save its safety note on this phone, so it didn't sign. Your money hasn't moved.",
+    money: inYourAccount,
+    next: { kind: "retry", label: "Try again" },
+  }),
+  /** Separate steps on one sheet (TxRequest.apart) asked by anyone but ZeroFee's own Safe screens (the audit's C3): refused by
+   *  name, never split. the copy review's words (7 Nov), Close lit. */
+  stepsNotAllowed: (): Problem => ({
+    code: "security.steps.not-allowed",
+    whatHappened: "Only ZeroFee's own screens can ask for steps together, so ZeroFee stopped this. Your money hasn't moved.",
+    money: inYourAccount,
+    next: { kind: "nothing", label: "Close" },
+  }),
+  /** Separate steps a key or signer can't sign together under one Face ID (a sheet key with no set, a signer with no
+   *  fence: the audit's MUST 2): refused before the sheet, never split. the copy review's words (7 Nov). */
+  stepsNotTogether: (): Problem => ({
+    code: "security.steps.not-together",
+    whatHappened: "This phone can't approve these steps together yet, so nothing was signed. Your money hasn't moved.",
+    money: inYourAccount,
+    next: { kind: "nothing", label: "Close" },
   }),
   signatureInvalid: (): Problem => ({
     code: "security.sign.invalid",
@@ -649,11 +676,13 @@ export const securityProblems = {
     money: { state: "not-involved" },
     next: { kind: "nothing", label: "Go back" },
   }),
-  subwalletRefused: (detail: string): Problem => ({
+  /** `again` (the copy review's ruling, 7 Nov): a read that failed (Private, the Safe, a coin's price), so a retry can work: Try again,
+   *  lit. Every other refusal: Go back, as before. */
+  subwalletRefused: (detail: string, again?: true): Problem => ({
     code: "security.subwallet.refused",
     whatHappened: "This wallet can't approve this, so ZeroFee said no.",
     money: { state: "safe", where: "in that wallet" },
-    next: { kind: "nothing", label: "Go back" },
+    next: again ? { kind: "retry", label: "Try again" } : { kind: "nothing", label: "Go back" },
     more: detail,
   }),
   /**
@@ -831,6 +860,14 @@ export const securityProblems = {
     whatHappened: "ZeroFee hit a problem on its side. Nothing was sent.",
     money: inYourAccount,
     next: { kind: "retry", label: "Try again" },
+    more: unexpectedDetails(where, error),
+  }),
+  /** The same, in a call that can move money: never "Nothing was sent", never a Try again (audit, 6 Nov). */
+  unexpectedMoney: (where?: string, error?: unknown): Problem => ({
+    code: "security.unexpected.money",
+    whatHappened: UNKNOWN_WORDS,
+    money: UNKNOWN_MONEY,
+    next: { kind: "open", label: "See what happened", screen: "activity" },
     more: unexpectedDetails(where, error),
   }),
 };

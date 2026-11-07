@@ -59,7 +59,7 @@ export type ChatItem =
 
 /** The free reading's relay, from the build (https, or a local http one); null when there is none. */
 export const relayBase = (): string | null => {
-  const raw = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_RELAY;
+  const raw = import.meta.env?.VITE_ZEROFEE_RELAY;
   try {
     const u = raw ? new URL(raw) : null;
     const local = u?.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);

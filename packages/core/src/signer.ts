@@ -86,12 +86,41 @@ export interface TxRequest {
    */
   moveFill?: true;
   /**
+   * A Move's fill, the whole Move (the copy review's (a), 7 Nov): each part's units in the fill's coin, 2 to 4 of them, as
+   * the wallet's plan has them (private-move.ts). Words only, never signed: the sheet says the whole Move in one line
+   * only once the core finds the very leg it built among them (intents.ts legsBlock); else no line.
+   */
+  movePlan?: string[];
+  /**
+   * A Move's fill that is a Swap (Home's Swap paid through Private; the copy review's (c), 7 Nov): a marker. The sheet is titled as a
+   * Swap only when the core's own record of the payment pays out another coin than the Safe's; else as a Move.
+   */
+  moveSwap?: true;
+  /**
    * A Send's fill (the Safe → Private move in whose payout goes to someone else; product decision, 5 Nov): a marker only. Its
    * sheet says the payout as the core read it from 1Click's signed quote when the pocket's payment was joined to this
    * move in (subwallets sendPayout): the payee in full (D37), what they get, and the Safe's figure from the bytes. No
    * such record, or one that doesn't fit this move in: refused before Face ID.
    */
   sendFill?: true;
+  /**
+   * More of this action's signatures come after this one (the ledger's signAll, a plan of steps the account can't chain):
+   * a marker only. The core says job.signed only for an action's last signature (bug report, 6 Nov).
+   */
+  more?: true;
+  /**
+   * The job this request is for (the wallet's own key of the Move or Swap, 16 to 64 letters, digits, - or _): a label
+   * only, never signed and never on the sheet. Just before its sheet shows, the core says approval.asked with it, so that
+   * job's row waits on the Face ID (the audit's MUST, 7 Nov: the phone's chip sheet is never heard by the page).
+   */
+  job?: string;
+  /**
+   * The steps (this request, then `then`) are separate transactions, for an account that can't chain them (the ledger's
+   * approvals): ONE sheet names every step, ONE Face ID signs them all (key.signSet, at most four), each with its own
+   * nonce in order, and they are sent in that order, each only once the one before it is done. Only ZeroFee's own Safe
+   * screens may ask it (from "wallet" or "trade", stamped by forApps); any other app is refused by name.
+   */
+  apart?: true;
 }
 
 /**
@@ -125,6 +154,8 @@ export interface PlainWords {
    * Both are rounded down for reading (4 decimals). Amounts that move, in the title and lines, are always exact.
    */
   effect: { token: string; before: string; after: string }[];
+  // an empty `before` is a row that says only where it ends ("Your Safe after", "$1,090.50 in USDC": separate steps, 53):
+  // the sheet draws `after` alone, no arrow
   /** The asking app's own words ("Wallet says: …"). Shown smaller, under everything above, never instead of it. */
   hint?: string;
   /** D146: the app that asked, as forApps stamped it ("wallet", "browser"…); absent: ZeroFee's own screens. A sheet shows
@@ -202,10 +233,11 @@ export interface Warning {
 }
 
 export type TxOutcome =
-  | { status: "done"; txHash: string; explorerUrl: string }
+  /** `explorerUrls`: every transaction sent, in order, for a request of separate steps (TxRequest.apart). */
+  | { status: "done"; txHash: string; explorerUrl: string; explorerUrls?: string[] }
   /** Accepted by the account's rules, but held: it waits until `readyAtIso` (the phone can cancel), and/or needs the
    *  second device's OK. Nothing has moved yet. `id` names it in `account.waiting`. */
-  | { status: "waiting"; txHash: string; explorerUrl: string; id: string; readyAtIso: string; needsSecondDevice: boolean }
+  | { status: "waiting"; txHash: string; explorerUrl: string; id: string; readyAtIso: string; needsSecondDevice: boolean; explorerUrls?: string[]; unsent?: number }
   | { status: "declined" } // the user said no, or closed the approval screen: not an error
   | { status: "problem"; problem: Problem };
 

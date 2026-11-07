@@ -107,4 +107,4 @@ export const phoneAppUrl = (raw: string | undefined): string => {
   const v = raw?.trim() ?? "";
   return /^https:\/\/[a-z0-9.-]+(\/[^\s"'<>]*)?$/i.test(v) ? v : "https://zerofee.si";
 };
-export const PHONE_APP_URL = phoneAppUrl((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_PHONE_APP_URL);
+export const PHONE_APP_URL = phoneAppUrl(import.meta.env?.VITE_PHONE_APP_URL);

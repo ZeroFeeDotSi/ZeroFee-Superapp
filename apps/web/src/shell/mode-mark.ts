@@ -10,7 +10,7 @@ export const SIM_LABEL = "Sim";
 /** The tap's label (Copywriter, 3 Nov). */
 export const HIDE_DUST = "Hide the Beta line for 1 day";
 /** D157: the Chrome extension has no Sim at all, so its build carries no Sim words (read inline: the bundler drops them). */
-export const SIM_NOTE = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_TARGET === "extension" && (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_EXTENSION_CHECK !== "1" ? "" : "Sim: pretend money";
+export const SIM_NOTE = import.meta.env?.VITE_ZEROFEE_TARGET === "extension" && import.meta.env?.VITE_ZEROFEE_EXTENSION_CHECK !== "1" ? "" : "Sim: pretend money";
 /** How long a hidden dust line stays hidden. */
 export const DUST_BACK_MS = 24 * 60 * 60 * 1000;
 /** When the dust line was hidden (Real's own storage: Sim never shows it). */

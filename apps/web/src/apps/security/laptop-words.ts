@@ -31,7 +31,7 @@ export const AT_LAUNCH = LAPTOP_SOON;
 
 /** Is this a production build (Vite's PROD)? A production build never names a local address (the copy review's desktop audit, 5 Nov:
  *  "open localhost:5209/laptop" in a sentence). */
-export const PROD_BUILD: boolean = (import.meta as { env?: { PROD?: boolean } }).env?.PROD === true;
+export const PROD_BUILD: boolean = import.meta.env?.PROD === true;
 /** The page's own origin as a person types it: the scheme and "://" dropped, the host kept (a bare host stays as it is). */
 const typed = (origin: string): string => origin.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").replace(/\/+$/, "").toLowerCase();
 

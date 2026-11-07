@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createMockBridge } from "@zerofee/shell-api/MockBridge.ts";
+import { simClock } from "@zerofee/shell-api/testing/sim-clock.ts";
 import { ProblemError } from "@zerofee/core/problem";
 import { createSpendingService, type SpendingActivity } from "@zerofee/core/spending";
 import { bridgeWallets, createCoreFloat, type CoreFloatDeps } from "../../../../trade/src/float-core.ts";
@@ -14,10 +15,12 @@ import { everyLanded, legsOf, placesNow, planOf, runOf, today, withLeg, type Mov
 
 const here = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 const PX = { sol: 150, hood: 3000, bsc: 600 } as const;
-const settle = () => new Promise((r) => setTimeout(r, 40));
 
 async function engine() {
-  const mock = createMockBridge({ latencyMs: 0, settleMs: 5, float: { moveMs: 10 } });
+  const clock = simClock();
+  const mock = clock.watch(createMockBridge({ latencyMs: 0, settleMs: 5, timers: clock.timers, float: { moveMs: 10, timers: clock.timers } }));
+  /** A round's 40 ms of the test's own time: the engine's calls answered, then the Sim's steps due by then land in order. */
+  const settle = async () => { await clock.quiet(); await clock.advance(40); };
   const call: CoreFloatDeps["call"] = async (method, params) => {
     const r = await mock.call<any>(method, params); if ("problem" in r) throw new ProblemError(r.problem);
     return r.ok;

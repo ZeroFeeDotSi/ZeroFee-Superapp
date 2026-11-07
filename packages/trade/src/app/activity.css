@@ -18,6 +18,8 @@ span.zf-shimmer.ac-img { box-shadow: none; }
 .ac-status { display: inline-flex; align-items: center; gap: 6px; font: 400 12.5px/1 var(--font); color: var(--ink-2); }
 .tr-card.is-live .ac-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--up); } /* live: the card's own dot is still; the step under way pings */
 /* a row that didn't go through (refused, or came back) is never green: a quiet --mute dot, "done" is the only mint one (5 Nov look) */
+.tr-card.is-check .ac-status { color: var(--mute); } /* the copy review's Check (7 Nov): mute, never the up or bad style */
+.tr-card.is-check .ac-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mute); }
 .tr-card.is-off .ac-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mute); }
 
 .tr-steps { list-style: none; margin: 0 0 14px 48px; padding: 0; display: grid; gap: 8px; }
@@ -38,3 +40,11 @@ span.zf-shimmer.ac-img { box-shadow: none; }
 .tr-cards > :nth-child(2) { animation-delay: 45ms; } .tr-cards > :nth-child(3) { animation-delay: 90ms; } .tr-cards > :nth-child(4) { animation-delay: 135ms; }
 .tr-cards > :nth-child(5) { animation-delay: 180ms; } .tr-cards > :nth-child(n+6) { animation-delay: 225ms; }
 @media (prefers-reduced-motion: reduce) { .tr-cards > * { animation: none; } }
+/* a kept trade's way back (the audit's MUST, 7 Nov; the copy review's sizes): Get it back lit, Copy 44 px, each value one line at 15 px */
+.tr-kept { display: grid; gap: 8px; padding: 0 0 14px 48px; }
+.tr-kept-go { min-height: 44px; }
+.tr-kept-more, .tr-kept-copy { min-height: 44px; min-width: 44px; justify-self: start; }
+.tr-kept-details { display: grid; gap: 4px; }
+.tr-kept-row { display: grid; grid-template-columns: auto 1fr 44px; align-items: center; gap: 8px; min-height: 44px; }
+.tr-kept-row .l { font: 400 13px/1.3 var(--font); color: var(--mute); }
+.tr-kept-row .v { font: 400 15px/1.3 var(--font); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

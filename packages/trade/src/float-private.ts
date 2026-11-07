@@ -5,8 +5,8 @@
 // page closed mid-job, by the ledger's own record of the job's payments (ledger.privateMoveStatus, by the job's key).
 // Loaded with its first use, never in Home's first load; types only from the engine (its values come in the host).
 import { ProblemError } from "@zerofee/core/problem";
-import { LANDED_MISSES, LANDED_UNREAD, privateBack } from "@zerofee/core/private-route";
-import type { FloatChain, MoveRow } from "./float-view.ts";
+import { LANDED_MISSES, LANDED_UNREAD, ONWAY_AGAIN, PRIVATE_KEEP_MS, PRIVATE_UNSURE, privateBack, privateOnWay } from "@zerofee/core/private-route";
+import { heldRow, type FloatChain, type MoveRow } from "./float-view.ts";
 
 type Priv = NonNullable<MoveRow["priv"]>;
 type Part = Priv["parts"][number];
@@ -39,6 +39,8 @@ export interface PrivateAdd {
   label: string;
   asked: { for?: string };
   job?: string;
+  /** Home's Swap (spending then.swap): the Safe's sheet is titled as a Swap (the copy review's (c), 7 Nov). */
+  swap?: true;
 }
 
 /** Asked of the ledger this often while a payment is open (events come first; this is for a page that was closed). */
@@ -99,9 +101,9 @@ export async function addFromPrivate(h: PrivateHost, r: MoveRow, a: PrivateAdd):
   // the tap waits on nothing), so its Done waits for a read that SHOWS the money (chainShown)
   const baseP = Promise.all(parts.map((p) => (p.chain === "near" ? Promise.resolve(null) : nativeOf(h, p.wallet))));
   await h.saveAdds();
-  let res: { parts: { wallet: string; usd: number; ids: string[]; stopped?: string; minOut?: string }[] };
+  let res: { parts: { wallet: string; usd: number; ids: string[]; stopped?: string; unsure?: true; minOut?: string }[] };
   try {
-    res = await h.d.call("ledger.moveFromPrivate", { parts: parts.map(({ wallet, usd, amount }) => ({ wallet, usd, ...(amount ? { amount } : {}) })), ...(a.from ? { tokenId: a.from.tokenId } : {}), label: a.label, ...a.asked, ...(a.job ? { job: a.job } : {}), ...(a.ready ? { whole: true } : {}) });
+    res = await h.d.call("ledger.moveFromPrivate", { parts: parts.map(({ wallet, usd, amount }) => ({ wallet, usd, ...(amount ? { amount } : {}) })), ...(a.from ? { tokenId: a.from.tokenId } : {}), label: a.label, ...a.asked, ...(a.job ? { job: a.job } : {}), ...(a.ready ? { whole: true } : {}), ...(a.swap ? { swap: true } : {}) });
   } catch (e) {
     if (e instanceof ProblemError && /declin/i.test(e.problem.code)) return "declined";
     throw e;
@@ -109,7 +111,7 @@ export async function addFromPrivate(h: PrivateHost, r: MoveRow, a: PrivateAdd):
   // the tap's read failed: Home's last known figure of that wallet (or this engine's own last read of it) is the base, so
   // a wallet that already held the least never ticks at once; none known: the whole balance must hold it (shows)
   const base = (await baseP).map((b, i) => (b !== null || parts[i]!.chain === "near" ? b : knownOf(h, parts[i]!.wallet)));
-  r.priv = { parts: parts.map((p, i) => ({ wallet: p.wallet, chain: p.chain, usd: p.usd, ids: res.parts[i]?.ids ?? [], ...(res.parts[i]?.stopped ? { stopped: res.parts[i]!.stopped } : {}), ...(base[i] != null ? { base: base[i]! } : {}), ...(UNITS.test(res.parts[i]?.minOut ?? "") ? { minOut: res.parts[i]!.minOut! } : {}) })) };
+  r.priv = { parts: parts.map((p, i) => ({ wallet: p.wallet, chain: p.chain, usd: p.usd, ids: res.parts[i]?.ids ?? [], ...(res.parts[i]?.stopped ? { stopped: res.parts[i]!.stopped } : {}), ...(res.parts[i]?.unsure === true ? { unsure: true as const } : {}), ...(base[i] != null ? { base: base[i]! } : {}), ...(UNITS.test(res.parts[i]?.minOut ?? "") ? { minOut: res.parts[i]!.minOut! } : {}) })) };
   delete r.signing;
   Object.assign(r, { status: "moving", where: "in-flight" });
   // the legs never go on from the NEAR wallet: each was paid straight to its wallet
@@ -122,13 +124,35 @@ export async function addFromPrivate(h: PrivateHost, r: MoveRow, a: PrivateAdd):
 }
 
 /** One movement of a paid row ended (or moved on): its row says so once every part is over. */
-export function moved(r: MoveRow, m: { id: string; status: string }, now: number = Date.now()): boolean {
+export function moved(r: MoveRow, m: { id: string; status: string; problem?: { money?: { state?: string } } }, now: number = Date.now()): boolean {
   const p = r.priv?.parts.find((x) => x.ids.includes(m.id));
   if (!p) return false;
   (p.ends ??= {})[m.id] = m.status;
+  // the Problem's money state rides the part (audit, 6 Nov): a payment that ended unpaid with its money still on its way to
+  // Private (send-job's slow end) is never said back there
+  const money = moneyOf(m);
+  if (money) (p.money ??= {})[m.id] = money;
   settle(r, now);
   return true;
 }
+
+/** Where an unpaid payment's money is, as its Problem says it (`money.state`), for an end that didn't pay. Pure. */
+export const moneyOf = (m: { status: string; problem?: { money?: { state?: string } } }): string | undefined =>
+  m.status === "problem" && typeof m.problem?.money?.state === "string" ? m.problem.money.state : undefined;
+/** A part's words once it ended unpaid: why it stopped; else on its way to Private, when a payment of it ended with its
+ *  money on the way there; else unsure (failedProblem's words for Private: leg 1 FAILED, or a hold past the keep, 83,
+ *  6 Nov); else back in Private. Pure: a table test. */
+export function partEnd(p: Pick<Part, "stopped" | "usd" | "ids" | "money">): string {
+  if (p.stopped) return p.stopped;
+  if (p.ids.some((id) => p.money?.[id] === "on-the-way")) return `${privateOnWay(p.usd)} ${ONWAY_AGAIN}`;
+  return p.ids.some((id) => p.money?.[id] === "unsure") ? PRIVATE_UNSURE : privateBack(p.usd);
+}
+/**
+ * A held row the ledger keeps no record of (its status read answers null) past PRIVATE_KEEP_MS from its tap (audit, 6 Nov:
+ * an older build's slow end, whose leg 1 was never kept): its money on the way is said unsure from then on, and the row
+ * is read no more. Never earlier: a younger one stays held and read. Pure: a table test.
+ */
+export const holdExpired = (r: Pick<MoveRow, "priv" | "at">, now: number): boolean => heldRow(r) && now - r.at > PRIVATE_KEEP_MS;
 
 const over = (p: Part) => !!p.stopped || (p.ids.length > 0 && p.ids.every((id) => ENDED.has(p.ends?.[id] ?? "")));
 const ok = (p: Part) => !p.stopped && p.ids.length > 0 && p.ids.every((id) => p.ends?.[id] === "done");
@@ -143,9 +167,16 @@ export function settle(r: MoveRow, now: number = Date.now()): void {
   if (fill) r.priv!.fill = fill;
   if (!parts.length || !parts.every(over)) return;
   const back = parts.filter((p) => !ok(p));
-  const said = back.map((p) => `${NAME[p.chain] ?? "Your wallet"}: ${p.stopped ?? privateBack(p.usd)}`);
-  if (back.length === parts.length) Object.assign(r, { status: "failed", where: "main", note: parts.length === 1 ? back[0]!.stopped ?? privateBack(back[0]!.usd) : said.join(" · ") });
-  else if (r.status !== "done") r.priv!.landed ??= { at: now, ...(said.length ? { note: said.join(" · ") } : {}) };
+  const said = back.map((p) => `${NAME[p.chain] ?? "Your wallet"}: ${partEnd(p)}`);
+  if (back.length === parts.length) return void Object.assign(r, { status: "failed", where: "main", note: parts.length === 1 ? partEnd(back[0]!) : said.join(" · ") });
+  const note = said.length ? said.join(" · ") : undefined;
+  const l = r.priv!.landed;
+  if (!l) { if (r.status !== "done") r.priv!.landed = { at: now, ...(note ? { note } : {}) }; return; }
+  // a part's words changed once it ended (its money on its way to Private, now there: 83, 6 Nov): the landing keeps its
+  // time, its words follow, and a Done row that said them says the new ones
+  if (l.note === note) return;
+  if (r.status === "done" && l.note !== undefined && r.note === l.note) { if (note) r.note = note; else delete r.note; }
+  if (note) l.note = note; else delete l.note;
 }
 
 /**
@@ -181,20 +212,33 @@ export function fillOf(r: MoveRow): "doing" | "done" | undefined {
   return ids.every((x) => x.end && ENDED.has(x.end)) ? "done" : "doing";
 }
 
+/** The status read's money state of each unpaid payment (privateMoveStatus `money`), over what the row heard before. */
+function moneyMap(ms: { id: string; status: string; money?: string }[], was?: Record<string, string>): { money?: Record<string, string> } {
+  const m: Record<string, string> = { ...was };
+  for (const x of ms) if (x.status === "problem" && typeof x.money === "string") m[x.id] = x.money;
+  return Object.keys(m).length ? { money: m } : {};
+}
+
 /** Rows paid from Private still open (a page closed mid-job included): the ledger's own record of each, by its key. */
 export async function checkOpen(h: PrivateHost): Promise<void> {
   const { adds, asking } = h;
   const now = h.d.now();
   for (const r of [...adds]) {
-    if (!r.priv || asking.has(r.id) || (r.status !== "moving" && r.status !== "waiting") || now - (r.priv.checkedAt ?? 0) < PRIV_CHECK_MS) continue;
+    if (!r.priv || asking.has(r.id) || (r.status !== "moving" && r.status !== "waiting" && !heldRow(r)) || now - (r.priv.checkedAt ?? 0) < PRIV_CHECK_MS) continue;
     const job = r.id.startsWith("mv-") ? r.id.slice(3) : undefined;
     if (!job) continue;
     r.priv.checkedAt = now;
-    const st = await h.d.call<{ parts: { wallet: string; stopped?: string; moves: { id: string; status: string }[] }[] } | null>("ledger.privateMoveStatus", { job }).catch(() => undefined);
+    const st = await h.d.call<{ parts: { wallet: string; stopped?: string; unsure?: true; moves: { id: string; status: string; money?: string }[] }[] } | null>("ledger.privateMoveStatus", { job }).catch(() => undefined);
     if (st === undefined) continue;
     // nothing kept by the ledger: it never reached a payment (refused, or the page closed before it): the row goes
     if (st === null) {
       if (!r.priv.parts.some((p) => p.ids.length) && now - r.at > PRIV_ORPHAN_MS) { adds.splice(adds.indexOf(r), 1); h.changed(); }
+      // a hold whose record is gone, past the keep: unsure, and heldRow ends its reads
+      else if (holdExpired(r, now)) {
+        for (const p of r.priv.parts) for (const [id, v] of Object.entries(p.money ?? {})) if (v === "on-the-way") p.money![id] = "unsure";
+        settle(r, now);
+        h.changed();
+      }
       continue;
     }
     // a page closed mid-job: the payments as the ledger kept them, each with its status now
@@ -203,7 +247,7 @@ export async function checkOpen(h: PrivateHost): Promise<void> {
       const was = r.priv!.parts[i];
       // a status that names no wallet keeps the one the row was paid to (never blanked: its job names it and ends on it)
       // what the tap read of its wallet and the quote's least, kept (audit: its Done waits for a read that shows the money)
-      return { wallet: s.wallet || was?.wallet || "", chain: was?.chain ?? "near", usd: was?.usd ?? 0, ids: s.moves.map((m) => m.id), ends: Object.fromEntries(s.moves.filter((m) => ENDED.has(m.status)).map((m) => [m.id, m.status])), ...(s.stopped ? { stopped: s.stopped } : {}), ...(was?.base !== undefined ? { base: was.base } : {}), ...(was?.minOut !== undefined ? { minOut: was.minOut } : {}) };
+      return { wallet: s.wallet || was?.wallet || "", chain: was?.chain ?? "near", usd: was?.usd ?? 0, ids: s.moves.map((m) => m.id), ends: Object.fromEntries(s.moves.filter((m) => ENDED.has(m.status)).map((m) => [m.id, m.status])), ...moneyMap(s.moves, was?.money), ...(s.stopped ? { stopped: s.stopped } : {}), ...(s.unsure === true || was?.unsure ? { unsure: true as const } : {}), ...(was?.base !== undefined ? { base: was.base } : {}), ...(was?.minOut !== undefined ? { minOut: was.minOut } : {}) };
     });
     settle(r, now);
     h.changed();

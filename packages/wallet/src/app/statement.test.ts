@@ -32,7 +32,7 @@ const LEDGER: Movement[] = [
   mv({ id: "s3", kind: "transfer", from: "nep141:bnb", to: `${BNB_ADDR} on BNB Chain`, amount: "0.2", updatedAtIso: at(6) }),
   mv({ id: "s4", kind: "transfer", from: "near", to: "kim.near", amount: "3", updatedAtIso: at(7) }),
   // out, Hidden: USDC paid from Hidden; a Hidden send from the SOL row (recorded on this phone)
-  mv({ id: "h1", kind: "pay", from: "nep141:usdc", to: `${SOL_ADDR} on Solana`, amount: "25", private: true, updatedAtIso: at(8), caller: "wallet" }),
+  mv({ id: "pay:h1", kind: "pay", from: "nep141:usdc", to: `${SOL_ADDR} on Solana`, amount: "25", private: true, updatedAtIso: at(8), caller: "wallet" }),
   mv({ id: "hidden-row:x1", kind: "transfer", from: "nep141:sol", to: `${SOL_ADDR} on Solana`, amount: "0.05", updatedAtIso: at(9) }),
   // between your own places: into Hidden; a rules change moved no money
   mv({ id: "p1", kind: "private", from: "nep141:usdc", to: "private", amount: "40", updatedAtIso: at(10) }),
@@ -66,7 +66,7 @@ test("§0 matrix as data: in from Bitcoin (a 1Click-only coin), out to SOL, ETH 
   assert.equal(btc.link, "https://mempool.space/tx/abc");
   // Hidden and Plain: which rows say yes
   assert.deepEqual(ROWS.filter((r) => r.hidden === "yes").map((r) => r.date.slice(8, 10)), ["08", "09", "10"]);
-  assert.equal(ROWS.find((r) => r.date.slice(8, 10) === "08")!.from, "Private balance");
+  assert.equal(ROWS.find((r) => r.date.slice(8, 10) === "08")!.from, "Private");
   assert.equal(ROWS.find((r) => r.date.slice(8, 10) === "04")!.from, "Safe", "control: a plain send is from the Safe");
 });
 

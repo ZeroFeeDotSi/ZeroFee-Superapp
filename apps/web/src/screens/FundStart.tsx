@@ -16,7 +16,7 @@ import { QrCode } from "@zerofee/design/QrCode.tsx";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { PushedFrame, useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { ProblemView } from "../shell/ProblemView.tsx";
-import { ADD_LINE, ADD_TITLE, ALL_HEAD, COPY_ADDRESS, LIKELY_HEAD, NEAR_LINE, NO_MATCH, PICK_OTHER, PRIVATE_LINE, SEARCH_LABEL, SEND_MORE_LINE, SHOW_ADDRESS, SWAP_OFF_LINE, coinIcon, coinsFound, fundCoinsShown, WAITS_LINE, WAITS_TITLE, addressGroups, asShown, depositTitle, depositUntil, depositWhere, dollars, fundLine, fundNext, fundTitle, liveOf, mayGoToApp, mayLeaveSetup, openCostLine, openingWords, setupProgress, showsChecklist, type FundCoinRow } from "./fund.ts";
+import { ADD_LINE, ADD_TITLE, ALL_HEAD, COPY_ADDRESS, coinsAnswer, fundBack, LIKELY_HEAD, NEAR_LINE, NO_MATCH, PICK_OTHER, PRIVATE_LINE, SEARCH_LABEL, SEND_MORE_LINE, SHOW_ADDRESS, SWAP_OFF_LINE, coinIcon, coinsFound, fundCoinsShown, WAITS_LINE, WAITS_TITLE, addressGroups, asShown, depositTitle, depositUntil, depositWhere, dollars, fundLine, fundNext, fundTitle, liveOf, mayGoToApp, mayLeaveSetup, openCostLine, openingWords, setupProgress, showsChecklist, type FundCoinRow } from "./fund.ts";
 import { ThreadBar } from "@zerofee/design/Thread.tsx";
 import { homeProof } from "@zerofee/wallet/app/money/home-proof.ts";
 import { threadOf } from "../shell/thread.ts";
@@ -422,7 +422,13 @@ export function FundFlow({ bridge, wallet, everyMs = FUND_POLL_MS, onAway, onWor
     void (async () => {
       const res = await read();
       if (!live.current) return;
-      if ("ok" in res && res.ok.deposit) return setScreen(showsChecklist(res.ok) ? { k: "checklist" } : { k: "deposit" });
+      // the coins are read behind a kept address too, so its Back has them at once (fundBack)
+      if ("ok" in res && res.ok.deposit) {
+        const k = showsChecklist(res.ok) ? "checklist" : "deposit";
+        screenNow.current = k;
+        setScreen({ k });
+        return void showCoins(true);
+      }
       if ("problem" in res && res.problem.code !== "security.fund.not-opening") return onProblem(res.problem);
       await showCoins();
     })();
@@ -433,15 +439,26 @@ export function FundFlow({ bridge, wallet, everyMs = FUND_POLL_MS, onAway, onWor
     if (view && screen.k === "deposit" && showsChecklist(view)) setScreen({ k: "checklist" });
   }, [view, screen.k]);
 
-  async function showCoins() {
+  /** `quiet`: read again behind a Back or a kept address (coinsAnswer), never holding the screen for it. */
+  async function showCoins(quiet = false, held = false) {
     const res = await bridge.call<{ coins: FundCoinRow[]; open?: { near: string; usd?: string } }>("account.fund.coins");
     if (!live.current) return;
+    const at = screenNow.current;
+    const here = at === "coins" || at === "loading";
     // O-2c: NEAR that came early opened the account the moment the words were checked: nothing waits for money any more,
     // so in, never "There's no account waiting for money" over an account that just opened.
-    if ("problem" in res && res.problem.code === "security.fund.not-opening") return onDone();
-    if ("problem" in res) return onProblem(res.problem);
-    setCoins(res.ok);
-    setScreen({ k: "coins" });
+    if ((!quiet || here) && "problem" in res && res.problem.code === "security.fund.not-opening") return onDone();
+    const does = coinsAnswer(at, held, "ok" in res, quiet);
+    if ("ok" in res && does !== "nothing") setCoins(res.ok);
+    if (does === "show") setScreen({ k: "coins" });
+    if (does === "problem" && "problem" in res) onProblem(res.problem);
+  }
+  /** Back from a coin's page: the coins at once (fundBack), read again behind it. */
+  function backToCoins() {
+    const step = fundBack(coins !== null);
+    screenNow.current = step.to;
+    setScreen({ k: step.to });
+    if (step.reread) void showCoins(true, coins !== null);
   }
 
   async function start(coin: FundCoinRow, back: Screen, tries = 0) {
@@ -558,7 +575,7 @@ export function FundFlow({ bridge, wallet, everyMs = FUND_POLL_MS, onAway, onWor
     case "asking":
       return <AskingView symbol={screen.coin.symbol} onBack={() => setScreen(screen.back)} />;
     case "deposit":
-      return view?.deposit ? <DepositView v={view} copied={copied} onCopy={() => void copy()} onBack={() => void showCoins()} onRenew={() => void next(view)} more={hiddenOn} /> : null;
+      return view?.deposit ? <DepositView v={view} copied={copied} onCopy={() => void copy()} onBack={backToCoins} onRenew={() => void next(view)} more={hiddenOn} /> : null;
     case "checklist":
       return view ? <ChecklistView v={view} busy={opening} onNext={() => void next(view)} onBack={() => (view.stage !== "needs-funding" ? onAway() : mayGoToApp(view) ? void away() : setScreen({ k: "deposit" }))} /> : null;
     case "win":

@@ -31,6 +31,11 @@ export function shortChain(c: ChainView, wantUsd: number): { ready: string; buyN
   return { ready: `${usd(c.readyUsd)} ready now`, ...(buyNow !== undefined ? { buyNow } : {}), ...(onWay ? { onWay } : {}), moreUsd: Math.max(0, Math.ceil(wantUsd - c.readyUsd)) };
 }
 
+/** T2-5 (the copy review's walk, 8 Nov): the over-wallet refusal's face. Head "Your SOL wallet has $144.06, not $5,000." (what it can
+ *  spend, as the sheet's "to spend" says it, against the typed buy), body "Nothing was spent." */
+export const overWalletWords = (walletName: string, haveUsd: string, wantText: string): { head: string; body: string } =>
+  ({ head: `${walletName.replace(/^./, (x) => x.toUpperCase())} has ${haveUsd}, not ${wantText}.`, body: "Nothing was spent." });
+
 /** "Move $N more" (re-walk.3): what's missing for the buy, never more than the reserve can pay with the move's own fee
  *  on top, in whole dollars. */
 export const moveMoreUsd = (moreUsd: number, reserveUsd: number, feeRoom: number): number => Math.min(moreUsd, Math.floor(reserveUsd / (1 + feeRoom)));

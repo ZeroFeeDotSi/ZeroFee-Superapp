@@ -36,6 +36,7 @@ test("the guard can fail: each banned word is caught where a person would read i
     ["The quote ran out.", "quote"],
     ["Oops, try later!", "oops"],
     ["Paid with 500 units of nep141:usdc.near", "nep141"],
+    ["Leaving your private balance", "private balance"],
   ] as const) assert.ok(bannedIn("x.ts", text).some((b) => b.word === word), `${word} in "${text}"`);
   // B28 R5: the product F line and its kin each fail the guard; the named lines that replace them pass
   for (const bad of ["We can't reach the service that holds your coins right now.", "We couldn't read your money.", "NEAR didn't answer, so we couldn't read it.", "Something went wrong. Try again.", "We can’t reach the network right now."]) {
@@ -53,6 +54,7 @@ test("the guard can fail: each banned word is caught where a person would read i
   assert.deepEqual(bannedIn("packages/core/src/services.ts", "NEAR Intents"), [], "9a's downLine names it as people see it");
   assert.ok(bannedIn("packages/wallet/src/x.ts", "NEAR Intents' bridge").length > 0, "control: only there");
   assert.deepEqual(bannedIn("x.ts", "Your $20 is on its way to Spending."), []);
+  assert.ok(bannedIn("packages/wallet/src/app/money/live-steps.ts", "Leaving your private balance").length > 0, "53, 7 Nov: \"Private\" outside the core");
   // The product's F example (2 Nov) grades D or worse on its own, without the guard.
   assert.match(grade("x.ts", "Your protection was saved before it counted every coin, so it holds this as a big payment, and its price can't wait.").grade, /[DF]/);
   assert.equal(grade("x.ts", "NEAR didn't answer.").grade, "A");

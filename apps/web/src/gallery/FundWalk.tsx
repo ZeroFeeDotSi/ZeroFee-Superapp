@@ -49,6 +49,7 @@ let clockShift = 0;
 const realNow = Date.now;
 Date.now = () => realNow() + clockShift;
 let breakOpen = false;
+let coinsSlowMs = 0;
 const sampleAddress = (chainId: string, n: number) =>
   chainId === "sol" ? ["7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"][n % 2] : ["0x3f5CE5FBFe3E9af3971dD833D26bA9b5C936f0bE", "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"][n % 2];
 let made = 0;
@@ -100,6 +101,12 @@ function makeCore() {
     sol: sol as unknown as NonNullable<ConstructorParameters<typeof DemoCore>[0]["sol"]>, evm: evm as unknown as NonNullable<ConstructorParameters<typeof DemoCore>[0]["evm"]>,
   });
   core.on<{ id: string }>("approval.needed", ({ id }) => void core.call("approval.answer", { id, approve: true }));
+  // __fund.slowCoins: the coins' read as slow as mainnet's can be (it asks the chain and NEAR's price first)
+  const call = core.call.bind(core) as (m: string, p?: Record<string, unknown>) => Promise<unknown>;
+  (core as unknown as { call: typeof call }).call = async (m, p) => {
+    if (m === "account.fund.coins" && coinsSlowMs > 0) await new Promise((r) => setTimeout(r, coinsSlowMs));
+    return call(m, p);
+  };
   return core;
 }
 
@@ -128,6 +135,9 @@ const latest = () => [...quotes.keys()].at(-1)!;
   },
   breakOpen() {
     breakOpen = true;
+  },
+  slowCoins(ms: number) {
+    coinsSlowMs = ms;
   },
   later(minutes: number) {
     clockShift += minutes * 60_000;

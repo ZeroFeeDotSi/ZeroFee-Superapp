@@ -15,7 +15,7 @@ import { DEFAULT_POLICY, FIRST_FUNDING_MS, LEG_GAP_MS, OUT_FEE_ROOM, instantUsd,
 import { GAS_TOPUP_MIN_USD, KEY_FORMAT, NOT_STARTED, createJobRunner, gasTopUps, randomJobId, refusalWords, type Job, type MoveAnswer } from "./float-jobs.ts";
 import type { BetweenAsk, Inner } from "./float-two.ts";
 import type { PrivateHost } from "./float-private.ts";
-import { CHAIN_MIN_USD, DEFAULT_SPLIT, FLOAT_CHAINS, policyOf, proven, splitFromUse, type ChainView, type FloatChain, type FloatSnapshot, type FloatView, type MoveRow, type Split, type WalletView } from "./float-view.ts";
+import { CHAIN_MIN_USD, DEFAULT_SPLIT, FLOAT_CHAINS, heldRow, policyOf, proven, splitFromUse, type ChainView, type FloatChain, type FloatSnapshot, type FloatView, type MoveRow, type Split, type WalletView } from "./float-view.ts";
 
 const DECIMALS: Record<FloatChain, number> = { sol: 9, hood: 18, bsc: 18 };
 /** Smallest units as the coin, to 6 places, rounded down ("1.42", "0.012"): never a digit the chain doesn't hold. */
@@ -32,7 +32,7 @@ const DEPOSIT = /^[0-9a-f]{64}$/;
 /** An Add's ledger movement id (its row keeps its job's id, `mv-<key>`, from before the Safe signed). */
 const mvId = (r: MoveRow): string => r.mv ?? r.id;
 /** A refusal after the Safe signed, when the payment may still have gone (sent, its answer lost or half run). */
-const MAYBE_SENT = /^(security\.send\.(partly|unconfirmed)|ledger\.send\.unread)$/;
+const MAYBE_SENT = /^(security\.send\.(partly|unconfirmed)|ledger\.send\.unread|(ledger|security)\.unexpected\.money)$/;
 /** Finding 18: an open Add is checked against the core's own record after this long, this often, so many at a time. */
 export const ADD_CORE_AFTER_MS = 60_000;
 export const ADD_CORE_EVERY_MS = 15_000;
@@ -96,7 +96,7 @@ export function moveAnswer(a: FloatMoveWire | { declined: true }): MoveAnswer {
 }
 
 /** The ledger's movement for an Add (ledger.toTrading) once it ended other than done, as far as its row needs it. */
-export interface AddMovementEnd { status: string; problem?: { code?: string }; depositAddress?: string }
+export interface AddMovementEnd { status: string; problem?: { code?: string; money?: { state?: string } }; depositAddress?: string }
 /**
  * Where a Top up's money is once it ended other than done, in its row's words: never a bare "failed" (mainnet 2 Nov,
  * m-refund: a late Top up's $3 was refunded by 1Click into Spending's cash, the quote's refund address, and the row said
@@ -106,13 +106,13 @@ export interface AddMovementEnd { status: string; problem?: { code?: string }; d
  */
 export function addEnd(m: AddMovementEnd): Pick<MoveRow, "status" | "where" | "note"> & { stayed?: true } {
   const code = m.problem?.code ?? "";
-  if (m.status === "refunded") return { status: "refunded", where: "reserve", note: `The swap service sent it back to your NEAR wallet` };
+  if (m.status === "refunded") return { status: "refunded", where: "reserve", note: `${SERVICE_NAMES.oneclick} sent it back to your NEAR wallet` };
   if (code === "ledger.send.failed") return { status: "failed", where: "main", stayed: true, note: "It didn't go through, so the money never left your Safe" };
   if (code === "ledger.hold.cancelled" || code === "ledger.hold.declined") return { status: "failed", where: "main", stayed: true, note: "Cancelled while it waited, so the money stayed in your Safe" };
   if (code === "ledger.hold.part-sent") return { status: "failed", where: "main", stayed: true, note: "Only part of it ran after the wait, so the money stayed in your Safe" };
   const id = m.depositAddress ? ` (its id: ${m.depositAddress})` : "";
   if (code === "ledger.send.unread" || code === "ledger.hold.unknown") return { status: "failed", where: "in-flight", note: `Not clear yet if it left your Safe${id} · if it did, it's in your NEAR wallet` };
-  return { status: "failed", where: "in-flight", note: `${SERVICE_NAMES.oneclick} is still finishing it${id} · if not, the money comes back to your NEAR wallet` };
+  return { status: "failed", where: "in-flight", note: `${SERVICE_NAMES.oneclick} didn't finish this. It's either in your NEAR wallet or still with ${SERVICE_NAMES.oneclick}.` };
 }
 
 export interface CoreFloatDeps {
@@ -531,7 +531,8 @@ export function createCoreFloat(d: CoreFloatDeps): FloatView & { fromPrivate: bo
     if (leaving && leavingHome && !js.some((j) => j.id === leavingHome && (j.state === "planned" || j.state === "asked" || j.state === "moving"))) { leaving = false; leavingHome = undefined; }
     await addsFromCore();
     if (adds.some((r) => r.signing && !r.priv && !asking.has(r.id))) await signingCheck().catch(() => undefined);
-    if (adds.some((r) => r.priv && (r.status === "moving" || r.status === "waiting") && !asking.has(r.id))) await priv().then((m) => m.checkOpen(privHost())).catch(() => undefined);
+    // a row ended with a part's money on its way to Private is read too, until that money is there (audit, 6 Nov)
+    if (adds.some((r) => r.priv && (r.status === "moving" || r.status === "waiting" || heldRow(r)) && !asking.has(r.id))) await priv().then((m) => m.checkOpen(privHost())).catch(() => undefined);
     // a Move paid from Private that landed (the ledger's word) is Done in the round whose reads show it (rule 11)
     if (adds.some((r) => r.priv?.landed && r.status !== "done")) {
       const m = await priv();
@@ -928,7 +929,7 @@ export function createCoreFloat(d: CoreFloatDeps): FloatView & { fromPrivate: bo
         await saveAdds();
       }
       const forget = () => { if (!pre) return; asking.delete(pre.id); const i = adds.indexOf(pre); if (i >= 0) adds.splice(i, 1); void saveAdds(); };
-      if (paysPrivately) return (await priv()).privAdd(privHost(), pre, { usd, from, ready, legs, label, asked, job: jobKey });
+      if (paysPrivately) return (await priv()).privAdd(privHost(), pre, { usd, from, ready, legs, label, asked, job: jobKey, ...(swapAsk ? { swap: true as const } : {}) });
       const ask = from ? { amount: from.amount, tokenId: from.tokenId, label, ...onward, ...asked, ...(jobKey ? { job: jobKey } : {}) } : { amount: usd.toFixed(2), label, ...onward, ...asked, ...(jobKey ? { job: jobKey } : {}) };
       try { m = await d.call<{ id?: string; status?: string; held?: MoveRow["held"]; etaSeconds?: number; depositAddress?: string }>("ledger.toTrading", ask); }
       catch (e) {

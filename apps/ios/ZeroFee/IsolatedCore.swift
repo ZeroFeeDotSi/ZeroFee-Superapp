@@ -95,6 +95,8 @@ extension Host {
       return problem("security.bridge.not-allowed", "Only ZeroFee's core answers that.")
     }
     var params = p["params"] as? [String: Any] ?? [:]
+    // C2 (audit, 7 Nov): a Move's wallet parts reach the core only well formed (othersWellFormed); anything else: none
+    if method == "subwallet.moveOthers", !Self.othersWellFormed(params["others"]) { params.removeValue(forKey: "others") }
     // D29 wallet mode: which site asked is the host's to say, from WebKit (never the engine's claim). A signature the
     // page asks while a wallet-mode page is waiting on one carries that host; any other `site` is removed.
     // Phone test, 3 Nov (pump.fun/GMGN "Continue with ZeroFee" did nothing): subwallet.site.forHost only finds or makes a
@@ -149,6 +151,17 @@ extension Host {
       PartnerWallet.trace.info("core \(method, privacy: .public) for Browser in \(took, privacy: .public) ms")
     }
     return r
+  }
+
+  /** A Move's wallet parts as the core takes them (spending-move.ts othersWellFormed): 1 to 6, each exactly
+   *  { from, to, cents }, two different wallet places and whole cents above 0 (at most 12 digits). */
+  static func othersWellFormed(_ raw: Any?) -> Bool {
+    let places: Set<String> = ["sol", "hood", "near", "bsc"]
+    guard let parts = raw as? [Any], !parts.isEmpty, parts.count <= 6 else { return false }
+    return parts.allSatisfy { x in
+      guard let d = x as? [String: Any], d.count == 3, let from = d["from"] as? String, let to = d["to"] as? String, let cents = d["cents"] as? String else { return false }
+      return places.contains(from) && places.contains(to) && from != to && (1...12).contains(cents.count) && cents.allSatisfy({ ("0"..."9").contains($0) }) && cents.contains(where: { $0 != "0" })
+    }
   }
 
   /** The exact hosts (WebKit's) whose page is asking the wallet engine something right now, in any Browser window: the
@@ -222,7 +235,7 @@ extension Host: CoreHostDelegate {
         return problem("security.key.refused", "This phone couldn't make its approval key again.")
       }
     }
-    guard ["info", "create", "sign", "signAlertsProof", "signChatName", "proof"].contains(op) else { return problem("security.key.refused", "ZeroFee doesn't know that request.") }
+    guard ["info", "create", "sign", "signSet", "signAlertsProof", "signChatName", "proof"].contains(op) else { return problem("security.key.refused", "ZeroFee doesn't know that request.") }
     return await key("key." + op, params)
   }
 

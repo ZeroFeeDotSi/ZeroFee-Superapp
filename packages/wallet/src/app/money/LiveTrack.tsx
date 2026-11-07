@@ -3,18 +3,21 @@
 // tracker, the whole screen (D135's Sheet), each step with when it was reached. Times come from live-steps.ts (the
 // engine's own states, or the moment this phone saw a step done), always in words ("2 min"), never a clock. Loaded
 // after Home's first paint.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { timeLeft } from "@zerofee/shell-api/job-steps.ts";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { cardStep, timeLeft } from "@zerofee/shell-api/job-steps.ts";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { ReceiptMark } from "@zerofee/design/Receipt.tsx";
 import "@zerofee/design/receipt.css";
 import { LiveRow, progressOf, timeSlot, type LiveRowState } from "@zerofee/design/LiveRow.tsx";
+import { checkpointAt } from "@zerofee/design/checkpoints.ts";
+import { Checkpoints } from "@zerofee/design/Checkpoints.tsx";
+import { jobFace, linePhrases } from "./job-face.ts";
 import { shortElapsed, tickEvery } from "@zerofee/design/time.ts";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import type { Bridge } from "@zerofee/core/bridge";
 import type { Movement } from "../../types.ts";
 import { isHomeSwapRow } from "./swap-ended.ts";
-import { FOLD_AFTER_MS, FOLD_MS, endFace, endGone, endLine, oneLine, rowTitle, trackMark, publishTracks, keptTrack, SLOW_MS, startingTracks, stillGoing, watchLive, type LiveStep, type LiveTrack, type LiveWatch, type StopGo } from "./live-steps.ts";
+import { FOLD_AFTER_MS, FOLD_MS, dropMerged, endFace, endGone, endLine, oneLine, rowTitle, trackMark, publishTracks, keptTrack, SLOW_MS, homeRows, openTrackOf, startingTracks, stillGoing, watchLive, type LiveStep, type LiveTrack, type LiveWatch, type StopGo } from "./live-steps.ts";
 import type { HomeWallet } from "@zerofee/shell-api/money.ts";
 import { taskStore } from "@zerofee/shell-api/tasks.ts";
 import { JOB_WORDS, sealJobs } from "@zerofee/shell-api/job-start.ts";
@@ -29,7 +32,7 @@ export { FOLD_AFTER_MS, FOLD_MS, endLine, publishTracks, rowTitle, taskOf, watch
 export type { LiveTrack } from "./live-steps.ts";
 
 /** Activity's feed: it reads the Adds on their way itself (Home already holds them). */
-function followLive(bridge: Bridge, movements: () => Movement[], on: (t: LiveTrack[], covered: ReadonlySet<string>, tell?: LiveTrack[], gone?: string[]) => void): LiveWatch {
+function followLive(bridge: Bridge, movements: () => Movement[], on: (t: LiveTrack[], covered: ReadonlySet<string>, tell?: LiveTrack[], gone?: string[], merged?: string[]) => void): LiveWatch {
   let adds: AddOnWay[] = [];
   const stopAdds = watchAddsOnWay(bridge, (l) => { adds = l; });
   const stop = watchLive(bridge, () => ({ adds, movements: movements() }), on, swapLabel, swapLands);
@@ -41,7 +44,7 @@ function followLive(bridge: Bridge, movements: () => Movement[], on: (t: LiveTra
  * paint. It follows the work in flight itself; `onCovered` hands back the rows a card stands for (drawn once). The
  * tracker is drawn over the whole app through `overlay` (Wallet's own sheets' place), else in place.
  */
-export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz, swaps = "all" }: { /** Swap in place's rows: Home draws them all; Activity lists an ended one itself, and the centre's Now holds a going one. */ swaps?: "all" | "going" | "none"; bridge: Bridge; feed: { current: { adds?: AddOnWay[]; movements: Movement[] } }; only?: string; overlay?: ((node: ReactNode) => void) | undefined; onCovered?: (ids: ReadonlySet<string>) => void; buzz?: () => void }) {
+export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz, swaps = "all", openId }: { /** J1 (copy review, 7 Nov): the Activity centre's task to open: its page at once, once its track is read (activity-rows openTrackOf) */ openId?: string; /** Swap in place's rows: Home draws them all; Activity lists an ended one itself, and the centre's Now holds a going one. */ swaps?: "all" | "going" | "none"; bridge: Bridge; feed: { current: { adds?: AddOnWay[]; movements: Movement[] } }; only?: string; overlay?: ((node: ReactNode) => void) | undefined; onCovered?: (ids: ReadonlySet<string>) => void; buzz?: () => void }) {
   const [tracks, setTracks] = useState<LiveTrack[]>([]);
   // jobs just made (job-start.ts): their rows at once, before the core's own row for them comes
   const [allStarting, setStarting] = useState<LiveTrack[]>(() => startingTracks(taskStore().list()));
@@ -57,7 +60,7 @@ export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz,
   const watch = useRef<LiveWatch | null>(null);
   useEffect(() => {
     const sent = new Map<string, string>();
-    const on = (list: LiveTrack[], covered: ReadonlySet<string>, tell?: LiveTrack[], gone?: string[]) => { setTracks(list); onCovered?.(covered); publishTracks(tasks, tell ?? list, sent); endGone(tasks, gone, sent); };
+    const on = (list: LiveTrack[], covered: ReadonlySet<string>, tell?: LiveTrack[], gone?: string[], merged?: string[]) => { setTracks(list); onCovered?.(covered); dropMerged(tasks, merged, sent); publishTracks(tasks, tell ?? list, sent); endGone(tasks, gone, sent); };
     // Home holds its Adds; a screen that doesn't (Activity) reads them itself
     const w = feed.current.adds ? watchLive(bridge, () => ({ adds: feed.current.adds ?? [], movements: feed.current.movements }), on, swapLabel, swapLands) : followLive(bridge, () => feed.current.movements, on);
     watch.current = w;
@@ -70,17 +73,29 @@ export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz,
   // the open tracker follows its own job by id, and keeps the newest of it seen (QA's crawl, 5 Nov: a swap's
   // tracker said "Done in 44 s", then went back to "Leaving your Safe · 3→5 min": once the row left the list, it fell back
   // to the copy taken at the tap); an ended job never goes back to a step before its end
-  useEffect(() => { if (opened) setOpened((o) => (o ? keptTrack(o, [...starting, ...tracks].find((t) => t.id === o.id)) : o)); }, [tracks, starting]);
+  // the core's own track first, as Home's rows (homeRows): a Swap's starting row with the same id carries no money or
+  // figure, so its done page lost "You got about 0.12 SOL." (the copy review's J2-4, 8 Nov)
+  useEffect(() => { if (opened) setOpened((o) => (o ? keptTrack(o, [...tracks, ...starting].find((t) => t.id === o.id)) : o)); }, [tracks, starting]);
+  // J1: the centre's Now row opens this job's page directly, once (closed, it stays closed)
+  const openedFor = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!openId || openedFor.current === openId) return;
+    const t = openTrackOf(openId, [...tracks, ...starting]);
+    if (t) { openedFor.current = openId; setOpened(t); }
+  }, [openId, tracks, starting]);
   // a stopped job's next tap (rule 8): Move again (it pays from Private first), Private's own screen, or Send
   const shell = useShell();
   const onNext = (go: StopGo) => {
     setOpened(null);
-    if (go.kind === "private") shell.openApp("wallet", "private");
+    if (go.kind === "close") return;
+    if (go.kind === "activity") shell.openApp("wallet", "activity");
+    else if (go.kind === "private") shell.openApp("wallet", "private");
     else if (go.kind === "swap") shell.openMoney({ kind: "swap", wallet: "near" });
-    else if (go.kind === "move") shell.openMoney({ kind: "move", from: "safe", to: go.to as HomeWallet, ...(go.usd ? { usd: go.usd } : {}) });
+    else if (go.kind === "move") shell.openMoney({ kind: "move", from: (go.from ?? "safe") as HomeWallet, to: go.to as HomeWallet, ...(go.usd ? { usd: go.usd } : {}) });
     else shell.openMoney({ kind: "send", ...(go.wallet ? { wallet: go.wallet } : {}) });
   };
-  const tracker = opened ? <LiveTracker key={opened.id} track={opened} onClose={() => setOpened(null)} onNext={onNext} /> : null;
+  // on Activity's own list (it holds no Adds), the page's back chevron goes back to that list (copy review, 6 Nov)
+  const tracker = opened ? <LiveTracker key={opened.id} track={opened} onClose={() => setOpened(null)} onNext={onNext} {...(feed.current.adds ? {} : { onBack: () => setOpened(null) })} /> : null;
   // S10b: the overlay is shared with Activity's row page; draw or clear only this tracker, never a page it didn't draw
   const slot = useMemo(() => (overlay ? ownSlot(overlay) : null), [overlay]);
   useEffect(() => { slot?.draw(tracker); }, [opened, tracks]);
@@ -104,7 +119,7 @@ export function LiveHome({ bridge, feed, only = "all", overlay, onCovered, buzz,
     (t as unknown as { unref?: () => void }).unref?.();
     return () => clearTimeout(t);
   }, [allStarting]);
-  const list = [...starting.filter((s) => !s.end?.ok && !tracks.some((t) => t.id === s.id)), ...tracks.filter((t) => (only === "all" || (only === "hot" ? t.wallets.some((w) => w !== "safe") : t.wallets.includes(only))) && !folded.has(t.id)), ...swapRows.filter((s) => s.end?.ok)];
+  const list = [...homeRows(starting, tracks), ...tracks.filter((t) => (only === "all" || (only === "hot" ? t.wallets.some((w) => w !== "safe") : t.wallets.includes(only))) && !folded.has(t.id)), ...swapRows.filter((s) => s.end?.ok)];
   return (
     <>
       {list.length > 0 && (
@@ -128,10 +143,10 @@ export function rowLine(t: LiveTrack, now: number): string {
     const took = shortElapsed((t.endMs !== undefined && Number.isFinite(t.endMs) ? t.endMs : now) - t.startMs);
     return took === "now" ? "Done" : `Done in ${took}`;
   }
-  if (t.end) return endLine(t) ?? t.end.line;
+  if (t.end) return t.end.row ?? endLine(t) ?? t.end.line;
   if (slowAdd(t, now)) return `Slower than usual · ${shortElapsed(now - t.startMs)}`;
   const step = t.steps.find((s) => s.state === "doing") ?? t.steps.find((s) => s.state === "waiting");
-  return `${step?.label ?? "On its way"} · ${timeLeft(t.endsAt, now, t.startMs)}`;
+  return `${step ? cardStep(step.label, t.title) : "On its way"} · ${timeLeft(t.endsAt, now, t.startMs)}`;
 }
 
 /** The row's line in its two columns (a16, Sim re-walk 1b: "NEAR Confidential is paying your SOL wallet. · 30 s left"
@@ -159,6 +174,9 @@ export function rowState(t: LiveTrack, now: number): LiveRowState {
 }
 
 const KIND_MARK: Record<LiveTrack["kind"], () => ReactNode> = { add: ActAdd, send: ActSend, swap: ActSwap, move: ActMove };
+/** A step line drawn piece by piece (linePhrases): each piece nowrap, a plain space between, so a wrap never leaves one
+ *  lone word on line 2 (as Add's rows, AddSheet Phrases). */
+export const StepLine = ({ line }: { line: string }) => <>{linePhrases(line).map((p, i) => <Fragment key={i}>{i > 0 && " "}<span className="lv-keep">{p}</span></Fragment>)}</>;
 
 /** Home's live rows: one shared row each (LiveRow): the kind's mark, what it is doing and for how long, its progress
  *  line; a tap, the tracker. */
@@ -183,7 +201,8 @@ export function LiveRows({ tracks, onOpen }: { tracks: readonly LiveTrack[]; onO
         const title = rowTitle(t), line = rowLine(t, now), parts = rowParts(t, now);
         return (
           <li key={t.id}>
-            <LiveRow mark={<Mark />} title={title} line={parts.words} {...timeSlot(parts.time)} state={rowState(t, now)} p={t.end && !t.end.ok && !stillGoing(t) ? undefined : progressOf(t.steps, !!t.end?.ok)}
+            <LiveRow mark={<Mark />} title={title} line={parts.words ? <StepLine line={parts.words} /> : parts.words} {...timeSlot(parts.time)} state={rowState(t, now)} p={t.end && !t.end.ok && !stillGoing(t) ? undefined : progressOf(t.steps, !!t.end?.ok)}
+              {...(!t.end?.ok && stillGoing(t) ? { track: { kind: t.kind, at: checkpointAt(t.steps) } } : {})}
               onOpen={() => onOpen(t)} label={`${title}. ${line}. Open its steps`} rowRef={(el) => { rows.current.set(t.id, el); }} />
           </li>
         );
@@ -206,42 +225,49 @@ function useNow(going: readonly number[]): number {
   return going.length ? Math.max(now, Date.now()) : now;
 }
 
-/** A step's mark: a drawn check once done, the live dot while it's being done, a cross where it stopped. */
-function Mark({ s }: { s: LiveStep }) {
-  if (s.state === "done") return <svg className="lv-mark is-done" viewBox="0 0 16 16" aria-hidden="true"><path className="zf-draw" pathLength={1} d="M3.5 8.5l3 3 6-7" /></svg>;
-  if (s.state === "doing") return <span className="lv-mark is-doing" aria-hidden="true"><span className="zf-live" /></span>;
-  if (s.state === "failed") return <svg className="lv-mark is-failed" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>;
-  return <span className="lv-mark is-waiting" aria-hidden="true" />;
-}
-
-/** The tracker: the whole screen, each step on its own line with when it was reached; where it stopped, and where the
- *  money is. Its one status line is the row's ("Through NEAR privately · 2 min"), never a clock. */
-export function LiveTracker({ track: t, onClose, onNext }: { track: LiveTrack; onClose: () => void; /** a stopped job's tap (rule 8) */ onNext?: (go: StopGo) => void }) {
+/** The job's page (the copy review's spec Part 2, 6 Nov; job-face.ts): the title once (the bar), the figure and what it is, the four
+ *  checkpoints (the --bad dot where it stopped), where the money is, the time left or one plain reason line, From and To,
+ *  each step once with its one word, and the floor: the real choices only. The bar's X is the way out on every face. */
+export function LiveTracker({ track: t, onClose, onNext, onBack, when, proof }: { track: LiveTrack; onClose: () => void; /** an ended job's day and time ("7 Nov"; J2) */ when?: string; /** its transactions (Activity's row: ActivityDetail JobProof) */ proof?: ReactNode; /** a stopped job's tap (rule 8) */ onNext?: (go: StopGo) => void; /** opened from Activity's list: the bar's back chevron goes back to it (copy review) */ onBack?: () => void }) {
   const now = useNow(stillGoing(t) ? [t.startMs] : []);
-  // the head's spaced capitals fit a short title, "MOVE $5.00" (its last step names where it goes)
+  const f = jobFace(t);
+  const left = f.state === "going" ? rowParts(t, now).time : undefined;
+  const tap = (go: StopGo) => (go.kind === "close" ? onClose() : onNext ? onNext(go) : onClose());
+  const ends = t.money && t.money.from.length && t.money.to.length ? { from: cardWords(t.money.from), to: cardWords(t.money.to) } : null;
   return (
-    <Sheet title={t.bar ?? rowTitle(t).replace(/ to your .+$/, "")} onClose={onClose}>
-      <div className="lv-tracker">
-        <div className="lv-tracker__head">
-          <ReceiptMark state={trackMark(t)} size={72} icon={<span className="zf-receipt__disc">{KIND_MARK[t.kind]()}</span>} />
-          <p className="lv-tracker__title" data-testid="tracker-title">{t.made && !t.end ? `${JOB_WORDS.created} ${rowTitle(t)}` : rowTitle(t)}</p>
+    <Sheet title={f.bar} onClose={onClose} {...(onBack ? { onBack } : {})}>
+      <div className="lv-tracker lv-job" data-face={f.state}>
+        <div className="lv-job__head">
+          {f.figure && <p className="lv-job__figure" data-testid="job-figure">{f.figure}</p>}
+          <p className="lv-job__what" data-testid="tracker-title">{t.made && !t.end ? `${JOB_WORDS.created} ${f.what}` : f.what}</p>
         </div>
-        {!(t.end && !t.end.ok && t.end.head) && <p className="lv-tracker__status" role="status">{!t.end ? oneLine(rowLine(t, now)) : t.end.ok ? rowLine(t, now) : t.end.unshown ? UNSHOWN_STATUS : stillGoing(t) ? `Slower than usual · ${shortElapsed(now - t.startMs)}` : "Stopped"}</p>}
-        <ol className="lv-steps">
-          {t.steps.map((s, i) => (
-            <li key={i} className={`lv-step is-${s.state}`}>
-              <Mark s={s} />
-              <span className="lv-step__label">{s.state === "doing" ? `${s.label.replace(/\.$/, "")}…` : s.label}</span>
-              <span className="lv-step__time">{i > 0 && s.state === "done" && s.atMs !== undefined ? shortElapsed(s.atMs) : ""}</span>
+        <Checkpoints kind={t.kind === "move" ? "move" : t.kind} at={f.at} bad={f.bad} className="lv-job__track" />
+        {f.money && <p className="lv-job__money" data-testid="job-money"><span>{f.money.lead}</span>{f.money.place}{f.money.after && <span>{f.money.after}</span>}</p>}
+        {left && <p className="lv-job__left" role="status">{left}</p>}
+        {f.took && <p className="lv-job__left" data-testid="job-took">{f.took}</p>}
+        {when && !left && <p className="lv-job__left" data-testid="job-when">{when}</p>}
+        {f.reason && <p className="lv-job__reason" role="status" data-testid="job-reason">{f.reason}</p>}
+        {ends && <div className="lv-job__card"><div><span>{FACE_CARD.from}</span><b>{ends.from}</b></div><div><span>{FACE_CARD.to}</span><b>{ends.to}</b></div></div>}
+        {f.steps.length > 0 && <ol className="lv-steps lv-job__steps">
+          {f.steps.map((s, i) => (
+            <li key={i} className={`lv-step is-${t.steps[i]?.state ?? "waiting"}`} data-testid="job-step">
+              <span className="lv-step__label"><StepLine line={s.label} />{t.steps[i]?.note && <small className="lv-step__note" data-testid="job-step-note">{t.steps[i]!.note}</small>}</span>
+              <span className="lv-step__time">{s.word ?? ""}</span>
             </li>
           ))}
-        </ol>
-        {t.end && <p className={`lv-tracker__end${t.end.ok || stillGoing(t) ? "" : " is-bad"}`}>{endLine(t)}</p>}
-        {/* rule 8: what to tap next, the first lit (look: the design review) */}
-        {t.end && !t.end.ok && onNext && t.next?.map((n, i) => <button key={n.label} type="button" className={`zf-btn${i ? " zf-btn--quiet" : ""} lv-tracker__next`} data-testid="tracker-next" onClick={() => onNext(n.go)}>{n.label}</button>)}
-        {!t.end && t.eta && <p className="zf-small lv-tracker__note">{t.eta}</p>}
-        {!t.end && <p className="zf-small lv-tracker__note">Each step shows the moment it's done. You can close this. It keeps going.</p>}
+        </ol>}
+        {proof}
+        {f.state === "going" && <p className="zf-small lv-tracker__note">Each step shows the moment it's done. You can close this. It keeps going.</p>}
+        {/* the floor: the real choices only (copy review, 6 Nov: lit Resume, quiet the way back; never three). The way out is the bar's X */}
+        {f.choices.length > 0 && <div className="lv-job__floor">
+          {f.choices.map((n, i) => <button key={n.label} type="button" className={`zf-btn${i ? " zf-btn--quiet" : ""}`} data-testid="tracker-next" onClick={() => tap(n.go)}>{n.label}</button>)}
+        </div>}
       </div>
     </Sheet>
   );
 }
+
+/** The From and To card's words (Home's names, no "your"): "Safe", "ETH (RH) wallet". */
+const FACE_CARD = { from: "From", to: "To" } as const;
+const CARD_NAME: Record<string, string> = { safe: "Safe", private: "Private", sol: "SOL wallet", hood: "ETH (RH) wallet", near: "NEAR wallet", bsc: "BNB wallet" };
+const cardWords = (ws: readonly string[]) => [...new Set(ws)].map((w) => CARD_NAME[w] ?? "Wallet").join(", ");

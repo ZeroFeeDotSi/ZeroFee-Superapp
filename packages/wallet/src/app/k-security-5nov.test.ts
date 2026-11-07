@@ -69,15 +69,19 @@ test("Details: short addresses, Copy names the wallet, one card for every wallet
   assert.doesNotMatch(details, />Export key</, "no Export key on each card");
   assert.match(details, /<KeysCard wallets=\{shown\.filter\(\(w\) => w\.role !== "hub"\)\}/, "the NEAR wallet's cash has no key to show");
   assert.match(details, /disabled=\{!showKeyConfirmed\(typed\)\} onClick=\{\(\) => void exportKey\(\)\}>Show its key</, "the typed phrase still gates it");
-  assert.match(details, /head: "A wallet's key", note: "Use it to open a wallet in another app\.", show: "Show a key", pick: "Which wallet\?"/);
+  assert.match(details, /head: "A wallet's key", note: "Use it to open a wallet in another app\.", show: "Show this wallet's key", pick: "Which wallet\?"/);
 });
 
 test("the copy review's desktop audit (5 Nov): Details' Safe card is headed \"Your account\"; its id is a quiet short line, Copy copies all of it (control: never the raw id as a title)", async () => {
   const { shortKey } = await import("@zerofee/core/format");
   assert.equal(shortKey("zf-sample677952.testnet"), "zf-sam…tnet", "the core's short form");
   assert.equal(shortKey("abc.near"), "abc.near", "control: a short id stays whole");
-  assert.match(details, /<div className="wl-dt-row1"><span className="t">Your account<\/span><span className="zf-small">NEAR<\/span><\/div>\n\s*\{account \? <AccountLine id=\{account\} \/> :/);
-  assert.match(details, /onClick=\{\(\) => \{ void copy\(id\); [^}]*\}\}>\n\s*<span className="zf-small" translate="no">\{shortKey\(id\)\}<\/span>/, "quiet, short on screen, whole on copy");
-  assert.match(details, /aria-label="Copy your account address"/, "the screen reader never reads the id");
+  // the copy review's S4 (7 Nov): the card's first row is "Your Safe address" with Copy, right under the "Safe" heading (B11: the
+  // "Your Safe" line under that heading said the same word twice, so it went); the id never shown
+  assert.match(details, /<div className="zf-label wl-dt-head">Safe<\/div>\n\s*<div className="wl-dt-card">\n\s*\{account \? <AccountLine id=\{account\} \/> :/);
+  assert.doesNotMatch(details, /DETAILS_WORDS\.safe|safe: "Your Safe"/, "no \"Your Safe\" line under the Safe heading");
+  assert.match(details, /DETAILS_WORDS = \{ address: "Your Safe address" \}/);
+  assert.match(details, /onClick=\{\(\) => \{ void copy\(id\); [^}]*\}\}>\n\s*<span className="wl-dt-addr__text">\{DETAILS_WORDS\.address\}<\/span>/, "whole on copy, never on screen");
+  assert.match(details, /aria-label="Copy your Safe's address"/, "the screen reader never reads the id");
   assert.doesNotMatch(details, /<Address text=\{account\}/, "control: the raw id is not the card's big line");
 });

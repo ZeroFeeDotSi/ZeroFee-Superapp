@@ -11,6 +11,7 @@
 .lv-step { display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); font: 400 17px/22px var(--font); }
 .lv-step.is-waiting .lv-step__label { color: var(--mute); }
 .lv-step.is-failed .lv-step__label { color: var(--down); }
+.lv-step__note { display: block; font-size: 13px; color: var(--mute); }
 .lv-step__time { font: 400 15px/20px var(--font); color: var(--mute); font-variant-numeric: tabular-nums; }
 .lv-mark { width: 20px; height: 20px; display: grid; place-items: center; }
 svg.lv-mark { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -24,3 +25,30 @@ svg.lv-mark { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoi
 .wl-now .zf-lrow.is-done { animation: lv-leave var(--dur-base) var(--ease-out) var(--m-hold-ms, 2500ms) forwards; }
 @keyframes lv-leave { to { opacity: 0; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .wl-now .zf-lrow.is-done { animation: none; } }
+/* the job's page (the copy review's spec Part 2, 6 Nov; job-face.ts): figure, what, the four checkpoints, the money line, one reason
+   line, From and To, the steps, and the floor pinned at the bottom. Tokens only; --down is the one colour on a stop. */
+.lv-job { display: flex; flex-direction: column; gap: 0; padding-bottom: 0; min-height: 100%; }
+.lv-job__head { display: grid; justify-items: center; gap: 4px; padding: 24px 0 0; text-align: center; }
+.lv-job__figure { margin: 0; font: 700 44px/52px var(--font); color: var(--ink); font-variant-numeric: tabular-nums; }
+.lv-job__what { margin: 0; font: 400 17px/22px var(--font); color: var(--mute); }
+.lv-job__track { margin-top: 28px; }
+.lv-job__money { margin: 16px 0 0; font: 600 15px/20px var(--font); color: var(--ink); text-align: center; }
+.lv-job__money span { font-weight: 400; color: var(--mute); }
+.lv-job__left, .lv-job__reason { margin: 8px 0 0; font: 400 15px/20px var(--font); color: var(--mute); text-align: center; }
+.lv-job__left { font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.lv-job__card { margin-top: 24px; border-radius: 16px; background: var(--fill); padding: 0 16px; }
+.lv-job__card > div { display: flex; justify-content: space-between; gap: 12px; padding: 14px 0; font: 400 17px/22px var(--font); }
+.lv-job__card > div + div { border-top: 1px solid var(--line); }
+.lv-job__card span { color: var(--mute); }
+.lv-job__card b { font-weight: 400; color: var(--ink); text-align: right; }
+.lv-job .lv-steps { margin-top: 16px; }
+.lv-job__steps .lv-step { grid-template-columns: 1fr auto; }
+.lv-job__steps .lv-step.is-failed .lv-step__label { color: var(--ink); }
+.lv-job .lv-tracker__note { margin-top: 12px; }
+/* the floor sits at the foot of the screen, as the money sheets' (margin-top auto in the column), and stays there on scroll */
+.lv-job__floor { position: sticky; bottom: 0; display: grid; gap: 10px; margin-top: auto; padding: 24px 0 6px; background: var(--bg); }
+.lv-job__floor .zf-btn { min-height: 56px; }
+.lv-job__nav { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* a step line's pieces (job-face linePhrases): the line breaks only between them, never one lone word on line 2 */
+.lv-keep { white-space: nowrap; }

@@ -19,6 +19,9 @@ test("the footer is true per network (grade 01d Q5): test money on the test netw
   assert.equal(footerWords(false), "Test network · test money");
   assert.equal(footerWords(true), "Version 0.1");
   assert.equal(footerWords(false, true), "Version 0.1");
+  // the copy review's S3 (7 Nov): the Sim's footer says its money is sample money (control: a test network without the Sim, above)
+  assert.equal(footerWords(false, false, true), "Sample money");
+  assert.equal(footerWords(true, false, true), "Version 0.1", "control: mainnet is the version");
   for (const w of [footerWords(false), footerWords(true)]) assert.doesNotMatch(w, /quantum|testnet|demo|nothing is sent/i);
 });
 

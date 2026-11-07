@@ -13,3 +13,9 @@ export function paidLine(q: { route: string; feeUsd: number }, network: string):
 export function getLine(head: string, fee: string): { head: string; fee: string } {
   return head ? { head, fee: ` · ${fee} fee` } : { head: "", fee: `Fee ${fee}` };
 }
+
+/** A sale's line under its figure (T2-4, the copy review's walk): the coins, then its fee said once in the copy review's form, "7,505 DOPE · Fee
+ *  $0.002"; with no holding read yet, "Fee $0.002" alone (a dot never leads a line). */
+export function saleLine(head: string, fee: string): { head: string; fee: string } {
+  return head ? { head, fee: ` · Fee ${fee}` } : { head: "", fee: `Fee ${fee}` };
+}

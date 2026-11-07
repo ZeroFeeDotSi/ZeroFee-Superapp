@@ -10,8 +10,8 @@ import { padBase } from "@zerofee/design/keypad.ts";
 import { SheetLine } from "@zerofee/design/MoneySheet.tsx";
 import { intentsKept } from "@zerofee/core/zero-fee";
 import { FIRST_PAYMENT, SEND_CANT, shortId, feeLines } from "./send-words.ts";
-import { TAP_ADDRESS, TAP_AGAIN, TAP_PASTE, refusedLine } from "./send-said.ts";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { TAP_ADDRESS, TAP_AGAIN, TAP_PASTE, refusedLine, sendFloor } from "./send-said.ts";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SheetNote } from "@zerofee/design/Sheet.tsx";
 import { filledAddressLine, toSlotLine } from "@zerofee/shell-api/money.ts";
 import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
@@ -24,7 +24,7 @@ import { TrayScan } from "@zerofee/pay/app/icons.tsx";
 import type { Prefill } from "@zerofee/pay/app/links.ts";
 import { LANDS_AS, nearLandsAs, RELAY_LIMIT_LINE, RELAY_SEND_MAX_USD, type SendToChain } from "../../send-to.ts";
 import { EXCHANGE_LINE, blockedLine, nearImplicitOf, LOOKALIKE_LINE, NO_TYPO_CHECK, noTypoCheck, cantSendTo, withNear, knownAddress, lookalikeOf, paidOn, routeLines, sendNetworks, startNetwork, type Paid } from "../../send-reach.ts";
-import { REST_STAYS, coinSaid, coinShown, heldWords, overLine, overMax, privateCap, privateOver, readyUsd, restStays, sendFigure } from "./send-cap.ts";
+import { REST_STAYS, coinShown, partShown, heldWords, overLine, overMax, privateCap, privateOver, readyUsd, restStays, sendFigure, underAmount, restLine, type RestParts } from "./send-cap.ts";
 import { lookupDelayMs } from "./send-lookup.ts";
 import { SEND_ROWS, type SendRowChain } from "./send-rows.ts";
 import { maxSendLine, rentLine } from "./send-sources.ts";
@@ -59,6 +59,9 @@ export interface SendSource {
   line?: string;
   /** A Safe coin this Send can pay only part of: the one quiet line under Max saying why (send-words.ts SEND_PART). */
   part?: string;
+  /** J2-5 (audit, 8 Nov): a Safe coin whose ready figure is under Home's, where the rest is, in dollars, by its real place
+   *  (send-sources.ts restOf): said in the From list under the coin's line (send-cap.ts restLine). */
+  rest?: RestParts;
   /** the copy review's ruling (5 Nov): a Safe coin this Send pays only from Private (its Safe's own route shut). Its row carries its
    *  figure (`line`: "NEAR · $8.85 in Private"), the keypad caps at it, and one line shows only when the typed amount was
    *  over it (send-cap.ts privateOver). No standing line. */
@@ -92,7 +95,7 @@ const dollarsOf = (n: number) => `$${n.toLocaleString("en-US", { minimumFraction
  *  site's wallet its own line (siteSources). */
 const held = (s: SendSource) => s.line ?? heldWords(s);
 
-export function SendForm({ prefill, typed: filled, sources, reading = false, history, busy, waits, notYet = null, blocked = null, said = null, onSend, onWho, onScan, onLink, onAddMoney, onMove, fillShut, onSwap, onBack, feeOf, start = null, ownWallets, pickCoin = 0 }: {
+export function SendForm({ prefill, typed: filled, sources, reading = false, history, busy, waits, notYet = null, blocked = null, said = null, again = null, onEdit, onSend, onWho, onScan, onLink, onAddMoney, onMove, fillShut, onSwap, onBack, feeOf, start = null, ownWallets, pickCoin = 0 }: {
   prefill: Prefill | null;
   sources: SendSource[];
   /** The wallets or the Safe haven't answered yet: no source is "reading", never "Nothing to send yet"; "failed": the
@@ -111,6 +114,10 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
   /** The sheet's own line (a refusal, a problem, a service down): right above Hold, the one place every sheet uses
    *  (a Send test, 4 Nov: it sat at the top, away from the button). */
   said?: string | null;
+  /** `said` is a refusal that can be tried again: the button's words while it stands (sendFloor). */
+  again?: string | null;
+  /** The amount, the coin or the network changed: the sheet's refusal ends (the To's change ends it through onWho). */
+  onEdit?: () => void;
   onSend: (a: SendAsk) => void;
   /** Who To now reads as (null: nobody yet), as soon as it is read: the sheet asks the guard's facts then. */
   onWho?: (r: Recipient | null) => void;
@@ -179,6 +186,9 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
   const networks = useMemo(() => (who ? withNear(sendNetworks(who.recipient), who.recipient, onNear) : []), [who, onNear]);
   // M1: the only network, or the one this address was paid on before; a NEW 0x address starts on none (the person picks)
   const network: SendToChain | null = picked && networks.includes(picked) ? picked : startNetwork(networks, who ? paidOn(who.recipient.kind === "address" ? who.recipient.address : who.recipient.accountId, history) : null);
+  // the copy review's J2-3 (8 Nov): the chosen network chip is shown whole, never under the row's right-edge fade ("Base" was)
+  const netsRow = useRef<HTMLDivElement | null>(null);
+  useEffect(() => { netsRow.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.scrollIntoView?.({ inline: "nearest", block: "nearest" }); }, [network, networks.length]);
 
   // The source changed under the amount (a wallet's row read after the Safe's coins, or its price came): dollars that were
   // typed stay those dollars in this coin (UI's mainnet rehearsal, 3 Nov: $0.50 filled in while the Safe's USDC was the
@@ -313,6 +323,8 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
   // S3: the same figure the From row says ("$8.85 ready to send"), one function for both
   const readyNow = readyUsd(max, perCoin);
   const most = readyNow !== null ? dollarsOf(readyNow) :`${coinShown(max, "down")} ${source?.symbol ?? ""}`;
+  // S1: over what can go, the slot under the amount says nothing worked from it (send-cap.ts underAmount)
+  const under = underAmount({ over, exact: exact ?? null, amount, symbol: source?.symbol ?? "", place: source?.place ?? "", maxLine });
   // why Hold is off, the first that applies (every disabled control says why)
   const why = !source ? null
     : source.cant ? source.cant
@@ -321,7 +333,7 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
     : blocked ? blockedLine(blocked, source.place)
     : waits ? waits
     : amountNo ? amountNo
-    : over ? overLine(source.place, most)
+    : over ? overLine(source.place, most, Number(max) > 0)
     : !who ? (line ? null : "Paste an address or a name.")
     : lookalike ? LOOKALIKE_LINE
     : !network ? "Pick the network first."
@@ -337,6 +349,11 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
   // product decision (5 Nov): no hold, no confirm: the tap IS the action; to an outside address the core's own
   // sheet asks Face ID (the web: the password) with the address and the fee, to the person's own wallet it just goes
   const label = exact ? `Send ${exact.amount} ${exact.symbol}` : `Send${Number(amount) > 0 ? ` ${figure !== null ? dollarsOf(Number(figure)) : `${amount} ${source?.symbol ?? ""}`}` : ""}`;
+  const floor = sendFloor({ label, again, said, why: why ?? null, ready });
+  // any edit ends the sheet's refusal, before it paints; never a read that settles (the sources loading must not end a link's line) (Swap's `edited`): keypad, chips, Max, a paste, a coin, a network
+  const editKey = JSON.stringify([sourceId, picked, amount, typed, exact]);
+  const lastEdit = useRef(editKey);
+  useLayoutEffect(() => { if (lastEdit.current !== editKey) { lastEdit.current = editKey; onEdit?.(); } }, [editKey]);
   // the fee before the tap (QA, 5 Nov: "the real figure, up front"): asked 400 ms after the address and the
   // amount settle, shown once it lands; never blocks the tap (not back yet: the core's own sheet says it)
   const feeKey = source?.row && !source.cant && who && network && !exact && Number(amount) > 0 ? `${source.id}|${network}|${who.recipient.kind === "address" ? who.recipient.address : who.recipient.accountId}|${amount}` : null;
@@ -396,7 +413,7 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
           <svg className="wl-pick__chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
         </button>
         {/* the held figure is more than can go now (the audit's filing, 5 Nov): said directly under From, before any amount */}
-        {source.part && <p className="zf-small wl-send2__part" data-testid="send-part">{source.part}</p>}
+        {partShown(source.part, held(source)) && <p className="zf-small wl-send2__part" data-testid="send-part">{source.part}</p>}
         {/* the fill shut (the copy review's ruling, 5 Nov): a Private-only row says public sends go through Private and what it holds,
             with the quiet link that opens the fill */}
         {fillShut && source.privateOnly && (
@@ -413,6 +430,8 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
                   <CoinIcon symbol={s.symbol} icon={s.icon} size={22} />
                   <b>{s.label}</b>
                   <span className="zf-small">{held(s)}</span>
+                  {/* J2-5: where the rest of Home's figure is, by place (a mute line, never on the From row) */}
+                  {s.rest && restLine(s) && <span className="zf-small wl-pick__why" data-testid="send-rest">{restLine(s)}</span>}
                 </button>
               </li>
             ))}
@@ -445,7 +464,7 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
       {who && networks.length > 1 && (
         <div className="wl-send2__nets" role="radiogroup" aria-label="Which network?" data-testid="send-networks">
           <span className="wl-send2__label">Which network?</span>
-          <div className="wl-chips">
+          <div className="wl-chips" ref={netsRow}>
             {networks.map((n) => (
               <button key={n} type="button" role="radio" aria-checked={n === network} className={`wl-chip zf-press${n === network ? " on" : ""}`} onClick={() => setPicked(n)} disabled={busy}>
                 {n === "hood" ? "ETH (RH)" : LANDS_AS[n].network}
@@ -474,9 +493,9 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
         <div className="wl-send2__sub" data-testid="send-sub">
           {capped && source.privateOnly
             ? <p className="zf-small wl-send2__coins" role="status" data-testid="send-private-over">{privateOver(most, source.symbol)}</p>
-            : (exact || Number(amount) > 0) && <p className="zf-small wl-send2__coins">{exact ? `They asked for ${exact.amount} ${exact.symbol}.` : `${coinSaid(amount, source.symbol)} from ${source.place}`}</p>}
+            : under.max ? <p className="zf-small wl-send2__coins" data-testid="send-max-line">{under.max}</p>
+            : under.coins && <p className="zf-small wl-send2__coins" data-testid="send-coin-line">{under.coins}</p>}
         </div>
-        {!exact && maxLine && <p className="zf-small wl-send2__coins" data-testid="send-max-line">{maxLine}</p>}
       </div>
       {/* the keypad stands on its own in the column (a16): it is the one piece that gives, 56 pt rows down to 34 */}
       {!exact && <Keypad value={padBase(shown || "0", preset)} decimals={perCoin !== null && !stable ? 2 : places} onChange={(v) => { setPreset(false); type(v === "0" ? "" : v); }} />}
@@ -486,7 +505,7 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
       {/* the fee lines (what stays, the quote) sit on the floor over the button, with its line */}
       {rent && <p className="zf-small" data-testid="send-rent">{rent}</p>}
       {feeNow?.high && <p className="zf-small" role="status" data-testid="send-fee-high">{feeNow.high}</p>}
-      {said ? <SheetLine text={said} /> : why && <p className="zf-small wl-send2__why" role="status" data-testid="send-why">{why}</p>}
+      {floor.line === "said" ? <SheetLine text={said} /> : floor.line === "why" && <p className="zf-small wl-send2__why" role="status" data-testid="send-why">{why}</p>}
       {/* the fee block, right above the button (the copy review, 6 Nov): both of Send's routes go through NEAR Intents (SendSheet's two calls) */}
       <div className="zf-fee">
         {feeNow && <p className="zf-small" data-testid="send-fee">{feeNow.fees}</p>}
@@ -496,7 +515,7 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
         ? <button type="button" className="zf-btn wl-hold" onClick={() => onSwap(source)} disabled={busy} data-testid="send-swap-first">{SEND_CANT.swapButton(SEND_ROWS[source.swap].coin)}</button>
         : source.cant && source.back && onBack
         ? <button type="button" className="zf-btn wl-hold" onClick={() => onBack(source)} disabled={busy} data-testid="send-move-back">{SEND_CANT.siteButton}</button>
-        : <button type="button" className="zf-btn wl-hold" disabled={!ready} onClick={go} data-testid="send-go">{label}</button>}
+        : <button type="button" className="zf-btn wl-hold" disabled={!ready} onClick={go} data-testid="send-go">{floor.label}</button>}
       </div>
     </div>
   );

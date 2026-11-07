@@ -95,7 +95,7 @@ test("Home's moves are the same tasks: each live track is published once it chan
   live.publishTracks(tasks, [going], sent);
   assert.deepEqual(calls, ["publish move:x pending"], "control: unchanged, not sent again");
   live.publishTracks(tasks, [{ ...going, steps: going.steps.map((s) => ({ ...s, state: "done", atMs: 7000 })), end: { ok: true, line: "In your SOL wallet." } }], sent);
-  assert.deepEqual(calls.slice(1), ["publish move:x pending", "end move:x done undefined"]);
+  assert.deepEqual(calls.slice(1), ["publish move:x pending", "end move:x done In your SOL wallet."], "its words go with its end (bug report, 6 Nov)");
   live.publishTracks(undefined, [going], new Map());
 });
 
@@ -191,7 +191,7 @@ test("real-tap proof, 6 Nov: at 390 wide a going row keeps its time left: the st
   const c = read("packages/shell-api/src/TaskCentre.tsx");
   assert.match(c, /line=\{parts \? parts\.line : line\} \{\.\.\.\(slot\.below \? \{ below: slot\.below \} : \{\}\)\} usd=\{t\.usd\} when=\{when\}/);
   assert.match(c, /const when = parts \? slot\.when : ago\(/);
-  assert.match(read("packages/wallet/src/app/money/LiveTrack.tsx"), /line=\{parts\.words\} \{\.\.\.timeSlot\(parts\.time\)\}/, "Home's row too");
+  assert.match(read("packages/wallet/src/app/money/LiveTrack.tsx"), /line=\{parts\.words \? <StepLine line=\{parts\.words\} \/> : parts\.words\} \{\.\.\.timeSlot\(parts\.time\)\}/, "Home's row too");
   const { timeSlot } = await server.ssrLoadModule("@zerofee/design/live-row.ts") as { timeSlot: (t?: string) => object };
   assert.deepEqual(timeSlot("8 s left"), { when: "8 s left" }, "fits beside the step");
   assert.deepEqual(timeSlot("3 min left"), { when: "3 min left" });

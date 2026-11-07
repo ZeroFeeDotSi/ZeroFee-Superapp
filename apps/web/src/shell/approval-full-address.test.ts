@@ -31,6 +31,9 @@ test("the sheet reads the core's lines: \"To <address>\" is the full address (ne
   assert.equal(toAddress("To your SOL wallet"), null, "control: an own wallet's words");
   assert.ok(isLandsLine("Public on Solana.") && isLandsLine("Private."));
   assert.ok(!isLandsLine("Anyone can see the Safe's part."), "control: another line");
+  // the joined public lines (the copy review and the audit, 6 Nov) are where it lands too; control: a line that only starts alike
+  assert.ok(isLandsLine("Public on NEAR: anyone can see the Safe's part.") && isLandsLine("Public on Solana. Anyone can see the Safe's part on NEAR."));
+  assert.ok(!isLandsLine("Public on Solana. Something else."), "control: not the joined line");
 });
 
 test("the view: the To caption above the address, the address a copy button in groups, mono 15 px ink, wrapping and never ellipsised; the lands line --mute; nothing in a fold", () => {
@@ -47,6 +50,10 @@ test("the view: the To caption above the address, the address a copy button in g
   const addr = rule(".approval__addr");
   for (const want of [/font-family: var\(--zf-mono/, /font-size: 15px/, /color: var\(--ink\)/, /overflow-wrap: anywhere/, /text-overflow: clip/]) assert.match(addr, want);
   assert.doesNotMatch(addr, /ellipsis|nowrap/, "never ellipsised, wraps freely");
+  // J2-2 (copy review, 8 Nov): the address is a 44 px row with its Copy, never a 22 px target
+  assert.match(addr, /display: flex;[^}]*min-height: 44px/);
+  assert.match(fn, /<span className="approval__addr-text">\{groupAddress\(address\)\}<\/span><span className="approval__addr-copy" aria-hidden="true">\{copied \? "Copied" : "Copy"\}<\/span>/);
+  assert.match(rule(".approval__addr-copy"), /flex: none;/);
   assert.match(rule(".approval__to-cap"), /font-size: 12px;[^}]*color: var\(--mute\)/);
   assert.match(rule(".approval__lands"), /color: var\(--mute\)/);
 });

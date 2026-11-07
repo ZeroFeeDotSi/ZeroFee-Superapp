@@ -48,7 +48,7 @@ export function takeOutLeast(legs: readonly TakeOutLeg[]): number {
 export function takeOutLines(legs: readonly TakeOutLeg[]): string[] {
   if (!legs.length) return [];
   const leaves = legs.map((l) => {
-    if (l.from === "hidden") return `About ${usd(l.usd)} leaves your private balance.`;
+    if (l.from === "hidden") return `About ${usd(l.usd)} leaves Private.`;
     // "Up to" where the row can't send the whole pick at once (a fee reserve kept while it holds coins)
     const what = `${l.all ? "About " : l.from !== "near" && l.readyUsd !== undefined && l.readyUsd < l.usd ? "Up to " : ""}${usd(l.usd)}`;
     // a chain row pays its own network fee on top; the NEAR row is Trading's own cash and pays none

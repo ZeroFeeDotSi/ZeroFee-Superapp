@@ -16,6 +16,7 @@ import { MoneyAmount, MoneySheet, SheetLine, type Pot } from "@zerofee/design/Mo
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { approvalWords } from "@zerofee/shell-api/approval-words.ts";
 import { runJob } from "@zerofee/shell-api/job-run.ts";
+import { topUpAsk, topUpEnded } from "@zerofee/shell-api/topup-ask.ts";
 import { dollars } from "../format.ts";
 import { ActMove } from "../icons.tsx";
 import { JobMade } from "../money/JobMade.tsx";
@@ -23,6 +24,7 @@ import { LEG_SEC } from "./move-split.ts";
 import { amountIn, capNeeds, topUpStart, trimCents, typedUsd, validUsd, wholeDollars } from "../hub.ts";
 import { SHEET_NEEDS, sheetLineOf, useServices } from "../services.ts";
 import { potsOf } from "../money/pots.ts";
+import { sendEndsHere } from "../money/swap-refused.ts";
 
 type Held = NonNullable<SpendingActivity["held"]>;
 
@@ -33,6 +35,8 @@ export function useMoveProblem(onOpen: (next: NextStep) => void, onLine?: (line:
     const line = onLine ? sheetLineOf(p) : null;
     if (line) return onLine!(line);
     const next = await shell.showProblem(p);
+    // money that may have gone: its sheet goes (MoneyHost's open: Activity) even on the screen's Close, never its lit button
+    if (sendEndsHere(p)) return onOpen(p.next);
     if (next.kind === "fix-input") {
       const usd = amountIn(next.label);
       if (usd) setUsd(usd);
@@ -83,14 +87,19 @@ export function TopUpSheet({ status, safeUsd: safeRead, onClose, onDone, onHeld,
   const [busy, setBusy] = useState(false);
   /** The job is made at the tap (rule 2: "Job created." and its time left, never "Moving…"): its dollars. */
   const [made, setMade] = useState<string | null>(null);
+  /** The job its receipt follows (runJob's made): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [madeJob, setMadeJob] = useState<string | null>(null);
   const [line, setLine] = useState<string | null>(null);
   const services = useServices(bridge, SHEET_NEEDS.move, "Move");
   const problem = useMoveProblem((next) => (next.kind === "open" && next.screen === "spending-cap" ? onCap() : onOpen(next)), setLine);
   const full = Number(status.roomUsd) < 2;
   const emptySafe = safeRead !== null && !(Number(safeRead) >= 0.01);
+  // the job's own key per amount (the audit's SHOULD, 7 Nov: topUpAsk): the core's approval.asked and job.signed name it
+  const keys = useRef(new Map<string, string>());
   const go = async () => {
     // cents always: the line and Home's row spell the moving amount one way ("$3.00", audit 2 Nov)
     const amount = `$${Number(typedUsd(usd)).toFixed(2)}`;
+    const ask = topUpAsk(keys.current, typedUsd(usd), "home-topup");
     setBusy(true);
     setLine(null);
     // rule 2 (5 Nov): the job is made at the tap, "Job created." and its time left here, its row on
@@ -98,11 +107,12 @@ export function TopUpSheet({ status, safeUsd: safeRead, onClose, onDone, onHeld,
     // takes the job away again and this sheet is as it was (runJob)
     const end = await runJob<SpendingActivity | { declined: true }>({
       tasks, title: `Move ${amount} to your NEAR wallet`, usd: amount, etaSec: LEG_SEC.nearOut, safe: true, money: ["safe"],
-      call: () => bridge.call<SpendingActivity | { declined: true }>("spending.topUp", { usd: typedUsd(usd) }),
+      call: () => bridge.call<SpendingActivity | { declined: true }>("spending.topUp", ask.params), key: ask.key,
       declined: (r) => "ok" in r && "declined" in r.ok,
-      made: () => { setMade(amount); setBusy(false); },
+      made: (j) => { setMadeJob(j.id); setMade(amount); setBusy(false); },
     });
     setBusy(false);
+    topUpEnded(keys.current, ask.params.usd, end);
     if ("declined" in end) return void setMade(null);
     if ("refused" in end) {
       setMade(null);
@@ -118,7 +128,7 @@ export function TopUpSheet({ status, safeUsd: safeRead, onClose, onDone, onHeld,
       return onDone("");
     }
   };
-  if (made !== null) return <JobMade title="Move to your NEAR wallet" amount={made} icon={<ActMove />} testid="topup-made" etaSec={LEG_SEC.nearOut} through={null} onDone={() => onDone("")} />;
+  if (made !== null) return <JobMade title="Move to your NEAR wallet" amount={made} icon={<ActMove />} testid="topup-made" etaSec={LEG_SEC.nearOut} through={null} job={madeJob} onDone={() => onDone("")} />;
   return (
     <MoneySheet title="Move to your NEAR wallet" pots={potsOf(safeRead, status)} away={busy} onClose={onClose}>
       {testAccount ? (
@@ -156,6 +166,8 @@ export function PutAwaySheet({ status, safeUsd = null, onClose, onDone, onOpen }
   const [busy, setBusy] = useState(false);
   /** The job is made at the tap (rule 2): its dollars, and the sheet says "Job created." with its time left. */
   const [made, setMade] = useState<string | null>(null);
+  /** The job its receipt follows (runJob's made): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [madeJob, setMadeJob] = useState<string | null>(null);
   const [line, setLine] = useState<string | null>(null);
   const services = useServices(bridge, SHEET_NEEDS.putaway, "Move to your Safe");
   const problem = useMoveProblem(onOpen, setLine);
@@ -168,7 +180,7 @@ export function PutAwaySheet({ status, safeUsd = null, onClose, onDone, onOpen }
       tasks, title: `Move ${shown} to your Safe`, usd: shown, etaSec: LEG_SEC.nearToSafe, safe: false, money: ["row:near"],
       call: () => bridge.call<SpendingActivity>("spending.putAway", { usd: amount }),
       declined: () => false,
-      made: () => { setMade(shown); setBusy(false); },
+      made: (j) => { setMadeJob(j.id); setMade(shown); setBusy(false); },
     });
     setBusy(false);
     if ("refused" in end) {
@@ -180,7 +192,7 @@ export function PutAwaySheet({ status, safeUsd = null, onClose, onDone, onOpen }
     end.job.made([`move:${end.ok.id}`]);
   };
   const cash = Number(status.cashUsd);
-  if (made !== null) return <JobMade title="Move to your Safe" amount={made} icon={<ActMove />} testid="putaway-made" etaSec={LEG_SEC.nearToSafe} through={null} onDone={() => onDone("")} />;
+  if (made !== null) return <JobMade title="Move to your Safe" amount={made} icon={<ActMove />} testid="putaway-made" etaSec={LEG_SEC.nearToSafe} through={null} job={madeJob} onDone={() => onDone("")} />;
   // Nothing to put away: say so, never a grey button (grade 1 Nov c, P10; Top up's N4 fix the same way).
   if (!(cash >= 0.01) && !some) {
     return (

@@ -16,7 +16,8 @@ test("the Buy sheet's Move opens Home's Move to the wallet it named, at the buy'
   assert.deepEqual(fundAsk("hood", "0"), { kind: "move", wallet: "hood" });
   assert.deepEqual(fundAsk("eth", "2"), { kind: "move" }, "a chain with no Home wallet: Move as it is");
   const sheet = src("./screens/TradeSheet.tsx");
-  assert.match(sheet, /<ShortChain [^>]*onAdd=\{\(\) => \{ onOpen\?\.\("move", value\); \}\}/, "the short state's link asks for the Move");
+  // T2-5 (the copy review's walk): the way on is the floor's quiet button now, never a link in the page
+  assert.match(sheet, /className="zf-btn zf-btn--quiet tp-add-quiet" onClick=\{\(\) => \{ onOpen\?\.\("move", value\); \}\}/, "the short state's button asks for the Move");
   const app = src("./TradeApp.tsx");
   assert.match(app, /if \(screen === "move"\) \{ void openMove\(from\); return true; \}/);
   assert.match(app, /shell\.openMoney\(back \? fundAsk\(back\.coin\.chain, back\.value\) : \{ kind: "move", quick: true \}/);
@@ -47,9 +48,10 @@ test("Your wallets (Home's Details) comes back to Trade's Settings on Back", asy
   assert.match(wallet, /if \(asked === "details" && !web\) setView\(detailsFor\(shell\.requestedLink\)\);/);
 });
 
-test("the short state's line is one string that says the buy is more than the wallet can spend, with no figure the sheet already shows (Copywriter batch 3: \"has only $X\" was false, $X is less its fee reserve; control: no stray '$0.00 .')", () => {
+test("the short state's head is one string (T2-5, the copy review's walk: \"Your SOL wallet has $144.06, not $5,000.\", the figure the sheet's \"to spend\" says, never the wallet's balance; Copywriter batch 3: \"has only $X\" was false; control: no stray '$0.00 .')", () => {
   const short = src("./screens/ShortChain.tsx");
-  assert.ok(short.includes("{`This buy is more than ${walletName} can spend.`}"));
+  assert.ok(short.includes('data-testid="over-wallet-head">{words.head}</p>'));
+  assert.ok(short.includes("haveUsd={") === false && src("./screens/TradeSheet.tsx").includes("haveUsd={usd(ready)}"), "the figure is what it can spend");
   assert.ok(!short.includes("has only"), "the old line is gone");
   assert.ok(!short.includes("{Wallet} has {usd(c.readyUsd)}."), "not three text pieces");
 });

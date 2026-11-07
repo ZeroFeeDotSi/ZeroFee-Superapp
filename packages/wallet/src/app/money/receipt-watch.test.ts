@@ -32,5 +32,5 @@ test("every receipt draws the line through TimeLeft's watch, never on its own (J
   for (const p of ["./JobMade.tsx", "./SiteMoney.tsx", "../../../../../apps/web/src/agentzero/AgentWallet.tsx"]) {
     assert.doesNotMatch(src(p), /<p className="zf-receipt__line">\{JOB_WORDS\.watch\}<\/p>/, p);
   }
-  assert.match(src("./JobMade.tsx"), /<TimeLeft etaSec=\{etaSec\} watch \/>/);
+  assert.match(src("./JobMade.tsx"), /<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/);
 });

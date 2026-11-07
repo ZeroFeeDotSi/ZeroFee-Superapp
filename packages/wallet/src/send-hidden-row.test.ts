@@ -71,9 +71,9 @@ test("a NEAR-only path is refused: a Solana and an EVM address are Hidden payees
 });
 
 test("the can't-carry line: names the coin; never Private; a short Hidden is not a can't-carry (it stops, D85)", () => {
-  assert.equal(hiddenCantLine("doge"), "Your private balance can't send DOGE yet. Send it plain?");
-  assert.equal(hiddenCantLine(undefined, "Bitcoin"), "Your private balance can't send to Bitcoin yet. Send it plain?");
-  assert.equal(hiddenCantLine("<b>x</b>"), "Your private balance can't send this yet. Send it plain?", "a symbol from outside is never echoed raw");
+  assert.equal(hiddenCantLine("doge"), "Private can't send DOGE yet. Send it plain?");
+  assert.equal(hiddenCantLine(undefined, "Bitcoin"), "Private can't send to Bitcoin yet. Send it plain?");
+  assert.equal(hiddenCantLine("<b>x</b>"), "Private can't send this yet. Send it plain?", "a symbol from outside is never echoed raw");
   assert.equal(hiddenCantCarry("pay.private.short"), false, "short stops on the form, never offers Plain");
   assert.equal(hiddenCantCarry("ledger.private.unavailable"), false, "not set up: set it up, never a public send");
   assert.equal(hiddenCantCarry("pay.route.none"), true);

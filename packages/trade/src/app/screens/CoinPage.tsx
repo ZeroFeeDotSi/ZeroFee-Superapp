@@ -1,5 +1,5 @@
 // A coin (D136, the approved mockup's order; design review 2026-11-03 items 1-3, 10, 17-19): the coin in its own light, its
-// name once and "SOL · PumpSwap"; the price (live, swapped in place, never rolling, a soft glint when it moves; "Updated 40 s
+// name once and its network ("On Solana"); the price (live, swapped in place, never rolling, a soft glint when it moves; "Updated 40 s
 // ago" once nothing has come for 30 s, "Updates every few seconds" while it is read instead of over the chain's socket) and
 // the range's change in dollars and percent, in its colour (chart bug); one line full width, the coin's icon faint behind it (a finger reads that moment, and lets go with the finger;
 // candles one tap away); what you hold; the coin's numbers; then, on the page itself (product decision, 5 Nov: no More sheet), price
@@ -15,7 +15,8 @@ import "./trap.css";
 import type { CoinDetail, CoinRow, LiveState, Range } from "../../market/types.ts";
 import { MarketError } from "../../market/gt.ts";
 import { tradeProblems } from "../../trade-problems.ts";
-import { pageRefusal, type PageRefusal } from "../coin-refusal.ts";
+import { pageRefusal, trapWords, type PageRefusal } from "../coin-refusal.ts";
+import { markNotForSale } from "../not-for-sale.ts";
 import { coinSafety, sellTrap } from "../coin-safety.ts";
 import { landedWith, landedWithout, mergeTrades, tradeSide, type TradeRow } from "../trades-list.ts";
 import { OFFLINE_SHORT, useOnline } from "../online.ts";
@@ -27,7 +28,7 @@ const REFUSAL_WORDS: Record<PageRefusal, (symbol: string) => { whatHappened: str
   "fee-raisable": tradeProblems.coinFeeRaisable, "fee-high": tradeProblems.coinFeeHigh,
 };
 import { agoText } from "../chart-math.ts";
-import { amount, coinHeadline, compactUsd, dexName, listPrice, pct, moveWords, usd } from "../format.ts";
+import { amount, coinHeadline, compactUsd, dexName, listPrice, pct, usd } from "../format.ts";
 import { coinPageSince } from "../your-coins.ts";
 import { CoinOrders } from "./Orders.tsx";
 import { CoinStanding } from "./Standing.tsx";
@@ -42,7 +43,7 @@ import { CandlesIcon, LineIcon } from "../icons.tsx";
 import { agentNearLine } from "@zerofee/shell-api/trade-ask.ts";
 import { CHAIN_NAME, MARKET, NEAR_NOT_TRADED, useCoinChart, useCoinDetail, useLive, useNoteTick, useTick, useTrade, useWarmRanges } from "../runtime.tsx";
 import { tickKey } from "../../market/ticks.ts";
-import { CHAIN_SHORT } from "./Discover.tsx";
+import { CHAIN_SHORT, dayChangePct, dayTime, headerChange, moveFigures, priceWord, STAT_LABELS } from "../coin-words.ts";
 import type { Candle } from "../../market/types.ts";
 
 /** wallet v1's ranges: LIVE (the last hour, the price now on its newest candle), then a day to everything it has traded. */
@@ -140,7 +141,8 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
   // page says what the row the person tapped said, so the list and the page never disagree (grade 1 Nov, item 4).
   const fromRow = market.recorded === true && seed.priceUsd !== undefined;
   const px = fromRow ? seed.priceUsd : live ?? d?.priceUsd;
-  const ch = fromRow ? seed.change24hPct ?? d?.change24hPct : d?.change24hPct ?? seed.change24hPct;
+  // one 24 hours figure for the header and the 24 hours chip (copy review, 6 Nov, item 10: "+5.9% in 24 hours" over a "+5.0%" chip)
+  const ch = dayChangePct(fromRow, seed.change24hPct, d?.change24hPct);
   const dayMove = px !== undefined && ch !== undefined ? { usd: px - px / (1 + ch / 100), pct: ch } : undefined;
   // what Buy would refuse, said here instead of a Buy pill: the mint's own answer or the market's freeze flag (Solana), the
   // coin's own sell check (BNB Chain, Robinhood Chain)
@@ -154,6 +156,8 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
   const mintHere = mintRead?.addr === seed.address ? mintRead : undefined;   // never the coin before's answer (review L)
   const chainClean = mintHere !== undefined && mintClean?.(seed.chain, seed.address) === true;
   const no = pageRefusal(seed.chain, { mint, freezeFlag: d?.security?.freezeAuthority === true, checks });
+  // T2-5: a coin refused here says "Not for sale" on its list rows from now on (not-for-sale.ts)
+  useEffect(() => { if (no) markNotForSale(seed.chain, seed.address); }, [no, seed.chain, seed.address]);
   const symbol = d?.symbol ?? seed.symbol;
   const holds = held.value && BigInt(held.value) > 0n;
   // an ask from another app: once, when everything it depends on has answered
@@ -212,10 +216,14 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
   const stale = Date.now() - heardAt > STALE_MS;
   const copy = () => { void navigator.clipboard?.writeText(seed.address).then(() => setCopied(true), () => undefined); };
   const sinceWords = coinPageSince(position, px, MARKET.includes(seed.chain));
-  const where = `${CHAIN_SHORT[seed.chain]}${d?.pools?.[0] && dexName(d.pools[0].dex) ? ` · ${dexName(d.pools[0].dex)}` : ""}`;
+  // the network in words, never the venue ("On Solana", not "SOL · PumpSwap": the copy review's final words, 7 Nov, T1)
+  const where = `On ${CHAIN_NAME[seed.chain]}`;
   const canTrade = !no && MARKET.includes(seed.chain) && !(!d && detail.error);
-  const moveChips = MOVE_CHIPS.flatMap(([w, label, words]) => { const v = d?.moves?.[w]; return v === undefined ? [] : [[w, label, words, v] as const]; });
-  const pools = (d?.pools ?? []).filter((p) => dexName(p.dex)).slice(0, 3);
+  const figures = moveFigures(d?.moves, ch);
+  const moveChips = d?.moves ? MOVE_CHIPS.flatMap(([w, label, words]) => { const v = figures[w]; return v === undefined ? [] : [[w, label, words, v] as const]; }) : [];
+  const word = priceWord({ scrubbing: scrub !== null, stale, recorded: market.recorded === true, feed });
+  // its biggest pool only, named by its network (copy review, T1: pool names never on the page)
+  const pools = (d?.pools ?? []).filter((p) => dexName(p.dex)).slice(0, 1);
   return (
     <div className="tr-coin cp zf-enter" ref={pageAt}>
       {/* D136 (design review 17, 19): the coin in its own light, its name once, its chain and pool under it */}
@@ -224,12 +232,16 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
         <div><div className="tr-sym">{coinHeadline(d?.name, symbol, seed.address)}</div><div className="zf-small cp-where"><CoinIcon symbol={CHAIN_SHORT[seed.chain]} icon={seed.chain === "bsc" ? "bsc" : seed.chain} size={14} />{where}</div></div>
       </div>
       {/* a coin people couldn't sell back says so first, before any price or change (UX audit 4 Nov) */}
-      {trap && <p className="cp-trap" role="alert"><span className="cp-trap-mark" aria-hidden="true">!</span>{trap}</p>}
+      {/* T2-5 (the copy review's walk): a coin ZeroFee won't buy for it can't be sold is one block, here, head and body; the floor
+          says nothing more (the bottom duplicate is gone) and has no button but Sell for coins already held */}
+      {no === "unsellable" ? <div className="cp-trap cp-trap--block" role="alert" data-testid="coin-trap"><span className="cp-trap-mark" aria-hidden="true">!</span><span><b className="cp-trap-head">{trapWords(symbol).head}</b><span className="cp-trap-body">{trapWords(symbol).body}</span></span></div>
+        : trap && <p className="cp-trap" role="alert"><span className="cp-trap-mark" aria-hidden="true">!</span>{trap}</p>}
       {/* a finger on the chart: that moment's price and time in place of now's; it lets go when the finger does */}
-      {/* a16 (Sim re-walk): the headline reads as the list's row does ("$0.0₅45", format.ts listPrice), never "$0.000004469" */}
+      {/* a16 (Sim re-walk), T2-3 (walk): the headline reads as the list's row does (format.ts listPrice: six decimals, "$0.000004") */}
       <div className="tr-price"><span className={!scrub && tick ? (tick === "up" ? "cp-glint-up" : "cp-glint-down") : undefined}>{scrub ? listPrice(scrub.c) : px !== undefined ? listPrice(px) : <span className="zf-shimmer cp-price-sk" aria-label="Loading the price" />}</span>
-        {!scrub && !market.recorded && !stale && feed !== "polling" && <span className="zf-live-word cp-live"><span className="zf-live" />Live</span>}</div>
-      <div className={`zf-small tr-change${trap ? " cp-change--trap" : ""}`}>{scrub ? scrubWhen(scrub.t) : moved ? <><span className={`cp-move cp-move--${moved.dir}`}>{moveWords(moved.usd, moved.pct)}</span> <span className="tr-mute">{rangeWords(range, whole)}</span></> : " "}
+        {word === "Live" && <span className="zf-live-word cp-live"><span className="zf-live" />Live</span>}
+        {word === "Now" && <span className="zf-live-word cp-live cp-now">Now</span>}</div>
+      <div className={`zf-small tr-change${trap ? " cp-change--trap" : ""}`}>{scrub ? dayTime(scrub.t) : moved ? <><span className={`cp-move cp-move--${moved.dir}`}>{headerChange(moved.usd, moved.pct)}</span> <span className="tr-mute">{rangeWords(range, whole)}</span></> : " "}
         {/* recorded prices (?demo) never tick: no "Updates every few seconds", no "Updated … ago" (item 3) */}
         {!scrub && stale && !market.recorded && <span className="tr-age">Updated {agoText(Date.now() - heardAt)} ago</span>}
         {!scrub && feed === "polling" && !market.recorded && <span className="tr-lbadge">Updates every few seconds</span>}</div>
@@ -264,12 +276,12 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
       {/* product decision, 4 Nov ("coin checks are not needed ... pull only data from GeckoTerminal and show it better"): the coin's
           numbers at once, as Phantom's Info and pump.fun's stats show them; then everything else behind one More */}
       <div className="cp-stats" data-testid="coin-stats">
-        <Stat loading={!d} value={mcap !== undefined && mcap > 0 ? compactUsd(mcap) : undefined} label="Market cap" />
-        <Stat loading={!d} value={fig.liquidityUsd !== undefined ? compactUsd(fig.liquidityUsd) : undefined} label="Liquidity" />
-        <Stat loading={!d} value={fig.volume24hUsd !== undefined ? compactUsd(fig.volume24hUsd) : undefined} label="Traded 24h" />
-        <Stat loading={!d} value={d?.holders !== undefined ? d.holders.toLocaleString("en-US") : undefined} label="Holders" />
-        <Stat loading={!d} value={fig.createdAt !== undefined ? ageText(Date.now() - fig.createdAt) : undefined} label="Age" />
-        <Stat loading={!d} value={d?.top10Pct !== undefined ? `${Math.round(d.top10Pct)}%` : undefined} label="Top 10 hold" />
+        <Stat loading={!d} value={mcap !== undefined && mcap > 0 ? compactUsd(mcap) : undefined} label={STAT_LABELS.cap} />
+        <Stat loading={!d} value={fig.liquidityUsd !== undefined ? compactUsd(fig.liquidityUsd) : undefined} label={STAT_LABELS.pool} />
+        <Stat loading={!d} value={fig.volume24hUsd !== undefined ? compactUsd(fig.volume24hUsd) : undefined} label={STAT_LABELS.traded} />
+        <Stat loading={!d} value={d?.holders !== undefined ? d.holders.toLocaleString("en-US") : undefined} label={STAT_LABELS.holders} />
+        <Stat loading={!d} value={fig.createdAt !== undefined ? ageText(Date.now() - fig.createdAt) : undefined} label={STAT_LABELS.age} />
+        <Stat loading={!d} value={d?.top10Pct !== undefined ? `${Math.round(d.top10Pct)}%` : undefined} label={STAT_LABELS.top10} />
       </div>
       {d?.buys24h !== undefined && d.sells24h !== undefined && <p className="zf-small cp-trades24">{tradesLine(d.buys24h, d.sells24h)}</p>}
       {/* product decision, 5 Nov ("More takes you to a popup when it should all be on the same page"): everything More held is here,
@@ -292,7 +304,7 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
         {pools.length > 0 && (
           <div className="tr-kvs" data-testid="coin-pools">
             <div className="zf-label tr-sec">Where it trades</div>
-            {pools.map((p) => <div key={p.address} className="tr-kv"><span>{dexName(p.dex)}</span><span>{p.liquidityUsd !== undefined ? `${compactUsd(p.liquidityUsd)} liquidity` : ""}</span></div>)}
+            {pools.map((p) => <div key={p.address} className="tr-kv"><span>{CHAIN_NAME[seed.chain]}</span><span>{p.liquidityUsd !== undefined ? `${compactUsd(p.liquidityUsd)} in the pool` : ""}</span></div>)}
           </div>
         )}
         {(tradeRows.length > 0 || whalesOn) && (
@@ -305,7 +317,7 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
               </div>
             </div>
             {tradeRows.slice(0, 10).map((t, i) => (
-              <div key={t.tx ?? i} className={`tr-kv${t.unconfirmed ? " tr-confirming" : ""}`} data-tx={t.tx}><span>{tradeSide(t)}</span><span>{usd(t.usd)} · {t.unconfirmed ? "now" : agoText(Date.now() - t.t)}</span></div>
+              <div key={t.tx ?? i} className={`tr-kv${t.unconfirmed ? " tr-confirming" : ""}`} data-tx={t.tx}><span>{tradeSide(t)}</span><span>{usd(t.usd)} · {dayTime(t.t)}</span></div>
             ))}
             {whalesOn && trades.value && tradeRows.length === 0 && <p className="zf-small tr-none">No trades over $1,000 lately.</p>}
             {whalesOn && !trades.value && tradeRows.length === 0 && <div className="tr-center"><Mark size={28} mode="loading" /></div>}
@@ -314,9 +326,9 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
         {!d?.fromChain && <p className="zf-small cp-source">Prices, charts and trades from GeckoTerminal.</p>}
       </div>
       {/* design review 3: a solid floor held to the bottom, two buttons only: Sell (hairline) left, Buy (ink) right */}
-      <div className="tr-floor tr-coin-floor">
+      {!(no === "unsellable" && !(holds && d)) && <div className="tr-floor tr-coin-floor">
         {no
-          ? <><p className="zf-small tr-why">{REFUSAL_WORDS[no](symbol).whatHappened}</p>{holds && d && <button className="tr-btn2" onClick={() => onSell(d)}>Sell</button>}</>
+          ? <>{no !== "unsellable" && <p className="zf-small tr-why">{REFUSAL_WORDS[no](symbol).whatHappened}</p>}{holds && d && <button className="tr-btn2" onClick={() => onSell(d)}>Sell</button>}</>
           : !MARKET.includes(seed.chain)
             ? <p className="zf-small tr-why">{NEAR_NOT_TRADED}</p>
           : !buyable && detail.error
@@ -327,7 +339,7 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
                   ? <button className="zf-btn" disabled><Mark size={18} mode="loading" />Sending…</button>
                   : <button className={`zf-btn${buyable && online && canTrade ? " zf-sweep" : ""}`} disabled={!buyable || !online} onClick={() => buyable && onBuy(buyable)}>Buy</button>}
               </div>}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -348,9 +360,3 @@ function Stat({ value, label, loading }: { value: string | undefined; label: str
   return <div className="cp-stat">{value === undefined ? <b className="zf-shimmer cp-stat-sk" aria-label="Loading" /> : <b>{value}</b>}<span className="zf-small">{label}</span></div>;
 }
 
-/** While a finger is on the chart, its moment: "7:25 am, 3 Nov" (design review 18). */
-function scrubWhen(ms: number): string {
-  const d = new Date(ms);
-  const time = d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true }).replace(/\s/g, " ").toLowerCase();
-  return `${time}, ${d.getDate()} ${d.toLocaleString("en-GB", { month: "short" })}`;
-}

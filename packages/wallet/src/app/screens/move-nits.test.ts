@@ -18,7 +18,7 @@ test("Move's sliders (the Home plan §1.5): its head is where your money sits, n
     const t = typeof w === "function" ? (w as (a: string, b: string) => string)("SOL", "$2") : w;
     assert.doesNotMatch(t, /Hidden|\brow\b|Trading|ETH on Robinhood|please|!/i, t);
     // labels (a heading, a button, the grouped summary's row names) are not sentences
-    if (!["title", "head", "go", "moving", "done", "leavesFrom", "leaves", "arrivesIn", "arrives", "atLeast", "fees", "atMost", "time", "leave", "was", "who", "typed"].includes(k)) assert.match(t, /[.…]$/, `a sentence ends with a full stop: ${t}`);
+    if (!["title", "head", "go", "moving", "done", "leavesFrom", "leaves", "arrivesIn", "arrives", "atLeast", "fees", "atMost", "time", "leave", "was", "who", "typed", "all"].includes(k)) assert.match(t, /[.…]$/, `a sentence ends with a full stop: ${t}`);
   }
   assert.doesNotMatch(sheet, /homePots|MOVE_WORDS\.empty|Your Safe is empty/, "control: no pots line with Hidden and Trading, no empty-Safe stop");
   assert.match(sheet, /MOVE_WORDS\.nothing/, "only when nothing anywhere can move: Add money");
@@ -41,7 +41,7 @@ test("D140 (the grade of 3 Nov: the total fell by the $310 on its way): from the
   assert.match(sheet, /setBusy\(true\); setLine\(null\);\s*setFrozen\(now\);/);
   // nothing moved (refused before the job, or a no on the Safe's Approve): it reads live again; a job made keeps them
   assert.match(sheet, /const back = \(\) => \{ setMade\(null\); setBusy\(false\); setFrozen\(null\); \};/);
-  assert.match(sheet, /refused: \(pr\) => \{ back\(\); const said = refusedLine\(pr\); if \(said !== null\) \{ setLine\(said\); setStep\(refusedStep\(pr\)\); \} else void problem\(pr, \(\) => undefined\); \},\s*declined: back,/);
+  assert.match(sheet, /refused: \(pr\) => \{ back\(\); if \(sendEndsHere\(pr\)\) return void endHere\(shell, pr, onClose\); const said = refusedLine\(pr\); if \(said !== null\) \{ setLine\(said\); setStep\(refusedStep\(pr\)\); \} else void problem\(pr, \(\) => undefined\); \},\s*declined: back,/);
   assert.match(sheet, /const total = totalOf\(now\);/, "the total from the held places");
 });
 
@@ -66,11 +66,11 @@ test("the copy review's Move walk (5 Nov): one note under the rows at a time, th
   assert.doesNotMatch(sheet, /kept\.map\(|back\.map\(|data-testid="move-fill"|data-testid="move-time"/);
 });
 
-test("the copy review's Move walk (5 Nov): Private's screen has a Move that opens Move with Private as its source (its row in focus); controls: not before Private holds money, and Home's own Move keeps its tab's focus", () => {
+test("the copy review's Move walk (5 Nov), A2-2 (8 Nov): Private's screen has a Move, only once Private holds money, that opens Private's own one-slider sheet (private-page-2.test.ts), never the all-wallets Move; Home's own Move keeps its tab's focus", () => {
   const priv = readFileSync(new URL("./Private.tsx", import.meta.url), "utf8");
-  assert.match(priv, /\{ready && rows\.length > 0 && onMove && <button className="zf-btn" data-testid="private-move" onClick=\{onMove\}>Move<\/button>\}/);
+  assert.match(priv, /\{ready && has && <button className="zf-btn" data-testid="private-move" onClick=\{\(\) => openSheet\(true\)\}>Move<\/button>\}/);
   const app = readFileSync(new URL("../WalletApp.tsx", import.meta.url), "utf8");
-  assert.match(app, /<PrivateScreen [^\n]*?onMove=\{\(\) => shell\.openMoney\(\{ kind: "move", source: "private" \}, moved\)\}/);
+  assert.doesNotMatch(app, /<PrivateScreen [^\n]*?onMove=/);
   const host = readFileSync(new URL("../money/MoneyHost.tsx", import.meta.url), "utf8");
   assert.match(host, /ask\.source === "private" \? \{ wallet: "private" as const \} : ask\.wallet \? \{ wallet: ask\.wallet \} : \{\}/);
   const sheet = readFileSync(new URL("./MoveSheet.tsx", import.meta.url), "utf8");
@@ -96,15 +96,16 @@ test("Move's rows (review of the shots, 3 Nov): the Safe wears the shield Home's
   assert.equal((sheet.match(/<span className="wl-mv-usd"/g) ?? []).length, 1, "the figure after the move, once per row");
 });
 
-test("R3 (the design review §4.4): Move opens on the total and one line, no \"Where your money sits\" header; \"Drag a slider\" is that line, never a paragraph above Move; the privacy line is one tap away and only with a plan (control: the old head and paragraph are gone)", () => {
+test("R3 (the design review §4.4): Move opens on the total and one line, no \"Where your money sits\" header; \"Drag a slider\" is that line, never a paragraph above Move; the privacy line is one tap away on the floor, its own sheet (control: the old head and paragraph are gone)", () => {
   const sheet = readFileSync(new URL("./MoveSheet.tsx", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
-  assert.match(sheet, /<div className="wl-mv-hero">\s*<p className="wl-mv-total"[^>]*>\{usdShort\(total\)\}<\/p>\s*<p className="wl-mv-lead">\{running \? \(allEnded \? "" : MOVE_WORDS\.closeOk\) : MOVE_WORDS\.untouched\}<\/p>/);
+  // pin changed (T-B, row 7 a): the total's label over it
+  assert.match(sheet, /<div className="wl-mv-hero">\s*<p className="wl-mv-label" data-testid="move-all">\{MOVE_WORDS\.all\}<\/p>\s*<p className="wl-mv-total"[^>]*>\{usdShort\(headline\)\}<\/p>\s*<p className="wl-mv-lead">\{running \? \(allEnded \? "" : MOVE_WORDS\.closeOk\) : MOVE_WORDS\.untouched\}<\/p>/);
   assert.doesNotMatch(sheet, /wl-mv-head|<span className="zf-label">\{MOVE_WORDS\.head\}/, "control: no header row");
-  assert.match(sheet, /\{block && block !== MOVE_WORDS\.untouched\n\s*\? <p className="zf-small wl-mv-why"/, "the why line above Move only for a real reason");
-  assert.match(sheet, /\{!running && legs\.length > 0 && \(\s*<div className="wl-mv-who">[\s\S]*?aria-expanded=\{who\}[\s\S]*?\{who && <p className="zf-small wl-mv-foot" data-testid="move-private">\{MOVE_WORDS\.privately\}<\/p>\}/);
+  assert.match(sheet, /\{on\.line === "why" && <p className="zf-small" role="status" data-testid="move-why">/, "the why line above Move only for a real reason (moveFloor: its table test in move-floor.test.ts)");
+  assert.match(sheet, /\{who && <MoneySheet title=\{MOVE_WORDS\.who\} onClose=\{\(\) => setWho\(false\)\}><p className="zf-body wl-sheet-lead" data-testid="move-private">\{MOVE_WORDS\.privately\}<\/p><\/MoneySheet>\}/);
   assert.doesNotMatch(sheet, /\{!running && <p className="zf-small wl-mv-foot">\{MOVE_WORDS\.privately\}<\/p>\}/, "control: never the always-on grey paragraph");
   const css = readFileSync(new URL("../money/move-swap.css", import.meta.url), "utf8");
-  assert.match(css, /\.zf-sheet__content:has\(> \.wl-mv-hero\) > :is\(\.wl-mv-why, \.zf-money__line\):has\(\+ \.wl-sheet-go\) \{ position: sticky; bottom: 74px;/, "the line rides the floor with its button");
+  assert.doesNotMatch(css, /:has\(> \.wl-mv-hero\)/, "the floor is its own box now: nothing has to ride it");
   assert.match(css, /\.zf-group \.wl-mv-leg__fill \{ display: none; \}/, "one progress device: no fill bar");
 });
 
@@ -128,7 +129,7 @@ test("the crawl (4 Nov): an unread Safe is never drawn as \"Safe $0\": the sheet
 
 test("one figure per Move (QA's MUST, Sim test: the first Jobs frame said $2.11 for a $2.04 sheet): \"Job created.\" says what was typed, the rows say their legs (control: the old round-up is gone)", () => {
   const sheet = readFileSync(new URL("./MoveSheet.tsx", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
-  assert.match(sheet, /made: \(usd\) => \{ setMade\(Math\.round\(usd \* 100\) \/ 100\);/);
+  assert.match(sheet, /made: \(usd, j\) => \{ setMadeJob\(j\); setMade\(Math\.round\(usd \* 100\) \/ 100\);/);
   assert.match(sheet, /<span className="wl-mv-leg__v">\{usdShort\(r\.leg\.usd\)\}<\/span>/);
   assert.doesNotMatch(sheet, /gridStays|shownLegUsd|extraAtTap|usd \+ extra/, "control: the Safe → NEAR wallet round-up");
   assert.match(sheet, /const fills = fillLine\(legs, coins, SAFE_FILL_OPEN\);/, "the top-up is its own step line");

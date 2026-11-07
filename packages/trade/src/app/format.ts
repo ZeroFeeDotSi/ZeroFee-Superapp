@@ -54,27 +54,26 @@ export function rowUsd(n: number): string {
   if (a >= 1e3) return `${n < 0 ? MINUS : ""}$${(a / 1e3).toFixed(1).replace(/\.0$/, "")}K`;
   return `${n < 0 ? MINUS : ""}$${Math.round(a)}`;
 }
-/** A coin's price: four significant digits, never in exponent form ("$0.00002134", "$8.37", "$2,416.10"). */
+/** What a price under a millionth of a dollar reads (T2-3): never "$0.000000", never a dust price rounded up. */
+export const PRICE_FLOOR_WORDS = "under $0.000001";
+/** A coin's price (the copy review's walk, T2-3, 8 Nov: no subscript form anywhere: "$0.0" with a small 4 and "57" read as a typo): $1,000 and up with
+ *  commas and cents, $10 and up cents, $1 to $10 up to four decimals, under $1 up to six decimals cut toward zero with
+ *  trailing zeros dropped ("$0.000057", "$0.0007"), under $0.000001 "under $0.000001". Never exponent form. The list,
+ *  the coin page's header and the receipt all read this one function. */
 export function price(n: number): string {
   if (!(n > 0)) return "$0";
   if (n >= 1000) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
   // $10 and up: cents, as every dollar figure reads (e2e walk 3 Nov: "$70.204")
   if (n >= 10) return `$${n.toFixed(2)}`;
   if (n >= 1) return `$${n.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")}`;
-  const zeros = Math.max(0, -Math.floor(Math.log10(n)) - 1);
-  return `$${n.toFixed(Math.min(20, zeros + 4)).replace(/0+$/, "")}`;
+  if (n < 1e-6) return PRICE_FLOOR_WORDS;
+  // six decimals, cut toward zero so a price never reads more than it is ("$0.0000569" is "$0.000056")
+  const cut = Math.floor(n * 1e6 + 1e-9) / 1e6;
+  return `$${cut.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
 }
-const SUB = "₀₁₂₃₄₅₆₇₈₉";
-/** A list row's price (copy review, 5 Nov: "$0.000000008808" pushed the name to "BLACKDRA…"): under $0.001 the compact trading
- *  form, "$0.0₈88": "0.0", the count of zeros after the point in subscript digits (10 and up as several, "₁₂"), then two
- *  significant digits cut toward zero (never more than it is), a trailing zero dropped ("$0.0₃9"). $0.001 and up, and
- *  every other screen (the coin page keeps the full figure), as price(). */
-export function listPrice(n: number): string {
-  if (!(n > 0) || n >= 0.001) return price(n);
-  const zeros = -Math.floor(Math.log10(n)) - 1;
-  const digits = String(Math.floor(n * 10 ** (zeros + 2) + 1e-9)).padStart(2, "0").slice(0, 2).replace(/0$/, "");
-  return `$0.0${String(zeros).split("").map((d) => SUB[Number(d)]).join("")}${digits}`;
-}
+/** A list row's price: the one price() (T2-3: the list's subscript form is gone). The name stays so the
+ *  list rows, the coin page's header and the receipt keep reading one formatter. */
+export const listPrice = (n: number): string => price(n);
 /** "+$2.10", "−$3.20": a change in dollars, always signed. */
 export const usdChange = (n: number): string => `${sign(n)}${usd(Math.abs(n))}`;
 /**
@@ -126,6 +125,28 @@ export function ago(at: number, now = Date.now()): string {
   if (s < 172800) return "Yesterday";
   return new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
+
+/** A time to the minute, local: "8:15 am" (UX audit 4 Nov: "02:23:36 AM" three times over). */
+export const clockTime = (at: number): string => {
+  const d = new Date(at), h = d.getHours();
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(d.getMinutes()).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+};
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** T2-6 (the copy review's walk, 8 Nov): when an Activity row happened, by the app's own clock (`now`, injected): "now" only in its
+ *  first 60 s, then the clock time ("8:15 am"); a row from before today also says its day ("6 Nov"). */
+export function whenWords(at: number, now: number): string {
+  if (now - at < 60_000) return "now";
+  const d = new Date(at), n = new Date(now);
+  const today = d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+  return today ? clockTime(at) : `${d.getDate()} ${MONTHS[d.getMonth()]}, ${clockTime(at)}`;
+}
+/** T2-6 (the copy review's walk, the owner's "Done in N seconds." form): a trade's time from the tap to the chain's answer, said as
+ *  done: "Done in under a second." under 1 s, else "Done in 2 seconds." (rounded, never 0). */
+export const doneIn = (ms: number): string => {
+  if (ms < 1000) return "Done in under a second.";
+  const n = Math.max(1, Math.round(ms / 1000));
+  return `Done in ${n} second${n === 1 ? "" : "s"}.`;
+};
 
 /** What a coin's page says when nothing names it (the ledger's word for the same coin). */
 export const UNNAMED_COIN = "An unnamed coin";

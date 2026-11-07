@@ -462,7 +462,7 @@ export async function pocketEmpty(k: {
   sol: SolChain;
   approve: (w: PlainWords) => Promise<boolean>;
   secret: () => Promise<Uint8Array>;
-  confirmed: (seen: () => Promise<("ok" | "failed" | null)[]>, signature: string, explorerUrl: string) => Promise<TxOutcome>;
+  confirmed: (seen: () => Promise<("ok" | "failed" | null | "unread")[]>, signature: string, explorerUrl: string) => Promise<TxOutcome>;
 }): Promise<TxOutcome | { declined: true }> {
   // Solana by name when its nodes don't answer (Home's Send landing: "Solana didn't answer."), never a bare "nodes".
   const { balance, latestBlockhash, send, status } = k.sol;

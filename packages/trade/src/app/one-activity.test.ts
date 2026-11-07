@@ -16,10 +16,13 @@ test("no Activity tab: one section, so no switch; the history stays one tap from
   assert.match(src("./TradeApp.tsx"), /view\.kind === "trades"[\s\S]*<Activity \/>/, "the history has its own page");
 });
 
-test("an Activity row's times are to the minute, never to the second (control: the old seconds are gone)", () => {
+test("an Activity row's times are to the minute, never to the second (control: the old seconds are gone)", async () => {
   const card = src("./screens/JobCard.tsx");
-  assert.match(card, /hour: "numeric", minute: "2-digit", hour12: true/);
+  assert.match(card, /import \{ clockTime as clock, usd, whenWords \} from "\.\.\/format\.ts";/, "the step times and the row's time: format.ts");
   assert.doesNotMatch(card, /second: "2-digit"/, "control");
+  const { clockTime } = await import("./format.ts");
+  const d = new Date(0); d.setHours(14, 23, 36, 0);                   // local, whatever the zone: no date in it matters
+  assert.equal(clockTime(d.getTime()), "2:23 pm", "to the minute");
 });
 
 test("the header's Activity centre draws Trade's trades: set while Trade is up with Trade's runtime and shell, cleared when it goes (control: the slot's own rule clears an app)", async () => {

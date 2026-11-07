@@ -16,6 +16,7 @@ import { KNOWN_COINS, NATIVE as WALLET_NATIVE } from "@zerofee/core/evm";
 import type { EvmWalletChain } from "@zerofee/core/evm";
 import { createFloatMock, SAMPLE_NEAR_COINS, type FloatMockOptions, type FloatMove, type FloatSnapshot } from "./mock-float.ts";
 import { approvalWords } from "./approval-words.ts";
+import { SIM_KEY_KIND } from "./key-place.ts";
 import { needWords } from "@zerofee/core/rule-words";
 import { SHOW_NEW_WORDS } from "@zerofee/core/show-new-words";
 import { defaultBands, recoveryChoices, shortFingerprint, type KeyProof } from "@zerofee/core/demo-core";
@@ -25,7 +26,9 @@ import { endsTitle } from "@zerofee/core/onward-ends";
 import { ProblemError } from "@zerofee/core/problem";
 import { SAFE_FILL_OPEN } from "@zerofee/core/safe-fill-open";
 import { SAFE_SEND_FILL_OPEN } from "@zerofee/core/safe-send-fill-open";
-import { LEG_WORDS, SEND_LEG_WORDS, fillStepUsd, privateShort, splitLines } from "@zerofee/core/private-route";
+import { LEG_WORDS, SEND_LEG_WORDS, fillStepUsd, privateRows, privateShort, quoted, sendTitle } from "@zerofee/core/private-route";
+import { moveSheet, moveSplitUsd, othersForSheet, sheetOthers } from "@zerofee/core/move-plan";
+import { NETWORK_FEE_USD } from "@zerofee/core/float-floors";
 import { FEES_KEPT } from "@zerofee/core/zero-fee";
 import { AGENT_PRIVATE_ROUTE, AGENT_TOP_UP_OFF } from "@zerofee/core/agent-route";
 import { ownWalletWords } from "@zerofee/core/own-wallet-words";
@@ -551,6 +554,12 @@ const SEND_LANDS: Record<string, { coin: string; network: string }> = {
 };
 // D143 (core approval-policy.ts): only what the Safe's own account signs asks. A hot key's signature (a chain wallet's
 // Send from Home, a site's transaction, a session, a NEAR wallet swap, a Move back) never does, as in the core.
+/** A sheet's job, as the core reads it (dev-signer.ts TxRequest.job): a request's `job`, or a ledger call's own `job` (a
+ *  Move's or Swap's key, private-move.ts), well formed only (16 to 64 letters, digits, - or _). Pure. */
+export function jobKeyOf(method: string, params: Record<string, unknown>): string | undefined {
+  const k = method === "tx.request" ? (params.request as { job?: unknown } | undefined)?.job : params.job;
+  return typeof k === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(k) ? k : undefined;
+}
 const NEEDS_YES = new Set(["ledger.sendFromSafe", "subwallet.export","ledger.toTrading", "tx.request", "ledger.pay", "ledger.transfer", "ledger.withdraw", "ledger.convert", "ledger.toPrivate", "account.waiting.run", "account.waiting.cancel", "account.secondDevice.pair", "account.secondDevice.setLimit", "account.protection.set", "recovery.cancel", "account.agent.set", "account.agent.setBudget", "account.agent.revoke", "recovery.renewConfirm"]);
 // New backup words are shown only after the person's yes, as the core (QA's real lap, k-trade3).
 NEEDS_YES.add("recovery.renew");
@@ -618,8 +627,9 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
   let appBands: Band[] = defaultBands("mainnet");
   let protectionBands: unknown[] = demoBands(appBands);
   /** This mock's own account: a laptop added in the demo (account.secondDevice.pair) shows as its second device. */
-  // The public web demo is the iPhone app, simulated (options.account): its device key is the phone's, in the secure chip.
-  const account: AccountInfo = { ...ACCOUNT, ...(options.accountId ? { accountId: options.accountId } : {}), ...(options.account ?? {}), keys: [...ACCOUNT.keys.map((k) => (options.account && k.role === "device" ? { ...k, kind: "secure-chip" as const } : { ...k })), ...(options.oldKey ? OLD_KEYS : [])] };
+  // The Sim's device key is a sample key in no chip (the audit's MUST, 7 Nov: it said "secure-chip" for options.account, the
+  // public Sim, so its screens could say "secure chip"): SIM_KEY_KIND, whatever account is given.
+  const account: AccountInfo = { ...ACCOUNT, ...(options.accountId ? { accountId: options.accountId } : {}), ...(options.account ?? {}), keys: [...ACCOUNT.keys.map((k) => (k.role === "device" ? { ...k, kind: SIM_KEY_KIND } : { ...k })), ...(options.oldKey ? OLD_KEYS : [])] };
   const subwallets: { id: string; kind: string; chain: string; address: string; label: string; site?: string; slot?: number; current?: boolean }[] = [
     { id: "sw-trade-sol", kind: "trade", chain: "sol", address: SAMPLE_ADDRESS.sol, label: "Solana wallet", slot: 0, current: true },
     // ?demo seeds every chain's trading wallet (option), so all three chains trade at once; tests keep Solana alone.
@@ -992,32 +1002,46 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     // the Move route's fill, as the real ledger's Safe sheet for route B (to-private.ts): the Safe's USDC into Private
     if (method === "ledger.moveFromPrivate") {
       const n = privateNeed(p);
-      // as the core's fill sheet (intents.ts legsBlock, the ruling of the audit and the copy review, 5 Nov): the title is the Move's own figure
-      // and its wallet (named only when it is the person's own, ownPayee), then Private's part of the short leg, what the
-      // Safe signs (the fill, the bytes' own figure, the only Safe figure), what stays in Private and Together, which add up;
-      // Private paying nothing, "Your Safe adds ... to Private first." alone
+      // as the core's one fill sheet (intents.ts legsBlock, moveSheet; the audit's ruling and the copy review's layout, 7 Nov), from the same
+      // figures: every part as the plan pays it (Private's own, the fill's), what the Safe signs (the one fill); the title
+      // the person's action, or the Swap of one part. A wallet not named, or no part the fill pays: the bytes' own words
       const parts = Array.isArray(p.parts) ? (p.parts as { usd?: unknown; wallet?: unknown }[]) : [];
-      const legs = parts.map((x) => Math.round((Number(x?.usd) || 0) * 100));
-      const leg = Math.max(0, ...legs), short = Math.round((n.need - n.have) * 100), safeC = Math.round(n.fill * 100);
-      const privC = Math.max(0, leg - short), pay = leg - privC, stays = privC + safeC - leg;
-      const $c = (c: number) => `$${(c / 100).toFixed(2)}`;
-      const to = subwallets.find((w) => w.id === parts[legs.indexOf(leg)]?.wallet && !(w as { keyExported?: true }).keyExported);
-      const named = to ? (to.kind === "trade" ? ({ sol: "your SOL wallet", hood: "your ETH (RH) wallet", bsc: "your BNB wallet", near: "your NEAR wallet" } as Record<string, string>)[to.chain] : undefined) : undefined;
-      const title = named && pay > 0 && stays >= 0 ? `Move ${$c(leg)} to ${named}` : `Move ${$c(safeC)} to Private`;
-      // the core's splitLines (QA's Sim re-check: "From Private · $15.00" while Private fell $10.00): Private's own part is
-      // the leg less the Safe's fill, what stays the fill less the leg; a $0 line left out, the lines add up in cents
-      const block = privC > 0 && stays >= 0 ? splitLines(BigInt(leg), BigInt(safeC), (c) => $c(Number(c))) : [LEG_WORDS.adds($c(safeC))];
-      // the Move's other legs (paid from Private on their own) said as a second step
-      const others = Math.round(n.need * 100) - leg;
+      const safeC = Math.round((Number.isFinite(n.fill) ? n.fill : 0) * 100);
+      const $c = (c: bigint | number) => `$${(Number(c) / 100).toFixed(2)}`;
+      const nameOf = (wallet: unknown) => {
+        const to = wallet === "near" ? { kind: "trade", chain: "near" } : subwallets.find((w) => w.id === wallet && !(w as { keyExported?: true }).keyExported);
+        return { to, name: to ? (to.kind === "trade" ? ({ sol: "your SOL wallet", hood: "your ETH (RH) wallet", bsc: "your BNB wallet", near: "your NEAR wallet" } as Record<string, string>)[to.chain] : undefined) : undefined };
+      };
+      const going = n.fills.filter((x) => x.fromPrivate > 0 || x.rest > 0).sort((a, b) => a.part - b.part).map((x) => ({ ...nameOf(parts[x.part]?.wallet), priv: BigInt(Math.round(x.fromPrivate * 100)), pay: BigInt(Math.round(x.rest * 100)) }));
+      const bound = going.some((x) => x.pay > 0n) && going.every((x) => !!x.name) && going.reduce((t, x) => t + x.pay, 0n) <= BigInt(safeC);
+      // the Sim's fill lands whole (its ledger adds the fill less every part it pays to Private): it brings the fill exactly
+      // the Move's wallet parts, as the core's sheet reads them: kept by spending.topUp under this job's key (C2)
+      const others = bound && typeof p.job === "string" ? sheetOthers(othersForSheet(p.job, "sim")) : [];
+      // a Swap of one part (the copy review's (c)): the call says so and that payment pays out another coin than the Safe's
+      const one = going.length === 1 && !others.length ? going[0]! : null;
+      const outCoin = one && p.swap === true && one.to?.kind === "trade" ? ({ sol: "SOL", hood: "ETH", bsc: "BNB" } as Record<string, string>)[one.to.chain] : undefined;
+      // J2-2: what the Swap gives and its fee, from the very cost the form quoted (simSwapCost), so form and sheet say one fee
+      const outPx = outCoin ? tokenPrice(({ SOL: "nep141:sol.omft.near", ETH: "nep141:eth.omft.near", BNB: "nep141:bsc.omft.near" } as Record<string, string>)[outCoin]) : 0;
+      // (the fill pays the whole part: one payout, one quote; a part Private pays some of itself has two, as the core: none)
+      const swapCost = one && one.priv === 0n && outCoin && outPx > 0 ? simSwapCost(Number(one.pay) / 100, "safe", one.to?.chain) : null;
+      const swapOut = swapCost && one ? { words: `about ${Math.floor((swapCost.arrivesUsd / outPx) * 1e4) / 1e4} ${outCoin} (about ${$c(Math.round(swapCost.arrivesUsd * 100))})`, fee: one.priv + one.pay - BigInt(Math.round(swapCost.arrivesUsd * 100)) } : null;
+      // the audit's ruling (c), 8 Nov: a Move's parts as their quotes give them, from the Sim's one cost (simSwapCost, as the Swap's
+      // form and sheet read it), each leg on its own (Private's share and the fill's); at least: 1Click's 1 % slippage
+      // the NEAR wallet's leg is USDC into USDC, as 1Click quotes a same-coin move (float-floors: no fee, 99 % promised)
+      const leg = (c: bigint, chain: unknown) => { if (c <= 0n) return { got: 0n, least: 0n }; const a = chain === "near" ? Number(c) : Math.round(simSwapCost(Number(c) / 100, "safe", chain).arrivesUsd * 100); return { got: BigInt(a), least: BigInt(Math.floor(a * 0.99)) }; };
+      const quotedOf = (x: (typeof going)[number]) => { if (x.to?.kind !== "trade") return {}; const a = leg(x.priv, x.to.chain), b = leg(x.pay, x.to.chain); return { got: a.got + b.got, least: a.least + b.least }; };
+      const sheet = bound ? moveSheet(going.map((x) => ({ wallet: x.name!, priv: x.priv, pay: x.pay, ...quotedOf(x) })), BigInt(safeC), $c, { brought: BigInt(safeC), ...(others.length ? { others } : {}), ...(swapOut ? { swapOut } : {}), ...(p.swap === true ? { swap: true } : {}) }) : null;
+      const title = sheet ? (outCoin ? `Swap ${$c(sheet.sums.moved)} of USDC for ${outCoin}` : sheet.title) : `Move ${$c(safeC)} to Private`;
+      const block = sheet ? sheet.lines : [LEG_WORDS.adds($c(safeC))];
       // `amount`: money leaves the Safe on this sheet, as the core's sheet says it (words.ts), so the Move's job is made on
       // its Approve (job-run.ts movesMoney; the proof, 5 Nov: 910 ms from Approve to "Job created." without it)
-      return { title, lines: [...block, LEG_WORDS.seen, `Then NEAR Confidential pays ${$c(leg)} from Private.`, ...(others > 0 ? [LEG_WORDS.other($c(others))] : [])], warnings: [], effect: [], ...amountOf(USDC_NEAR, n.fill.toFixed(2)), amountSaid: true };
+      return { title, lines: [...block, LEG_WORDS.seen], warnings: [], effect: [], ...amountOf(USDC_NEAR, (Number.isFinite(n.fill) ? n.fill : 0).toFixed(2)), amountSaid: true };
     }
     // Agent (release 10): its own key with a daily limit, and the kill switch, as the core's sheet says them.
     if (method === "account.agent.set" || method === "account.agent.setBudget") {
       const people = Array.isArray(p.people) ? (p.people as string[]) : [];
       // product decision, 5 Nov: never a daily price. The cap stays in the rules; the sheet says only that it spends from its own wallet.
-      return { title: method === "account.agent.set" ? "Turn on AgentZero" : "Add money to AgentZero's wallet", lines: [ownWalletWords().sheet, ...(people.length ? [`It can pay only ${people.join(", ")}.`] : []), "Anything more, you approve yourself.", "Your protection rules still count every payment AgentZero makes."], warnings: [], effect: [] };
+      return { title: agentSheetTitle(method, Number(p.limitUsd), agentRules?.limitUsd ?? 0), lines: [ownWalletWords().sheet, ...(people.length ? [`It can pay only ${people.join(", ")}.`] : []), "Anything more, you approve yourself.", "Your protection rules still count every payment AgentZero makes."], warnings: [], effect: [] };
     }
     if (method === "account.agent.revoke") {
       return { title: "Stop AgentZero", lines: ["AgentZero's key comes off your account now.", "It can't pay anything after this."], warnings: [], effect: [] };
@@ -1159,7 +1183,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         // and what a send hides and what it doesn't (privacy audit, 4 Nov): both steps are public, close in time
         // the network line after the fee, as the core's outsideLines (QA test: "Public on Solana." was missing);
         // the coin figure at most 4 decimals (042: "0.052526348 SOL")
-        return { title: `Send from your ${row}`, lines: [`To ${String(payee?.address ?? payee?.accountId ?? "")}`, ...(fee ? [`They get about $${fee.outUsd}`, `Fees · about $${(Number(fee.inUsd) - Number(fee.outUsd)).toFixed(2)}`, FEES_KEPT] : []), `Public on ${lands.network}.`, `First, ${coinSaid(amount, coin)} leaves your ${row} for your private balance. Anyone can see this step.`, `Then your private balance pays it as ${lands.coin}${lands.coin.endsWith("(RH)") ? "" : ` on ${lands.network}`}. Anyone can see this step too, soon after the first.`, SEND_MATCHED], warnings: [], effect: [], ...priced };
+        return { title: `Send from your ${row}`, lines: [`To ${String(payee?.address ?? payee?.accountId ?? "")}`, ...(fee ? [`They get about $${fee.outUsd}`, `Fees · about $${(Number(fee.inUsd) - Number(fee.outUsd)).toFixed(2)}`, FEES_KEPT] : []), `Public on ${lands.network}.`, `First, ${coinSaid(amount, coin)} leaves your ${row} for Private. Anyone can see this step.`, `Then Private pays it as ${lands.coin}${lands.coin.endsWith("(RH)") ? "" : ` on ${lands.network}`}. Anyone can see this step too, soon after the first.`, SEND_MATCHED], warnings: [], effect: [], ...priced };
       }
       // Home's Send from the Safe: the part already in the private balance, straight out (the core's Send sheet)
       case "ledger.sendFromSafe": {
@@ -1171,7 +1195,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         // (the core's short form, in full one tap away) and its network, never the coin's machine form ("It goes as wNEAR
         // to …"); the copy review's ruling: "To 0x7D06…7e3D on Ethereum. Public on Ethereum."
         const whom = String(payee?.address ?? payee?.accountId ?? "");
-        return fillSheet(p, id, payee, lands, { ...priced, ...hint }) ?? { title: titled((m) => `Send ${m} through NEAR Confidential`, `${String(p.amount ?? "")} ${coinOf(id)}`, priced), lines: [`To ${outsideShort(whom)} on ${lands.network}. Public on ${lands.network}.`, SEND_UNNAMED, "It leaves your private balance on NEAR. If it can't go, it comes back there."], warnings: [], effect: [], ...(whom !== outsideShort(whom) ? { details: [{ label: "The address in full", lines: [whom] }] } : {}), ...priced, ...hint };
+        return fillSheet(p, id, payee, lands, { ...priced, ...hint }) ?? { title: titled((m) => `Send ${m} through NEAR Confidential`, `${String(p.amount ?? "")} ${coinOf(id)}`, priced), lines: [`To ${outsideShort(whom)} on ${lands.network}. Public on ${lands.network}.`, SEND_UNNAMED, "It leaves Private on NEAR. If it can't go, it comes back there."], warnings: [], effect: [], ...(whom !== outsideShort(whom) ? { details: [{ label: "The address in full", lines: [whom] }] } : {}), ...priced, ...hint };
       }
       case "subwallet.signTx": {
         const why = typeof p.why === "string" && p.why.trim() ? { hint: `${asker === "social" ? APP_STORE_NAME : asker} says: ${p.why.trim().slice(0, 80)}` } : {};
@@ -1203,7 +1227,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       }
       case "ledger.swap": {
         const q = safeQuotes.get(String(p.quoteId ?? ""));
-        return { title: q ? `Swap ${roundedAmount(q.amountIn)} ${q.inSymbol} for ${roundedAmount(q.amountOut)} ${q.outSymbol}` : "Swap in your Safe", lines: [], warnings: [], effect: [], ...hint };
+        return { title: q ? `Swap ${roundedAmount(q.amountIn)} ${q.inSymbol} for ${quoted(`${roundedAmount(q.amountOut)} ${q.outSymbol}`)}` : "Swap in your Safe", lines: [], warnings: [], effect: [], ...hint };
       }
       default: return { title: "Sign this", lines: [], warnings: [], effect: [], ...hint };
     }
@@ -1284,13 +1308,40 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     held.push(item);
     return { status: "waiting", txHash: "sample-tx", explorerUrl: NO_EXPLORER, id: item.id, readyAtIso: item.readyAtIso, needsSecondDevice: false };
   };
-  const describe = (request: TxRequest): PlainWords => ({
-    title: request.why || "Sign this",
-    lines: [`To ${request.receiverId}. Fee: at most 0.001 NEAR.`],
-    warnings: [],
-    effect: [],
-    hint: request.from ? `${request.from[0].toUpperCase()}${request.from.slice(1)} says: ${request.why}` : undefined,
-  });
+  /** A step's words as the core's coin words say it (coins.ts): storage, a coin out, NEAR out. The Sim's mirror only. */
+  type MockStep = { receiverId: string; actions: TxRequest["actions"] };
+  const actOf = (s: MockStep | undefined) => s?.actions.length === 1 ? (s.actions[0] as { kind: string; method?: string; args?: Record<string, unknown>; yocto?: string }) : undefined;
+  const shortAccount = (id: unknown) => (typeof id === "string" && /^[0-9a-f]{64}$/.test(id) ? `the NEAR account ${id.slice(0, 6)}…${id.slice(-4)}` : String(id));
+  /** A dollar coin's units (6 decimals) as the core says them ("135"); null: not a dollar coin's whole figure. */
+  const usdUnits = (sym: string, amount: unknown) => (/^USD[CT]$/.test(sym) && typeof amount === "string" && /^\d{1,30}$/.test(amount) ? Number(amount) / 1e6 : null);
+  /** A step's title as the core's coin words say it (coins.ts): storage, a coin out, NEAR out. The Sim's mirror only. */
+  const stepWords = (s: MockStep): string => {
+    const a = actOf(s) ?? (s.actions[0] as { kind: string; method?: string; args?: Record<string, unknown>; yocto?: string } | undefined);
+    const sym = coinOf(`nep141:${s.receiverId}`);
+    if (a?.kind === "call" && a.method === "storage_deposit") return `Let ${shortAccount(a.args?.account_id)} hold ${sym}`;
+    if (a?.kind === "call" && a.method === "ft_transfer") return `Send ${usdUnits(sym, a.args?.amount) ?? ""} ${sym} to ${shortAccount(a.args?.receiver_id)}`.replace("Send  ", "Send ");
+    if (a?.kind === "transfer") return `Send ${(Number(a.yocto) / 1e24).toFixed(2)} NEAR to ${s.receiverId}`;
+    return `Use ${s.receiverId}`;
+  };
+  const describe = (request: TxRequest): PlainWords => {
+    const hint = request.from ? `${request.from[0].toUpperCase()}${request.from.slice(1)} says: ${request.why}` : undefined;
+    // separate steps on one sheet (TxRequest.apart, an account that can't chain), as the core's plainWordsApart: the
+    // Safe's room-then-pay steps in the copy review's words (7 Nov), any other set every step as a chain says it; never the app's line
+    const steps: MockStep[] = [{ receiverId: request.receiverId, actions: request.actions }, ...(request.then ?? [])];
+    if (request.apart && steps.length > 1) {
+      const title = steps.map(stepWords).join(", then ");
+      const room = actOf(steps[0]), pay = actOf(steps[1]);
+      const sym = coinOf(`nep141:${steps[0]!.receiverId}`);
+      const usd = steps.length === 2 && room?.method === "storage_deposit" && pay?.method === "ft_transfer" && steps[1]!.receiverId === steps[0]!.receiverId && pay.args?.receiver_id === room.args?.account_id ? usdUnits(sym, pay.args?.amount) : null;
+      if (usd !== null) {
+        const held = Number(balances.find((b) => b.tokenId === `nep141:${steps[0]!.receiverId}` && b.held === "ledger")?.amount ?? NaN);
+        const after = Number.isFinite(held) ? [{ token: "Your Safe after", before: "", after: `$${(Math.floor((held - usd) * 100 + 1e-6) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in ${sym}` }] : [];
+        return { title, lines: [`1. Your Safe lets NEAR Intents take $${usd.toFixed(2)} in ${sym}.`, "2. Your Safe sends it.", "Step 2 runs only if step 1 worked.", "Fee · about $0.01. A small NEAR deposit comes back to your Safe later."], warnings: [], effect: after };
+      }
+      return { title, lines: [...steps.map(stepWords), "Each step happens only if the one before it worked.", `Fee: at most ${(0.001 * steps.length).toFixed(3)} NEAR.`], warnings: [], effect: [] };
+    }
+    return { title: request.why || "Sign this", lines: [`To ${request.receiverId}. Fee: at most 0.001 NEAR.`], warnings: [], effect: [], hint };
+  };
   // Private (D27): the pocket starts not set up; ledger.privateSetup makes it, and money moves in through ledger.toPrivate.
   const pocket: { ready: boolean; defaultOn: boolean; rows: (typeof BALANCES)[number][] } = { ready: false, defaultOn: false, rows: [] };
   if (options.hiddenStart) {
@@ -1364,23 +1415,48 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     balances.push({ ...balances[0]!, tokenId: to, symbol, name: o.name ?? t?.name ?? symbol, icon: t?.icon ?? symbol.toLowerCase(), chain: "near", amount: amountOut, usd: (Number(amountOut) * outPx).toFixed(2), bridged: false, held: "ledger", listed: true });
   };
   const pocketUsd = () => pocket.rows.reduce((t, r) => t + Number(r.usd ?? 0), 0);
+  /** Home's Swap cost, the Sim's one source (J2-2, 8 Nov: the form said "Fees · about $1.50" and the Check-this "Fee ·
+   *  $0.00" for the same Swap): 0.4 % and $0.30 of network fees for each leg on to a chain's wallet. The form's quote
+   *  (subwallet.float.swapCost) and the Swap's Check-this read it, so both say one fee. */
+  const simSwapCost = (usd: number, from: unknown, to: unknown): { arrivesUsd: number; feeUsd: number } => {
+    // each chain leg's network fee from the one table the plan's bound reads (float-floors NETWORK_FEE_USD, the audit's MUST, 8 Nov)
+    const net = (x: unknown) => (x === "sol" || x === "hood" || x === "bsc" ? NETWORK_FEE_USD[x] : 0);
+    const fee = usd * 0.004 + net(from) + net(to);
+    const cents = (x: number) => Math.round(x * 100) / 100;
+    return { arrivesUsd: cents(usd - fee), feeUsd: cents(fee) };
+  };
   /** A Move paid from Private, as the real ledger's private-move.ts: what it needs, what Private's USDC has, and the
    *  Safe's fill when it is short (a whole step over the need, core fillStepUsd; the extra stays in Private). */
+  /** The Safe's row that fills Private with `tokenId`: NEAR on the account for "near", else its NEAR Intents row. */
+  const safeFillRow = (raw: string, tokenId: string) => balances.find((b) => (raw === "near" ? b.tokenId === "near" && b.held === "account" : b.tokenId === tokenId && b.held === "ledger"));
   const privateNeed = (p: Record<string, unknown>) => {
     const parts = Array.isArray(p.parts) ? (p.parts as { usd?: unknown }[]) : [];
     const need = Math.round(parts.reduce((n, x) => n + (Number(x?.usd) || 0), 0) * 100) / 100;
     // the coin the Move pays with (the real ledger's `tokenId`, USDC by default; Spending picks it), as Private holds it
     // (the proof, 5 Nov: the sheet counted Private's NEAR, the Sim only its USDC)
-    const tokenId = typeof p.tokenId === "string" && p.tokenId ? (p.tokenId === "near" ? "nep141:wrap.near" : p.tokenId) : USDC_NEAR;
+    const raw = typeof p.tokenId === "string" && p.tokenId ? p.tokenId : USDC_NEAR;
+    const tokenId = raw === "near" ? "nep141:wrap.near" : raw;
     const row = pocket.rows.find((r) => r.tokenId === tokenId);
     const have = tokenId === USDC_NEAR ? Number(row?.amount ?? 0) : Number(row?.usd ?? 0);
-    // the Sim's fill is in the Safe's USDC: another coin short is short
     const short = have + 0.000001 < need;
-    // a site's top-up (`whole`): one fill of the whole, one exit; Private's own share stays (the real safe-send.ts)
-    return { need, have, tokenId, fill: short ? (tokenId === USDC_NEAR ? fillStepUsd(p.whole === true ? need : need - have) : Infinity) : 0 };
+    // the fill, as the real ledger's safe-send.ts fillUnits (any coin: a whole step in dollars at its price; T-F, 6 Nov:
+    // the Sim filled only USDC, so a Swap of the Safe's NEAR with Private short was refused after the sheet promised the
+    // cover): from the Safe's NEAR Intents row of the coin, or for NEAR on the account ("near") from that row, wrapped
+    // (the real core takes that fill since the audit's ruling, 6 Nov: the Safe's own wrap.near storage; real-core-paths T-F)
+    const fillable = tokenId === USDC_NEAR || (tokenPrice(tokenId) > 0 && !!safeFillRow(raw, tokenId));
+    // ONE fill for the whole Move, as the core's plan sizes it (core moveSplit; the audit's ruling, 7 Nov): Private pays the parts
+    // it covers whole, the smallest first; the one fill pays every other part; a site's top-up (`whole`): the fill pays all
+    const safeRow = tokenId === USDC_NEAR ? balances.find((b) => b.tokenId === USDC_NEAR && b.held === "ledger") : safeFillRow(raw, tokenId);
+    const safeHas = Number(safeRow?.amount ?? 0) * (tokenId === USDC_NEAR ? 1 : tokenPrice(tokenId));
+    const split = moveSplitUsd(parts.map((x) => Number(x?.usd) || 0), have, { whole: p.whole === true, safeHas });
+    // each part: what Private pays of it from its own share, and what the one fill pays of it (`rest`)
+    const fills = split.parts.map((x) => ({ part: x.part, at: x.at, fromPrivate: x.fromPrivate, rest: x.viaFill }));
+    return { need, have, tokenId, raw, fills, fill: short ? (fillable ? split.fill : Infinity) : 0 };
   };
   /** A held movement, by its held id: a released one finishes as an unheld one would; a cancelled one stays in main. */
   const heldMoves = new Map<string, { m: Record<string, unknown>; ends: "done" | "refunded"; toTrading?: string; payWith?: PayWith }>();
+  /** A Move from Private whose later Safe sheet was turned down: the part (in the ledger's order) it stopped at. */
+  const movesStopAt = new WeakMap<object, number>();
 
   // ── mainnetRules: the account contract's rules (lib.rs `level_for_moves`, `place`, `floor_ns`) ──
   const rules = options.mainnetRules;
@@ -1508,7 +1584,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     const to = String(payee?.address ?? payee?.accountId ?? "");
     const usd$ = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     // any coin (QA walk, MUST 1: a NEAR Send was refused "Up to 0.871326373 NEAR"): the split in dollars at the coin's
-    // price, rounded to the cent once, by the core's own split (splitLines: From your Safe - Stays in Private = Together)
+    // price, rounded to the cent once, by the core's own split (From your Safe - Stays in Private = what they get)
     const coinPx = tokenPrice(c.id), askedUsd = c.asked * coinPx;
     const cents = (n: number) => BigInt(Math.round(n * 100));
     // what they get (QA's Sim walk): the coin figure first (4 places, down), then what it is worth to them in brackets
@@ -1521,7 +1597,13 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     const sendsUsd = Number(cents(fill * coinPx)) / 100, staysUsd = Number(cents(fill * coinPx) - cents(askedUsd)) / 100;
     // as the real core's fill sheet (send-fill.ts) and every outside sheet (the audit's D37 condition): the FULL address first,
     // unfolded, then where it lands in the copy review's words, then the split and what they get
-    return { title: `Send ${usd$(askedUsd)} from your Safe`, lines: [`To ${to}`, `Public on ${lands.network}.`, "Private is your money inside NEAR Confidential. Moves pay from it. The public can't see what's in it.", `${SEND_LEG_WORDS.gets} · ${gets} (${usd$(outUsd)})`, `${SEND_LEG_WORDS.sends} · ${usd$(sendsUsd)}`, ...(staysUsd > 0 ? [`${SEND_LEG_WORDS.stays} · ${usd$(staysUsd)}`] : []), ...(feesUsd > 0 ? [SEND_LEG_WORDS.fees(usd$(feesUsd)), SEND_LEG_WORDS.kept] : []), LEG_WORDS.seen, ...(feesUsd > 0 ? [] : ["NEAR Confidential moves it. ZeroFee takes nothing."])], warnings: [], effect: [], ...more };
+    // J2-2 (copy review, 8 Nov), as the core's send-fill.ts: "Send $25.00 to alice.near"; From your Safe = they get + Fees + what
+    // Private keeps (privateRows, its net change), the Fees row on every sheet, no why sentence
+    const $b = (c: bigint) => usd$(Number(c) / 100);
+    return { title: sendTitle(usd$(askedUsd), to), lines: [`To ${to}`, SEND_LEG_WORDS.seen(lands.network), `${SEND_LEG_WORDS.gets} · ${gets} (${quoted(usd$(outUsd))})`, `${SEND_LEG_WORDS.sends} · ${usd$(sendsUsd)}`, ...privateRows(cents(staysUsd), $b, { about: true }), SEND_LEG_WORDS.fees(usd$(feesUsd)), SEND_LEG_WORDS.kept], warnings: [], effect: [], ...more,
+      // as the real core (intents.ts, the Send's fill): the Amount is what the Safe's bytes move (the fill), said by "Your
+      // Safe sends", so no "Amount:" line over it (QA's ledger re-walk, 6 Nov, b/12: "Amount: about $25.00" said the Send)
+      ...amountOf(c.id, fill.toFixed(9)), amountSaid: true as const };
   };
   /** Whether a Send from the Safe takes the fill (as the ledger case below decides) and its fill would be held. */
   const sendFillHeld = (p: Record<string, unknown>): boolean => {
@@ -2238,6 +2320,10 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
           const address = p.chain === "sol" ? base58(h) : `0x${Array.from(h.slice(0, 20), (b) => b.toString(16).padStart(2, "0")).join("")}`;
           const w = { id: `sw-site-${s.site}-${p.chain}`, kind: "site", site: s.site, chain: String(p.chain), address, label: `${s.name} wallet` };
           subwallets.push(w);
+          // the copy review's A2-3 (8 Nov): a site's wallet made once the account is home (prepare.ts) holds the Sim's sample money, but
+          // Home had read the wallets before it was made, so Hot said $172.54 while set-up counted it ($5,515.49): Home
+          // reads its wallets again (home-reads.ts: the "spending" part re-reads spending.wallets), as it does after a move
+          emit("ledger.balancesChanged", { parts: ["spending"] });
           return w;
         }
         // One per kind and chain (the card's wallet, the old apps wallet on Solana): asking again gives the same one.
@@ -2303,10 +2389,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         if (p.app !== undefined && p.app !== "wallet") throw securityProblems.requestNotAllowed("Only Home's Swap asks this.");
         const usd = Number(p.usd);
         if (!(usd >= 2)) throw securityProblems.requestInvalid("usd is dollars as text, $2 or more");
-        const chain = (x: unknown) => x === "sol" || x === "hood" || x === "bsc";
-        const fee = usd * 0.004 + (chain(p.from) ? 0.3 : 0) + (chain(p.to) ? 0.3 : 0);
-        const cents = (x: number) => Math.round(x * 100) / 100;
-        return { arrivesUsd: cents(usd - fee), feeUsd: cents(fee) };
+        return simSwapCost(usd, p.from, p.to);
       }
       case "subwallet.site.addCost": {
         if (p.app !== undefined && p.app !== "wallet" && p.app !== "social") throw securityProblems.requestNotAllowed("Only Browser's money sheet asks this.");
@@ -2577,7 +2660,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
           const left = Number((had - need).toFixed(6));
           Object.assign(row, { amount: String(left), ...(row.usd !== undefined ? { usd: (Number(row.usd) * (left / had)).toFixed(2) } : {}) });
           emit("ledger.balancesChanged", {});
-          return move("pay", q.amountIn ?? q.amountOut, { quoteId: p.quoteId, from: q.fromTokenId, ...payee(q.to), private: true, debited: true, ...(typeof p.label === "string" ? { label: p.label } : {}) }, "done", { method, p });
+          return move("pay", q.amountIn ?? q.amountOut, { id: `pay:sim-${movements.length + 1}`, quoteId: p.quoteId, from: q.fromTokenId, ...payee(q.to), private: true, debited: true, ...(typeof p.label === "string" ? { label: p.label } : {}) }, "done", { method, p });
         }
         // what left, in the coin that left (the quote's in-amount: the same as its out-amount for one coin), never the
         // out-amount of the coin it became; and who was paid, as the real ledger records both (payPrivately, execute)
@@ -2674,13 +2757,20 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       // confidential move (recorded 25 Oct: 1.000000 in, 1.000000 out); the core would accept as little as 98 %.
       case "ledger.fromPrivate": {
         if (!pocket.ready) throw privateProblem("ledger.private.unavailable", "Private isn't set up on this device yet. Nothing was sent.");
-        const out = pocket.rows.filter((r) => (p.tokenId === undefined || r.tokenId === p.tokenId) && Number(r.amount) > 0);
+        // `upTo` (the sheet's own figures, per coin; the ledger's private-pay.ts): each coin at most that, one not shown not at all
+        const upTo = p.upTo as Record<string, string> | undefined;
+        const out = pocket.rows.filter((r) => (p.tokenId === undefined || r.tokenId === p.tokenId) && Number(r.amount) > 0 && (!upTo || Number(upTo[r.tokenId] ?? 0) > 0));
         const ms = out.map((r) => {
-          pocket.rows.splice(pocket.rows.indexOf(r), 1);
-          const m: Record<string, unknown> = { id: `mv-${movements.length + 1}`, kind: "private", status: "moving", amount: r.amount, from: "private", to: r.tokenId, startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [] };
+          const most = upTo ? Number(upTo[r.tokenId]) : Infinity;
+          const part = most < Number(r.amount);
+          const amount = part ? upTo![r.tokenId]! : r.amount;
+          const usd = part ? (Number(r.usd ?? 0) * most) / Number(r.amount) : Number(r.usd ?? 0);
+          if (part) { r.usd = (Number(r.usd ?? 0) - usd).toFixed(2); r.amount = String(Math.round((Number(r.amount) - most) * 1e6) / 1e6); }
+          else pocket.rows.splice(pocket.rows.indexOf(r), 1);
+          const m: Record<string, unknown> = { id: `mv-${movements.length + 1}`, kind: "private", status: "moving", amount, from: "private", to: r.tokenId, startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [] };
           movements.unshift(m);
           later({ kind: "settle", movementId: m.id as string, ends: "done", balances: true }, settle);
-          later({ kind: "private.home", tokenId: r.tokenId, amount: r.amount, usd: Number(r.usd ?? 0).toFixed(2) }, settle);
+          later({ kind: "private.home", tokenId: r.tokenId, amount, usd: usd.toFixed(2) }, settle);
           return { ...m };
         });
         emit("ledger.balancesChanged", {});
@@ -2712,7 +2802,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
           if (!t) throw securityProblems.subwalletRefused("Private can't take this yet. Nothing moved.");
           if (!(Number(p.amountIn) > 0)) throw securityProblems.requestInvalid("amount is the coin's decimal text");
           const payee = p.to as { address?: string; accountId?: string } | undefined;
-          const m: Record<string, unknown> = { id: `mv-${movements.length + 1}`, kind: "pay", status: "moving", amount: String(p.amountIn), startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], from: String(p.coin), to: String(payee?.address ?? payee?.accountId ?? ""), private: true, debited: true };
+          const m: Record<string, unknown> = { id: `hidden-row:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: String(p.amountIn), startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], from: String(p.coin), to: String(payee?.address ?? payee?.accountId ?? ""), private: true, debited: true };
           movements.unshift(m);
           later({ kind: "settle", movementId: m.id as string, ends: "done", balances: false }, settle);
           return { ...m };
@@ -2726,7 +2816,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         const to = { address: payee?.address ?? payee?.accountId ?? "" };
         // the money leaves the row only (never the Safe: move() would take it from there), and lands for the payee; Activity
         // records what left the row, in the row's coin, as the real ledger's hiddenFromRow does (leg 1's in-amount)
-        const m: Record<string, unknown> = { id: `mv-${movements.length + 1}`, kind: "pay", status: "moving", amount: unitsText(need, p.chain === "sol" ? 9 : 18), startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], from: `nep141:${p.chain}.omft.near`, to: String(to?.address ?? ""), private: true, debited: true };
+        const m: Record<string, unknown> = { id: `hidden-row:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: unitsText(need, p.chain === "sol" ? 9 : 18), startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], from: `nep141:${p.chain}.omft.near`, to: String(to?.address ?? ""), private: true, debited: true };
         movements.unshift(m);
         later({ kind: "settle", movementId: m.id as string, ends: "done", balances: false }, settle);
         return { ...m };
@@ -2742,53 +2832,53 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         const n = privateNeed(p);
         if ((n.fill > 0 && !(options.safeFillOpen ?? SAFE_FILL_OPEN)) || n.fill === Infinity) throw new ProblemError(privateShort(n.have, n.need));
         if (!pocket.ready) { subwallets.push({ id: "sw-private-near", kind: "private", chain: "near", address: SAMPLE_POCKET, label: "Private" }); pocket.ready = true; }
-        // another coin than USDC (Private's NEAR): paid from its row at its own price, never the fill
-        if (n.tokenId !== USDC_NEAR) {
-          const coinRow = pocket.rows.find((r) => r.tokenId === n.tokenId)!;
-          const per = Number(coinRow.usd) / Number(coinRow.amount);
-          const out = parts.map((x, i) => {
-            const usd = Math.round(Number(x.usd) * 100) / 100;
-            Object.assign(coinRow, { amount: String(Math.max(0, Number(coinRow.amount) - usd / per)), usd: (Math.max(0, Number(coinRow.usd) - usd)).toFixed(2) });
-            const w = ws[i]!;
-            const m: Record<string, unknown> = { id: `pocket-send:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: String(Number((usd / per).toFixed(6))), from: n.tokenId, to: w === "near" ? "your NEAR wallet" : w.address,
-              private: true, debited: true, startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...(typeof p.job === "string" ? { job: p.job, part: i } : {}) };
-            movements.unshift(m);
-            later({ kind: "private.pay", movementId: m.id as string, wallet: w === "near" ? "near" : w.id, usd }, settle);
-            return { wallet: String(x.wallet), usd, ids: [m.id as string] };
-          });
-          emit("ledger.balancesChanged", {});
-          return { parts: out };
-        }
-        let row = pocket.rows.find((r) => r.tokenId === USDC_NEAR);
-        if (!row) { row = { ...BALANCES[0]!, amount: "0", usd: "0", held: "private" }; pocket.rows.push(row); }
-        let fillId: string | undefined;
-        if (n.fill > 0) {
-          const safe = balances.find((b) => b.tokenId === USDC_NEAR && b.held === "ledger");
-          const fill = Number(safe?.amount ?? 0) >= n.fill ? n.fill : n.need - (p.whole === true ? 0 : n.have);
-          if (!safe || Number(safe.amount) < fill) throw balanceLow(fill.toFixed(2), "USDC");
-          moveMainUsdc(-toMicro(fill.toFixed(6)));
-          const f: Record<string, unknown> = { id: `mv-${movements.length + 1}`, kind: "private", status: "moving", amount: fill.toFixed(2), from: USDC_NEAR, to: "private", startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...(typeof p.job === "string" ? { job: p.job } : {}) };
-          movements.unshift(f);
-          later({ kind: "settle", movementId: f.id as string, ends: "done", balances: true }, settle);
-          fillId = f.id as string;
-          const micro = toMicro(row.amount) + toMicro(fill.toFixed(6));
-          Object.assign(row, { amount: fromMicro(micro), usd: fromMicro(micro - (micro % 10_000n)) });
-        }
-        const out = parts.map((x, i) => {
-          const usd = Math.round(Number(x.usd) * 100) / 100;
-          const micro = toMicro(row!.amount) - toMicro(usd.toFixed(2));
-          Object.assign(row!, { amount: fromMicro(micro), usd: fromMicro(micro - (micro % 10_000n)) });
-          const w = ws[i]!;
-          // the leg the fill paid is the real ledger's "safe-send:" job (its steps show the fill); the rest "pocket-send:"
-          const filled = fillId !== undefined && i === parts.length - 1;
-          const m: Record<string, unknown> = { id: `${filled ? "safe-send" : "pocket-send"}:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: usd.toFixed(2), from: USDC_NEAR, to: w === "near" ? "your NEAR wallet" : w.address,
-            private: true, debited: true, startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...(typeof p.job === "string" ? { job: p.job, part: i, partWallet: String(x.wallet) } : {}) };
+        // each part as the ledger pays it (core moveFills; the Sim's mirror, 7 Nov): the smallest first; Private's own share
+        // (a "pocket-send:" payment), and the part's own fill from the Safe (a "safe-send:" payment holding the fill's id),
+        // the fill's extra kept in Private. Another coin than USDC (Private's NEAR): its row at its own price, the Safe's
+        // NEAR Intents row (or NEAR on the account) filling it
+        const usdc = n.tokenId === USDC_NEAR;
+        const px = usdc ? 1 : tokenPrice(n.tokenId);
+        let coinRow = pocket.rows.find((r) => r.tokenId === n.tokenId);
+        const safe = usdc ? balances.find((b) => b.tokenId === USDC_NEAR && b.held === "ledger") : safeFillRow(n.raw, n.tokenId);
+        if (!coinRow) { coinRow = { ...(usdc ? BALANCES[0]! : safe ?? BALANCES[0]!), tokenId: n.tokenId, amount: "0", usd: "0", held: "private" }; pocket.rows.push(coinRow); }
+        const row = coinRow;
+        const per = !usdc && Number(row.amount) > 0 && Number(row.usd) > 0 ? Number(row.usd) / Number(row.amount) : px;
+        const units = (usd: number) => (usdc ? usd.toFixed(2) : String(Number((usd / per).toFixed(6))));
+        const addRow = (usd: number) => {
+          if (usdc) { const micro = toMicro(row.amount) + toMicro(usd.toFixed(6)); Object.assign(row, { amount: fromMicro(micro < 0n ? 0n : micro), usd: fromMicro((micro < 0n ? 0n : micro) - ((micro < 0n ? 0n : micro) % 10_000n)) }); return; }
+          const amt = Math.max(0, Number(row.amount) + usd / per);
+          Object.assign(row, { amount: String(Number(amt.toFixed(9))), usd: Math.max(0, Number(row.usd ?? 0) + usd).toFixed(2) });
+        };
+        const stopAt = movesStopAt.get(p);
+        const pay = (usd: number, w: (typeof ws)[number], i: number, kind: "safe-send" | "pocket-send") => {
+          const m: Record<string, unknown> = { id: `${kind}:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: units(usd), from: n.tokenId, to: w === "near" ? "your NEAR wallet" : w!.address,
+            private: true, debited: true, startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...(typeof p.job === "string" ? { job: p.job, part: i, partWallet: String(parts[i]!.wallet) } : {}) };
           movements.unshift(m);
-          later({ kind: "private.pay", movementId: m.id as string, wallet: w === "near" ? "near" : w.id, usd }, filled ? settle * 2 : settle);
-          // the fill is the filled leg's own step (the real safe-send.ts: one "safe-send:" movement holds fill and payout), so
-          // its id goes with that leg: Activity folds it into the Move's one row, never a second row (Sim Jobs, 5 Nov)
-          return { wallet: String(x.wallet), usd, ids: filled ? [m.id as string, fillId!] : [m.id as string] };
-        });
+          later({ kind: "private.pay", movementId: m.id as string, wallet: w === "near" ? "near" : w!.id, usd }, kind === "safe-send" ? settle * 2 : settle);
+          return m.id as string;
+        };
+        const out: { wallet: string; usd: number; ids: string[]; stopped?: string }[] = parts.map((x) => ({ wallet: String(x.wallet), usd: Math.round(Number(x.usd) * 100) / 100, ids: [] }));
+        const order = [...n.fills].sort((a, b) => a.at - b.at);
+        // Private's own payments first (no Safe sheet), the smallest first
+        for (const f of order) if (f.fromPrivate > 0) { addRow(-f.fromPrivate); out[f.part]!.ids.push(pay(f.fromPrivate, ws[f.part]!, f.part, "pocket-send")); }
+        // then the ONE fill for every part left (the audit's ruling, 7 Nov): one Safe sheet; a No there leaves those parts not started
+        const via = order.filter((f) => f.rest > 0);
+        if (via.length && stopAt !== undefined) for (const f of via) out[f.part]!.stopped = "Didn't start. It's still in Private and your Safe.";
+        else if (via.length && n.fill > 0) {
+          const fillUnits = n.fill / px;
+          if (!safe || Number(safe.amount) + 1e-9 < fillUnits) throw usdc ? balanceLow(n.fill.toFixed(2), "USDC") : balanceLow(String(Math.ceil(fillUnits * 1e4) / 1e4), safe?.symbol ?? "NEAR");
+          if (usdc) moveMainUsdc(-toMicro(n.fill.toFixed(6)));
+          else { const left = Math.max(0, Number((Number(safe.amount) - fillUnits).toFixed(9))); Object.assign(safe, { amount: String(left), usd: (left * px).toFixed(2) }); }
+          const fm: Record<string, unknown> = { id: `mv-${movements.length + 1}`, kind: "private", status: "moving", amount: usdc ? n.fill.toFixed(2) : String(Number(fillUnits.toFixed(6))), from: n.tokenId, to: "private", startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...(typeof p.job === "string" ? { job: p.job, part: via[0]!.part, partWallet: String(parts[via[0]!.part]!.wallet) } : {}) };
+          // with the part its id goes with (7 Nov): the status read (privateMoveStatus) keeps only movements with a part, so
+          // the fill stays the Move's, never a second Activity row
+          movements.unshift(fm);
+          later({ kind: "settle", movementId: fm.id as string, ends: "done", balances: true }, settle);
+          // what the one fill brings over every part stays in Private
+          addRow(n.fill - via.reduce((t, f) => t + f.rest, 0));
+          // each part's payment out of the one fill; the fill's id goes with the first, so Activity folds it into the Move's row
+          via.forEach((f, k) => { out[f.part]!.ids.push(pay(f.rest, ws[f.part]!, f.part, "safe-send"), ...(k === 0 ? [fm.id as string] : [])); });
+        } else for (const f of via) addRow(-f.rest);
         emit("ledger.balancesChanged", {});
         return { parts: out };
       }
@@ -2818,7 +2908,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         const payee = p.to as { address?: string; accountId?: string } | undefined;
         // it leaves the private balance only, once (a web test: a $25 send took 25 USDC here and 25 more from the
         // Safe's own row when it settled, 1,385.60 -> 1,335.60): `debited`, and the row's dollars follow its coins
-        const m: Record<string, unknown> = { id: `mv-${movements.length + 1}`, kind: "pay", status: "moving", amount: String(p.amount), startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], from: id, to: String(payee?.address ?? payee?.accountId ?? ""), private: true, debited: true };
+        const m: Record<string, unknown> = { id: `pocket-send:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: String(p.amount), startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], from: id, to: String(payee?.address ?? payee?.accountId ?? ""), private: true, debited: true };
         if (id === USDC_NEAR) {
           const micro = toMicro(row.amount) - toMicro(String(p.amount));
           Object.assign(row, { amount: fromMicro(micro), usd: fromMicro(micro - (micro % 10_000n)) });
@@ -3126,9 +3216,37 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         const refused = renewRefusal();
         if (refused) return { problem: refused };
       }
-      if (asksFirst(method, params) && !(await ask(sheetWords()))) {
-        if (method === "recovery.renew") return { problem: securityProblems.renewDeclined() };
-        return method.startsWith("ledger.") ? { problem: signatureDeclined() } : { ok: { status: "declined" } as T };
+      // separate steps (TxRequest.apart), as the core's dev-signer: ZeroFee's own Safe screens only, at most four, never split
+      if (method === "tx.request" && (params.request as TxRequest | undefined)?.apart) {
+        const r = params.request as TxRequest;
+        if (!["wallet", "trade"].includes(String(r.from))) return { problem: securityProblems.stepsNotAllowed() };
+        if (1 + (r.then?.length ?? 0) > 4) return { problem: securityProblems.requestInvalid("A request can chain at most four receivers.") };
+      }
+      // as the core (dev-signer.ts onAsked, the audit's MUST, 7 Nov): a job's sheet about to show says approval.asked with the job's
+      // key (the ledger's `job`, a request's TxRequest.job), and job.signed names it, so the Sim and the phone take one path
+      const jobKey = jobKeyOf(method, params);
+      const asked = () => { if (jobKey) emit("approval.asked", { jobKey }); };
+      const signedSaid = () => emit("job.signed", jobKey ? { jobKey } : {});
+      if (method === "ledger.moveFromPrivate" && asksFirst(method, params)) {
+        // as the ledger (private-move.ts, safe-send.ts fillMove; the audit's ruling, 7 Nov): ONE Safe sheet for the whole Move, after
+        // Private's own payments; a No where Private paid nothing signs nothing; else the fill's parts don't start
+        const fills = privateNeed(params).fills;
+        const words = wordsFor(method, params);
+        asked();
+        if (!(await ask(willHold ? { ...words, lines: [...words.lines, ...holdLines(willHold)] } : words))) {
+          if (!fills.some((x) => x.fromPrivate > 0)) return { problem: signatureDeclined() };
+          params = { ...params }; movesStopAt.set(params, 0);
+        } else if (words.amount && words.tap !== true) signedSaid();
+      } else if (asksFirst(method, params)) {
+        const words = sheetWords();
+        asked();
+        if (!(await ask(words))) {
+          if (method === "recovery.renew") return { problem: securityProblems.renewDeclined() };
+          return method.startsWith("ledger.") ? { problem: signatureDeclined() } : { ok: { status: "declined" } as T };
+        }
+        // as the core (dev-signer.ts onSigned, 6 Nov): the Safe's money signed on its one sheet, before anything is
+        // sent, says job.signed, and the shell makes the job then ("Job created.")
+        if (words.amount && words.tap !== true) signedSaid();
       }
       try {
         return { ok: answer(method, params) as T };
@@ -3150,4 +3268,12 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     },
     emit,
   };
+}
+
+/** The Sim's AgentZero sheet's headline (copy review, 7 Nov: "Turn on AgentZero" never said the amount): what it adds, "Add $25.00
+ *  to AgentZero's wallet", the new limit less the one in force. Adding nothing (a list change): the old words. */
+export function agentSheetTitle(method: string, limitUsd: number, wasUsd: number): string {
+  const add = Math.round((limitUsd - (method === "account.agent.set" ? 0 : wasUsd)) * 100) / 100;
+  if (Number.isFinite(add) && add > 0.004) return `Add $${add.toFixed(2)} to AgentZero's wallet`;
+  return method === "account.agent.set" ? "Turn on AgentZero" : "Add money to AgentZero's wallet";
 }

@@ -22,6 +22,7 @@ import type { AppModule } from "@zerofee/shell-api/app-module.ts";
 import { AppFrame, PushedFrame, useShell, type TrayItem } from "@zerofee/shell-api/AppFrame.tsx";
 import { agentZeroSteps, onAgentZeroStep, type AgentZeroStep } from "@zerofee/shell-api/agentzero-steps.ts";
 import { ThisDevice, onPhone, thisDevice } from "@zerofee/shell-api/approval-words.ts";
+import { askUnderLine } from "./ask-words.ts";
 import { USDC_ID, WNEAR_ID } from "../agent-pay.ts";
 import { zeroBudget } from "../zero/budget.ts";
 import { MODEL, NearAiError, attest, type Proof } from "../nearai.ts";
@@ -38,9 +39,11 @@ import { AGENT_PRIVATE_ROUTE } from "@zerofee/core/agent-route";
 import type { ChatSheet } from "../chat/turn.ts";
 import { MEMORY_KIND_WORDS, memoryStore, type MemoryLine } from "../zero/memory.ts";
 import { onDemoPage } from "@zerofee/shell-api/release.ts";
-import { ADD_BUTTON, addable, FUND_AMOUNTS, FUND_BUTTON, FUND_JOB_WORDS, FUND_TITLE, fillFundJob, fundJob, fundLines, jobCostLine, STOP_BACK_DONE, STOP_BACK_LINE, walletRow } from "./fund-words.ts";
+import { ADD_BUTTON, addable, FUND_AMOUNTS, FUND_BUTTON, FUND_DETAILS_LABEL, FUND_JOB_WORDS, FUND_TITLE, fillFundJob, fundJob, fundPage, fundShows, fundSlowLine, jobCostLine, readUntilShown, STOP_BACK_DONE, STOP_BACK_LINE, walletRow } from "./fund-words.ts";
 import { onOwnApproval } from "@zerofee/shell-api/job-run.ts";
-import { receiptLeft } from "@zerofee/shell-api/job-steps.ts";
+import { TIME_WORDS, receiptLeft } from "@zerofee/shell-api/job-steps.ts";
+import { More } from "@zerofee/design/More.tsx";
+import { agentFundLine } from "@zerofee/wallet/app/money/receipt-said.ts";
 import { startJob as startMoneyJob, watchShown, type JobHandle } from "@zerofee/shell-api/job-start.ts";
 
 /** What the chat's card says for something AgentZero can't do yet (an act while AGENT_ACT is off). */
@@ -116,7 +119,7 @@ export function agentState(view: unknown, nearUsd: number): AgentState | null {
 
 /** The relay's base, set at build time (VITE_ZEROFEE_RELAY); none in the web demo's sample. */
 const RELAY: string | null = (() => {
-  const raw = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_RELAY;
+  const raw = import.meta.env?.VITE_ZEROFEE_RELAY;
   try {
     const u = raw ? new URL(raw) : null;
     // https, or http on this machine only (the dev server's own relay), as Trade's relayBase.
@@ -196,9 +199,12 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
   };
   const [sheet, setSheet] = useState<SheetState | null>(null);
   /** Funding's job was made (its Safe's yes): what it adds and where from, until Done. */
-  const [funded, setFunded] = useState<{ amount: string; from: string; endsAt: number; landedAt?: number } | null>(null);
-  // W9-5b: its core's answer landed it: the receipt stops saying "About 10 s left" and "It keeps going" over money already there
+  const [funded, setFunded] = useState<{ amount: string; from: string; startAt: number; endsAt: number; landedAt?: number; slow?: true } | null>(null);
+  // W9-5b: it landed (the Safe's funding: a read of AgentZero's wallet shows it, fundShows): the receipt stops saying
+  // "About 10 s left" and "It keeps going" over money already there, and says how long it took
   const fundedLanded = () => setFunded((f) => (f ? { ...f, landedAt: Date.now() } : f));
+  // the audit's SHOULD: still not shown by its estimate plus the slack: the slow face, never "It keeps going" for ever
+  const fundedSlow = () => setFunded((f) => (f && f.landedAt === undefined ? { ...f, slow: true } : f));
   const [why, setWhy] = useState<Receipt | null>(null);
   const [proof, setProof] = useState<Proof | null>(null);
   const [checking, setChecking] = useState(false);
@@ -272,6 +278,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
     setPocketRead(got);
     const state = got.k === "known" ? agentState(got.view, price) : null;
     setAgent(state);
+    const read = state;
     if (state && (POCKET_CHOICES as readonly number[]).includes(Math.round(state.limitUsd))) setChoice(Math.round(state.limitUsd));
     const without = got.k === "none";
     const rules = without ? await readWithin(bridge.call<{ current: number; update?: { waitSeconds: number; thenWaitSeconds?: number; listFirst?: true; waiting?: { readyAtIso: string } } }>("account.rules")) : null;
@@ -279,6 +286,8 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
     setPocketUpdate(u ? { waitSeconds: u.waitSeconds, ...(u.thenWaitSeconds ? { thenWaitSeconds: u.thenWaitSeconds } : {}), ...(u.listFirst ? { listFirst: true } : {}), ...(u.waiting ? { readyAtIso: u.waiting.readyAtIso } : {}) } : null);
     const own = await readWithin(bridge.call<{ value: string | null }>("device.secret.get", { key: SECRETS.ownKey }));
     setHasOwnKey(typeof own === "object" && "ok" in own && !!own.ok?.value);
+    // what was read, for a funding's receipt (fundShows)
+    return read;
   }, [bridge, engine]);
 
   useEffect(() => {
@@ -349,8 +358,9 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
     // funding (QA's Sim test Nov: no "Job created.", no time, nothing said where the $10 came from): the job is made
     // on the Safe's yes (its Face ID), as a site's Add is (job-run.ts onOwnApproval), with its source and its time
     const f = fund ? fundJob(usd, Math.max(0, usd - pocketUsd)) : null;
+    const fundEnds = f ? Date.now() + f.job.etaSec * 1000 : 0;
     let job: JobHandle | null = null;
-    const stop = f ? onOwnApproval((yes) => { if (yes && !job) { job = startMoneyJob(shell.tasks, f.job); job.approved(); setFunded({ ...f.said, endsAt: Date.now() + f.job.etaSec * 1000 }); } }, { anySheet: true }) : () => {};
+    const stop = f ? onOwnApproval((yes) => { if (yes && !job) { job = startMoneyJob(shell.tasks, f.job); job.approved(); setFunded({ ...f.said, startAt: Date.now(), endsAt: Date.now() + f.job.etaSec * 1000 }); } }, { anySheet: true }) : () => {};
     // USDC only, the listed people only (security design review H1, H2): budget.ts.
     const r = await bridge.call<TxOutcome>(method, { limitUsd: usd, people: [...people], budget: zeroBudget(usd, people, Date.now(), on ? agent?.endsAtNs : undefined, { anyAddress: AGENT_PRIVATE_ROUTE && anyAddress }), orders: [] }).finally(stop);
     setBusy(false);
@@ -362,8 +372,8 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
       else if (r.ok.status === "waiting") j.made([]);
       else if (r.ok.status === "declined") j.gone();
       else shell.tasks?.end(j.id, "failed", r.ok.status === "problem" ? r.ok.problem.whatHappened : FUND_JOB_WORDS.stopped);
-      if ("ok" in r && r.ok.status === "done") fundedLanded();
-      else setFunded(null);
+      // landed only once the read below shows it (fundShows), never on the answer alone
+      if (!("ok" in r && r.ok.status === "done")) setFunded(null);
     }
     if ("problem" in r) {
       // S2: the account's rules have no its wallet after all (release 9): say so in AgentZero's words, never "isn't
@@ -387,7 +397,9 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
       if (r.ok.status === "problem") void shell.showProblem(r.ok.problem);
       return false;
     }
-    await read();
+    const seen = await read();
+    // landed once a read shows it; not yet, read again (bounded: readUntilShown), then the slow face
+    if (f) void readUntilShown(usd, seen?.limitUsd, () => read().then((s) => s?.limitUsd), fundEnds, { now: Date.now, sleep: (ms) => new Promise((ok) => setTimeout(ok, ms)) }).then((r) => (r === "shown" ? fundedLanded() : fundedSlow()));
     return true;
   };
 
@@ -407,7 +419,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
       const tasks = t && typeof t.publish === "function" && typeof t.update === "function" && typeof t.end === "function" ? (t as Tasks) : undefined;
       // one funding receipt (main's az-fund-made sheet): "Job created.", where the money comes from, its time left
       const f = fillFundJob(usd);
-      const end = await fillJob({ bridge, tasks, usd, tap, key: `agent-fill-${Date.now().toString(36)}`, made: () => { setSheet(null); setFunded({ ...f.said, endsAt: Date.now() + f.job.etaSec * 1000 }); } });
+      const end = await fillJob({ bridge, tasks, usd, tap, key: `agent-fill-${Date.now().toString(36)}`, made: () => { setSheet(null); setFunded({ ...f.said, startAt: Date.now(), endsAt: Date.now() + f.job.etaSec * 1000 }); } });
       if ("refused" in end) { setFunded(null); void shell.showProblem(end.refused); }
       else if ("declined" in end || "problem" in end) setFunded(null); // a no takes the row away; a refusal's row says why (rule 8)
       else { tasks?.end(end.job.id, "done", FUND_JOB_WORDS.done); fundedLanded(); void read(); }
@@ -879,7 +891,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
               </button>
             ))}
           </div>
-          <p className="zf-small ag-under">Asking less often needs Face ID. Asking more often works at once.</p>
+          <p className="zf-small ag-under">{askUnderLine(PHONE)}</p>
         </Sheet>
       )}
 
@@ -887,26 +899,24 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
         // product decision, 5 Nov: the funding page. What the wallet is, what a job costs at the model's own price, who is paid
         // (Anthropic, the chain), and that ZeroFee takes nothing. No daily price. The account still holds AgentZero's key
         // to the amount picked here (the contract's cap over 24 hours); only the words changed.
+        // the copy review (7 Nov): the amounts first, under the title; three plain lines; the price and who is paid one tap away
         <Sheet title={FUND_TITLE} onClose={() => setSheet(null)}>
-          {(() => {
-            const w = fundLines();
-            return (
-              <>
-                <div className="ag-rows">{w.what.map((l) => <div key={l} className="ag-row"><span className="t">{l}</span></div>)}</div>
-                <div className="zf-label ag-section">What a job costs</div>
-                <div className="ag-rows">{w.cost.map((l) => <div key={l} className="ag-row"><span className="t">{l}</span></div>)}</div>
-                <div className="zf-label ag-section">Who you pay</div>
-                <div className="ag-rows">{w.who.map((l) => <div key={l} className="ag-row"><span className="t">{l}</span></div>)}</div>
-              </>
-            );
-          })()}
-          <div className="zf-label ag-section">How much</div>
+          <div className="zf-label ag-section" data-testid="ag-fund-howmuch">How much</div>
           <div className="ag-pick" role="radiogroup" aria-label="How much">
             {addable(FUND_AMOUNTS, on && pocketHere ? pocketUsd : 0).map((c) => (
               <button key={c} className={`ag-chip${choice === c ? " on" : ""}`} role="radio" aria-checked={choice === c} onClick={() => setChoice(c)}>{`$${c}`}</button>
             ))}
           </div>
           {pocketHere && <p className="zf-small ag-under">{pocketWaitLine(recoveryDelay, agent ? pocketAtOnce({ on, sample: agent.sample, limitUsd: pocketUsd, ...(agent.lastLimitUsd !== undefined ? { lastLimitUsd: agent.lastLimitUsd } : {}), choiceUsd: choice }) : undefined)}</p>}
+          {(() => {
+            const w = fundPage(pocketHere);
+            return (
+              <>
+                <div className="ag-rows" data-testid="ag-fund-lines">{w.lines.map((l) => <div key={l} className="ag-row"><span className="t">{l}</span></div>)}</div>
+                <More label={FUND_DETAILS_LABEL} lines={w.details} />
+              </>
+            );
+          })()}
           <div className="ag-sheet-floor">
             {pocketHere ? (
               <button className="zf-btn" disabled={busy || !(choice > (on ? pocketUsd : 0)) || agent?.waiting?.usd === choice} onClick={() => void setPocket(choice, runningList(jobs), needsAnyAddress(jobs), true).then((ok) => ok && setSheet(null))}>{ADD_BUTTON}</button>
@@ -918,15 +928,16 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
         </Sheet>
       )}
 
-      {/* funding is a job (rule 2): "Job created." on the Safe's yes, where the money comes from, and its time left */}
+      {/* funding is a job (rule 2): "Job created." on the Safe's yes, what it adds, where the money comes from, and its time left */}
       {funded && (
         <Sheet title={FUND_TITLE} onClose={() => setFunded(null)}>
           <div className="zf-receipt zf-receipt--job" data-state="away" role="status" aria-live="polite" data-testid="az-fund-made">
             <p className="zf-receipt__amount">{funded.amount}</p>
             <p className="zf-receipt__head">{JOB_WORDS.created}</p>
+            <p className="zf-receipt__line" data-testid="az-fund-said">{funded.slow ? fundSlowLine(funded.amount) : agentFundLine(funded.amount, funded.landedAt !== undefined)}</p>
             <p className="zf-receipt__line" data-testid="az-fund-from">{funded.from}</p>
-            <p className="zf-receipt__line" data-testid="job-time-left">{receiptLeft(funded.endsAt, Date.now(), undefined, funded.landedAt)}</p>
-            {watchShown(funded.landedAt) && <p className="zf-receipt__line">{JOB_WORDS.watch}</p>}
+            <p className="zf-receipt__line" data-testid="job-time-left">{funded.slow ? TIME_WORDS.slow : receiptLeft(funded.endsAt, Date.now(), funded.startAt, funded.landedAt)}</p>
+            {watchShown(funded.landedAt) && !funded.slow && <p className="zf-receipt__line">{JOB_WORDS.watch}</p>}
           </div>
           <div className="ag-sheet-floor"><button className="zf-btn" onClick={() => setFunded(null)} data-testid="az-fund-done">Done</button></div>
         </Sheet>

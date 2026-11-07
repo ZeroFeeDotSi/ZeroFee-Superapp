@@ -11,8 +11,9 @@ test("c6 MUST 1 (b): Send's keypad and its button say one cent figure, the one i
   assert.equal(cap.typed, "6.85");
   const usd = Number(cap.amount) * per;
   assert.equal(sendFigure({ typed: cap.typed, exact: false, usd }), cap.typed, "the button says the keypad's $6.85, never $6.86");
-  // control: nothing typed (Max, the slider): the worth, rounded once by the one rule, on the keypad and the button alike
-  assert.equal(sendFigure({ typed: null, exact: false, usd }), "6.86");
+  // control: nothing typed (Max, the slider): the worth, down to the cent once (audit, 6 Nov: never a cent over the at-most
+  // line), on the keypad and the button alike
+  assert.equal(sendFigure({ typed: null, exact: false, usd }), "6.85");
   assert.equal(sendFigure({ typed: null, exact: false, usd: null }), null, "no price: the coins, no dollar figure");
 });
 

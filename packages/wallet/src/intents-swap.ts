@@ -59,7 +59,7 @@ export interface IntentsSwapDeps {
   /** A dry 1Click quote through the pinned relay (display only). */
   dryQuote: (request: QuoteRequest) => Promise<QuoteResponse>;
   signAll: (requests: TxRequest[], caller: Caller, since?: number) => Promise<{ txHash: string; explorerUrls: string[]; hold?: Movement["held"]; unsent?: number }>;
-  approvals: (steps: TxRequest[], canChain: boolean) => TxRequest[];
+  approvals: (steps: TxRequest[], canChain: boolean, caller?: string) => TxRequest[];
   remember: (m: Movement) => Promise<void>;
   /** 1Click's status follow (the ledger's slow path), for a Safe swap the fast read didn't see end. */
   follow: (m: Movement, depositAddress: string) => void;
@@ -175,7 +175,7 @@ export function createIntentsSwap(d: IntentsSwapDeps) {
     const tag = typeof r.ok.statusTag === "string" && /^[A-Za-z0-9_-]{16,128}$/.test(r.ok.statusTag) ? r.ok.statusTag : undefined;
     const why = `Swap ${quote.amountIn} in your Safe`;
     const steps = [mtTransfer({ to: r.ok.depositAddress, tokenId: quote.from, units: BigInt(k.units), why })];
-    const signed = await d.signAll(d.approvals(steps, await d.canChain(accountId)), caller, since);
+    const signed = await d.signAll(d.approvals(steps, await d.canChain(accountId), caller), caller, since);
     const job: SwapJob = { ...base, id: `swap:${signed.txHash}`, status: signed.hold ? "waiting" : "moving", explorerUrls: signed.explorerUrls, depositAddress: r.ok.depositAddress, ...(tag ? { statusTag: tag } : {}), ...(signed.hold ? { held: signed.hold } : {}), source: "safe" };
     await d.remember(job);
     if (!signed.hold) void watchSafe(job, since, to?.decimals);

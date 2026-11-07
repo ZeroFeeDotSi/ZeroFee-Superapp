@@ -34,5 +34,5 @@ test("062: a site wallet's Take out is a job at the tap: every site page's Take 
   const go = money.slice(money.indexOf("function SiteBackSheetFor("), money.indexOf("const legNetworks ="));
   const job = go.indexOf("const job = startJob(tasks, takeOutJob(picked, name));"), call = go.indexOf("const r = await one(w);");
   assert.ok(job > 0 && call > job, "the job exists before the core's first call");
-  assert.match(money, /data-testid="takeout-made"[^]*?\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{TAKE_OUT_ETA_SEC\} watch \/>/, "\"Job created.\" and its time left");
+  assert.match(money, /data-testid="takeout-made"[^]*?\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{TAKE_OUT_ETA_SEC\} watch job=\{madeJob\} \/>/, "\"Job created.\" and its time left");
 });

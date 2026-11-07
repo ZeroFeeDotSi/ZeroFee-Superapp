@@ -5,6 +5,7 @@
 // refunded), and a failed one says where it stayed.
 import type { MoveProof } from "@zerofee/core/tx-proof";
 import { ProblemError } from "@zerofee/core/problem";
+import { moneyMayHaveMoved } from "@zerofee/core/money-calls";
 import { GAS_TOPUP_MIN_USD, OUT_FEE_ROOM, gasTopUpUsd, type MoveWhy, type TimedMove } from "./float.ts";
 import type { ChainId } from "./types.ts";
 
@@ -189,8 +190,11 @@ export function createJobRunner(d: JobDeps) {
         : j.kind === "out" ? await d.out({ chain: j.chain!, ...(j.wallet ? { to: j.wallet } : j.slot !== undefined ? { slot: j.slot } : {}), amount: j.raw ?? await d.toRaw(j.chain!, j.usd), key: j.id })
         : await d.in({ chain: j.chain!, ...(j.wallet ? { from: j.wallet } : j.slot !== undefined ? { slot: j.slot } : {}), amount: j.all ? "all" : j.raw ?? await d.toRaw(j.chain!, j.usd), key: j.id });
     } catch (e) {
-      // the core refused it (the fee guard, a minimum, its own checks): nothing moved
-      if (e instanceof ProblemError) {
+      // the core refused it (the fee guard, a minimum, its own checks): nothing moved. Never a Problem that leaves the
+      // money unknown (the audit's MUST, 6 Nov: a plain throw inside float.home/out/in comes back as security.unexpected.money):
+      // that stays asked like a dropped connection, so the next round asks again with the same key and the core answers
+      // with the move it made; only a real refusal is "stayed", the one the Move-stopped face says "Nothing moved" for
+      if (e instanceof ProblemError && !moneyMayHaveMoved(e.problem)) {
         Object.assign(j, { state: "failed", stayed: true, note: `${refusalWords(e.problem)} · it's ${j.kind === "in" ? "on the chain" : "in your NEAR wallet"}` });
         await save();
       }

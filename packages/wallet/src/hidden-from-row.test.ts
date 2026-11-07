@@ -304,7 +304,7 @@ test("leg 1 sent but not seen done by both nodes (security review M): Activity k
     const list = await x.ledger.call<Movement[]>("ledger.activity", { caller: "wallet" });
     const m = "ok" in list ? list.ok.find((y) => y.id.startsWith("hidden-row:")) : undefined;
     assert.equal(m?.status, "problem", `${code}: in Activity`);
-    assert.match(m?.problem?.whatHappened ?? "", /the ETH reached your private balance, so nothing was paid\. Your money is there or on its way\.$/);
+    assert.match(m?.problem?.whatHappened ?? "", /the ETH reached Private, so nothing was paid\. Your money is there or on its way\.$/);
     assert.deepEqual(x.submitted, []);
   }
   const unsent = setup({ leg1Status: ["SUCCESS"], unsent: true });

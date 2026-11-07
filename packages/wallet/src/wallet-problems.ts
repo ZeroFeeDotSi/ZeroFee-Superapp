@@ -2,7 +2,10 @@
 // and a test checks both. The words follow the three-part rule in core/problem.ts: what happened, where the money is,
 // the one next step. They never promise what the ledger can't know. A service that fails is named (B28): NEAR, 1Click,
 // NEAR Intents' bridge; never "we can't", never "the service that holds your coins" (no service holds them, D37).
-import type { MoneyState, Problem } from "@zerofee/core/problem";
+import { unsureIn } from "@zerofee/core/private-route";
+import { ProblemError, type MoneyState, type Problem } from "@zerofee/core/problem";
+import { UNKNOWN_MONEY, UNKNOWN_WORDS } from "@zerofee/core/security-problems";
+import type { Movement } from "./types.ts";
 import { SERVICE_NAMES, serviceProblem, type Fault, type Service } from "@zerofee/core/services";
 import { NEAR_SWAP_UNFINISHED, NEAR_SWAP_UNSURE } from "./near-swap-words.ts";
 
@@ -14,7 +17,51 @@ const ONE_CLICK = SERVICE_NAMES.oneclick;
 const BRIDGE = SERVICE_NAMES.bridge;
 
 const inYourBalance: MoneyState = { state: "safe", where: "in your Safe" };
+/** Provisional words (the copy review rules): a held first step ran and the rest wasn't sent (holdPartSent). */
+export const FINISH_WORDS = { finish: "Finish the move", steps: "Step 1: Done. The rest: Not sent." } as const;
+/** The screen whose own sheet finishes a movement's action (the shell's openMoney, WalletApp follow): a send, a swap, or a
+ *  move; a conversion opens the Safe's own Convert. */
+export function finishScreen(kind: Movement["kind"] | undefined): "money/send" | "money/swap" | "money/move" | "convert" {
+  if (kind === "withdraw" || kind === "transfer" || kind === "pay") return "money/send";
+  if (kind === "swap") return "money/swap";
+  if (kind === "convert") return "convert";
+  return "money/move";
+}
 const noMoney: MoneyState = { state: "not-involved" };
+
+/**
+ * The Safe's part stopped after Private's part went (the audit's MUST, 6 Nov): the Send can't simply go again, a second go pays Private's part
+ * twice. So the one step is Activity, whatever the Safe's refusal offered. A Safe part that didn't move says the part that went;
+ * one that may have moved (money not "safe") keeps its own words, which say so.
+ */
+export function pocketPartWent(p: Problem): Problem {
+  const next = { kind: "open" as const, label: "See what happened", screen: "activity" };
+  const more = `${p.more ? `${p.more} ` : ""}The part from Private went. Activity shows it.`;
+  if (p.money.state !== "safe") return { ...p, next, more };
+  return { ...p, code: "ledger.send.part-went", whatHappened: "Only the part from Private was sent. Activity shows it.", money: { state: "on-the-way", where: "Private's part, to the person you paid; the rest in your Safe" }, next, more };
+}
+
+/** pocketPartWent's Problem, with the part that went: a Move keeps its id (private-move.ts: the sweep holds on it, the row follows it). */
+export class PartWent extends ProblemError {
+  readonly went: readonly Pick<Movement, "id">[];
+  constructor(problem: Problem, went: readonly Pick<Movement, "id">[]) {
+    super(problem);
+    this.went = went;
+  }
+}
+
+export type RefundPlace = "your Safe" | "Private" | "your NEAR wallet";
+type Followed = Pick<Movement, "kind"> & Partial<Pick<Movement, "source" | "private">>;
+
+/** Where this move's quote sends a refund (audit, 6 Nov): a Top up's is Spending's cash (the Add quote's refundTo), a NEAR wallet
+ *  swap's the NEAR wallet, a move into Private's and a payment from it the pocket (their refundTo), the rest the Safe. */
+export function refundPlace(m: Followed): RefundPlace {
+  if (m.kind === "trading" || m.source === "private") return "your NEAR wallet";
+  return m.private || m.kind === "private" ? "Private" : "your Safe";
+}
+
+/** Where to look after a FAILED, one full sentence on screen (copy review, 6 Nov): never "it comes back". */
+// unsureIn: core private-route.ts (the same words a Move part says once its money is unsure)
 
 export const walletProblems = {
   // The network and the two-node rule
@@ -195,12 +242,15 @@ export const walletProblems = {
     money: inYourBalance,
     next: { kind: "nothing", label: "Done" },
   }),
-  holdPartSent: (): Problem => ({
+  /** A held first step ran, the rest of its steps were never sent (the audit's C2, 7 Nov): one lit choice, Finish the move,
+   *  reopens the same action's own sheet (a new Face ID, fresh nonces above the fence); the first step was only room for
+   *  the coin, so asking it again is harmless. Never a Done-only dead end (the HARD rule). */
+  holdPartSent: (kind?: Movement["kind"]): Problem => ({
     code: "ledger.hold.part-sent",
     whatHappened: "Only the first part went after the wait. The rest wasn't sent.",
     money: inYourBalance,
-    next: { kind: "nothing", label: "Done" },
-    more: "Your account checks each part on its own, and it held the first one. Send it again to finish.",
+    next: { kind: "open", label: FINISH_WORDS.finish, screen: finishScreen(kind) },
+    more: FINISH_WORDS.steps,
   }),
   holdUnknown: (): Problem => ({
     code: "ledger.hold.unknown",
@@ -253,7 +303,7 @@ export const walletProblems = {
   }),
   privateChild: (): Problem => ({
     code: "ledger.private.child",
-    whatHappened: "A child's account has no private balance. Nothing was sent.",
+    whatHappened: "A child's account can't use Private. Nothing was sent.",
     money: inYourBalance,
     next: { kind: "nothing", label: "Go back" },
   }),
@@ -262,14 +312,14 @@ export const walletProblems = {
   // D128: Hidden is how money travels, not a place: the money line names the private balance on NEAR.
   hiddenRowBack: (coin = "SOL"): Problem => ({
     code: "ledger.hidden-row.back",
-    whatHappened: `The ${coin} came back. It's in your private balance now. Nothing was paid.`,
-    money: { state: "safe", where: "in your private balance" },
+    whatHappened: `The ${coin} came back. It's in Private now. Nothing was paid.`,
+    money: { state: "safe", where: "in Private" },
     next: { kind: "nothing", label: "Go back" },
   }),
   hiddenRowShort: (coin = "SOL"): Problem => ({
     code: "ledger.hidden-row.short",
-    whatHappened: `Less ${coin} reached your private balance than the payment needs, so it wasn't paid. Your money is in your private balance.`,
-    money: { state: "safe", where: "in your private balance" },
+    whatHappened: `Less ${coin} reached Private than the payment needs, so it wasn't paid. Your money is in Private.`,
+    money: { state: "safe", where: "in Private" },
     next: { kind: "nothing", label: "Go back" },
   }),
   /** QA's (b), 5 Nov: a coin other than NEAR paid out to a NEAR account arrives by that coin's own transfer,
@@ -290,8 +340,8 @@ export const walletProblems = {
   }),
   hiddenRowSlow: (coin = "SOL"): Problem => ({
     code: "ledger.hidden-row.slow",
-    whatHappened: `NEAR Intents didn't confirm the ${coin} reached your private balance, so nothing was paid. Your money is there or on its way.`,
-    money: { state: "safe", where: "in your private balance" },
+    whatHappened: `NEAR Intents didn't confirm the ${coin} reached Private, so nothing was paid. Your money is there or on its way.`,
+    money: { state: "safe", where: "in Private" },
     next: { kind: "nothing", label: "Go back" },
   }),
   // Home's Send (the Home plan §1.3, D128): every Send goes privately through NEAR. The quote relay's own limit on one quote
@@ -323,7 +373,7 @@ export const walletProblems = {
   }),
   privateUnavailable: (): Problem => ({
     code: "ledger.private.unavailable",
-    whatHappened: "Your private balance isn't set up on this phone yet. Nothing was sent.",
+    whatHappened: "Private isn't set up on this phone yet. Nothing was sent.",
     money: inYourBalance,
     next: { kind: "nothing", label: "Go back" },
   }),
@@ -347,19 +397,21 @@ export const walletProblems = {
   }),
 
   // Converting
-  convertStuck: (): Problem => ({
+  /** Fires on PENDING_DEPOSIT or a failed read (ledger.ts trackQuote), so nobody has seen the deposit: never "with it, not lost"
+   *  (audit, 6 Nov). The move stays moving, so a late SUCCESS still lands. */
+  convertStuck: (place: RefundPlace = "your Safe"): Problem => ({
     code: "ledger.convert.stuck",
-    whatHappened: `${ONE_CLICK} hasn't started changing your coins yet. They're with it, not lost.`,
-    money: { state: "on-the-way", where: `with ${ONE_CLICK}, waiting to change` },
+    whatHappened: `${ONE_CLICK} hasn't started this yet.`,
+    money: unsureIn(place),
     next: { kind: "wait", label: "Wait a little longer" },
-    more: `If ${ONE_CLICK} can't change them, it sends them back to your Safe.`,
   }),
-  convertFailed: (): Problem => ({
+  /** 1Click's FAILED: its docs promise a refund only for REFUNDED, so this says where to look, never that the money is back.
+   *  `pot`: where this quote's refund goes (refundPlace). */
+  convertFailed: (pot: "your Safe" | "Private" = "your Safe", what: "swap" | "payment" | "move" = "swap"): Problem => ({
     code: "ledger.convert.failed",
-    whatHappened: `${ONE_CLICK} couldn't change your coins.`,
-    money: { state: "needs-you", where: `with ${ONE_CLICK}, coming back to your Safe` },
+    whatHappened: `${ONE_CLICK} didn't finish this ${what}.`,
+    money: unsureIn(pot),
     next: { kind: "nothing", label: "Done" },
-    more: `${ONE_CLICK} stopped it. Your coins come back to your Safe when it sends them.`,
   }),
   /** A NEAR wallet swap 1Click ended FAILED: its docs promise a refund only for REFUNDED, so this says where to look, never that
    *  the money is back (the core's where: "float" on FAILED is its assumption, not a read of the balance). */
@@ -382,10 +434,19 @@ export const walletProblems = {
    *  float-core.ts addEnd, 512f3d3f): one story in Wallet's Activity and in Spending's. */
   topUpFailed: (depositAddress?: string): Problem => ({
     code: "ledger.topup.failed",
-    whatHappened: "Your move to your NEAR wallet hasn't landed yet. Activity shows it.",
-    money: { state: "on-the-way", where: `with ${ONE_CLICK}. It ends up in your NEAR wallet` },
+    whatHappened: `${ONE_CLICK} didn't finish this move.`,
+    money: unsureIn("your NEAR wallet"),
     next: { kind: "nothing", label: "Done" },
-    more: `${ONE_CLICK} is still finishing it${depositAddress ? ` (its id: ${depositAddress})` : ""} · if not, the money comes back to your NEAR wallet`,
+    ...(depositAddress ? { more: `${ONE_CLICK}' id: ${depositAddress}` } : {}),
+  }),
+
+  /** More than 4 steps for an action's one sheet (the audit's R3): refused before any sheet, never split (the copy review's words, 6 Nov).
+   *  Its one lit button is Close: a smaller amount takes as many steps. */
+  tooManySteps: (): Problem => ({
+    code: "ledger.steps.too-many",
+    whatHappened: "This has more steps than one Face ID covers, so ZeroFee stopped it. Your money hasn't moved.",
+    money: inYourBalance,
+    next: { kind: "nothing", label: "Close" },
   }),
 
   // Quotes
@@ -442,4 +503,20 @@ export const walletProblems = {
     next: { kind: "retry", label: "Try again" },
     more: detail,
   }),
+  /** The same, in a call that can move money (core money-calls.ts): never "Nothing moved", never a Try again (audit, 6 Nov). */
+  unexpectedMoney: (detail: string): Problem => ({
+    code: "ledger.unexpected.money",
+    whatHappened: UNKNOWN_WORDS,
+    money: UNKNOWN_MONEY,
+    next: { kind: "open", label: "See what happened", screen: "activity" },
+    more: detail,
+  }),
 };
+
+/** 1Click's FAILED for a followed move: its own words, its own refund place. Pure, so each kind is a test (ledger.ts trackQuote). */
+export function failedProblem(m: Followed, depositAddress?: string): Problem {
+  if (m.kind === "trading") return walletProblems.topUpFailed(depositAddress);
+  if (m.source === "private") return walletProblems.nearSwapFailed();
+  const place = refundPlace(m) as "your Safe" | "Private";
+  return walletProblems.convertFailed(place, m.kind === "private" ? "move" : m.kind === "pay" ? "payment" : "swap");
+}

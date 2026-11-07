@@ -32,7 +32,7 @@ function sheetOnTop(native: string): string[] {
   const ownHost = /let sheet = UIHostingController\(rootView: make\(finish\)\)/.test(modal) ||
     (/let sheet = SheetHost\(make\(finish\)/.test(modal) && /final class SheetHost: UIHostingController<AnyView> \{/.test(native) && !/addSubview|addChild|insertSubview/.test(native.slice(native.indexOf("final class SheetHost"), native.indexOf("\n}", native.indexOf("final class SheetHost")))));
   if (!ownHost) p.push("the sheet is not its own UIHostingController");
-  if (!/var top: UIViewController = controller\s*\n\s*while let next = top\.presentedViewController \{ top = next \}\s*\n\s*top\.present\(sheet, animated: true\)/.test(modal)) p.push("not presented on the topmost presented controller");
+  if (!/var top: UIViewController = controller\s*\n\s*while let next = top\.presentedViewController \{ top = next \}\s*\n\s*top\.present\(sheet, animated: !approval\)/.test(modal)) p.push("not presented on the topmost presented controller");
   if (!/sheet\.modalPresentationStyle = \.pageSheet/.test(modal) || !/sheet\.isModalInPresentation = true/.test(modal)) p.push("not a page sheet only its own buttons close");
   if (/addSubview|addChild|\.view\.insertSubview/.test(modal)) p.push("the sheet is put inside another view");
   if (!/Self\.sheetOpen = true\s*\n\s*defer \{ Self\.sheetOpen = false \}/.test(modal)) p.push("approvalOpen isn't held for the whole sheet");
@@ -112,13 +112,13 @@ test("no partner window comes on screen while the sheet is open, and leaving one
 
 test("controls: each rule fails a deliberately bad source", () => {
   // the sheet put on the shell's own controller (under a partner window), not the topmost one
-  assert.ok(sheetOnTop(native.replace("top.present(sheet, animated: true)", "controller.present(sheet, animated: true)")).length > 0);
+  assert.ok(sheetOnTop(native.replace("top.present(sheet, animated: !approval)", "controller.present(sheet, animated: !approval)")).length > 0);
   assert.ok(sheetOnTop(native.replace("sheet.isModalInPresentation = true", "sheet.isModalInPresentation = false")).length > 0);
   assert.ok(sheetOnTop(native.replace("defer { Self.sheetOpen = false }", "Self.sheetOpen = false")).length > 0);
   // the sheet's controller not a UIHostingController of its own
   assert.ok(sheetOnTop(native.replace("final class SheetHost: UIHostingController<AnyView> {", "final class SheetHost: UIViewController {")).length > 0);
   assert.ok(sheetOnTop(native.replace("    super.viewDidDisappear(animated)\n", "    super.viewDidDisappear(animated)\n    view.addSubview(UIView())\n")).length > 0);
-  assert.ok(sheetOnTop(native.replace("top.present(sheet, animated: true)", "top.view.addSubview(sheet.view)\n      top.present(sheet, animated: true)")).length > 0);
+  assert.ok(sheetOnTop(native.replace("top.present(sheet, animated: !approval)", "top.view.addSubview(sheet.view)\n      top.present(sheet, animated: !approval)")).length > 0);
   // a web view in the sheet
   assert.ok(noWebInSheet({ "NativeSheet.swift": native + "\nstruct Page: UIViewRepresentable { func makeUIView(context: Context) -> WKWebView { WKWebView() } }" }).length > 0);
   assert.ok(noWebInSheet({ "SheetWords.swift": "import WebKit\n" }).length > 0);

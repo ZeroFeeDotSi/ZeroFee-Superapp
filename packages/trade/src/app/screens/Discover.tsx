@@ -18,6 +18,7 @@ import { ProblemError } from "@zerofee/core/problem";
 import { CHAINS, type TradeRecord } from "../../service.ts";
 import { amount as fmtAmount } from "../format.ts";
 import { createFeedback } from "../feedback.ts";
+import { followRecord, recordOf, UNCONFIRMED } from "../unconfirmed-follow.ts";
 import { landedDetail, whenCosted } from "../landed-detail.ts";
 import { ROW_RECEIPT_MS, rowBuyEnd, rowBuyLanded, rowBuyLine, type RowBuy as RowBuyState } from "./row-buy.ts";
 import { useQuickBuy } from "./quick-buy.ts";
@@ -26,7 +27,8 @@ import { tickKey } from "../../market/ticks.ts";
 import type { BuyRefusal } from "../../sol/screen.ts";
 import type { ChainId } from "../../types.ts";
 import type { FloatSnapshot } from "../../float-view.ts";
-import { listPrice, pct, rowUsd, usd } from "../format.ts";
+import { listPrice, pct } from "../format.ts";
+import { isNotForSale, markIfUnsellable, NOT_FOR_SALE, useNotForSale } from "../not-for-sale.ts";
 import { Gear, Search } from "../icons.tsx";
 import { readPasted } from "../paste.ts";
 import { OFFLINE_SHORT, useOnline } from "../online.ts";
@@ -37,12 +39,11 @@ import { LISTED, MARKET, useFloat, useLogo, useMarketList, usePrefetchCoin, useS
 import { rowLogo } from "../../market/logo.ts";
 import "../discover.css";
 
-/** Home's words for each chain (D124): the coin, and ETH (RH) for Robinhood Chain. */
-export const CHAIN_SHORT: Record<ChainId, string> = { sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+import { CHAIN_SHORT, rowLines, walletChip } from "../coin-words.ts";
+/** Home's words for each chain (D124): the coin, and ETH (RH) for Robinhood Chain (coin-words.ts; hood: "ETH (RH)"). */
+export { CHAIN_SHORT };
 /** The bundled logos, by trusted key. */
 const CHAIN_ICON: Record<ChainId, string> = { sol: "sol", hood: "hood", near: "near", bsc: "bsc" };
-/** A coin's worth in a row: the row form, suffixed ("$3.1K", "$153.4K", never "$153,447": the copy review's ruling, 5 Nov). */
-const capWords = (n: number): string => rowUsd(n);
 /** A launch younger than this wears its age, with a live dot. */
 const NEW_MS = 6 * 3_600_000;
 
@@ -73,10 +74,15 @@ function ChainTabs({ chain, onChain, onSettings, onMove }: { chain: ChainId | "a
   const [mark, setMark] = useState<{ x: number; w: number } | null>(null);
   useLayoutEffect(() => {
     const el = box.current?.querySelector<HTMLElement>(`[data-chain="${chain}"]`);
-    if (el) setMark({ x: el.offsetLeft, w: el.offsetWidth });
+    if (!el) return;
+    setMark({ x: el.offsetLeft, w: el.offsetWidth });
+    // T2-2 (the copy review's walk, 8 Nov: "ETH (RH) wallet" sat half under the fade): the chosen chip is always whole, scrolled to the
+    // nearest edge, the strip's scroll-padding keeping it clear of the fade (discover.css)
+    el.scrollIntoView?.({ inline: "nearest", block: "nearest" });
   }, [chain, usdOf("sol") === undefined, usdOf("hood") === undefined]);
   const quiet = LISTED.filter((c) => !MARKET.includes(c));
-  const money = (c: ChainId) => { const v = usdOf(c); return v === undefined ? <span className="zf-shimmer dc-tab-sk" /> : <span className="dc-tab-usd">{usd(v)}</span>; };
+  // 53, 6 Nov, item 9: each chip names its wallet over its figure ("SOL wallet" / "$169.37"), never a bare amount
+  const money = (c: ChainId) => { const w = walletChip(c, usdOf(c)); return <span className="dc-tab-two"><span className="dc-tab-name">{w.name}</span>{w.figure === null ? <span className="zf-shimmer dc-tab-sk" /> : <span className="dc-tab-usd">{w.figure}</span>}</span>; };
   return (
     <div className="dc-top">
       <div className="dc-tabs" role="tablist" aria-label="Your wallets and their markets" ref={box}>
@@ -85,14 +91,14 @@ function ChainTabs({ chain, onChain, onSettings, onMove }: { chain: ChainId | "a
           const v = usdOf(c);
           return (
             <button key={c} data-chain={c} role="tab" aria-selected={chain === c} className={chain === c ? "on" : ""} onClick={() => onChain(c)}
-              aria-label={`Your ${CHAIN_SHORT[c]} wallet${v === undefined ? "" : `, ${usd(v)}`}`}>
-              <CoinIcon symbol={CHAIN_SHORT[c]} icon={CHAIN_ICON[c]} size={18} />{money(c)}
+              aria-label={walletChip(c, v).label}>
+              {money(c)}
             </button>
           );
         })}
         {quiet.filter((c) => (usdOf(c) ?? 0) > 0).map((c) => (
-          <span key={c} className="dc-tab-quiet" aria-label={`Your ${CHAIN_SHORT[c]} wallet${usdOf(c) === undefined ? "" : `, ${usd(usdOf(c)!)}`}`}>
-            <CoinIcon symbol={CHAIN_SHORT[c]} icon={CHAIN_ICON[c]} size={18} />{money(c)}
+          <span key={c} className="dc-tab-quiet" aria-label={walletChip(c, usdOf(c)).label}>
+            {money(c)}
           </span>
         ))}
         {mark && <span className="dc-mark" aria-hidden="true" style={{ transform: `translateX(${mark.x}px)`, width: mark.w }} />}
@@ -127,6 +133,7 @@ const Row = memo(function Row({ r, rise, win, showChain, refused, lit, needsLogo
   const prefetch = usePrefetchCoin();
   const seen = useSeenPrefetch(r);
   const ch = changeIn(r, win === "new" ? "trending" : win);
+  const words = rowLines(r);
   const age = r.createdAt ? Date.now() - r.createdAt : undefined;
   const fresh = age !== undefined && age >= 0 && age < NEW_MS;
   // the quiet Buy chip's trade (row-buy.ts): while it is on, the row IS the receipt (the mark on the logo, the line under the name)
@@ -134,6 +141,10 @@ const Row = memo(function Row({ r, rise, win, showChain, refused, lit, needsLogo
   // a trade still checking is followed on the service's events (RowBuy): the row that owns it stops the follow when it goes
   const follow = useRef<(() => void) | null>(null);
   useEffect(() => () => { follow.current?.(); follow.current = null; }, []);
+  // while the row says "Not confirmed yet" and Trade is on screen, the service looks at the trade again (RECHECK_MS)
+  const { svc, active } = useTrade();
+  const checking = buy?.phase === "checking";
+  useEffect(() => (checking && active ? svc.watch() : undefined), [checking, active, svc]);
   // the row is the receipt until the trade's end is known: a landed or refused one stays ROW_RECEIPT_MS, then the chip is
   // back; one still checking keeps the row (no chip: a second $25 must never be invited by a trade that may still land)
   useEffect(() => {
@@ -141,24 +152,28 @@ const Row = memo(function Row({ r, rise, win, showChain, refused, lit, needsLogo
     const t = setTimeout(() => setBuy(null), ROW_RECEIPT_MS);
     return () => clearTimeout(t);
   }, [buy]);
+  useNotForSale();
+  const noSale = refused || isNotForSale(r.chain, r.address);
   // after every hook (the 5 Nov walk: returning before the chip's hooks crashed Trade, "Rendered fewer hooks", when a row's logo failed on New)
   if (needsLogo && logo.state === "none") return null;
   return (
-    <div className={`dc-rr${buy ? ` is-${buy.phase}` : ""}`}>
+    <div className={`dc-rr${buy ? ` is-${buy.phase}` : ""}${noSale ? " dc-rr--nfs" : ""}`}>
     <LiveRow rowRef={seen} state="past" className={`dc-row${enter !== null ? " zf-rise" : ""}`} style={enter !== null ? { ["--i" as string]: enter } : undefined} onPointerDown={() => prefetch(r)} onOpen={() => onCoin(r)}
       mark={<span className="dc-logo-box">
         {buy ? <ReceiptMark state={buy.phase} icon={<Logo r={r} lit={false} />} size={48} /> : <Logo r={r} lit={lit} />}
         {showChain && !buy && <span className="dc-badge" role="img" aria-label={`on ${CHAIN_SHORT[r.chain]}`}><CoinIcon symbol={CHAIN_SHORT[r.chain]} icon={CHAIN_ICON[r.chain]} size={16} /></span>}
       </span>}
-      title={<span className="dc-sym">{r.symbol}{fresh && !buy && <span className="dc-age"><span className="zf-live" />{ageText(age!)}</span>}</span>}
+      // 53, 6 Nov, item 9: the worth beside the symbol, the name on its own line below, whole (2 lines at most)
+      title={<span className="dc-sym">{r.symbol}{words.cap && <span className="dc-cap">{words.cap}</span>}{fresh && !buy && <span className="dc-age"><span className="zf-live" />{ageText(age!)}</span>}</span>}
       // the chain is the logo's badge, spoken as "on ETH (RH)" (webd-money2 crawl, 4 Nov: CASHCAT's row didn't say ETH (RH))
       line={buy ? <span className="dc-sub--buy" role="status">{buy.phase === "away" && <span className="zf-live" aria-hidden="true" />}<span className="dc-sub__words">{rowBuyLine(buy, r.symbol)}</span></span>
         // product decision, 5 Nov (via a proxy): the line is the coin's name and worth ("Doge Pepe · $3.27M"); on All the chain is
         // the badge on the logo and the row's spoken label, never words that pushed the name to "SOL ·…" beside the chip
-        : <span className="dc-sub"><span className="dc-name">{r.name}</span>{r.marketCapUsd ? <span className="dc-cap">{capWords(r.marketCapUsd)}</span> : null}</span>}
+        : <span className="dc-sub dc-sub--name"><span className="dc-name dc-name--whole">{words.name}</span></span>}
       usd={<span className={`dc-px${tick === "up" ? " dc-glint-up" : tick === "down" ? " dc-glint-down" : ""}`}>{r.priceUsd ? listPrice(r.priceUsd) : ""}</span>}
-      when={refused ? <span className="dc-chg">Not offered</span> : ch !== undefined ? <span className={`dc-chg ${ch > 0 ? "up" : ch < 0 ? "down" : ""}`}>{pct(ch)}</span> : undefined} />
-    {!refused && !buy && <RowBuy r={r} onState={setBuy} follow={follow} />}
+      when={ch !== undefined ? <span className={`dc-chg ${ch > 0 ? "up" : ch < 0 ? "down" : ""}`}>{pct(ch)}</span> : undefined} />
+    {/* T2-5 (the copy review's walk): a coin ZeroFee won't buy says so in mute where Buy was (not-for-sale.ts: only what is proven) */}
+    {noSale ? <span className="dc-nfs" data-testid="row-not-for-sale">{NOT_FOR_SALE}</span> : !buy && <RowBuy r={r} onState={setBuy} follow={follow} />}
     </div>
   );
 });
@@ -196,49 +211,53 @@ function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: (b: RowBuyS
     const taskId = `trade-${Date.now()}`, taskAt = Date.now();
     const route = `coin:${r.chain}:${r.address}:${r.symbol}`;
     const secs = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
+    let got = "";
+    const landed = (rec: TradeRecord) => {
+      const now = Date.now(), ms = performance.now() - at;
+      rowBuyLanded(tasks, taskId, { taskAt, now, wallet: `In your ${CHAINS[r.chain].symbol} wallet`, detail: landedDetail(secs(ms), rec, CHAINS[r.chain].name), proof: (rec.hashes ?? []).map((hash) => ({ chain: r.chain, hash })) });
+      whenCosted(svc.on, rec, () => void tasks?.update(taskId, { detail: landedDetail(secs(ms), rec, CHAINS[r.chain].name) }));
+      void feel.filled();
+      onState({ phase: "landed", at, got, ms });   // the Row keeps the state: this chip is gone the moment the row is the receipt
+    };
+    const refused = (rec: TradeRecord, why?: string) => {
+      tasks?.end(taskId, rec.status === "declined" ? "stopped" : "failed", why);
+      if (rec.status !== "declined") feel.failed();
+      onState({ phase: "refused", why, at, got });
+    };
+    // unconfirmed (QA's MUST): the chain's answer was lost after the send, so the trade may still land. The task
+    // stays open (Sent done, Landed doing), no failed buzz, the row stays the receipt with no chip; while it says so on
+    // screen the service looks at it again (RECHECK_MS, the Row's watch), and the row and the task end only as that answer says
+    const stillChecking = (rec: TradeRecord) => {
+      tasks?.update(taskId, { detail: "Not confirmed yet", steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "doing" }, { label: `In your ${CHAINS[r.chain].symbol} wallet`, state: "waiting" }] });
+      onState({ phase: "checking", at, got });
+      // followed until it ends, once (followRecord); the Row stops it if it goes first
+      follow.current = followRecord(svc, rec.id, (now) => {
+        follow.current = null;
+        const e2 = rowBuyEnd(now);
+        if (e2.phase === "landed") landed(now); else if (e2.phase === "refused") refused(now, e2.why);
+      });
+    };
     try {
       const p = await svc.quote("buy", r.chain, r.address, { usd: quick });
       await p.ready();
       const q = p.quote;
-      const got = `${fmtAmount(q.getRaw, q.decimals)} ${r.symbol}`;
+      got = `${fmtAmount(q.getRaw, q.decimals)} ${r.symbol}`;
       onState({ phase: "away", at, got });
       tasks?.publish({ id: taskId, title: `Buy $${quick} of ${r.symbol}`, open: { route },
         steps: [{ label: "Sent", state: "doing", at: taskAt }, { label: "Landed", state: "waiting" }, { label: `In your ${CHAINS[r.chain].symbol} wallet`, state: "waiting" }] });
       const rec = await svc.trade(p, `chip:${r.address}`);
-      const landed = (rec: TradeRecord) => {
-        const now = Date.now(), ms = performance.now() - at;
-        rowBuyLanded(tasks, taskId, { taskAt, now, wallet: `In your ${CHAINS[r.chain].symbol} wallet`, detail: landedDetail(secs(ms), rec, CHAINS[r.chain].name), proof: (rec.hashes ?? []).map((hash) => ({ chain: r.chain, hash })) });
-        whenCosted(svc.on, rec, () => void tasks?.update(taskId, { detail: landedDetail(secs(ms), rec, CHAINS[r.chain].name) }));
-        void feel.filled();
-        onState({ phase: "landed", at, got, ms });   // the Row keeps the state: this chip is gone the moment the row is the receipt
-      };
-      const refused = (rec: TradeRecord, why?: string) => {
-        tasks?.end(taskId, rec.status === "declined" ? "stopped" : "failed", why);
-        if (rec.status !== "declined") feel.failed();
-        onState({ phase: "refused", why, at, got });
-      };
       const end = rowBuyEnd(rec);
       if (end.phase === "landed") { landed(rec); return; }
       if (end.phase === "refused") { refused(rec, end.why); return; }
-      // unconfirmed (QA's MUST): the chain's answer was lost after the send, so the trade may still land. The task
-      // stays open (Sent done, Landed doing), no failed buzz, the row stays the receipt with no chip; the service looks at the
-      // record again (its resume on the next open) and the row and the task end only as that answer says
-      tasks?.update(taskId, { detail: "Sent · still checking", steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "doing" }, { label: `In your ${CHAINS[r.chain].symbol} wallet`, state: "waiting" }] });
-      onState({ phase: "checking", at, got });
-      let ended = false;   // two events can each start activity() before the follow is off: the end fires once
-      const off = svc.on(() => void svc.activity().then((all) => {
-        if (ended) return;
-        const now = all.find((x) => x.id === rec.id);
-        if (!now || now.status === "unconfirmed" || now.status === "confirming" || now.status === "sending" || now.status === "signing") return;
-        ended = true;
-        off();
-        follow.current = null;
-        const e2 = rowBuyEnd(now);
-        if (e2.phase === "landed") landed(now); else if (e2.phase === "refused") refused(now, e2.why);
-      }));
-      follow.current = off;   // the Row stops it if it goes first
+      stillChecking(rec);
     } catch (e) {
+      // the service throws a trade that may still land as its unconfirmed Problem (run()): the row follows it, never
+      // "Didn't buy" with the chip back 6 s later (a second buy would pay twice)
+      const rec = e instanceof ProblemError && e.problem.code === UNCONFIRMED ? await recordOf(svc, e.problem) : undefined;
+      if (rec) { stillChecking(rec); return; }
       const why = e instanceof ProblemError ? e.problem.whatHappened : "It didn't go through. Nothing moved.";
+      // an unseen trap coin refused by the quote: its row says "Not for sale" once the receipt line goes (the audit's note)
+      if (e instanceof ProblemError) markIfUnsellable(e.problem.code, r.chain, r.address);
       tasks?.end(taskId, "failed", why);
       feel.failed();
       onState({ phase: "refused", at, why });

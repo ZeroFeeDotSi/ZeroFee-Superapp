@@ -2,9 +2,10 @@
 // `spending.putAway`, docs/interfaces.md "Spending"). Top up: the Safe → Spending, one Approve sheet and one Face ID; the
 // cap, the $2 floor, the Safe's Face ID band and the coin that pays are the engine's, checked before the sheet. Put away:
 // Spending's cash → the Safe, no sheet; coins stay until sold. Both say an honest time.
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { runJob } from "@zerofee/shell-api/job-run.ts";
+import { topUpAsk, topUpEnded } from "@zerofee/shell-api/topup-ask.ts";
 import { JobReceipt } from "@zerofee/wallet/app/money/JobMade.tsx";
 import { ActMove } from "@zerofee/wallet/app/icons.tsx";
 import { LEG_SEC } from "@zerofee/wallet/app/screens/move-split.ts";
@@ -46,18 +47,24 @@ export function AddSheet({ onClose, onProblem }: { onClose: () => void; onProble
   const [declined, setDeclined] = useState(false);
   /** The job is made at the tap (rule 2: "Job created." and its time left, never "Moving…"): its dollars. */
   const [made, setMade] = useState<string | null>(null);
+  /** The job its receipt follows (runJob's made): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [madeJob, setMadeJob] = useState<string | null>(null);
+  // the job's own key per amount (the audit's SHOULD, 7 Nov: topUpAsk): the core's approval.asked and job.signed name it
+  const keys = useRef(new Map<string, string>());
   const topUp = async () => {
     const amount = `$${Number(shown).toFixed(2)}`;
+    const ask = topUpAsk(keys.current, shown, "trade-topup");
     setBusy(true); setDeclined(false);
     try {
       // made at the tap; the Safe still asks Face ID for its signature, and a No or a refusal before the yes takes the
       // job away again (runJob)
       const end = await runJob<SpendingActivity | { declined: true }>({
         tasks, title: `Move ${amount} to your NEAR wallet`, usd: amount, etaSec: LEG_SEC.nearOut, safe: true, money: ["safe"],
-        call: () => bridge.call<SpendingActivity | { declined: true }>("spending.topUp", { usd: shown }),
+        call: () => bridge.call<SpendingActivity | { declined: true }>("spending.topUp", ask.params), key: ask.key,
         declined: (r) => "ok" in r && "declined" in r.ok,
-        made: () => { setMade(amount); setBusy(false); },
+        made: (j) => { setMadeJob(j.id); setMade(amount); setBusy(false); },
       });
+      topUpEnded(keys.current, ask.params.usd, end);
       if ("declined" in end) { setMade(null); setDeclined(true); return; }
       if ("refused" in end) {
         setMade(null);
@@ -81,7 +88,7 @@ export function AddSheet({ onClose, onProblem }: { onClose: () => void; onProble
   if (made !== null) {
     return (
       <Sheet title="Move to your NEAR wallet" onClose={onClose}>
-        <JobReceipt amount={made} icon={<ActMove />} testid="trade-add-made" etaSec={LEG_SEC.nearOut} through={null} onDone={onClose} />
+        <JobReceipt amount={made} icon={<ActMove />} testid="trade-add-made" etaSec={LEG_SEC.nearOut} through={null} job={madeJob} onDone={onClose} />
       </Sheet>
     );
   }
@@ -111,6 +118,8 @@ export function TakeOutSheet({ onClose, onProblem }: { onClose: () => void; onPr
   const [busy, setBusy] = useState(false);
   /** The job is made at the tap (rule 2): its dollars, and the sheet says "Job created." with its time left. */
   const [made, setMade] = useState<string | null>(null);
+  /** The job its receipt follows (runJob's made): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [madeJob, setMadeJob] = useState<string | null>(null);
   // what can go home now: Spending's cash (coins stay until sold, and a wallet holding coins keeps its fee)
   const total = snap.takeableUsd;
   const want = all ? total : Math.min(total, Number(value) || 0);
@@ -124,7 +133,7 @@ export function TakeOutSheet({ onClose, onProblem }: { onClose: () => void; onPr
         tasks, title: `Move ${amount} to your Safe`, usd: amount, etaSec: LEG_SEC.nearToSafe, safe: false, money: ["row:near"],
         call: () => bridge.call<SpendingActivity>("spending.putAway", { usd: all ? "all" : want.toFixed(2) }),
         declined: () => false,
-        made: () => { setMade(amount); setBusy(false); },
+        made: (j) => { setMadeJob(j.id); setMade(amount); setBusy(false); },
       });
       if ("refused" in end) { setMade(null); await onProblem(end.refused); return; }
       // refused once the job existed: its row says why (said once); the receipt stays until Done
@@ -137,7 +146,7 @@ export function TakeOutSheet({ onClose, onProblem }: { onClose: () => void; onPr
   if (made !== null) {
     return (
       <Sheet title="Move to your Safe" onClose={onClose}>
-        <JobReceipt amount={made} icon={<ActMove />} testid="trade-takeout-made" etaSec={LEG_SEC.nearToSafe} through={null} onDone={onClose} />
+        <JobReceipt amount={made} icon={<ActMove />} testid="trade-takeout-made" etaSec={LEG_SEC.nearToSafe} through={null} job={madeJob} onDone={onClose} />
       </Sheet>
     );
   }

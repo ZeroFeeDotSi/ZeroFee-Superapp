@@ -97,3 +97,42 @@ export function fundLines(): { what: string[]; cost: string[]; who: string[] } {
     ],
   };
 }
+
+/** The funding page as the copy review graded it (7 Nov): the amounts first, under the title; then three plain lines (the copy review's words), and
+ *  everything else behind one tap ("How is this priced?", the copy review's label): the model's price, who is paid, the wallet's rule. */
+export const FUND_DETAILS_LABEL = "How is this priced?";
+/** the copy review's words (7 Nov) where the money comes from the Safe (the Sim's funding, setPocket): never "AgentZero never spends
+ *  from your Safe" over a receipt that says "From your Safe". */
+export const FROM_SAFE_LINE = "You add money from your Safe. AgentZero spends only what is in its own wallet.";
+/** `fromSafe`: this page's Add takes the money from the Safe (pocketHere); else from the NEAR wallet (a real account's
+ *  fill), and the wallet's own rule stays. */
+export function fundPage(fromSafe = false): { lines: string[]; details: string[] } {
+  const w = fundLines();
+  return {
+    lines: ["AgentZero spends only what you put here.", w.cost[0]!, "You can take it back any time."],
+    details: [fromSafe ? FROM_SAFE_LINE : w.what[2]!, ...w.cost.slice(1), ...w.who],
+  };
+}
+
+/** A funding's receipt says the money is in AgentZero's wallet only once a read of the wallet shows it (copy review, 7 Nov: "only
+ *  when it did land, a read proves it"): the limit read back holds the amount asked. Unread, or less: not shown. */
+export const fundShows = (askedUsd: number, readUsd: number | null | undefined): boolean =>
+  typeof readUsd === "number" && Number.isFinite(readUsd) && Number.isFinite(askedUsd) && askedUsd > 0 && readUsd >= askedUsd - 0.005;
+
+/** the audit's SHOULD (7 Nov): the core said done but the first read doesn't show the amount yet. Read again every
+ *  FUND_READ_EVERY_MS until the job's estimate plus FUND_READ_SLACK_MS (10 s + 20 s for the Safe's funding: at most about
+ *  15 reads over 30 s), then "slow": the receipt shows the slow face and where the money is, never "It keeps going" for
+ *  ever. `first`: what the read after "done" showed. The clock is passed in (tests inject it). */
+export const FUND_READ_EVERY_MS = 2_000;
+export const FUND_READ_SLACK_MS = 20_000;
+export async function readUntilShown(askedUsd: number, first: number | null | undefined, read: () => Promise<number | null | undefined>, endsAt: number, clock: { now: () => number; sleep: (ms: number) => Promise<void> }): Promise<"shown" | "slow"> {
+  let seen = first;
+  for (;;) {
+    if (fundShows(askedUsd, seen)) return "shown";
+    if (clock.now() + FUND_READ_EVERY_MS > endsAt + FUND_READ_SLACK_MS) return "slow";
+    await clock.sleep(FUND_READ_EVERY_MS);
+    seen = await read().catch(() => undefined);
+  }
+}
+/** The slow face's line (provisional): where the money is, by name. */
+export const fundSlowLine = (usd: string): string => `${usd} isn't in AgentZero's wallet yet. Home shows where your money is.`;

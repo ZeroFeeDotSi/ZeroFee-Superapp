@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { taskStore, type Task } from "@zerofee/shell-api/tasks.ts";
 import { JOB_WORDS } from "@zerofee/shell-api/job-start.ts";
 import { runJob } from "@zerofee/shell-api/job-run.ts";
+import { pendingShown } from "@zerofee/shell-api/approval-answered.ts";
 import { LEG_SEC } from "./move-split.ts";
 
 const store = taskStore();
@@ -38,7 +39,7 @@ test("each screen's receipt says \"Job created.\" with the route's time left (co
   assert.match(sp, /<JobMade title="Move to your Safe"[^\n]*testid="putaway-made" etaSec=\{LEG_SEC\.nearToSafe\}/);
   assert.match(SCREENS.addTakeOut, /<JobReceipt[^\n]*testid="trade-add-made" etaSec=\{LEG_SEC\.nearOut\}/);
   assert.match(SCREENS.addTakeOut, /<JobReceipt[^\n]*testid="trade-takeout-made" etaSec=\{LEG_SEC\.nearToSafe\}/);
-  assert.match(SCREENS.shortChain, /\{JOB_WORDS\.created\}<\/p><TimeLeft etaSec=\{LEG_SEC\.nearOut\} \/>/);
+  assert.match(SCREENS.shortChain, /\{JOB_WORDS\.created\}<\/p><TimeLeft etaSec=\{LEG_SEC\.nearOut\} job=\{madeJob\} \/>/);
   // the Safe's top ups ask Face ID on their signature: safe: true, the Safe's money claimed
   assert.match(sp, /safe: true, money: \["safe"\],\n\s+call: \(\) => bridge\.call<[^>]+>\("spending\.topUp"/);
   assert.match(SCREENS.addTakeOut, /safe: true, money: \["safe"\]/);
@@ -51,26 +52,38 @@ test("each screen's receipt says \"Job created.\" with the route's time left (co
   assert.match(src("../money/JobMade.tsx"), /through = THROUGH_CONFIDENTIAL/);
 });
 
-test("Spending's Move to your NEAR wallet, as it runs: the job is on Home at the tap with \"Approve on your iPhone\" and the route's time while the core hasn't answered; a No takes it away (control: before the tap, no job)", async () => {
+test("Spending's Move to your NEAR wallet, as it runs (one Face ID, 6 Nov): \"Check this\" at the tap, the job on Home with the route's time on the Safe's signature, already Approved, while the core hasn't answered; a No makes nothing (control: before the tap, no job)", async () => {
   clear();
   assert.equal(jobs().length, 0, "control: nothing before the tap");
   let made = 0;
-  let answer!: (r: { ok: { declined: true } }) => void;
+  let answer!: (r: { ok: { declined: true } | { id: string } }) => void;
+  let signed: (() => void) | undefined;
   const go = runJob<{ declined: true } | { id: string }>({
     tasks, title: "Move $20.00 to your NEAR wallet", usd: "$20.00", etaSec: LEG_SEC.nearOut, safe: true, money: ["safe"],
     call: () => new Promise((r) => { answer = r; }),
     declined: (r) => "ok" in r && "declined" in r.ok,
-    made: () => { made++; }, onApproval: quiet,
+    made: () => { made++; }, onApproval: quiet, onSigned: (fn) => { signed = fn; return () => { signed = undefined; }; },
   });
   await flush();
-  assert.equal(made, 1, "Job created. at the tap");
+  assert.equal(made, 0, "not at the tap: the Safe's Face ID first");
+  assert.equal(pendingShown()?.headline, "Move $20.00 to your NEAR wallet", "Check this is up instead");
+  signed!();
+  assert.equal(made, 1, "Job created. on the signature");
   const [j] = jobs();
   assert.equal(j?.title, "Move $20.00 to your NEAR wallet");
-  assert.equal(j?.steps[0]?.label, JOB_WORDS.approve, "the Safe's Face ID first, never money moving before it");
-  answer({ ok: { declined: true } });
-  const end = await go;
-  assert.ok("declined" in end && end.after, "the No takes the job made at the tap away");
-  assert.equal(jobs().length, 0);
+  assert.equal(j?.steps[0]?.label, JOB_WORDS.approved, "already approved: never money moving before the signature");
+  assert.ok(j?.endsAt, "the route's time");
+  answer({ ok: { id: "m1" } });
+  await go;
+  // a No: nothing made, nothing listed
+  clear();
+  let answer2!: (r: { ok: { declined: true } }) => void;
+  let made2 = 0;
+  const go2 = runJob<{ declined: true } | { id: string }>({ tasks, title: "Move $20.00 to your NEAR wallet", safe: true, money: ["safe"], call: () => new Promise((r) => { answer2 = r; }), declined: (r) => "ok" in r && "declined" in r.ok, made: () => { made2++; }, onApproval: quiet, onSigned: () => () => {} });
+  await flush();
+  answer2({ ok: { declined: true } });
+  assert.deepEqual(await go2, { declined: true, after: false });
+  assert.deepEqual([made2, jobs().length], [0, 0]);
 });
 
 test("Move to your Safe, as it runs: made at the tap with no approval step, even when the core never answers (control: a second tap on the same money is refused before any call)", async () => {

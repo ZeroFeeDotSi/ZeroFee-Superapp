@@ -67,7 +67,7 @@ test("last used, in words", () => {
 test("Settings → Passwords: the row opens the screen on the phone, says 'On the phone only.' in a browser", () => {
   const src = readFileSync(new URL("../shell/SettingsPanel.tsx", import.meta.url), "utf8");
   assert.match(src, /logins = loginsClient\(iosHost\(\)\)/);
-  assert.match(src, /LOGINS_ON_PHONE_ONLY/);
+  assert.match(src, /setPasswordsOnIphone\(true\)/, "the copy review's #7 (7 Nov): a browser's row opens its On iPhone page");
   assert.match(src, /<PasswordsScreen client=\{logins\}/);
 });
 

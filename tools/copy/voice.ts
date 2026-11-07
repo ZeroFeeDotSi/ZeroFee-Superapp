@@ -39,6 +39,8 @@ export const BANNED: Banned[] = [
   // Product decision, 5 Nov is a banned phrase; AgentZero's money is "AgentZero's wallet", a site's is "your pump.fun wallet"
   { re: /\bpocket[ -]money\b/i, word: "pocket money", say: "AgentZero's wallet, or the site's wallet by name" },
   { re: /\bApp Store\b/, word: "App Store (for Apps)", say: "Apps" },
+  // the copy review (7 Nov): the place is "Private", in every step, row, page and receipt ("Leaving Private"), never "private balance"
+  { re: /\bprivate balances?\b/i, word: "private balance", say: "Private" },
   { re: /[A-Za-z)]!(\s|$)/, word: "exclamation mark", say: "a full stop" },
   // B28 R5 (product decision, 2 Nov): blame by name, the money line always. ZeroFee never says "we can't reach" or "we couldn't"
   // (it puts the fault on ZeroFee and names nothing), never "something went wrong", and never "the service that holds
@@ -77,6 +79,9 @@ export const ALLOWED: { file: RegExp; text: RegExp; why: string }[] = [
   // The product beta note in the terms (5 Nov late): "first release" means this first version of ZeroFee, not a contract
   // release; only these two lines in terms.ts.
   { file: /apps\/web\/src\/terms\.ts$/, text: /^First release\. Use small amounts\.$|^This is the first release\. Use small amounts while you try it\.$/, why: "the product beta note: ZeroFee's first version (5 Nov)" },
+  // The core's own sheet and refusal words (7 Nov): their move to "Private" is a core change, so it is the audit's to review
+  // (money path); listed for it by line. Only the core: every other file is held to the ban.
+  { file: /^packages\/core\/src\//, text: /private balances?/i, why: "the core's words, awaiting the audit's review (7 Nov)" },
   // A bug report line for ZeroFee, shown behind Details: the code is the point of it.
   { file: /./, text: /^Details for ZeroFee/, why: "bug-report line, by design" },
   // Key-derivation constants (BIP32's "Bitcoin seed", the Spending wallets' passphrase): bytes that make keys, never shown.
@@ -92,6 +97,9 @@ export const ALLOWED: { file: RegExp; text: RegExp; why: string }[] = [
   { file: /packages\/shell-api\/src\/job-steps\.ts$/, text: /^NEAR Intents$/, why: "Jobs name the protocol doing the work (product decision, 5 Nov)" },
   // the audit's privacy ruling (5 Nov): PRIVATE_SEEN names who sees every payment, by the name people can look up; never "private from everyone".
   { file: /packages\/wallet\/src\/app\/format\.ts$/, text: /^Private from the public, except the money going in and coming out\. NEAR Intents sees every payment\.$/, why: "the honest privacy line names who sees, the whole sentence only (audit)" },
+  // the copy review's words for separate steps on one Safe sheet (B3, 7 Nov): step 1 names the protocol that takes the money, by name
+  // (product decision, 5 Nov: name the protocol, "they"); the whole numbered sentence only, in the core's words, the Sim and the gallery.
+  { file: /(packages\/core\/src\/words|packages\/shell-api\/src\/MockBridge|apps\/web\/src\/gallery\/Screens)\.tsx?$/, text: /^1\. Your Safe lets NEAR Intents take \S+ in \S+\.$/, why: "the copy review's step-1 line names who takes the money, the whole sentence only (B3)" },
   // Send's NEAR line (build, 5 Nov): a balance held in NEAR Intents lands as wNEAR; the product's name is how that form is told.
   { file: /packages\/wallet\/src\/send-reach\.ts$/, text: /^Lands as wNEAR, the NEAR Intents form of NEAR\.$/, why: "names the form wNEAR is, by the product's own name, the whole sentence only" },
   // D98 (QA): AgentZero's receipt for a Chat request it paid privately names the route people can look up, once.

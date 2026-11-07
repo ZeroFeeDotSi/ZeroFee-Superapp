@@ -133,7 +133,7 @@
 /* the address row: two plain links side by side, each a 44 pt target */
 .cp .cp-addr { align-items: center; padding: 0; }
 .cp .cp-addr > span:last-child { display: flex; gap: 16px; }
-.cp .cp-addr .tr-copy { min-height: 44px; min-width: 0; padding: 0; font: 400 14.5px/1.2 var(--font); color: var(--ink); }
+.cp .cp-addr .tr-copy { min-height: 44px; min-width: 44px; padding: 0; font: 400 14.5px/1.2 var(--font); color: var(--ink); }
 .cp .cp-addr > span:first-child { padding: 11px 0; }
 .cp .tr-sizes button { min-height: 44px; padding: 0; }
 .cp .tr-trades-head { align-items: center; }
@@ -170,3 +170,8 @@
    concept's rect 18 at 56 pt (the lit Buy and the quiet Sell, one shape for one meaning) */
 .cp .tr-price, .cp .cp-move, .cp .cp-stat b, .cp .cp-hold-v, .cp .cp-chip b, .cp .cp-trades24 { font-family: var(--font-money, var(--font)); font-variant-numeric: tabular-nums; }
 .cp .tr-coin-floor .zf-btn, .cp .tr-coin-floor .tr-btn2 { height: 56px; border-radius: var(--r-cmd, 18px); }
+/* 53, 6 Nov, item 10 (fix/trade-list-coin): "Now" beside a price no finger is on, quiet, where "Live" sits on a live feed */
+.cp .cp-now { color: var(--mute); }
+/* the copy review's final words (7 Nov, T2): the plain labels ("Money in the pool", "Traded in the last day") wrap to two lines whole,
+   never cut with an ellipsis */
+.cp .cp-stat .zf-small { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }

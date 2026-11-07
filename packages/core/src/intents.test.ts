@@ -489,33 +489,33 @@ test("a move into Private: \"Move … to Private\" from the core's own quote, ou
   await refuse(quote({ ...into, recipient: "e".repeat(64), refundTo: "e".repeat(64) }, { amountIn: "10000000", minAmountOut: "9900000" }), plain, "not the pocket");
 });
 
-test("Sim re-check (QA, 5 Nov): the fill sheet's Private line is what Private really pays. $50 with $15 of Private's USDC: the Safe fills $40, Private falls $10 (the sheet said $15); $9.74 with $5: the Safe fills $10, Private rises $0.26 (the sheet said $5); the lines add up in cents, a $0 line left out; control: the old gross share is never said", async () => {
-  const { splitLines } = await import("./private-route.ts");
+test("Sim re-check (QA, 5 Nov), in the copy review's rows (7 Nov): the fill sheet's Private line is what Private really pays. $50 with $15 of Private's USDC: the Safe fills $40, Private falls $10 (the sheet said $15); $9.74 with $5: the Safe fills $10, Private rises $0.26 (the sheet said $5); the rows add up in cents to what the wallet gets, a $0 row left out; control: the old gross share is never said", async () => {
+  const { fillRows } = await import("./private-route.ts");
   const say = (c: bigint) => `$${(c / 100n).toString()}.${String(c % 100n).padStart(2, "0")}`;
   // the ledger's own sums as it pays: Private's share, then the fill's payout; the fill lands in Private first
   const privateChange = (move: number, fill: number) => Math.round((fill - move) * 100);
-  const big = splitLines(5000n, 4000n, say);
-  assert.deepEqual(big, ["From Private · $10.00", "From your Safe · $40.00", "Together · $50.00"]);
+  const big = fillRows(5000n, 4000n, "your SOL wallet", say);
+  assert.deepEqual(big, ["Your SOL wallet gets · $50.00", "From your Safe · $40.00", "From Private · $10.00", "Fee · $0.00"]);
   assert.equal(privateChange(50, 40), -1000, "Private really falls $10.00");
   assert.ok(!big.some((l) => /\$15\.00|\$5\.00/.test(l)), "control: never the gross $15 nor a $5 that stays");
-  const small = splitLines(974n, 1000n, say);
-  assert.deepEqual(small, ["From your Safe · $10.00", "Stays in Private · $0.26", "Together · $9.74"]);
+  const small = fillRows(974n, 1000n, "your SOL wallet", say);
+  assert.deepEqual(small.slice(0, 3), ["Your SOL wallet gets · $9.74", "From your Safe · $10.00", "Private keeps the rest · about $0.26"]);
   assert.equal(privateChange(9.74, 10), 26, "Private really rises $0.26");
-  assert.ok(!small.some((l) => /From Private/.test(l)), "control: Private pays nothing, so no From Private line");
+  assert.ok(!small.some((l) => /From Private/.test(l)), "control: Private pays nothing, so no From Private row");
   const c = (l: string) => Math.round(Number(l.split("$")[1]) * 100);
   for (const [lines, typed] of [[big, 5000], [small, 974]] as const) {
     const get = (k: string) => lines.filter((l) => l.startsWith(k)).reduce((n, l) => n + c(l), 0);
-    assert.equal(get("From Private") + get("From your Safe") - get("Stays in Private"), get("Together"), "the lines add up");
-    assert.equal(get("Together"), typed);
+    assert.equal(get("From Private") + get("From your Safe") - get("Private keeps the rest") - get("Fee"), get("Your SOL wallet gets"), "the rows add up");
+    assert.equal(get("Your SOL wallet gets"), typed);
   }
-  assert.deepEqual(splitLines(3000n, 3000n, say), ["From your Safe · $30.00", "Together · $30.00"], "the fill is the Move: both $0 lines left out");
+  assert.deepEqual(fillRows(3000n, 3000n, "your SOL wallet", say), ["Your SOL wallet gets · $30.00", "From your Safe · $30.00", "Fee · $0.00"], "the fill is the leg: no Private row, no why; the Fee row on every sheet (J2-2)");
 });
 
 test("the ruling (the audit and the copy review, 5 Nov): a Move's fill sheet is titled by the Move's own figure and wallet, \"Move $30.00 to your SOL wallet\", then From Private, From your Safe (the bytes' amountIn, the only Safe figure), Stays in Private and Together, which add up; Private's line not known: \"Your Safe adds $20.00 to Private first.\" (controls: a payee ownPayee didn't pass, or no record: the bytes' own title; an app's figure never shown; another coin; no marker: no block)", async () => {
   const POCKET = "a1".repeat(32), SOLW = "So1aWa11et1111111111111111111111111111111111";
   const own = new Map([[POCKET, PRIVATE_POCKET], [SOLW, "your SOL wallet"]]);
   const into = { originAsset: `nep141:${USDC}`, destinationAsset: `nep141:${USDC}`, recipient: POCKET, recipientType: "CONFIDENTIAL_INTENTS", refundTo: POCKET, refundType: "CONFIDENTIAL_INTENTS", depositType: "ORIGIN_CHAIN" };
-  const block = (lines: string[]) => lines.filter((l) => /^(From Private|From your Safe|Stays in Private|Together) · /.test(l));
+  const block = (lines: string[]) => lines.filter((l) => /^(Your \S+.* gets|From Private|From your Safe|Private keeps the rest|Stays in Private|Together) · /.test(l));
   type Leg = { tokenId: string; units?: string; payUnits?: string; recipient?: string; own?: boolean };
   const sheet = async (o: { units?: string; leg?: Leg | null; extra?: Record<string, unknown> }) => {
     const units = o.units ?? "20000000";
@@ -529,14 +529,15 @@ test("the ruling (the audit and the copy review, 5 Nov): a Move's fill sheet is 
   assert.equal(both.title, "Move $30.00 to your SOL wallet", "the Move's own figure and its wallet");
   // Sim re-check (5 Nov): Private's line is what Private really pays, the Move less the Safe's fill ($30 - $20), never
   // its gross share ($12.50, of which $2.50 came back from the fill)
-  assert.deepEqual(block(both.lines), ["From Private · $10.00", "From your Safe · $20.00", "Together · $30.00"], String(both.lines));
+  assert.deepEqual(block(both.lines), ["Your SOL wallet gets · $30.00", "From your Safe · $20.00", "From Private · $10.00"], String(both.lines));
   assert.deepEqual(both.lines.slice(0, 3), block(both.lines), "the block right under the title, never folded away");
   assert.deepEqual(both.asked, [DEPOSIT], "Private's leg read by this very move in's address");
   const cents = block(both.lines).map((l) => Math.round(Number(l.split("$")[1]) * 100));
-  assert.equal(cents[0]! + cents[1]!, cents[2]!, "Private + Safe = Together");
+  assert.equal(cents[1]! + cents[2]!, cents[0]!, "Safe + Private = what the wallet gets");
   assert.equal(cents[1]!, 2000, "the Safe's line is the bytes' amountIn (20 USDC)");
   assert.equal(both.lines.filter((l) => /Safe/.test(l) && /\$\d/.test(l)).length, 1, "the only Safe figure on the sheet");
-  assert.equal(both.lines[3], "Anyone can see the Safe's part.", "then who can see what");
+  assert.equal(both.lines[3], "Fee · $0.00", "the Fee row on every sheet (J2-2)");
+  assert.equal(both.lines[4], "Anyone can see the Safe's part.", "then who can see what");
   assert.equal(both.amountSaid, true, "the block says the Safe's figure: no Amount line over it (one amount, said once)");
   // the audit's condition: with "Amount:" gone, the Safe's signed figure (the bytes' amountIn, 20 USDC) is still on the sheet,
   // as the From your Safe line; and the line hides only while that is so (sheet-amount.ts, the phone's SheetWords.swift)
@@ -546,7 +547,7 @@ test("the ruling (the audit and the copy review, 5 Nov): a Move's fill sheet is 
   assert.equal(amountLine({ amount: both.amount, amountSaid: true, lines: both.lines.filter((l) => !l.startsWith("From your Safe")) }), both.amount, "control: no line says it, the Amount line stays");
   assert.equal(amountLine({ amount: both.amount, lines: both.lines }), both.amount, "control: no flag, the Amount line stays");
   const big = await sheet({ units: "40000000", leg: { tokenId: `nep141:${USDC}`, units: "15000000", payUnits: "35000000", recipient: SOLW, own: true }, extra: { moveFill: true } });
-  assert.deepEqual(block(big.lines), ["From Private · $10.00", "From your Safe · $40.00", "Together · $50.00"], "QA's $50 case from the bytes");
+  assert.deepEqual(block(big.lines), ["Your SOL wallet gets · $50.00", "From your Safe · $40.00", "From Private · $10.00"], "QA's $50 case from the bytes");
   assert.equal(amountLine({ amount: big.amount, amountSaid: big.amountSaid, lines: big.lines }), null);
   const alone2 = await sheet({ extra: { moveFill: true } });
   assert.equal(amountLine({ amount: alone2.amount, amountSaid: alone2.amountSaid, lines: alone2.lines }), null, "the one-line form says the bytes' $20.00 too");
@@ -555,10 +556,11 @@ test("the ruling (the audit and the copy review, 5 Nov): a Move's fill sheet is 
   assert.ok(both.lines.includes("Send 20 USDC from your Safe to the swap service"), "the signed amount line stays");
   // nothing stays: no Stays line, still adds up
   const exact = await sheet({ leg: { ...leg, payUnits: "20000000" }, extra: { moveFill: true } });
-  assert.deepEqual([exact.title, block(exact.lines)], ["Move $32.50 to your SOL wallet", ["From Private · $12.50", "From your Safe · $20.00", "Together · $32.50"]]);
-  // Private paid none (Private's line not known): the title and the Safe's one line
+  assert.deepEqual([exact.title, block(exact.lines)], ["Move $32.50 to your SOL wallet", ["Your SOL wallet gets · $32.50", "From your Safe · $20.00", "From Private · $12.50"]]);
+  // Private paid none (copy review, 7 Nov): what the wallet gets, the Safe's step, what stays and why (audit, 7 Nov: the quote promises
+  // only its minimum, so what stays is about)
   const solo = await sheet({ units: "10000000", leg: { tokenId: `nep141:${USDC}`, payUnits: "6000000", recipient: SOLW, own: true }, extra: { moveFill: true } });
-  assert.deepEqual([solo.title, solo.lines[0], block(solo.lines)], ["Move $6.00 to your SOL wallet", "Your Safe adds $10.00 to Private first.", []]);
+  assert.deepEqual([solo.title, block(solo.lines), solo.lines[3]], ["Move $6.00 to your SOL wallet", ["Your SOL wallet gets · $6.00", "From your Safe · $10.00", "Private keeps the rest · about $4.00"], "Fee · $0.00"]);
   // controls: ownPayee didn't pass, or the core's list doesn't name it: the bytes' own title, never a name
   const outside = await sheet({ leg: { ...leg, own: false }, extra: { moveFill: true } });
   assert.equal(outside.title, "Move $20.00 to Private", "a payee ownPayee didn't pass: the bytes' own title");
@@ -583,7 +585,7 @@ test("hotfix (Train 19's one bridge leg): a Move's fill paid by ONE mt_transfer 
   const own = new Map([[POCKET, PRIVATE_POCKET], [SOLW, "your SOL wallet"]]);
   // subwallets privateQuoteIn with `intents` (Train 19): the pocket is recipient and refund, the deposit taken INTENTS
   const into = { originAsset: `nep141:${USDC}`, destinationAsset: `nep141:${USDC}`, recipient: POCKET, recipientType: "CONFIDENTIAL_INTENTS", refundTo: POCKET, refundType: "CONFIDENTIAL_INTENTS", depositType: "INTENTS" };
-  const block = (lines: string[]) => lines.filter((l) => /^(From Private|From your Safe|Stays in Private|Together) · /.test(l));
+  const block = (lines: string[]) => lines.filter((l) => /^(Your \S+.* gets|From Private|From your Safe|Private keeps the rest|Stays in Private|Together) · /.test(l));
   const leg = { tokenId: `nep141:${USDC}`, units: "12500000", payUnits: "17500000", recipient: SOLW, own: true };
   // to-private.ts on main: convert.ts mtTransfer({ to: depositAddress, tokenId, units }), one action on intents.near
   const sheet = async (o: { q?: Record<string, unknown>; wallets?: Map<string, string>; sent?: { token_id?: string; amount?: string }; extra?: Record<string, unknown> } = {}) => {
@@ -593,7 +595,7 @@ test("hotfix (Train 19's one bridge leg): a Move's fill paid by ONE mt_transfer 
   };
   const w = await sheet();
   assert.equal(w.title, "Move $30.00 to your SOL wallet", String(w.lines));
-  assert.deepEqual(block(w.lines), ["From Private · $10.00", "From your Safe · $20.00", "Together · $30.00"], String(w.lines));
+  assert.deepEqual(block(w.lines), ["Your SOL wallet gets · $30.00", "From your Safe · $20.00", "From Private · $10.00"], String(w.lines));
   assert.ok(w.amount && w.tap === undefined, "money leaves on this sheet: Face ID's");
   // the Private screen's own move in on this route (no marker): accepted, its own title
   assert.match((await sheet({ extra: {} })).title, /^Move .+ to your private balance$/);
@@ -761,7 +763,7 @@ test("product decision (5 Nov), QA's MUSTs 1 and 4: a Send's fill sheet is ONE F
   const payout = { recipient: PAYEE, recipientType: "DESTINATION_CHAIN", originAsset: `nep141:${USDC}`, destinationAsset: "nep141:sol.omft.near", amountIn: "250000000", amountOut: "1234567890", amountInUsd: "250.00", amountOutUsd: "247.5" };
   // the UI lead's ruling (5 Nov): this sheet's legs are "They get", "Your Safe sends", "Stays in Private"; the old
   // words are matched too, so a sheet still saying them fails below
-  const block = (lines: string[]) => lines.filter((l) => /^(They get|Your Safe sends|From Private|From your Safe|Stays in Private|Together|Fees) · /.test(l));
+  const block = (lines: string[]) => lines.filter((l) => /^(They get|Your Safe sends|From Private|From your Safe|Private keeps the rest|Stays in Private|Together|Fees) · /.test(l));
   // the core's own tag (bind-intent, demo-core intentOf): the move in its private.quoteIn door asked is a "move"
   const sheet = async (o: { units?: string; out?: typeof payout | null; extra?: Record<string, unknown>; tag?: "swap" | "move" | null; unnamed?: true }) => {
     const units = o.units ?? "300000000";
@@ -774,30 +776,35 @@ test("product decision (5 Nov), QA's MUSTs 1 and 4: a Send's fill sheet is ONE F
   const { w, asked } = await sheet({});
   // the UI lead's rulings (5 Nov) and QA's Sim walk: ONE "They get" line, the signed coin figure (the audit's MUST 4) then what
   // it is worth to them (the signed amountOutUsd) in brackets; the network fees named last
-  assert.deepEqual(block(w.lines), ["They get · 1.2345 SOL ($247.50)", "Your Safe sends · $300.00", "Stays in Private · $50.00", "Fees · about $2.50"], String(w.lines));
+  assert.deepEqual(block(w.lines), ["They get · 1.2345 SOL (about $247.50)", "From your Safe · $300.00", "Private keeps the rest · about $50.00", "Fees · about $2.50"], String(w.lines));
   const cents = block(w.lines).map((l) => Math.round(Number(l.split("$").at(-1)!.replace(")", "")) * 100));
   const T = 25000; // the payout's amountIn, what leaves Private: $250.00
   assert.equal(cents[1], cents[2]! + T, "the lines add up: the Safe's figure is what stays plus what goes (Y = Z + T)");
   assert.ok(Math.abs(cents[0]! + cents[3]! - T) <= 1, "They get's dollars + the network fees = T (within a cent)");
   assert.equal(w.lines.filter((l) => /They get/.test(l)).length, 1, `"They get" said exactly once: ${String(w.lines)}`);
-  assert.ok(!w.lines.some((l) => /^(Together|From your Safe) · /.test(l)), "no \"Together\" and no \"From your Safe\" on a Send's fill sheet");
+  assert.ok(!w.lines.some((l) => /^(Together|Your Safe sends) · /.test(l)), "no \"Together\"; J2-2 (copy review, 8 Nov): the Safe's row is \"From your Safe\", as on every Check-this");
   // every outside sheet: the full address first, unfolded, then where it lands (the audit's D37 condition, the copy review's words)
-  assert.deepEqual(w.lines.slice(0, 2), [`To ${PAYEE}`, "Public on Solana."], String(w.lines));
+  assert.deepEqual(w.lines.slice(0, 2), [`To ${PAYEE}`, "Public on Solana. Anyone can see the Safe's part on NEAR."], String(w.lines)); // the copy review (6 Nov): one public line
   assert.ok(!(w.details ?? []).some((d) => d.lines.includes(PAYEE)), "control: never inside a folded detail");
   assert.ok(!w.lines.some((l) => l.includes("…")), "control: no short form on the sheet");
   assert.ok(w.lines.some((l) => l.startsWith("They get · 1.2345 SOL ")), `what they get: the payout's signed amountOut (MUST 4), 4 places down from 1.23456789: ${String(w.lines)}`);
   assert.equal(w.title, "Send $250.00 from your Safe");
   assert.deepEqual(asked, [DEPOSIT], "the payout read by this very move in's address");
   assert.ok(w.amount && w.tap === undefined, "money leaves on this sheet: Face ID's (no tap)");
+  // the copy review's ruling (6 Nov): a public payee's Check this is these lines and nothing else (no Private explainer, no second
+  // "who can see" line, no refund or receipt line); control: a payee paid into their private balance keeps them
+  assert.deepEqual(w.lines, [`To ${PAYEE}`, "Public on Solana. Anyone can see the Safe's part on NEAR.", "They get · 1.2345 SOL (about $247.50)", "From your Safe · $300.00", "Private keeps the rest · about $50.00", "Fees · about $2.50", "NEAR Intents and the network keep this. ZeroFee takes nothing.", "From alice.near. Fee: at most 0.007 NEAR."], String(w.lines)); // the gas line every NEAR sheet carries
+  const priv = await sheet({ out: { ...payout, recipientType: "CONFIDENTIAL_INTENTS" } });
+  assert.deepEqual([priv.w.lines[1], priv.w.lines[2], priv.w.lines.includes("Anyone can see the Safe's part.")], ["Private.", "Private is your money inside NEAR Confidential. Moves pay from it. The public can't see what's in it.", true], String(priv.w.lines));
   // the whole fill goes: no Stays line
   const exact = await sheet({ units: "250000000" });
-  assert.deepEqual(block(exact.w.lines), ["They get · 1.2345 SOL ($247.50)", "Your Safe sends · $250.00", "Fees · about $2.50"]);
+  assert.deepEqual(block(exact.w.lines), ["They get · 1.2345 SOL (about $247.50)", "From your Safe · $250.00", "Fees · about $2.50"]);
   // control: a zero-fee quote (worth all of T to them): no fees line
   const free = await sheet({ out: { ...payout, amountOutUsd: "250" } });
-  assert.deepEqual(block(free.w.lines), ["They get · 1.2345 SOL ($250.00)", "Your Safe sends · $300.00", "Stays in Private · $50.00"], String(free.w.lines));
+  assert.deepEqual(block(free.w.lines), ["They get · 1.2345 SOL (about $250.00)", "From your Safe · $300.00", "Private keeps the rest · about $50.00", "Fees · $0.00"], String(free.w.lines));
   // controls, each refused before Face ID: no payout bound to this move in, another coin, more than the move in brings
   // the audit's ruling (5 Nov): a payout coin the core can't name with its decimals is refused before the sheet (the control:
-  // the named SOL above shows "They get · 1.2345 SOL ($247.50)")
+  // the named SOL above shows "They get · 1.2345 SOL (about $247.50)")
   await assert.rejects(sheet({ unnamed: true }), (e: any) => e.problem?.code === "security.send.coin-unknown" && e.problem.next.label === "Try again" && e.problem.next2?.label === "Pick a coin", "an unnamed payout coin");
   await assert.rejects(sheet({ out: null }), (e: any) => e.problem?.code === "security.send.unbound" && e.problem.whatHappened === "NEAR Intents priced it differently than asked. Nothing moved." && e.problem.next.label === "Send again" && e.problem.money.where === "in your Safe", "no payout bound");
   await assert.rejects(sheet({ out: { ...payout, originAsset: "nep141:wrap.near" } }), (e: any) => e.problem?.code === "security.send.unbound", "another coin");
@@ -817,8 +824,8 @@ test("product decision (5 Nov), QA's MUSTs 1 and 4: a Send's fill sheet is ONE F
     return s.signer.describe({ ...intentsCall("mt_transfer", { receiver_id: DEPOSIT, token_id: `nep141:${USDC}`, amount: "300000000", approval: null }), sendFill: true } as TxRequest);
   };
   const mt = await inside(payout);
-  assert.deepEqual([mt.title, ...block(mt.lines)], ["Send $250.00 from your Safe", "They get · 1.2345 SOL ($247.50)", "Your Safe sends · $300.00", "Stays in Private · $50.00", "Fees · about $2.50"], String(mt.lines));
-  assert.deepEqual(mt.lines.slice(0, 2), [`To ${PAYEE}`, "Public on Solana."], "the full address first, then where it lands");
+  assert.deepEqual([mt.title, ...block(mt.lines)], ["Send $250.00 from your Safe", "They get · 1.2345 SOL (about $247.50)", "From your Safe · $300.00", "Private keeps the rest · about $50.00", "Fees · about $2.50"], String(mt.lines));
+  assert.deepEqual(mt.lines.slice(0, 2), [`To ${PAYEE}`, "Public on Solana. Anyone can see the Safe's part on NEAR."], "the full address first, then where it lands (copy review, 6 Nov: one public line)");
   await assert.rejects(inside(null), (e: any) => e.problem?.code === "security.send.unbound", "control: unbound, refused on this route too");
   // controls on the route itself (checkIntents): an mt_transfer on a quote that takes its deposit from outside, or paying
   // a pocket that isn't on the core's own list, is refused as before

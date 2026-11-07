@@ -99,6 +99,8 @@
 .wl-kv span:first-child .zf-coin, .wl-kv span:first-child img { flex: none; }
 .wl-kv-btn { appearance: none; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); font: inherit; font-size: 14.5px; text-align: left; cursor: pointer; }
 .wl-kv-btn span:last-child { color: var(--ink); }
+/* the copy review (8 Nov): Private's page with no job line between them: one hairline, never two */
+.wl-where > .wl-kv-btn + .zf-more { border-top: 0; margin-top: 0; }
 .wl-sheet-label { margin: 18px 0 8px; }
 
 /* A test account's one-line note on top of Balance: quiet, a tap dismisses it. */
@@ -266,10 +268,6 @@
 .wl-addline__qr:active:not(:disabled) { transform: scale(var(--press-scale, .98)); opacity: .6; }
 .wl-addline__qr:disabled { opacity: .25; cursor: default; }
 .wl-safemark { display: inline-grid; place-items: center; flex: none; border-radius: 50%; background: var(--ink); color: var(--bg); }
-.wl-addpage__ask {
-  appearance: none; align-self: center; margin-top: auto; min-height: 44px; padding: 28px 16px 4px; border: 0; background: none; cursor: pointer;
-  color: var(--ink-2); font: 400 15px/1.3 var(--font); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line);
-}
 /* The QR, full screen: the name, a large QR on its white tile, the address grouped, Copy, two quiet lines. */
 .wl-qrfull { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 4px; }
 .wl-qrfull__who { display: grid; justify-items: center; gap: 10px; animation: wl-rise var(--dur-base) var(--ease-out) both; }
@@ -280,6 +278,7 @@
 }
 :root[data-theme="dark"] .wl-qrfull__code { box-shadow: 0 0 0 1px var(--line), 0 0 70px -18px rgba(242, 242, 243, .22); }
 .wl-qrfull__code svg { display: block; width: min(256px, 66vw); height: auto; }
+.wl-qrfull__sample { margin: 12px 0 0; }
 @keyframes wl-qr-in { from { opacity: 0; transform: scale(.98); } }
 .wl-qrfull__addr {
   margin: 24px 0 0; max-width: 14.6em; color: var(--ink);
@@ -308,7 +307,7 @@
 /* Add rises on Home's own keyframes (wl-rise, below): one definition */
 @media (prefers-reduced-motion: reduce) {
   .wl-addline, .wl-addline__state.is-copied, .wl-addline__wait, .wl-qrfull__who, .wl-qrfull__code, .wl-qrfull__copy.is-copied svg { animation: none; }
-  .wl-addline__qr { transition: none; }
+  .wl-addline__qr, .wl-addline__icon { transition: none; }
 }
 /* Home's Swap (V4 step 5): "You pay" and "You get" pickers, the slider and All */
 .wl-swap-pick { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 12px; margin-top: 8px; border: 0; border-radius: var(--r-field, 16px); background: var(--fill, none); color: var(--ink); text-align: left; }
@@ -466,7 +465,7 @@
 .wl-addline__qr { width: 44px; height: 44px; }
 .wl-addline__qr svg { width: 24px; height: 24px; }
 .wl-addline .wl-mark-badge { box-shadow: 0 0 0 2px var(--bg); background: var(--bg); }
-.wl-addpage__ask.zf-btn { align-self: stretch; height: 48px; min-height: 48px; padding: 0 var(--sp-6, 24px); color: var(--ink); font: 500 16px/1 var(--font); text-decoration: none; }
+.wl-addpage__ask.zf-btn { align-self: stretch; text-decoration: none; } /* the copy review's row spec: the lit floor, the button's own 56 px */
 @media (prefers-reduced-motion: reduce) { .wl-addline__sub.is-copied { animation: none; } }
 
 /* ── REVAMP v2 (3 Nov): Home beats HOME-VISUAL with light, not boxes ───────────────────────────────────────────
@@ -815,11 +814,6 @@
 /* Pair pass (5 Nov): Change wallet is a quiet capsule (a choice shape, 44 pt); a used-up row/page is muted and never copied;
    the sheet's frame stays while its address is made (no words, no spinner: a blank tile where the code will be) */
 .zf-btn.wl-capsule { width: auto; height: 44px; min-height: 44px; padding: 0 20px; margin: 12px auto 0; border-radius: 999px; background: var(--fill, var(--act-fill)); color: var(--ink); box-shadow: inset 0 1px 0 var(--edge-hi, transparent); font: 600 15px/20px var(--font); }
-.wl-addline__change.wl-capsule { flex: none; margin: 0 0 0 8px; padding: 0 14px; }
-.wl-addline.is-done .wl-addline__name { color: var(--mute); }
-.wl-addline.is-done .wl-addline__why { color: var(--mute); }
-.wl-addline.is-done .wl-addline__tap { cursor: default; }
-.wl-addline.is-done .wl-addline__tap > :first-child { opacity: .5; }
 .wl-qrfull__code--blank { width: min(280px, calc(66vw + 24px)); aspect-ratio: 1; background: var(--fill, var(--act-fill)); box-shadow: none; animation: none; }
 .wl-qrfull__done { margin: 16px 0 0; max-width: 18em; }
 .wl-changesure { display: grid; gap: 12px; padding: 4px 0 24px; }
@@ -858,3 +852,54 @@
 /* the fee block stands on the pinned button (the copy review, 6 Nov): pinned with it, its room held for the figure, so nothing moves when the figure lands */
 .zf-sheet__content > .zf-fee:has(+ .wl-sheet-go:not(.wl-sheet-go ~ .wl-sheet-go)) { position: sticky; bottom: 64px; z-index: 2; box-sizing: border-box; min-height: 62px; margin: auto 0 0; padding: 8px 0 0; background: var(--bg); }
 .zf-sheet__content > .zf-fee + .wl-sheet-go:not(.wl-sheet-go ~ .wl-sheet-go) { margin-top: 8px; }
+
+/* the copy review's row spec (6 Nov) + the audit's MUST, in the copy review's two-band grid (6 Nov, graded B before): band 1 is mark 40 · name · Copy 44 ·
+   QR 44, 12 px gaps, the icons centred on the name's line and the mark top-aligned with the name; band 2 is the rule and
+   the end, from the name's left edge to the QR's right edge, under the icons. Each line wraps only at its comma (.wl-keep
+   phrases): 14 + 22 + 2 + 18 + 18 + 14 = 88 px, 106 px when a line wraps once. The row itself is no tap. The only colour
+   is Copy's flash, in --up. A failed ask: why, then Tap QR. */
+.wl-addpage .wl-addlist:has(> .wl-addrow), .wl-addlist:has(> .wl-addrow) { padding: 0 12px 0 16px; border-radius: 16px; background: var(--fill); box-shadow: none; }
+.wl-addrow { display: grid; grid-template-columns: 40px minmax(0, 1fr) 44px 44px; grid-template-rows: 22px auto; column-gap: 12px; align-items: start; min-height: 88px; padding: 14px 0; box-sizing: border-box; }
+.wl-addrow > :first-child { grid-area: 1 / 1 / 3 / 2; align-self: start; }
+.wl-addrow > .wl-addline__text { grid-area: 1 / 2 / 3 / 5; }
+.wl-addrow > .wl-addline__icon { grid-row: 1; grid-column: 3; align-self: center; margin: -11px 0; }
+.wl-addrow > .wl-addline__qr { grid-column: 4; }
+.wl-addrow .wl-addline__text > .wl-addline__name { padding-right: 112px; }
+.wl-keep { white-space: nowrap; }
+/* Copy's flash (copy review, 6 Nov) adds no words: the rule line turns --up, the end's line reads "Copied." in --up, so the row
+   keeps its height with no reserved band. */
+.wl-addline__lines { display: block; margin-top: 2px; }
+.wl-addlist > .wl-addrow + .wl-addrow::before { left: 0; right: 0; }
+.wl-addrow .wl-addline__text { display: block; min-width: 0; }
+.wl-addpage .wl-addrow .wl-addline__name, .wl-addrow .wl-addline__name { display: block; font: 600 17px/22px var(--font); letter-spacing: -.015em; color: var(--ink); }
+.wl-addline__addr { display: block; font: 400 13px/18px var(--font); color: var(--mute); font-variant-numeric: tabular-nums; }
+.wl-addline__name + .wl-addline__addr { margin-top: 2px; }
+.wl-addline__addr.is-copied { color: var(--up); }
+.wl-addline__icon {
+  appearance: none; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 22px; background: none; color: var(--ink);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.wl-addrow .wl-addline__qr { width: 44px; height: 44px; padding: 0; }
+.wl-addline__icon:active:not(:disabled) { transform: scale(var(--press-scale, .98)); opacity: .6; }
+.wl-addline__icon:disabled { opacity: .25; cursor: default; }
+.wl-addrow.has-why .wl-addline__addr:first-of-type { color: var(--ink-2); }
+/* 53, 6 Nov, item 12 (fix/trade-list-coin): the Safe row's Buy stays a 32 pt pill to the eye and taps at 44: an inert
+   hit box 6 over and under it (targets.test.ts measures it) */
+.wl-buy { position: relative; }
+.wl-buy::after { content: ""; position: absolute; inset: -6px 0; }
+
+/* Private's way home (the audit's MUSTs, 8 Nov): the trigger is a 44 px quiet capsule; its Check this says the head, the row, the
+   privacy line, then Approve (lit, 56 px) and Not now (44 px) */
+.wl-where > .zf-btn.wl-capsule { display: block; }
+.wl-moveall__head { margin: 8px 0 16px; }
+/* the copy review (8 Nov): no void: the privacy line right under the rows, Approve and Not now right under it */
+.wl-moveall__seen { margin: 8px 0 0; color: var(--ink-2); }
+.wl-moveall__range { --c: var(--ink); margin: 0 0 8px; }
+.wl-moveall__foot { padding-top: 24px; display: grid; gap: 4px; justify-items: center; }
+/* Private's page (the copy review's A2-2): a coin's dollars first, its units under, mute; "Job created." its own block */
+.wl-private-coin { display: grid; gap: 2px; }
+.wl-kv .wl-private-coin > span:first-child { display: block; color: var(--ink); }
+.wl-kv .wl-private-coin > .zf-small { color: var(--mute); }
+.wl-explain.wl-private-made { margin: 16px 0; }
+/* the copy review's J2-3 (8 Nov, MUST): the QR page's Copy a 44 pt tap (65 x 32 before) */
+.zf-btn.wl-qrfull__copy { height: 44px; min-height: 44px; border-radius: 22px; }

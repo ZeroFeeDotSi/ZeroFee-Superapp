@@ -1,0 +1,26 @@
+/* The checkpoint track (Checkpoints.tsx; the copy review's spec, 6 Nov): 30 px tall (dot 10, gap 6, label 14). Dot k's centre sits at
+   5px + (100% - 10px) * k/3, so the first is flush left and the last flush right; the fill runs from the first centre to
+   the current one exactly. Tokens only; no shadow, no loop. The bad colour is the app's --down (the token named --bad in
+   the spec). */
+.zf-cp { position: relative; display: block; height: 30px; --cp-span: calc(100% - 10px); }
+.zf-cp::before, .zf-cp__fill { content: ""; position: absolute; left: 5px; top: 4px; height: 2px; border-radius: 1px; }
+.zf-cp::before { right: 5px; background: var(--line); }
+.zf-cp__fill { width: calc(var(--cp-span) * var(--cp, 0)); background: var(--up); }
+.zf-cp__pt { position: absolute; top: 0; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); }
+.zf-cp__pt:nth-child(2) { left: 5px; }
+.zf-cp__pt:nth-child(3) { left: calc(5px + var(--cp-span) / 3); }
+.zf-cp__pt:nth-child(4) { left: calc(5px + var(--cp-span) * 2 / 3); }
+.zf-cp__pt:nth-child(5) { left: calc(100% - 5px); }
+/* the first label starts under the first dot's left edge, the last ends under the last dot's right edge */
+.zf-cp__pt:nth-child(2) { transform: translateX(-5px); align-items: flex-start; }
+.zf-cp__pt:nth-child(5) { transform: translateX(calc(-100% + 5px)); align-items: flex-end; }
+.zf-cp__pt i { position: relative; z-index: 1; display: block; width: 10px; height: 10px; box-sizing: border-box; border-radius: 50%;
+  border: 2px solid var(--line); background: var(--bg); }
+.zf-cp__pt.is-done i { background: var(--up); border-color: var(--up); }
+.zf-cp__pt.is-now i { border-color: var(--up); }
+.zf-cp__pt.is-now i::after, .zf-cp__pt.is-bad i::after { content: ""; position: absolute; inset: 1px; border-radius: 50%; background: var(--up); }
+.zf-cp__pt.is-bad i { border-color: var(--down); }
+.zf-cp__pt.is-bad i::after { background: var(--down); }
+.zf-cp__pt b { display: block; margin-top: 6px; font: 400 11px/14px var(--font); color: var(--mute); white-space: nowrap; }
+.zf-cp__pt.is-now b { color: var(--ink); font-weight: 600; }
+.zf-cp__pt.is-bad b { color: var(--down); font-weight: 600; }

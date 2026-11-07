@@ -143,7 +143,7 @@ export function nearTradeBytesRefusal(d: DecodedTx, wallet: string, a: NearTrade
  *  the wallet, at least the least), `refunded` (the swap failed and its coins went back), `failed` (a receipt failed),
  *  `unproven` (used in full, but no transfer line the core reads says where the coin went: the wallet's balance, read on
  *  two nodes at final, decides), or null (not executed yet). */
-export type NearOutcome = { landed: true; got: bigint } | { refunded: true } | { failed: string } | { unproven: true } | null;
+export type NearOutcome = { landed: true; got: bigint } | { refunded: true } | { failed: string } | { unproven: true; used?: bigint; kept?: true } | null;
 
 /** NEP-141 transfers to `wallet` from Ref, as the coin's own logs say, summed: the NEP-297 EVENT_JSON ft_transfer, or the
  *  older plain line ("Transfer <amount> from v2.ref-finance.near to <wallet>"), which wrap.near writes (mainnet, 3 Nov:
@@ -186,6 +186,12 @@ export function sheetSymbol(raw: unknown, coin: string): string {
   return listed !== undefined && listed !== coin ? "this coin" : s;
 }
 
+// the audit's MUST (7 Nov): on a SUCCESS (status SuccessValue) an answer that can't be read, a part used, or a transfer line
+// under the least is our read being off (Ref uses all or panics, and panics under the least), never a refusal: unproven,
+// and the wallet's balance at the trade's block decides. `used`: the part the chain says it used (the fill's spent).
+// A failed transfer receipt with some used (the audit's MUST, 7 Nov) is unproven too, `kept`: the input WAS spent and Ref kept
+// the coin out on its side (its own deposit for the wallet, else its lost and found), never "nothing was bought".
+// `failed` only for a Failure status.
 export function nearOutcome(r: any, a: NearTradeAsk, wallet: string): NearOutcome {
   const status = r?.status ?? r?.transaction_outcome?.outcome?.status;
   if (!status || typeof status !== "object" || !("SuccessValue" in status || "Failure" in status)) return null;
@@ -193,14 +199,15 @@ export function nearOutcome(r: any, a: NearTradeAsk, wallet: string): NearOutcom
   // ft_transfer_call's answer (the last action's): how much of the amount the swap USED; less than all is a refund
   let used: string | undefined;
   try { used = JSON.parse(new TextDecoder().decode(base64ToBytes(String(status.SuccessValue)))); } catch { used = undefined; }
-  if (typeof used !== "string" || !DIGITS.test(used)) return { failed: "Its answer can't be read." };
-  if (BigInt(used) !== BigInt(a.amountIn)) return BigInt(used) === 0n ? { refunded: true } : { failed: "The swap used only part of it." };
+  if (typeof used !== "string" || !DIGITS.test(used)) return { unproven: true };
+  if (BigInt(used) === 0n) return { refunded: true };
   const failedReceipt = (Array.isArray(r?.receipts_outcome) ? r.receipts_outcome : []).some((ro: any) => ro?.outcome?.status && "Failure" in ro.outcome.status);
   const got = transfersIn(r, wallet, a.side === "buy" ? a.coin : WNEAR);
   // the coin out never reached the wallet (Ref kept it as lost and found), or less than the least: never "landed"
-  if (failedReceipt && got < BigInt(a.minOut)) return { failed: "Rhea couldn't send the coin to your wallet." };
-  // used in full and no transfer line the core reads: the wallet's balance, on two nodes at final, decides (review M3)
-  if (got === 0n) return { unproven: true };
-  if (got < BigInt(a.minOut)) return { failed: "Less came back than the least." };
+  const part = BigInt(used) !== BigInt(a.amountIn) ? { used: BigInt(used) } : {};
+  if (failedReceipt && got < BigInt(a.minOut)) return { unproven: true, kept: true, ...part };
+  // used in part or in full with no transfer line the core reads, or one under the least: the wallet's balance, on two
+  // nodes at final, decides (review M3; the audit's MUST, 7 Nov)
+  if (BigInt(used) !== BigInt(a.amountIn) || got < BigInt(a.minOut)) return { unproven: true, ...part };
   return { landed: true, got };
 }

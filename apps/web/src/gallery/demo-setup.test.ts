@@ -42,7 +42,7 @@ test("finding 50: Money in is ticked only once its figure is shown; Protected co
   assert.notEqual(step("5460.55", "device"), "done", "control: the second device is still to come");
   assert.equal(DEMO_MONEY_IN.rule, "Your Safe's rule: up to $500 each day needs your yes. More waits 24 hours first.");
   const view = read("./DemoMoneyIn.tsx");
-  assert.match(view, /const total = useBalanceTotal\(bridge\);\s*const t = demoMoneyThread\(total\);/);
+  assert.match(view, /const parts = useBalanceParts\(bridge\);\s*const total = parts\?\.usd \?\? null;\s*const t = demoMoneyThread\(total\);/);
   assert.match(view, /\{total === null \? "…" : dollars\(total\)\}/, "the figure that ticks Money in is on screen");
   assert.match(view, /\{DEMO_MONEY_IN\.rule\} \{DEMO_MONEY_IN\.ruleWhere\}/, "the rule that ticks Protected is on screen");
   assert.match(demo, /<DemoMoneyIn bridge=\{demoWalletBridge\}/);

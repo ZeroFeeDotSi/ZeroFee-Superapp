@@ -151,8 +151,8 @@ test("a send's title follows its status: Paid or Sent only once it's done", () =
 test("a move into Private says so, and that anyone can see it", () => {
   const tokens = new Map<string, Token>([["usdc", { assetId: "usdc", chain: "near", symbol: "USDC", decimals: 6, contract: "x" }]]);
   const m = (status: Movement["status"]): Movement => ({ id: "p", kind: "private", status, from: "usdc", to: "private", amount: "50", startedAtIso: "", updatedAtIso: "", explorerUrls: [] });
-  assert.deepEqual(describe(m("done"), tokens, chains), { title: "Moved to your private balance", detail: "50 USDC · in your private balance · anyone can see this move" });
-  assert.equal(describe(m("moving"), tokens, chains).title, "Moving to your private balance");
+  assert.deepEqual(describe(m("done"), tokens, chains), { title: "Moved to Private", detail: "50 USDC · Into Private from your Safe." });
+  assert.equal(describe(m("moving"), tokens, chains).title, "Moving to Private");
   assert.equal(describe(m("problem"), tokens, chains).title, "Not moved");
   assert.equal(describe(m("waiting"), tokens, chains).title, "On hold");
 });
@@ -160,7 +160,7 @@ test("a move into Private says so, and that anyone can see it", () => {
 test("a payment from Private says so in Activity", () => {
   const tokens = new Map<string, Token>([["usdc", { assetId: "usdc", chain: "near", symbol: "USDC", decimals: 6, contract: "x" }]]);
   const m: Movement = { id: "pay:1", kind: "pay", status: "done", from: "usdc", to: "13Qkxh…gjRK on Solana", amount: "30.09", label: "Dinner", private: true, startedAtIso: "", updatedAtIso: "", explorerUrls: [] };
-  assert.deepEqual(describe(m, tokens, chains), { title: "Paid · Dinner", detail: "30.09 USDC from your private balance · to 13Qkxh…gjRK on Solana" });
+  assert.deepEqual(describe(m, tokens, chains), { title: "Paid · Dinner", detail: "30.09 USDC from Private · to 13Qkxh…gjRK on Solana" });
 });
 
 test("another app opens Receive on its coin's network: a tokenId, a symbol, or coin=&chain=; else as always", () => {

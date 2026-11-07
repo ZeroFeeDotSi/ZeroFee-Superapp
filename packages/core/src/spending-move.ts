@@ -5,6 +5,97 @@
 // guard asks past its daily bound). `key` (16 to 62 letters, digits, - or _): asking again with it gives the same move.
 // Types only from spending.ts: its values come in `lib` (the bundler then never splits spending.ts out of Home's chunk).
 import type { EngineMove, EngineSnapshot, SpendingActivity, SpendingEngine, SpendingLib, SpendingNetwork } from "./spending.ts";
+/**
+ * C2 (the audit's five conditions, 7 Nov): a Move's wallet parts, kept for its one Safe sheet (move-plan.ts othersForSheet) and
+ * to cap its wallet legs. Here, off Home's first load and with no import (an import would put a preload list in Home's
+ * first load): the store is one per JS realm, by the symbol move-plan.ts OTHERS_STORE names.
+ */
+type Part = { from: string; to: string; cents: string };
+type Kept = { parts: Part[]; atMs: number; dep?: string; used: Set<number> } | { ended: true; atMs: number };
+const OTHERS_MS = 10 * 60_000;
+const kept = (): Map<string, Kept> => ((globalThis as Record<symbol, Map<string, Kept>>)[Symbol.for("zerofee.move-others")] ??= new Map());
+const WALLETS = ["sol", "hood", "near", "bsc"];
+/** The page's parts against the engine's own read (EngineSnapshot): each from one wallet place to another, at least a
+ *  cent, the parts from one wallet together at most what the read shows it holds (a chain's coins, cash and native; the
+ *  NEAR wallet's cash). One part not so: null, none kept (the sheet says the Safe's side only). Pure: a table test. */
+export function confirmOthers(raw: unknown, read: { reserveUsd: number; chains: readonly { chain: string; nativeUsd: number; readyUsd: number; coinsUsd: number; unread?: true; closed?: true }[] }): Part[] | null {
+  if (!Array.isArray(raw) || !raw.length || raw.length > 6) return null;
+  const out: Part[] = [];
+  const from = new Map<string, number>();
+  for (const x of raw as { from?: unknown; to?: unknown; usd?: unknown }[]) {
+    const usd = Number(x?.usd);
+    if (typeof x?.from !== "string" || typeof x.to !== "string" || !WALLETS.includes(x.from) || !WALLETS.includes(x.to) || x.from === x.to || typeof x.usd !== "number" || !(Number.isFinite(usd) && usd >= 0.01)) return null;
+    const cents = Math.round(usd * 100);
+    from.set(x.from, (from.get(x.from) ?? 0) + cents);
+    out.push({ from: x.from, to: x.to, cents: String(cents) });
+  }
+  for (const [w, c] of from) {
+    const ch = w === "near" ? null : read.chains.find((x) => x.chain === w);
+    const has = w === "near" ? read.reserveUsd : ch && !ch.unread && !ch.closed ? ch.nativeUsd + ch.readyUsd + ch.coinsUsd : NaN;
+    if (!(Number.isFinite(has) && c <= Math.round(has * 100))) return null;
+  }
+  return out;
+}
+/** Keeps the checked parts under the Move's key; null: none (and nothing older under it). */
+export function keepOthers(job: string, parts: Part[] | null, now = Date.now()): void {
+  for (const [k, v] of kept()) if (now - v.atMs > OTHERS_MS) kept().delete(k);
+  if (parts?.length) kept().set(job, { parts, atMs: now, used: new Set() }); else kept().delete(job);
+}
+/** spending.topUp's keep: the page's parts checked against the engine's read, kept (none confirmed: none kept). */
+export const keepFor = (job: string, raw: unknown, read: EngineSnapshot): void => keepOthers(job, raw === undefined ? null : confirmOthers(raw, read));
+/** C2 on the phone (the audit's shape, 7 Nov): the page's parts as they cross to the core (subwallet.moveOthers), each its
+ *  figure in whole cents; one not a figure: none cross. Pure: a table test. */
+export function othersToCross(raw: unknown): Part[] | null {
+  if (!Array.isArray(raw) || !raw.length || raw.length > 6) return null;
+  const out = (raw as { from?: unknown; to?: unknown; usd?: unknown }[]).map((x) => ({ from: x?.from, to: x?.to, cents: typeof x?.usd === "number" && Number.isFinite(x.usd) && x.usd >= 0.01 ? String(Math.round(x.usd * 100)) : "" }));
+  return othersWellFormed(out);
+}
+/** What the core takes (the phone's allow-list says the same, IsolatedCore.swift othersWellFormed): 1 to 6 parts, each
+ *  exactly { from, to, cents }, two different wallet places and whole cents above 0; anything else: none. Pure. */
+export function othersWellFormed(raw: unknown): Part[] | null {
+  if (!Array.isArray(raw) || !raw.length || raw.length > 6) return null;
+  const ok = raw.every((x) => !!x && typeof x === "object" && Object.keys(x).length === 3 && WALLETS.includes(x.from) && WALLETS.includes(x.to) && x.from !== x.to && typeof x.cents === "string" && /^\d{1,12}$/.test(x.cents) && BigInt(x.cents) > 0n);
+  return ok ? (raw as Part[]).map((x) => ({ from: x.from, to: x.to, cents: x.cents })) : null;
+}
+/** The core's own keep (subwallet.moveOthers; on the phone, in the isolated core): the parts well formed, then checked
+ *  against the core's OWN read of each wallet they come from (`read`), so the page's figures can only lower it. */
+export async function keepInCore(job: string, raw: unknown, read: (from: string[]) => Promise<Parameters<typeof confirmOthers>[1]>): Promise<number> {
+  const parts = othersWellFormed(raw), started = Date.now();
+  const has = parts ? await read([...new Set(parts.map((x) => x.from))]).catch(() => null) : null;
+  // ended while it was read (Not now before the read came back): it stays ended
+  const was = kept().get(job);
+  if (was && "ended" in was && was.atMs >= started) return 0;
+  const ok = parts && has ? confirmOthers(parts.map((x) => ({ from: x.from, to: x.to, usd: Number(x.cents) / 100 })), has) : null;
+  keepOthers(job, ok);
+  return ok?.length ?? 0;
+}
+/** The Safe's step ended with no yes (Not now, Close, a refusal): the parts go, and a leg still carrying the key is refused. */
+export function endOthers(job: string, now = Date.now()): void { kept().set(job, { ended: true, atMs: now }); }
+/** move-plan.ts planLegRefusal's words (a table test holds them equal). */
+export const LEG_CAP_WORDS = {
+  gone: "This phone no longer has this Move's plan, so ZeroFee stopped this. Nothing moved.",
+  none: "That wallet isn't in this Move's plan, so ZeroFee stopped this. Nothing moved.",
+  more: "That wallet would get more than this Move planned, so ZeroFee stopped this. Nothing moved.",
+} as const;
+/** A wallet leg of a Move (spending.move with `job`): at most its kept part (that wallet to that wallet), each part once.
+ *  Null: it goes as asked; a string: refused by name; a number: it goes as that many dollars. Nothing kept under the
+ *  key: as before (the sheet named no part). "all" (a leg that empties its wallet, move-split's L3; the audit's MUST, 7 Nov):
+ *  `held`, the wallet's dollars as the engine read it just now, at most its part plus the drift (2 % of the part, at least
+ *  $0.50): "all" goes; more (a deposit or a trade landed since the sheet), or not read: exactly its part. */
+export function legCap(job: unknown, from: string, to: string, usd: number | "all", held?: number, now = Date.now()): string | number | null {
+  if (typeof job !== "string") return null;
+  const k = kept().get(job);
+  if (!k || now - k.atMs > OTHERS_MS) return null;
+  if ("ended" in k) return LEG_CAP_WORDS.gone;
+  const i = k.parts.findIndex((p, n) => p.from === from && p.to === to && !k.used.has(n));
+  if (i < 0) return LEG_CAP_WORDS.none;
+  const part = Number(k.parts[i]!.cents);
+  if (usd !== "all" && Math.round(usd * 100) > part) return LEG_CAP_WORDS.more;
+  k.used.add(i);
+  if (k.used.size === k.parts.length) kept().delete(job);
+  if (usd !== "all") return null;
+  return held !== undefined && Number.isFinite(held) && Math.round(held * 100) <= part + Math.max(Math.ceil(part * 0.02), 50) ? null : part / 100;
+}
 // lap FAIL 2: spending.topUp's promised-money check rides this lazy part (spending-taken.ts)
 export { taken } from "./spending-taken.ts";
 
@@ -62,8 +153,13 @@ export async function move(s: Ctx, p: Record<string, unknown>): Promise<Spending
   const snap = s.readable(e);
   const shut = [from, to].find((c) => c !== "near" && snap.chains.find((x) => x.chain === c)?.closed);
   if (shut) throw new ProblemError(spendingProblems.networkClosed(NETWORK_NAME[shut as SpendingNetwork]));
+  // C2 (the audit's condition 1 and MUST, 7 Nov): a Move's wallet leg carries its key, and is at most the part its Safe sheet
+  // said, once; "all" goes only while the wallet, read just now, holds about that part, else exactly the part
+  const w = snap.chains.find((x) => x.chain === from);
+  const capped = p.job === undefined ? null : legCap(p.job, from, to, usd, w && !w.unread ? w.nativeUsd + w.readyUsd + w.coinsUsd : undefined);
+  if (typeof capped === "string") throw new ProblemError(securityProblems.subwalletRefused(capped));
   // read once (the refresh above): between() takes this read, never a second one back to back (speed, D145)
-  return s.activityOf(await e.between({ from: from as SpendingNetwork | "near", to: to as SpendingNetwork | "near", usd: usd as number | "all", key: p.key, refreshed: true }));
+  return s.activityOf(await e.between({ from: from as SpendingNetwork | "near", to: to as SpendingNetwork | "near", usd: typeof capped === "number" ? capped : usd as number | "all", key: p.key, refreshed: true }));
 }
 
 /** Make ready (D55): Spending's cash → that network's one wallet now, for Apps and Chat (no sheet: money between the

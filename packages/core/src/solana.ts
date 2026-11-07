@@ -232,8 +232,12 @@ export interface SolChain {
   hasHistory?(address: string): Promise<boolean>;
   /** The newest confirmed transactions at the address (their signatures, at most `n`): an Add's deposit, for 1Click's hint. */
   recentSignatures?(address: string, n: number): Promise<string[]>;
-  /** A sent transaction as each of the two nodes has it: "ok" (confirmed), "failed", or null (not yet, or no answer). */
-  status?(signature: string): Promise<("ok" | "failed" | null)[]>;
+  /** A sent transaction as each of the two nodes has it: "ok" (confirmed), "failed", null (the node answered: not in its
+   *  recent status cache) or "unread" (no node on that side answered: never an absence, the audit's MUST 7 Nov). */
+  status?(signature: string): Promise<SeenStatus[]>;
+  /** the audit's MUST (7 Nov): true only when `signature` provably never landed: two nodes' full history without it, AND the
+   *  wallet's own signature list, from a node that indexes it and reaching back before `since`, without it. */
+  absent?(signature: string, wallet: string, since?: number): Promise<boolean>;
   /** A recent blockhash both nodes accept, for a transaction the core builds itself (the float's moves). */
   latestBlockhash?(): Promise<string>;
   /** Both nodes answer that this blockhash is no longer valid: nothing signed with it can land any more. */
@@ -388,6 +392,22 @@ export const isSolPublicDown = (e: unknown): boolean => e instanceof Error && e.
 export const TABLES_KEPT = 512;
 export const PROGRAMS_KEPT = 2_048;
 export const PROGRAMS_KEPT_MS = 10 * 60_000;
+
+/** One node's word on a sent transaction (status): "unread" when no door on that side answered. */
+export type SeenStatus = "ok" | "failed" | null | "unread";
+const seenOf = (st: any): "ok" | "failed" | null => (!st ? null : st.err ? "failed" : st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized" ? "ok" : null);
+/** How far back a wallet's own signature list is read to prove a transfer never landed (absent). */
+export const SIGNATURES_BACK = 1000;
+/** A landing's block time may sit this far before the move's own start (clocks differ). */
+export const SINCE_SKEW_MS = 120_000;
+/** Does one indexing node's list of the wallet's signatures prove `hash` never landed: not in it, and the list reaches
+ *  back before `since` (the wallet's whole history, or its oldest entry earlier than `since` less the skew)? */
+export function signaturesProveAbsent(list: readonly { signature?: unknown; blockTime?: unknown }[], hash: string, since?: number): boolean {
+  if (list.some((e) => e?.signature === hash)) return false;
+  if (list.length < SIGNATURES_BACK) return true;
+  const oldest = list[list.length - 1]?.blockTime;
+  return since !== undefined && typeof oldest === "number" && oldest * 1000 < since - SINCE_SKEW_MS;
+}
 
 export class RpcSolChain implements SolChain {
   private readonly simGraceMs: number;
@@ -760,14 +780,27 @@ export class RpcSolChain implements SolChain {
     throw new Error(`neither node took it${said.length ? `: ${said.join(" / ")}` : ""}`);
   }
 
-  async status(signature: string): Promise<("ok" | "failed" | null)[]> {
-    const answers = await this.pair((u) => this.rpc(u, "getSignatureStatuses", [[signature]]));
-    return answers.map((a) => {
-      const st = a?.value?.[0];
-      if (!st) return null;
-      if (st.err) return "failed";
-      return st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized" ? "ok" : null;
-    });
+  async status(signature: string): Promise<SeenStatus[]> {
+    // the recent status cache only (speed: the send's own confirm loop asks this); a side whose every door failed is
+    // "unread", never null (the audit's MUST, 7 Nov: an error is never an absence)
+    const answers = await this.pair(async (u) => ({ r: await this.rpc(u, "getSignatureStatuses", [[signature]]) }));
+    return answers.map((a) => (a === null ? "unread" : seenOf(a.r?.value?.[0])));
+  }
+
+  async absent(signature: string, wallet: string, since?: number): Promise<boolean> {
+    const real = this.nodes === SOL_NODES;
+    const [hist, list] = await Promise.all([
+      this.pair(async (u) => ({ r: await this.rpc(u, "getSignatureStatuses", [[signature], { searchTransactionHistory: true }]) })),
+      // only a node that indexes the wallet's signatures (the relay's paid door, SOL_INDEXED_NODES), never a pruned one
+      hedged([...(real ? this.paid() : []), ...(real ? SOL_INDEXED_NODES : this.nodes)], async (u) => {
+        const r = await this.rpc(u, "getSignaturesForAddress", [wallet, { limit: SIGNATURES_BACK, commitment: "confirmed" }]);
+        if (!Array.isArray(r)) throw new Error("no answer about history");
+        return r as { signature?: unknown; blockTime?: unknown }[];
+      }).catch(() => null),
+    ]);
+    // both sides answered, in shape, with no trace of it (a node that failed, or any status at all: no proof)
+    if (hist.length < 2 || hist.some((a) => a === null || !Array.isArray(a.r?.value) || a.r.value[0] !== null)) return false;
+    return list !== null && signaturesProveAbsent(list, signature, since);
   }
 
   /**

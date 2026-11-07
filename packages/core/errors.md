@@ -15,6 +15,9 @@ Every Problem the security layer (packages/core) can produce. Generated from `sr
 | `security.pairing.code-wrong` | That code didn't match. Check it on your laptop, then paste again. | not involved | Check the code (nothing) |
 | `security.request.invalid` | This app asked for something ZeroFee can't read, so ZeroFee said no. | safe: in your Safe | Go back (nothing) |
 | `security.request.not-allowed` | This app asked for something it isn't allowed. ZeroFee said no. | safe: in your Safe | Go back (nothing) |
+| `security.steps.not-allowed` | Only ZeroFee's own screens can ask for steps together, so ZeroFee stopped this. Your money hasn't moved. | safe: in your Safe | Close (nothing) |
+| `security.steps.not-together` | This phone can't approve these steps together yet, so nothing was signed. Your money hasn't moved. | safe: in your Safe | Close (nothing) |
+| `security.sign.not-kept` | ZeroFee couldn't save its safety note on this phone, so it didn't sign. Your money hasn't moved. | safe: in your Safe | Try again (retry) |
 | `security.decode.mismatch` | The app asked for something other than it showed you. ZeroFee stopped. | safe: in your Safe | Go back (nothing) |
 | `security.decode.unreadable` | A step in this can't be read, so ZeroFee said no. | safe: in your Safe | Go back (nothing) |
 | `security.balance.low` | You don't have enough NEAR for this and its network fee. | safe: in your Safe | Add NEAR (open → receive) |
@@ -108,6 +111,7 @@ Every Problem the security layer (packages/core) can produce. Generated from `sr
 | `security.method.unknown` | This part of the app isn't ready yet. | not involved | Go back (nothing) |
 | `security.bridge.not-allowed` | Only ZeroFee's own Approve screen can answer that. | not involved | Go back (nothing) |
 | `security.unexpected` | ZeroFee hit a problem on its side. Nothing was sent. | safe: in your Safe | Try again (retry) |
+| `security.unexpected.money` | ZeroFee hit a problem on its side. Check Activity before you try again. | unsure: in your own wallets, or on its way | See what happened (open → activity) |
 
 ## Spending (`src/spending.ts`, D52)
 

@@ -11,7 +11,7 @@ import { fromUnits, toUnits, usdOf } from "./amount.ts";
 import type { QuoteRequest } from "./apis.ts";
 import { NATIVE_NEAR, WRAPPED_NEAR, type Catalogue } from "./catalogue.ts";
 import { fundingSteps, originAsset, routeFor, type ConvertRoute } from "./convert.ts";
-import { WRAP_STORAGE_YOCTO } from "./moves.ts";
+import { WRAP_STORAGE_YOCTO, wrapRegistered } from "./moves.ts";
 import { PRIVATE_KIND, type Movement, type Quote } from "./types.ts";
 import { walletProblems } from "./wallet-problems.ts";
 import { quoteDeadline } from "@zerofee/core/quote-deadline";
@@ -31,8 +31,8 @@ export interface ToPrivateDeps {
   notForChild: () => Promise<void>;
   askPrivate: (r: QuoteRequest) => Promise<{ quote: { amountOut: string; minAmountOut: string; timeEstimate?: number } }>;
   bridgeFor: (caller: Caller) => Bridge;
-  signAll: (requests: TxRequest[], caller: Caller) => Promise<Signed>;
-  approvals: (steps: TxRequest[], canChain: boolean) => TxRequest[];
+  signAll: (requests: TxRequest[], caller: Caller, since?: number) => Promise<Signed>;
+  approvals: (steps: TxRequest[], canChain: boolean, caller?: string) => TxRequest[];
   /** The move in, kept and followed as the ledger follows any sent request (landed, or held for later). */
   finish: (m: Movement, signed: Signed, follow: { signer: string; depositAddress: string; sender: string }) => Promise<Movement>;
   now: () => number;
@@ -107,7 +107,7 @@ export function createToPrivate(x: ToPrivateDeps) {
       amountIn: amount,
       amountOut: fromUnits(r.quote.amountOut, plan.coin.decimals),
       minOut: fromUnits(r.quote.minAmountOut, plan.coin.decimals),
-      feeNote: "The swap fee is in this price. Anyone can see this move into your private balance.",
+      feeNote: "The swap fee is in this price. Anyone can see this move into Private.",
       ...(typeof r.quote.timeEstimate === "number" ? { etaSeconds: r.quote.timeEstimate } : {}),
       expiresAtIso: new Date(now() + x.quoteTtlMs).toISOString(),
     };
@@ -118,9 +118,12 @@ export function createToPrivate(x: ToPrivateDeps) {
   /** Route B into the pocket: exactly plan.units to 1Click's NEAR address for it (storage first when the address has
    *  none), one ft_withdraw out of the ledger or the account's own transfer, on the main key's sheet. `moveFill`: a Move's
    *  fill (TxRequest.moveFill, a marker): the core's sheet says its legs from its own figures. */
-  async function payIntoPocket(plan: Awaited<ReturnType<typeof privatePlan>>, tokenId: string, depositAddress: string, why: string, caller: Caller, moveFill: boolean | "send" = false): Promise<Signed> {
+  async function payIntoPocket(plan: Awaited<ReturnType<typeof privatePlan>>, tokenId: string, depositAddress: string, why: string, caller: Caller, moveFill: boolean | "send" | { plan?: string[]; swap?: true } = false, since?: number, job?: string): Promise<Signed> {
     let registered = true;
     let storageYocto = WRAP_STORAGE_YOCTO;
+    // NEAR on the account wraps on wrap.near: the Safe's own storage step only when it isn't set up there (or unknown)
+    const wraps = plan.route === "near-account" && tokenId === NATIVE_NEAR;
+    const meP = wraps ? wrapRegistered((c, m, a) => chain.view(c, m, a, plan.block), plan.accountId) : Promise.resolve(false);
     if (plan.contract) {
       const [balance, bounds] = await Promise.all([
         chain.view(plan.contract, "storage_balance_of", { account_id: depositAddress }, plan.block),
@@ -130,8 +133,9 @@ export function createToPrivate(x: ToPrivateDeps) {
       const min = (bounds as { min?: unknown } | null)?.min;
       if (typeof min === "string" && /^\d+$/.test(min)) storageYocto = min;
     }
-    const steps = fundingSteps(plan.route, { tokenId, units: plan.units, depositAddress, registered, storageYocto, me: plan.accountId, why }).map((s, i, all) => (i !== all.length - 1 || !moveFill ? s : moveFill === "send" ? { ...s, sendFill: true as const } : { ...s, moveFill: true as const }));
-    return x.signAll(x.approvals(steps, plan.canChain), caller);
+    const meRegistered = await meP;
+    const steps = fundingSteps(plan.route, { tokenId, units: plan.units, depositAddress, registered, storageYocto, me: plan.accountId, meRegistered, why }).map((s, i, all) => (i !== all.length - 1 || !moveFill ? s : moveFill === "send" ? { ...s, sendFill: true as const } : { ...s, moveFill: true as const, ...(typeof moveFill === "object" && moveFill.plan ? { movePlan: moveFill.plan } : {}), ...(typeof moveFill === "object" && moveFill.swap ? { moveSwap: true as const } : {}) })).map((s) => (job ? { ...s, job } : s));
+    return x.signAll(x.approvals(steps, plan.canChain, caller), caller, since);
   }
 
   /** Move into Private: a real quote now (refused if it promises less than shown), paid on NEAR like Convert's route B. */
@@ -151,7 +155,7 @@ export function createToPrivate(x: ToPrivateDeps) {
     const fair = typeof depositAddress === "string" && /^[0-9a-f]{64}$/.test(depositAddress) && /^\d+$/.test(String(r.ok.minAmountOut)) && /^\d+$/.test(String(r.ok.amountIn));
     if (!fair || BigInt(r.ok.minAmountOut) < held.minOutUnits || BigInt(r.ok.amountIn) !== plan.units) throw new ProblemError(walletProblems.quoteExpired());
     privateQuotes.delete(quote.id);
-    const why = `Move ${quote.amountIn} ${quote.from === NATIVE_NEAR ? "NEAR" : plan.coin.symbol} to your private balance`;
+    const why = `Move ${quote.amountIn} ${quote.from === NATIVE_NEAR ? "NEAR" : plan.coin.symbol} to Private`;
     const signed = await payIntoPocket(plan, quote.from, depositAddress, why, caller);
     const at = iso();
     const movement: Movement = {

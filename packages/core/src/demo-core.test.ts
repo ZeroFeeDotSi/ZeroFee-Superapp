@@ -1247,15 +1247,14 @@ test("security review 2 Nov (Low): Browser, Apps and Chat can neither make Spend
   }
 });
 
-test("subwallet.send is Wallet's own Send's only (V4 Send from a row, D143): every other app, Chat included, and ZeroFee's own screens are refused; Chat reaches nothing else of subwallet.*", async () => {
+test("subwallet.send is shut for everyone, Wallet too (the HARD RULE: every money move through NEAR Confidential; no screen sends it); Chat reaches nothing else of subwallet.*", async () => {
   const { core } = await readyAccount();
   const shown = sheet(core);
   try {
     const ask = { chain: "sol", to: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", amount: "0.1" };
-    // Wallet's Send (the person's own tap on a row): through to the core (no Solana wallet yet here: unknown, never not-allowed)
-    assert.equal(code(await forApps(core, "wallet").call("subwallet.send", ask)), "security.subwallet.unknown", "Wallet's own Send reaches the core");
-    for (const other of [{ ...ask, chain: "eth", to: "0x7d06e272b5305a4b9d40e872c7950d3437547e3d" }, { ...ask, token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" }]) {
-      assert.equal(code(await forApps(core, "wallet").call("subwallet.send", other)), "security.request.not-allowed", "only a row's own coin on its own chain");
+    // the door is shut even for Wallet, with every shape of ask
+    for (const other of [ask, { ...ask, chain: "eth", to: "0x7d06e272b5305a4b9d40e872c7950d3437547e3d" }, { ...ask, token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" }]) {
+      assert.equal(code(await forApps(core, "wallet").call("subwallet.send", other)), "security.request.not-allowed", "Wallet's own call");
     }
     // D143: a hot key's send has no sheet, so Chat (it pays from the private balance) is refused like every other app
     for (const app of ["chat", "pay", "trade", "extension", "browser", "social", "agent", "earn"] as const) {

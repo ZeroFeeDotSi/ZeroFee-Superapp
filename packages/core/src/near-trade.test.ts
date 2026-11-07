@@ -102,12 +102,17 @@ test("landed only when the swap used all of it and the coin reached the wallet, 
   assert.deepEqual(nearOutcome(answer(buy.amountIn, { token: COIN, amount: "980000000000000000000000" }), buy, WALLET), { landed: true, got: 980000000000000000000000n });
   assert.deepEqual(nearOutcome(answer(sell.amountIn, { token: WNEAR, amount: String(NEAR / 4n) }), sell, WALLET), { landed: true, got: NEAR / 4n });
   assert.deepEqual(nearOutcome(answer("0", null), buy, WALLET), { refunded: true }, "Rhea refused the swap: the wNEAR went back");
-  assert.ok("failed" in nearOutcome(answer("1", null), buy, WALLET)!, "part used");
+  // pins changed (the audit's MUST, 7 Nov): on a success, a part used, an unreadable answer and a line under the least were
+  // "failed"; our read is off there, never the trade: unproven, the balance decides
+  assert.deepEqual(nearOutcome(answer("1", null), buy, WALLET), { unproven: true, used: 1n }, "part used: unproven, never failed, the chain's own figure carried");
+  assert.deepEqual(nearOutcome({ status: { SuccessValue: "!!" }, receipts_outcome: [] }, buy, WALLET), { unproven: true }, "an answer that can't be read: unproven, never failed");
   // used in full, no transfer line: the wallet's balance on two nodes decides (review M3; Trade's engine reads it), never landed
   assert.deepEqual(nearOutcome(answer(buy.amountIn, null), buy, WALLET), { unproven: true }, "used, but no line says the coin reached the wallet");
-  assert.ok("failed" in nearOutcome(answer(buy.amountIn, { token: COIN, amount: "1" }), buy, WALLET)!, "less than the least");
+  assert.deepEqual(nearOutcome(answer(buy.amountIn, { token: COIN, amount: "1" }), buy, WALLET), { unproven: true }, "a line under the least on a success: unproven, never failed");
   assert.deepEqual(nearOutcome(answer(buy.amountIn, { token: "copy.near", amount: "980000000000000000000000" }), buy, WALLET), { unproven: true }, "another contract's log never counts: never landed on it");
-  assert.ok("failed" in nearOutcome(answer(buy.amountIn, { token: COIN, amount: "980000000000000000000000" }, true), buy, WALLET)!, "the transfer's own receipt failed");
+  // pin changed (the audit's MUST, 7 Nov): the transfer's own receipt failed with the input used: the input WAS spent and Ref kept
+  // the coin on its side: unproven, kept (was "failed": "nothing was bought" and Try again, a second buy)
+  assert.deepEqual(nearOutcome(answer(buy.amountIn, { token: COIN, amount: "980000000000000000000000" }, true), buy, WALLET), { unproven: true, kept: true }, "the transfer's own receipt failed, the input used: kept, never failed");
   assert.ok("failed" in nearOutcome({ status: { Failure: { ActionError: {} } } }, buy, WALLET)!);
   assert.equal(nearOutcome({ status: "Started" }, buy, WALLET), null, "not executed yet");
 });

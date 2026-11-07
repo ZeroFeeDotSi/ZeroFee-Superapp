@@ -262,10 +262,10 @@ test("resume: a trade sent before the app closed is confirmed from its saved byt
   const a = setup({ script: { statuses: Array(400).fill("pending") } });
   await a.svc.trade(await a.svc.quote("buy", "sol", "BONKmint", { usd: 10 })).catch(() => undefined);
   // a new service on the same device store (the app opened again); the trade has landed meanwhile
-  const saved = await a.stored("activity"), pos = await a.stored("positions");
+  const saved = await a.stored("activity"), pos = await a.stored("positions.v2");
   const b = setup({ script: { statuses: ["pending", "confirmed"] } });
   await b.mock.call("device.store.set", { app: "trade", key: "activity", value: saved });
-  await b.mock.call("device.store.set", { app: "trade", key: "positions", value: pos });
+  await b.mock.call("device.store.set", { app: "trade", key: "positions.v2", value: pos });
   await b.svc.resume();
   const [rec] = await b.svc.activity();
   assert.equal(rec!.status, "done");

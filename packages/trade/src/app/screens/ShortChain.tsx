@@ -4,7 +4,7 @@
 import { useState } from "react";
 import type { NextStep, Problem } from "@zerofee/core/problem";
 import type { FloatChain, MoveRow } from "../../float-view.ts";
-import { floatProblems, moveMoreUsd, problemOf, shortChain } from "../boards.ts";
+import { floatProblems, moveMoreUsd, overWalletWords, problemOf, shortChain } from "../boards.ts";
 import { useFloat } from "../runtime.tsx";
 import { OUT_FEE_ROOM } from "../../float.ts";
 import { webWallet } from "@zerofee/shell-api/release.ts";
@@ -18,12 +18,25 @@ const COIN: Record<FloatChain, string> = { sol: "SOL", hood: "ETH", bsc: "BNB" }
 
 /** `walletName`: the chain's wallet by its own name ("your SOL wallet", D129). The smaller buy is the page's one button
  *  (TradeSheet's floor, shortBuyNow); this says what the wallet has and the one way to add to it (UX audit 4 Nov). */
-export function ShortChain({ chain, wantUsd, walletName, onAdd, onProblem }: { chain: FloatChain; wantUsd: number; walletName: string; onAdd: () => void; onProblem: (p: Problem) => Promise<NextStep> }) {
+/** The short wallet's one way on: "add" is the quiet "Move money to your SOL wallet" button (TradeSheet's floor, second
+ *  under the lit "Buy $X instead"); the rest are said here. One rule for both places. */
+export function shortWay(c: Parameters<typeof shortChain>[0] & { closed?: boolean }, wantUsd: number, reserveUsd: number): "closed" | "onWay" | "move" | "add" {
+  if (c.closed) return "closed";
+  const s = shortChain(c, wantUsd);
+  if (s.onWay) return "onWay";
+  return moveMoreUsd(s.moreUsd, reserveUsd, OUT_FEE_ROOM) >= MOVE_OFFER_MIN_USD ? "move" : "add";
+}
+/** The floor's quiet button's words: the web wallet has no Move, so its way on is Add (a web test, 4 Nov). */
+export const addWords = (chain: FloatChain, walletName: string): string => (webWallet() ? `Add ${COIN[chain]}` : `Move money to ${walletName}`);
+
+export function ShortChain({ chain, wantUsd, wantText, haveUsd, walletName, onProblem }: { chain: FloatChain; wantUsd: number; wantText: string; haveUsd: string; walletName: string; onProblem: (p: Problem) => Promise<NextStep> }) {
   const { view, snap } = useFloat();
   const { tasks } = useShell();
   const [busy, setBusy] = useState(false);
   /** The move's job is made at the tap (rule 2: "Job created." and its time left, never "Moving…"). */
   const [made, setMade] = useState(false);
+  /** The job its receipt follows (runJob's made): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [madeJob, setMadeJob] = useState<string | null>(null);
   const c = snap.chains.find((x) => x.chain === chain)!;
   const s = shortChain(c, wantUsd);
   // never the whole reserve: the move's fee comes out of it too (re-walk.3: "Move $8 more" of $8.06 was refused)
@@ -43,7 +56,7 @@ export function ShortChain({ chain, wantUsd, walletName, onAdd, onProblem }: { c
         safe: false, money: [`row:${chain}`],
         call: async () => { try { row = await view.moveNow(chain, moveUsd); return { ok: row }; } catch (e) { thrown = { e }; return { problem: problemOf(e, floatProblems.moveFailed(chain)) }; } },
         declined: (x) => !("ok" in x) || x.ok.status === "failed" || x.ok.status === "refunded",
-        made: () => setMade(true),
+        made: (j) => { setMadeJob(j.id); setMade(true); },
       });
       if ("refused" in end) { setMade(false); return void await onProblem(end.refused); }
       if (thrown) { setMade(false); throw thrown.e; }
@@ -67,23 +80,24 @@ export function ShortChain({ chain, wantUsd, walletName, onAdd, onProblem }: { c
     finally { setBusy(false); }
   };
   const Wallet = walletName.replace(/^./, (x) => x.toUpperCase());
+  const words = overWalletWords(walletName, haveUsd, wantText);
   return (
     <div className="tr-inline">
-      {/* one string, so it reads as one line however the page's text is taken (k-trade crawl: "has $0.00 ."). No figure:
-          the sheet already shows what's there to spend, and the wallet holds more than that (its fee reserve; Copywriter
-          batch 3) */}
-      <p className="zf-small tp-has">{`This buy is more than ${walletName} can spend.`}</p>
+      {/* T2-5 (the copy review's walk): the refusal's head and body, each one string (k-trade crawl: "has $0.00 ."); the figure is what
+          the wallet can spend, the sheet's own "to spend" (the fee reserve stays out of it; Copywriter batch 3) */}
+      <p className="zf-body tp-refuse-head" data-testid="over-wallet-head">{words.head}</p>
+      <p className="zf-small tp-has">{words.body}</p>
       {c.closed ? <p className="zf-small">{Wallet} opens once ZeroFee has tested it.</p>
         // the job made at the tap: said at once, with its time left (never "Moving…")
-        : made ? <div data-testid="short-move-made"><p className="zf-small tp-has">{JOB_WORDS.created}</p><TimeLeft etaSec={LEG_SEC.nearOut} /></div>
+        : made ? <div data-testid="short-move-made"><p className="zf-small tp-has">{JOB_WORDS.created}</p><TimeLeft etaSec={LEG_SEC.nearOut} job={madeJob} /></div>
         : s.onWay ? <p className="zf-small">{s.onWay}</p>
         // TRADE-FLOAT §4: a move the person asks for goes at once, not after the planner's wait
         : canMove ? <>
             <button className="tp-move" disabled={busy} onClick={more}>{`Move $${moveUsd.toLocaleString("en-US")} more to ${walletName}`}</button>
             <p className="zf-small tp-has">It goes right away.</p>
           </>
-        // the web wallet has no Move (a web test, 4 Nov): its way on is Add, the wallet's own address (TradeApp openMove)
-        : <button className="tp-move" onClick={onAdd}>{webWallet() ? `Add ${COIN[chain]}` : `Move money to ${walletName}`}</button>}
+        // nothing spare to move: the way on is the floor's quiet "Move money to your SOL wallet" (T2-5), never bold text here
+        : null}
     </div>
   );
 }

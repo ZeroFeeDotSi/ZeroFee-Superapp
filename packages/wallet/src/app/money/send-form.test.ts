@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createMockBridge } from "@zerofee/shell-api/MockBridge.ts";
-import { coinShown, overLine, overMax } from "./send-cap.ts";
+import { OVER_MAX_TAP, coinShown, overLine, overMax, underAmount } from "./send-cap.ts";
 import { homePots } from "../format.ts";
 import { RELAY_LIMIT_LINE, RELAY_SEND_MAX_USD } from "../../send-to.ts";
 import { walletProblems } from "../../wallet-problems.ts";
@@ -15,13 +15,16 @@ test("finding 64: a typed number over what the coin can send stays as typed, Hol
   assert.equal(overMax("10.55", "42.1"), false);
   assert.equal(overMax("abc", "42.1"), false);
   assert.equal(overLine("your SOL wallet", "$144.27"), "You can send at most $144.27 from your SOL wallet.");
+  // S1 (QA's ledger re-walk, 6 Nov): the line names the next tap while Max can set something (control: none, no tap)
+  assert.equal(overLine("your ETH (RH) wallet", "$27.93", true), "You can send at most $27.93 from your ETH (RH) wallet. Tap Max to send that.");
+  assert.equal(OVER_MAX_TAP, "Tap Max to send that.");
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
   const type = form.slice(form.indexOf("const type = (v: string)"), form.indexOf("const slide = "));
   // the copy review's ruling (5 Nov): a Send from Private alone caps at Private's figure, and says so (send-private-cap.test.ts)
   const notPrivate = type.split("\n").filter((l) => !/privateCap|if \(cap\)|Send from Private/.test(l)).join("\n");
   assert.doesNotMatch(notPrivate, /max|setTyped\(null\)/, "typing never turns into the whole balance, nor drops what was typed");
   assert.match(type, /source\.privateOnly \? privateCap\(/, "control: the cap is only a Send from Private's");
-  assert.match(form, /: waits \? waits\s*(: amountNo \? amountNo\s*)?: over \? overLine\(source\.place, most\)/, "said before any other reason, once something is typed");
+  assert.match(form, /: waits \? waits\s*(: amountNo \? amountNo\s*)?: over \? overLine\(source\.place, most, Number\(max\) > 0\)/, "said before any other reason, once something is typed");
   assert.match(form, /if \(typed === null && Number\(amount\) > Number\(max\)\)/, "a new source caps only what wasn't typed (Max)");
   assert.match(form, /onClick=\{\(\) => \{ setPreset\(true\); slide\(STEPS\); \}\} data-testid="send-max"/, "Max is the way to all of it");
 });
@@ -44,10 +47,11 @@ test("Send's coin figures have at most 4 decimals (COIN_SHOWN_DECIMALS): what le
   }
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
   // the line under the amount (the auditor's ruling, 5 Nov): rounded as the sheet rounds it (send-coin-said.test.ts)
-  assert.match(form, /`\$\{coinSaid\(amount, source\.symbol\)\} from \$\{source\.place\}`/, "the line under the amount: as the sheet says it, down");
+  // changed pin (S1, 6 Nov): the line is underAmount's (send-cap.ts), as behaviour
+  assert.equal(underAmount({ over: false, exact: null, amount: "1.128653627", symbol: "NEAR", place: "your Safe", maxLine: null }).coins, "1.1286 NEAR from your Safe", "the line under the amount: as the sheet says it, down");
   // S3: the From line is send-cap.ts heldWords (a Safe coin says "$8.85 ready to send"); a site's wallet its own line; a wallet's as before
   assert.match(form, /const held = \(s: SendSource\) => s\.line \?\? heldWords\(s\);/);
-  assert.match(readFileSync(new URL("./send-cap.ts", import.meta.url), "utf8"), /: `\$\{coinShown\(s\.amount, "down"\)\} \$\{s\.symbol\}/, "what a wallet holds, down");
+  assert.match(readFileSync(new URL("./send-cap.ts", import.meta.url), "utf8"), /(?::|return) `\$\{coinShown\(s\.amount, "down"\)\} \$\{s\.symbol\}/, "what a wallet holds, down");
   assert.doesNotMatch(form, /maximumFractionDigits: 6|round\(amount, Math\.min\(places, 6\)/, "control: the old 6-place figures are gone");
 });
 
@@ -169,10 +173,11 @@ test("the review's walk: (1) Send from a wallet's tab opens From on that wallet,
 
 test("the amount line says where the coin is: \"0.5 SOL from your SOL wallet\", \"12 USDC in your Safe\" (control: never \"in your USDC in your Safe\")", () => {
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
-  assert.match(form, /\$\{coinSaid\(amount, source\.symbol\)\} from \$\{source\.place\}`/);
+  assert.equal(underAmount({ over: false, exact: null, amount: "0.5", symbol: "SOL", place: "your SOL wallet", maxLine: null }).coins, "0.5 SOL from your SOL wallet", "changed pin: behaviour, not source");
   // R3 (the design review §4.5, say it once): before anything is typed there is no line; the From row says what it holds
   assert.doesNotMatch(form, /\$\{held\(source\)\} in \$\{source\.place\}`/, "control: never the balance a second time under the chips");
-  assert.match(form, /: \(exact \|\| Number\(amount\) > 0\) && <p className="zf-small wl-send2__coins">/);
+  assert.equal(underAmount({ over: false, exact: null, amount: "0", symbol: "SOL", place: "your SOL wallet", maxLine: null }).coins, null, "nothing typed, no line (changed pin)");
+  assert.match(form, /: under\.coins && <p className="zf-small wl-send2__coins"/);
   assert.match(form, /<span className="zf-small">\{held\(source\)\}<\/span>/, "the From row's balance, once");
   assert.doesNotMatch(form, /your \$\{source\.label\}/, "control: the dropdown's words never sit inside the line");
 });

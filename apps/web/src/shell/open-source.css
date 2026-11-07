@@ -8,10 +8,16 @@ button.os__tv { cursor: pointer; }
 .os__row { padding: 16px 0; display: grid; gap: 4px; font: 400 16px/1.3 var(--font); cursor: default; list-style: none; }
 summary.os__row { cursor: pointer; }
 summary.os__row::-webkit-details-marker { display: none; }
+/* the copy review's S6: "Licences (N)", one 44 px row over the folded list, its chevron turning when open */
+.os__all { border-bottom: 1px solid var(--line); }
+.os__all-row { min-height: 44px; grid-template-columns: 1fr auto; align-items: center; }
+.os__all-row::after { content: "›"; color: var(--mute); font-size: 20px; transition: transform var(--dur-base) var(--ease-out); }
+.os__all[open] > .os__all-row::after { transform: rotate(90deg); }
+.os__all[open] > .os__all-row { border-bottom: 1px solid var(--line); }
 .os__name { overflow-wrap: anywhere; }
 .os__meta { color: var(--mute); font-size: 13px; overflow-wrap: anywhere; }
 .os__text { margin: 0 0 16px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-2); font: 400 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; }
 .os__notice { color: var(--mute); font-size: 13px; white-space: pre-line; overflow-wrap: anywhere; }
-.os__link { appearance: none; justify-self: start; border: 0; background: none; color: var(--ink); font: 500 13px var(--font); min-height: 32px; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.os__link { appearance: none; justify-self: start; border: 0; background: none; color: var(--ink); font: 500 13px var(--font); min-height: 44px; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
 /* "Get the code" under the line (product decision, 5 Nov late): a 44 px target, its padding taken back by its margin */
 .os__link.os__code { display: inline-block; margin-top: 6px; min-height: 44px; padding: 12px 0; margin-bottom: -12px; font-size: 15px; line-height: 20px; }

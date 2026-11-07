@@ -25,14 +25,14 @@ test("rule 2: Swap's receipt says the route's time left, from the same table as 
   for (const [r, s] of routes) assert.equal(routeSec(r), s, JSON.stringify(r));
   assert.equal(aboutTime({ kind: "topup", coin: "USDC", to: "sol" }), "About 1 min.", "the sheet's line and the receipt read one figure");
   assert.equal(receiptLeft(T + routeSec({ kind: "topup", coin: "USDC", to: "sol" }) * 1000, T), "About 1 min left.");
-  assert.equal(receiptLeft(T + 30_000, T), "About 30 s left.");
+  assert.equal(receiptLeft(T + 30_000, T), "About 30 seconds left.");
   assert.equal(receiptLeft(undefined, T), TIME_WORDS.receiptNone, "control: no estimate, said plainly");
   assert.equal(receiptLeft(T - 5_000, T), "Almost there.", "past it: a calm line, never a blame on the estimate");
   const sheet = src("./SwapSheet.tsx");
   assert.match(sheet, /etaSec: routeSec\(route\), safe,/, "the job's row counts down from the tap");
   assert.match(sheet, /<JobReceipt amount=\{made\} icon=\{<ActSwap \/>\} testid="swap-made" etaSec=\{route \? routeSec\(route\) : undefined\}/);
   const made = src("./JobMade.tsx");
-  assert.match(made, /\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{etaSec\} watch \/>/, "under Job created., above where to watch it");
+  assert.match(made, /\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/, "under Job created., above where to watch it");
   assert.match(src("../../../../shell-api/src/job-run.ts"), /\.\.\.\(a\.etaSec \? \{ etaSec: a\.etaSec \} : \{\}\)/, "runJob hands it to startJob");
 });
 
@@ -70,9 +70,9 @@ test("rule 8: Send's first payment names who, the wallet it comes from, and the 
 
 test("S2 (the build's trace): a refused swap clears \"Job created.\" and says the refusal; train 10's runJob decides the row (control: a No on the sheet makes nothing)", async () => {
   const sheet = src("./SwapSheet.tsx");
-  assert.match(sheet, /made: \(\) => \{ sayWent\(""\); setMade\(said\); setBusy\(false\); \},/);
-  assert.match(sheet, /if \("refused" in end\) \{ mark\("refused"\); setMade\(null\); return void \(saidOnSheet\(end\.refused\) \? setStopped\(end\.refused\) : problem\(end\.refused, onUsd\)\); \}/);
-  assert.match(sheet, /if \("problem" in end\) \{ mark\("refused"\); setMade\(null\); return void \(saidOnSheet\(end\.problem\) \? setStopped\(end\.problem\) : problem\(end\.problem, onUsd\)\); \}/, "refused after the job existed: the row says why (runJob), and the sheet too");
+  assert.match(sheet, /made: \(j\) => \{ sayWent\(""\); setMadeJob\(j\.id\); setMadeSaid\(\{ going: swappingLine\(said, SWAP_COIN\[pay\.place\]\.label, SWAP_COIN\[get\]\.label\), landed: swappedLine\(said, lands, SWAP_COIN\[get\]\.where\) \}\); setMade\(said\); setBusy\(false\); \},/);
+  assert.match(sheet, /if \("refused" in end\) \{ mark\("refused"\); setMade\(null\); return void \(sendEndsHere\(end\.refused\) \? endHere\(shell, end\.refused, onClose\) : saidOnSheet\(end\.refused\) \? setStopped\(end\.refused\) : problem\(swapRefusal\(end\.refused\), onUsd\)\); \}/);
+  assert.match(sheet, /if \("problem" in end\) \{ mark\("refused"\); setMade\(null\); return void \(sendEndsHere\(end\.problem\) \? endHere\(shell, end\.problem, onClose\) : saidOnSheet\(end\.problem\) \? setStopped\(end\.problem\) : problem\(swapRefusal\(end\.problem\), onUsd\)\); \}/, "refused after the job existed: the row says why (runJob), and the sheet too");
   assert.match(sheet, /if \("declined" in end\) return setMade\(null\);/, "control: a No makes nothing");
   // train 10 wins (ask-first runJob): the sheet never makes a second row of its own; a refusal before the Safe's yes
   // takes the tap's job away, after it the row ends stopped with the refusal's words
@@ -84,7 +84,9 @@ test("S2 (the build's trace): a refused swap clears \"Job created.\" and says th
 
 test("S2 (the build's trace): a Safe → wallet swap Private pays names Private, never \"leaves your Safe\" (control: the grid's own line on the public leg; E7 and the NEAR wallet say nothing)", () => {
   const sol: SwapRoute = { kind: "topup", coin: "USDC", to: "sol" };
-  assert.equal(swapStays(sol, 25), "$25.00 leaves Private. If Private is short, your Safe covers the rest.");
+  // T-F (6 Nov): the cover clause only when the Safe really covers (swap-cover.ts); else Private's line alone
+  assert.equal(swapStays(sol, 25, undefined, true, { kind: "cover" }), "$25.00 leaves Private. If Private is short, your Safe covers the rest.");
+  assert.equal(swapStays(sol, 25), "$25.00 leaves Private.");
   assert.doesNotMatch(swapStays(sol, 25, (u) => u + 1)!, /leaves your Safe/);
   assert.equal(swapStays(sol, 25, (u) => u + 1, false), "Your Safe sends $26.00. $1.00 stays in Private.", "control: the public leg's round-up (Move's line, the copy review's words)");
   assert.equal(swapStays({ kind: "topup", coin: "USDC", to: "near" }, 25), null, "control: into the NEAR wallet");

@@ -15,7 +15,7 @@ import { formatNearShort } from "@zerofee/core/format";
 import type { RecoveryPending } from "@zerofee/core/signer";
 import { NOT_A_WORD, enteredWord, closeWords } from "./word-entry.ts";
 import { CHOICE_WORDS, choiceLine, newPhoneWait, oldPhoneCount, phoneCanStop, waitName, whoCanStop, type DelayChoice } from "./recovery-words.ts";
-import { endsWords, useCountdown } from "./countdown.ts";
+import { endsShort, leftWords, useCountdown } from "./countdown.ts";
 import { thisDevice } from "@zerofee/shell-api/approval-words.ts";
 import { DEFAULT_PROTECTION } from "@zerofee/core/protection-bands";
 import { MAINNET } from "../mode.ts";
@@ -154,7 +154,7 @@ export { useCountdown };
  */
 export function RecoveryWaiting({ pending, delaySeconds, onFinish, onSee, onBack, onSkip, device }: { pending: RecoveryPending; delaySeconds: number; onFinish: () => void; onSee?: () => void; onBack?: () => void; onSkip?: () => void; device?: string }) {
   const w = newPhoneWait(pending, delaySeconds, undefined, undefined, device);
-  const { left, text } = useCountdown(w.untilIso);
+  const { left } = useCountdown(w.untilIso);
   // Escape and the browser's Back leave the wait too (grade 02g, G10); it keeps waiting.
   useBack(onBack);
   const ready = w.ready || (left === 0 && w.untilIso === (pending.canFinishAtIso ?? pending.readyAtIso));
@@ -173,8 +173,8 @@ export function RecoveryWaiting({ pending, delaySeconds, onFinish, onSee, onBack
         <Mark size={120} mode="still" />
         {/* One "Ready", never a label and a figure saying the same (grade 1 Nov b, N6); while it counts, when it ends. */}
         {!ready && <div className="zf-label" style={{ marginTop: 36 }}>{w.label}</div>}
-        <div className="zf-display rc-count" style={ready ? { marginTop: 36 } : undefined}>{ready ? "Ready" : text}</div>
-        {!ready && endsWords(w.untilIso) && <p className="zf-small rc-ends">Ends {endsWords(w.untilIso)}</p>}
+        <div className="zf-display rc-count rc-count--words" style={ready ? { marginTop: 36 } : undefined}>{ready ? "Ready" : leftWords(left)}</div>
+        {!ready && endsShort(w.untilIso) && <p className="zf-small rc-ends">Ends {endsShort(w.untilIso)}</p>}
         <p className="zf-body" style={{ marginTop: 14 }}>{ready ? `The wait is over. Bring your account to ${thisDevice()}.` : w.body}</p>
         {/* Rule 9 (UI-SIMPLICITY-RULES): the time left and its end, one sentence, the step. The fallback and the NEAR held
             for the wait (true to the account, grade 02g, F14) are one tap down, never a second and third paragraph. */}
@@ -185,7 +185,7 @@ export function RecoveryWaiting({ pending, delaySeconds, onFinish, onSee, onBack
         {/* No grey "Waiting…" button: the count says it waits; Finish comes when it can be tapped. */}
         {ready && <button className="zf-btn" onClick={onFinish}>Finish</button>}
         {onSee && !ready && <button className="zf-link" onClick={onSee}>Open your laptop</button>}
-        {onSkip && !ready && <button className="zf-link" onClick={onSkip}>Skip ahead</button>}
+        {onSkip && !ready && <button className="zf-link" onClick={onSkip}>Skip ahead (sample only)</button>}
         {ready && <p className="zf-small">{HOLD_LINE}</p>}
       </div>
     </div>
@@ -235,15 +235,16 @@ export function WaitLine({ choices, seconds, onChange }: { choices: readonly Del
 /** The old phone, when someone used the words. The only screen with red on it. Release 7: who can stop it. */
 export function WasThisYou({ pending, onStop, onItsMe }: { pending: RecoveryPending; onStop: () => void; onItsMe: () => void }) {
   const count = oldPhoneCount(pending);
-  const { text } = useCountdown(count.untilIso);
+  const { alone } = useCountdown(count.untilIso);
   return (
     <div className="zf-screen zf-pad" role="alertdialog" aria-labelledby="wty-title">
       <div style={{ height: 96 }} />
       <div className="rc-center zf-enter">
         <div className="zf-label" style={{ color: "var(--alert)" }}>Recovery started</div>
         <h1 id="wty-title" className="zf-title" style={{ marginTop: 18 }}>Someone is moving your account to a new device.</h1>
-        <div className="zf-display rc-count" style={{ fontWeight: 200 }}>{text}</div>
-        <p className="zf-small">{pending.needsSecondDevice && !pending.approved ? "until it finishes, with your second device's yes" : "until it finishes"}</p>
+        <div className="zf-display rc-count rc-count--words" style={{ fontWeight: 200 }}>{alone}</div>
+        {/* the copy review (7 Nov): the figure alone, never the figure and a sentence of the same time on one screen */}
+        {pending.needsSecondDevice && !pending.approved && <p className="zf-small">Your second device has to say yes.</p>}
       </div>
       <div className="zf-note rc-alert-note zf-enter-2">{whoCanStop(pending)} If this is you, do nothing. If it isn't, stop it now. <b>Your money hasn't moved. It's in your Safe.</b></div>
       <div className="zf-fill" />

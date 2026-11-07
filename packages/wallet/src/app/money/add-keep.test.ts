@@ -1,5 +1,5 @@
-// Row 16 (4 Nov): Add money's fresh address stays the same until the person taps Change wallet and says yes;
-// never a new one on reopen or reload. The key lives in Home's sealed store. Each with a control.
+// Row 16 (4 Nov): Add money's address stays the same on reopen and reload; since the owner's Bugs: (6 Nov) it is
+// renewed only when the core says it can take no more (no Change wallet). The key lives in Home's sealed store. Each with a control.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -61,30 +61,28 @@ test("row 16: the old plain copy joins the sealed store once and is erased (cont
   assert.equal(locked.m.size, 1, "control: nothing erased");
 });
 
-test("row 16: Change wallet gives a new address only after its yes, kept at once (reload shows the new one); a no keeps the old (control: done is said, never swapped by itself)", async () => {
+test("row 16 + owner's Bugs: (6 Nov): the kept key stays on every open and reload; only the core's word that its address can take no more renews it, kept at once (reload shows the new one); a failed ask asks the same key again (control: no Change wallet)", async () => {
   const dev = deviceStore();
   const page = addCards(() => undefined);
   await page.seal(dev.bridge);
   const old = cardKey(page.store(), "safe-sol");
+  assert.equal(cardKey(page.store(), "safe-sol"), old, "reopen: the same key");
   const next = changeCardKey(page.store(), "safe-sol");
   assert.notEqual(next, old);
   await flush();
   const reload = addCards(() => undefined);
   await reload.seal(dev.bridge);
-  assert.equal(cardKey(reload.store(), "safe-sol"), next, "a reload after the yes: the new one");
-  // the sheet: the hook never makes a key by itself; only the yes does
+  assert.equal(cardKey(reload.store(), "safe-sol"), next, "a reload after a renewal: the new one");
+  // the sheet: one place sets a new key, renew(), and it runs only on addStep's renew or the address's own end
   const sheet = readFileSync(new URL("./AddSheet.tsx", import.meta.url), "utf8");
-  const hook = sheet.slice(sheet.indexOf("function useOneTimeAddress("), sheet.indexOf("function ChangeSure("));
-  assert.equal((hook.match(/setKey\(/g) ?? []).length, 1, "one place sets a new key: change()");
-  assert.match(hook, /const change = \(\) => \{[\s\S]*?setKey\(o\.slot \? changeCardKey\(store\(\), o\.slot\) : addKey\(row\.chain, to\)\);/);
-  assert.match(hook, /if \(r\.problem\.code === ADD_USED\) return setDone\(true\);/, "used or ran out: said, not swapped");
-  assert.match(hook, /const ended = \(\) => swapDue\(a\.untilIso, Date\.now\(\)\)\.due && setDone\(true\);/, "its end: said, not swapped");
-  assert.match(hook, /retry: \(\) => setTries\(\(n\) => n \+ 1\)/, "a retry asks the same key again");
-  assert.doesNotMatch(hook, /renew/, "control: the old self-swap is gone");
-  // every Change wallet goes through "Are you sure?": its yes runs change, its no only closes
-  for (const m of sheet.matchAll(/<ChangeSure onYes=\{\(\) => \{ setSure\(false\); ([a-zA-Z]+)\(\); \}\} onNo=\{\(\) => setSure\(false\)\} \/>/g)) assert.match(m[1]!, /^(change|onChange)$/);
-  assert.equal((sheet.match(/<ChangeSure /g) ?? []).length, 3, "the row, the coin page and the QR sheet");
-  assert.doesNotMatch(sheet, /onClick=\{change\}|onChange=\{change\}/, "control: never a change without the sure-check");
+  const hook = sheet.slice(sheet.indexOf("function useOneTimeAddress("), sheet.indexOf("function useCopiedFades("));
+  assert.equal((hook.match(/setKey\(/g) ?? []).length, 1, "one place sets a new key: renew()");
+  assert.match(hook, /const renew = \(\) => \{[\s\S]*?setKey\(o\.slot \? changeCardKey\(store\(\), o\.slot\) : addKey\(row\.chain, to\)\);/);
+  assert.equal((hook.match(/renew\(\)/g) ?? []).length, 4, "renew runs on the first answer's renew, the recheck's renew, the address's end, and a QR tap after a renewed key was refused only");
+  assert.match(hook, /if \("renew" in step\) return renew\(\);/, "the core's ADD_USED: a new one");
+  assert.match(hook, /const ended = \(\) => \{ if \(live && swapDue\(a\.untilIso, Date\.now\(\)\)\.due\) \{ live = false; renew\(\); \} \};/, "its end: a new one");
+  assert.match(hook, /retry: \(\) => \(usedAgain\.current \? \(\(usedAgain\.current = false\), renew\(\)\) : setTries\(\(n\) => n \+ 1\)\)/, "a retry asks the same key again, unless the core refused that renewed key");
+  assert.doesNotMatch(sheet, /ChangeSure|onChange|add-change/, "no Change wallet left");
   // Add waits for the sealed copy before it picks a key; Home reads it at boot
   assert.match(sheet, /return <AddList \{\.\.\.p\} ready=\{ready\} \/>;/, "rule 2: the sheet's frame at once, never a wait screen");
   assert.match(sheet, /const line = \(r: AddRow, to: AddTo\) => !ready \? <RowWaits /, "rows show their frame; only the address waits");

@@ -26,7 +26,25 @@ export const JOB_WORDS = {
   /** A starting row whose page closed before the core answered (a reload in the second after "Job created"; QA's
    *  Jobs re-crawl F2): nothing will tell it more, so it ends at once, never 10 minutes of "Getting ready". */
   closed: "The page closed as it started. Home shows your money.",
+  /** the copy review's W1 (6 Nov): a job Private pays whole (a hot key, D143: no Face ID by design), said on its row and its page, so
+   *  no Face ID never reads as nothing signed. */
+  fromPrivate: "From Private, so no Face ID.",
+  fromPrivatePage: "Private money is already set up to spend, so it pays without Face ID. The Safe always asks.",
+  /** the audit's ruling (B), 7 Nov: a job the page said Private pays whole (made at the tap), whose core asks the Safe after all:
+   *  its row waits on the Face ID, Signed unlit, until the Safe has signed (job.signed). Provisional (to 53). */
+  faceIdWait: "Waiting for your Face ID",
+  /** Its Not now (or a Face ID that failed): the job ends, never left waiting (the core's own words for a no). */
+  saidNo: "You said no, so nothing moved.",
+  /** the audit's ruling (8 Nov): a reopened page can't prove nothing moved (Private's way home, the core's answer not kept, a
+   *  move out of Private after its start in the ledger, or the ledger unread): never "nothing moved" without proof. */
+  mayHaveMoved: "Check Activity for where this is.",
 } as const;
+
+/** The receipt's W1 line (the copy review's W1, 6 Nov; J3, 7 Nov: a $10 Swap from the Safe that Private pays whole went straight to its
+ *  receipt with no word of why no Face ID came): a Safe route (`safeRoute`, Swap's topup) whose fill rule says the Safe
+ *  signs nothing (`signs` false: Private pays it whole, D143) says JOB_WORDS.fromPrivate; the Safe signing, or its coins
+ *  not read (undefined: the sheet comes), or a wallet's own swap: nothing. Pure: a table test. */
+export const receiptPrivate = (safeRoute: boolean, signs: boolean | undefined): string | null => (safeRoute && signs === false ? JOB_WORDS.fromPrivate : null);
 
 /** A starting row with no news this long ends with JOB_WORDS.stale. */
 export const STALE_MS = 10 * 60_000;
@@ -46,7 +64,17 @@ export interface JobHandle {
   failed(words: string): void;
   /** Nothing was made and nothing needs saying (the person said no on the Safe's sheet). */
   gone(): void;
+  /** the audit's (B), 7 Nov: a job made at the tap as Private's alone (no Face ID) whose core asks the Safe after all: its row
+   *  says JOB_WORDS.faceIdWait, every step not begun (Signed is the checkpoint now, unlit), no "From Private" line, until
+   *  approved() (the Safe signed: job.signed) or failed(). */
+  asked(): void;
 }
+
+/** Each job's own rows, by its id (its starting row, then the ids it was made with): its receipt follows these and no
+ *  other job's (QA's finding, 7 Nov; job-steps.ts receiptRows). This page's jobs only: a receipt lives no longer. */
+const rowsOfJob = new Map<string, Set<string>>();
+/** Whether the row `row` is one of job `job`'s own (its starting row, or one it was made with). */
+export const jobRows = (job: string): ((row: string) => boolean) => (row) => rowsOfJob.get(job)?.has(row) ?? false;
 
 const rand = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
 
@@ -55,11 +83,12 @@ const rand = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => 
 /** `id`: the job's own row id when it is known at the tap (a Safe Move's `move:mv-<key>`, the core's row from its start):
  *  one row, never a second. `etaSec`: how long the protocol takes (its quote, or the route's measured time): the row
  *  counts down from the tap. */
-export function startJob(tasks: Tasks | undefined, job: { title: string; usd?: string; id?: string; etaSec?: number; /** a Safe job: its first step is its approval */ approve?: boolean }, o: { now?: () => number; store?: { list(): { id: string }[]; subscribe(fn: () => void): () => void } } = {}): JobHandle {
+export function startJob(tasks: Tasks | undefined, job: { title: string; usd?: string; id?: string; etaSec?: number; /** a Safe job: its first step is its approval */ approve?: boolean; /** Private pays it whole: no Face ID, said (W1) */ fromPrivate?: boolean }, o: { now?: () => number; store?: { list(): { id: string }[]; subscribe(fn: () => void): () => void } } = {}): JobHandle {
   const now = o.now ?? Date.now;
   const id = job.id ?? `${STARTING}${rand()}`;
   const endsAt = job.etaSec && job.etaSec > 0 ? now() + job.etaSec * 1000 : undefined;
-  tasks?.publish({ id, title: job.title, ...(job.usd ? { usd: job.usd } : {}), steps: job.approve ? [{ label: JOB_WORDS.approve, state: "doing", at: now() }, { label: JOB_WORDS.starting, state: "waiting", at: now() }] : [{ label: JOB_WORDS.starting, state: "doing", at: now() }], ...(endsAt !== undefined ? { endsAt } : {}), staleMs: STALE_MS, staleDetail: JOB_WORDS.stale, open: { route: "activity" } });
+  rowsOfJob.set(id, new Set([id]));
+  tasks?.publish({ id, title: job.title, ...(job.usd ? { usd: job.usd } : {}), steps: job.approve ? [{ label: JOB_WORDS.approve, state: "doing", at: now() }, { label: JOB_WORDS.starting, state: "waiting", at: now() }] : job.fromPrivate ? [{ label: JOB_WORDS.fromPrivate, state: "done", at: now() }, { label: JOB_WORDS.starting, state: "doing", at: now() }] : [{ label: JOB_WORDS.starting, state: "doing", at: now() }], ...(job.fromPrivate && !job.approve ? { detail: JOB_WORDS.fromPrivatePage } : {}), ...(endsAt !== undefined ? { endsAt } : {}), staleMs: STALE_MS, staleDetail: JOB_WORDS.stale, open: { route: "activity" } });
   tasks?.pulse?.();
   // its own row id known at the tap (a Safe Move's): the core's row keeps its dollars from its first read, never only
   // once the core answered (the copy review's Sim walk, 5 Nov: the sheet $5.01, the job $5.20 while the Safe's Approve was up)
@@ -67,19 +96,23 @@ export function startJob(tasks: Tasks | undefined, job: { title: string; usd?: s
   let over = false;
   const drop = () => { if (!tasks?.drop?.(id)) tasks?.end(id, "done"); };
   let yes = false;
+  let asking = false;
   return {
     id,
     approved() {
-      if (over || !job.approve || yes) return;
+      if (over || !(job.approve || asking) || yes) return;
       yes = true;
       tasks?.update(id, { steps: [{ label: JOB_WORDS.approved, state: "done", at: now() }, { label: JOB_WORDS.starting, state: "doing", at: now() }] });
     },
     made(ids, missed) {
       if (over) return;
       over = true;
+      // its rows are known before the store hears of them (drop below re-reads every receipt)
+      for (const x of ids) rowsOfJob.get(id)?.add(x);
       if (missed) { tasks?.end(id, "failed", missed); return; }
       // the rows that take its place keep its dollars and its time left (job-carry.ts; Jobs hunt, 5 Nov)
-      carryTo(ids, { ...(job.usd ? { usd: job.usd } : {}), ...(endsAt !== undefined ? { endsAt } : {}) });
+      // and the job they are parts of: two core moves of one Move are its one Activity row (activity-rows.ts foldJobs)
+      carryTo(ids, { ...(job.usd ? { usd: job.usd } : {}), ...(endsAt !== undefined ? { endsAt } : {}), ...(new Set(ids).size > 1 ? { job: id } : {}) });
       // the core's row IS this row (the same id): it carries on in place
       if (ids.includes(id)) return;
       // the real rows are in the store: this one goes in the same change, so the row never blinks out
@@ -93,8 +126,15 @@ export function startJob(tasks: Tasks | undefined, job: { title: string; usd?: s
     failed(words) {
       if (over) return;
       over = true;
-      tasks?.update(id, { steps: job.approve && !yes ? [{ label: JOB_WORDS.approve, state: "failed", at: now() }] : [...(job.approve ? [{ label: JOB_WORDS.approved, state: "done" as const, at: now() }] : []), { label: JOB_WORDS.starting, state: "failed", at: now() }] });
+      const signs = job.approve || asking;
+      tasks?.update(id, { steps: signs && !yes ? [{ label: asking ? JOB_WORDS.faceIdWait : JOB_WORDS.approve, state: "failed", at: now() }] : [...(signs ? [{ label: JOB_WORDS.approved, state: "done" as const, at: now() }] : []), { label: JOB_WORDS.starting, state: "failed", at: now() }] });
       tasks?.end(id, "failed", words);
+    },
+    asked() {
+      if (over || job.approve || asking || yes) return;
+      asking = true;
+      // nothing begun (checkpointAt: Signed now, unlit); W1's line and page words go: the Safe asks after all
+      tasks?.update(id, { steps: [{ label: JOB_WORDS.faceIdWait, state: "waiting", at: now() }, { label: JOB_WORDS.starting, state: "waiting", at: now() }], detail: "" });
     },
     gone() {
       if (over) return;
@@ -138,13 +178,50 @@ function writer(bridge: Bridge, key: string): (text: string) => void {
 }
 
 let sealed = false;
-/** The starting rows ("job:") still going in what a closed page kept: each ends with JOB_WORDS.closed. */
-export function endOrphans(text: string | null): void {
+/** Private's way home's job title (Private.tsx; live-steps HOME_TRACK_WORDS.title): its reopen reads the ledger. */
+export const PRIVATE_HOME_TITLE = "Move money from Private to your Safe";
+/** What a reopened page does with a starting row it kept: goes on (its parts are in the ledger: live-steps homeTracks
+ *  follows them to done), ends it unsure, or ends it closed (today's words). */
+export type Reopen = (t: Partial<Task>) => "resume" | "unsure" | "closed";
+/** A move out of Private as the ledger lists it (private-pay.ts fromPrivate "home:<id>", the Sim's own). */
+const outOfPrivate = (m: { kind?: unknown; from?: unknown }) => m.kind === "private" && m.from === "private";
+/** How far a ledger row's start may sit before the job's own (the core's clock and the page's). */
+export const REOPEN_SLACK_MS = 5_000;
+/**
+ * the audit's ruling (8 Nov) on a reload while Private's way home goes. Ids kept (the job's carry `parts`, written the moment
+ * the core answered): any of them in the ledger, it resumes; none, it ends unsure. No ids kept (closed before the
+ * answer): "closed" only when the ledger proves no move out of Private started after the job's start; any such move,
+ * or a ledger that won't answer, unsure. Every other job: closed, as before. Rows by id only, never by time or amount
+ * alone (the start is only ever a proof of nothing).
+ */
+export async function reopenOf(bridge: Pick<Bridge, "call">, text: string | null, parts: (job: string) => readonly string[] | undefined = (job) => jobCarry().get(job)?.parts): Promise<Reopen> {
+  let kept: Partial<Task>[] = [];
+  // a damaged store proves nothing (the audit's SHOULD, 8 Nov): unsure, never "closed"
+  try { const raw = JSON.parse(text ?? "[]") as unknown; if (Array.isArray(raw)) kept = raw as Partial<Task>[]; } catch { return () => "unsure"; }
+  const mine = (t: Partial<Task>) => typeof t?.id === "string" && t.id.startsWith(STARTING) && t.state === "pending" && t.title === PRIVATE_HOME_TITLE;
+  if (!kept.some(mine)) return () => "closed";
+  const r = await bridge.call<{ id?: unknown; kind?: unknown; from?: unknown; startedAtIso?: unknown }[]>("ledger.activity", { limit: 50 }).catch(() => null);
+  const rows = r && "ok" in r && Array.isArray(r.ok) ? r.ok : null;
+  return (t) => {
+    if (!mine(t)) return "closed";
+    if (!rows) return "unsure";
+    const ids = parts(t.id!);
+    if (ids?.length) return rows.some((m) => typeof m.id === "string" && ids.includes(m.id)) ? "resume" : "unsure";
+    const since = (t.startedAt ?? 0) - REOPEN_SLACK_MS;
+    return rows.some((m) => outOfPrivate(m) && Date.parse(String(m.startedAtIso)) >= since) ? "unsure" : "closed";
+  };
+}
+/** The starting rows ("job:") still going in what a closed page kept: each ends with JOB_WORDS.closed, unless `reopen`
+ *  says it goes on (resume) or that the ledger can't prove nothing moved (unsure: JOB_WORDS.mayHaveMoved, Activity). */
+export function endOrphans(text: string | null, reopen: Reopen = () => "closed"): void {
   let kept: Partial<Task>[] = [];
   try { const raw = JSON.parse(text ?? "[]") as unknown; if (Array.isArray(raw)) kept = raw as Partial<Task>[]; } catch { return; }
   for (const t of kept) {
     if (typeof t?.id !== "string" || !t.id.startsWith(STARTING) || t.state !== "pending" || !t.app || !TASK_APP_HOME[t.app]) continue;
     const tasks = taskStore().forApp(TASK_APP_HOME[t.app].app);
+    const how = reopen(t);
+    if (how === "resume") continue;
+    if (how === "unsure") { tasks.update(t.id, { where: JOB_WORDS.mayHaveMoved, open: { route: "activity" } }); tasks.end(t.id, "stopped", JOB_WORDS.mayHaveMoved); continue; }
     tasks.update(t.id, { steps: [{ label: JOB_WORDS.starting, state: "failed", at: Date.now() }] });
     tasks.end(t.id, "failed", JOB_WORDS.closed);
   }
@@ -165,11 +242,13 @@ export async function sealJobs(bridge: Bridge, plain: Pick<Storage, "getItem" | 
   const old = (k: string) => { try { return plain?.getItem(k) ?? null; } catch { return null; } };
   const text = rows ?? old(TASKS_KEY), put = writer(bridge, SEALED_TASKS);
   taskStore().keep({ getItem: () => text, setItem: (_k, v) => put(v) });
-  // a starting row a closed page left (its own sheet is gone, so its made() never comes): it ends now (F2). A Safe Move's
-  // row has the core's own id (move:mv-…) and goes on from the core's record; only "job:" rows are the page's alone.
-  endOrphans(text);
-  // what each job said at the tap (its dollars, time, a Swap's name), kept with the rows (job-carry.ts)
+  // what each job said at the tap (its dollars, time, a Swap's name, Private's way home's parts), kept with the rows
+  // (job-carry.ts); read before the orphans, so a reopened job finds its parts by id
   jobCarry().keep(carries ?? old(JOB_CARRY_KEY), writer(bridge, SEALED_CARRY));
+  // a starting row a closed page left (its own sheet is gone, so its made() never comes): it ends now (F2), unless the
+  // ledger shows its money moved (reopenOf). A Safe Move's row has the core's own id (move:mv-…) and goes on from the
+  // core's record; only "job:" rows are the page's alone.
+  endOrphans(text, await reopenOf(bridge, text));
   try { plain?.removeItem(TASKS_KEY); plain?.removeItem(JOB_CARRY_KEY); } catch { /* nothing more to erase */ }
   return true;
 }

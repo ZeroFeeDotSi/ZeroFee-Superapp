@@ -1,13 +1,19 @@
 // Activity's rows (and the Statement's, unfolded): its own module, loaded with Activity, never in Home's first load.
 import type { SpendingActivity } from "@zerofee/core/spending";
 import { foldLegs } from "@zerofee/core/spending-fold";
+import { unsureIn } from "@zerofee/core/private-route";
 import type { Movement } from "../types.ts";
 import { statusWords } from "./hub.ts";
+import { ACTIVITY_WORDS, ago, dollars, movementDollars, payeeWords, whereNow } from "./format.ts";
+import { untilDate } from "./money/add-coins.ts";
+import type { Token } from "../types.ts";
 import { SAFE_LEG_MIN_USD } from "@zerofee/core/float-floors";
 import { swapLabel } from "./money/swap-follow.ts";
 import { isInplaceRow } from "./money/inplace-activity.ts";
 import { carried } from "@zerofee/shell-api/job-carry.ts";
-import { SLOW_MS, moveTrack, rowTitle, sendFrom, sendTrack, withCarry, type Folded, type LiveTrack } from "./money/live-steps.ts";
+import { SLOW_MS, moveTrack, paidFrom, placesSaid, rowTitle, rowTrack, sendFrom, sendTrack, withCarry, type Folded, type LiveTrack } from "./money/live-steps.ts";
+export { joinTracks } from "./money/live-steps.ts";
+import type { Task } from "@zerofee/shell-api/tasks.ts";
 
 /** The job a Spending row is (what Home's Jobs row draws: the figure asked, its own end), when the tap made one; else
  *  null (an older move, one made elsewhere). One source (the copy review's pair-jobs walk, 5 Nov: Activity "Put away $28.80 ·
@@ -16,7 +22,8 @@ export function jobOf(s: SpendingActivity): LiveTrack | null {
   const c = carried(`move:${s.id}`);
   // the core kept the person's own figure (askedUsd): its job's name, with no carry too (a reload, another device)
   if (!c?.usd && !c?.words && !s.askedUsd) return null;
-  const t = moveTrack(s as Folded);
+  // a job's row (its parts): the job's one track, every wallet it goes to and every part's end (the audit's M2/M3, 7 Nov)
+  const t = rowTrack(s as Folded);
   return t ? withCarry(t, c) : null;
 }
 /** A job's line: its end, or the step going now (each ticked on a chain read: live-steps.ts). */
@@ -35,7 +42,8 @@ export const lineOf = (s: SpendingActivity): string => { if (isInplaceRow(s) && 
 /** The same move in the ledger and in Spending, by its id (review, 1 Nov: matched by time, two moves a minute apart
  *  could swap rows, and the two sides showed different amounts). A Top up's row carries the ledger movement's id; a Put
  *  away's ledger row carries the engine's move key. */
-const sameMove = (m: Movement, r: SpendingActivity) => m.kind === "trading" && m.id === r.id;
+/** A row saved under its job's key (`mv-<key>`) keeps its ledger movement's id beside it (ledgerId, 7 Nov): the same move. */
+export const sameMove = (m: Pick<Movement, "kind" | "id">, r: Pick<SpendingActivity, "id" | "ledgerId">) => m.kind === "trading" && (m.id === r.id || m.id === r.ledgerId);
 
 /**
  * One Activity list, one row per move. Spending's `shown` rows (what the person did, what waits on them, what failed,
@@ -43,25 +51,251 @@ const sameMove = (m: Movement, r: SpendingActivity) => m.kind === "trading" && m
  * second: they win over the ledger's row for the same Top up or Put away, which only learns it on its own check. A
  * ledger row with no Spending row (an older move, or one the engine doesn't know) stays. Background moves stay quiet.
  */
-export function activityRows(ledger: Movement[], spending: SpendingActivity[]): { ledger: Movement[]; spending: SpendingActivity[] } {
+export function activityRows(ledger: Movement[], spending: SpendingActivity[], jobOfRow: (id: string) => string | undefined = noJob): { ledger: Movement[]; spending: JobRow[] } {
   const shown = spending.filter((r) => r.shown);
   // a move paid from Private is its one row: its payments (the fill, each wallet's) are in it, never rows of their own (S5;
   // "Paid … with the address you gave" for the person's own pump.fun wallet; fix/jobs-4r f9f3ab6d4, ba41a7710)
   const paid = new Set(shown.flatMap((r) => r.paid ?? []));
   // one move, one row: a Move's legs fold into its row (each kept whole in `legs`; the Statement unfolds them)
-  return { ledger: ledger.filter((m) => !paid.has(m.id) && !shown.some((r) => sameMove(m, r))), spending: foldLegs(shown).map(stillGoing) };
+  // one job, one row (Activity's screen passes carriedJob): a Move's core moves (the Safe's and each wallet's leg) share no `of`, so they fold by their job
+  // a movement a row stands for (its payments, its own ledger move) is never a row: its end is the row's (hiddenEnd)
+  const said = shown.map((r) => hiddenEnd(r, ledger.filter((m) => (r.paid ?? []).includes(m.id) || sameMove(m, r))));
+  const kept = ledger.filter((m) => !paid.has(m.id) && !shown.some((r) => sameMove(m, r)));
+  return { ledger: jobOfRow === noJob ? kept : foldHomes(kept), spending: foldJobs(foldLegs(said).map(stillGoing), jobOfRow) };
 }
+
+/** Private's way home, one job, one row (the copy review's MUST, 8 Nov): its coins' core moves (the page's carry names their job) fold
+ *  into the first, which keeps them in `homeParts`, each whole with its own figure for its page; its status the worst. */
+export type HomeFold = Movement & { homeParts?: Movement[] };
+export function foldHomes(ledger: readonly Movement[], jobOf: (id: string) => string | undefined = (id) => carried(`send:${id}`)?.job): HomeFold[] {
+  const isHome = (m: Movement) => m.kind === "private" && m.from === "private";
+  const byJob = new Map<string, Movement[]>();
+  for (const m of ledger) { const j = isHome(m) ? jobOf(m.id) : undefined; if (j) byJob.set(j, [...(byJob.get(j) ?? []), m]); }
+  const out: HomeFold[] = [];
+  for (const m of ledger) {
+    const j = isHome(m) ? jobOf(m.id) : undefined;
+    if (!j) { out.push(m); continue; }
+    const all = byJob.get(j)!;
+    const first = all.reduce((a, b) => (Date.parse(a.startedAtIso) <= Date.parse(b.startedAtIso) ? a : b));
+    if (first !== m) continue;
+    const status = (["problem", "waiting", "moving", "refunded", "done"] as const).find((st) => all.some((x) => x.status === st)) ?? first.status;
+    const updatedAtIso = all.reduce((a, b) => (Date.parse(a.updatedAtIso) >= Date.parse(b.updatedAtIso) ? a : b)).updatedAtIso;
+    out.push({ ...first, status, updatedAtIso, homeParts: all });
+  }
+  return out;
+}
+
+/** A folded way home's row (copy review, 8 Nov): "Moved $33.86 from Private to your Safe", its line each coin's figure then its
+ *  place ("USDC $25.00 · NEAR $8.86 · in your Safe"), dearest first as its sheet took them (homePlan); `said`: the job's figure at the tap, else the coins' sum. */
+export function homeRowOf(r: HomeFold, tokens: Map<string, Token>, said: string | undefined = carried(carried(`send:${r.id}`)?.job ?? "")?.usd): { title: string; line: string; usd: string; coins: { symbol: string; usd: string }[] } | null {
+  if (!r.homeParts?.length) return null;
+  const coins = r.homeParts.map((m) => ({ symbol: tokens.get(m.to === "near" ? "nep141:wrap.near" : m.to ?? "")?.symbol ?? (m.to === "near" ? "NEAR" : "Coin"), usd: movementDollars(m, tokens) ?? "" })).sort((a, b) => (Number(b.usd.replace(/[^0-9.]/g, "")) || 0) - (Number(a.usd.replace(/[^0-9.]/g, "")) || 0));
+  const sum = coins.reduce((n, c) => n + (Number(c.usd.replace(/[^0-9.]/g, "")) || 0), 0);
+  const usd = said ?? dollars(sum.toFixed(2));
+  const verb = r.status === "done" ? "Moved" : r.status === "moving" || r.status === "waiting" ? "Moving" : "Move";
+  return { title: `${verb} ${usd} from Private to your Safe`, line: [...coins.map((c) => `${c.symbol} ${c.usd}`.trim()), whereNow(r, "")].join(" · "), usd, coins };
+}
+
+/** the audit's pin (7 Nov): a row hides its own ledger movements (its payments, `paid`; its public move, sameMove). One that ended
+ *  FAILED with its money unsure (the ledger's convertFailed: "either in your Safe or still with NEAR Intents") makes the row
+ *  say so, on its line and its page: never a bare "Moving", never Done. Any other row as it was. Pure. */
+export function hiddenEnd(r: SpendingActivity, mine: readonly Movement[]): SpendingActivity {
+  if (r.status === "failed" || r.status === "refused" || r.unsure) return r;
+  const m = mine.find((x) => x.status === "problem" && x.problem?.money.state === "unsure");
+  const where = m?.problem?.money && "where" in m.problem.money ? m.problem.money.where : undefined;
+  const place = where && /^either in (.+) or still with /.exec(where)?.[1];
+  if (!m || !place) return r;
+  const u = unsureIn(place);
+  return { ...r, status: "failed", unsure: true, note: `Your money is ${u.where}. ${u.check}` };
+}
+
+/** A Spending row with the other core moves of its job (`parts`, each whole with its own figure). */
+/** `own`: the first row's own state when the job's (the worst of its parts) differs: its own line says it (audit, 7 Nov). */
+export type JobRow = SpendingActivity & { parts?: SpendingActivity[]; own?: SpendingActivity["status"] };
+/** The job a core row is part of (job-start.ts made(): the job's id, carried onto each row it made). */
+export const carriedJob = (id: string): string | undefined => carried(`move:${id}`)?.job;
+/** The record (the Statement, AgentZero) keeps every core move its own row: no job folding there. */
+const noJob = (): undefined => undefined;
+
+/** Where a job's state stands, worst first: one part still going is the job going; one that failed is the job failed. */
+const WORST: readonly SpendingActivity["status"][] = ["failed", "refused", "waiting-for-you", "waiting", "on-its-way", "refunded", "done"];
+
+/**
+ * One Move, one row (the Activity walk, 6 Nov, item 3: "Move $165.00 to your SOL wallet" twice, its ETH (RH) leg and the
+ * Safe's part, each with the whole job's figure). The rows one job made fold into its first: that row stays (its id, its
+ * page, its job's name and figure), the others go into `parts`, each with its own figure; its status is the worst of them.
+ */
+export function foldJobs(rows: readonly SpendingActivity[], jobOfRow: (id: string) => string | undefined): JobRow[] {
+  const byJob = new Map<string, SpendingActivity[]>();
+  for (const r of rows) { const j = jobOfRow(r.id); if (j) byJob.set(j, [...(byJob.get(j) ?? []), r]); }
+  const out: JobRow[] = [];
+  for (const r of rows) {
+    const j = jobOfRow(r.id);
+    const all = j ? byJob.get(j)! : [r];
+    if (all.length < 2) { out.push(r); continue; }
+    const first = all.reduce((a, b) => (Date.parse(a.atIso) <= Date.parse(b.atIso) ? a : b));
+    if (first !== r) continue;
+    const parts = all.filter((x) => x !== first);
+    const status = WORST.find((st) => all.some((x) => x.status === st)) ?? first.status;
+    out.push({ ...first, status, parts, ...(status !== first.status ? { own: first.status } : {}) });
+  }
+  return out;
+}
+
+/**
+ * A folded row's line (audit, 7 Nov: folding never hides a stopped or unsure leg behind the Move's whole figure): every part
+ * done, the job's own line; else each part's own line (its money's place), said once each, the first in its own state.
+ */
+export function jobRowLine(r: JobRow): string {
+  if (!r.parts?.length) return lineOf(r);
+  // the first part on its own (its own track, never the job's): each part says its own place
+  const { parts: _parts, own: _own, ...head } = r;
+  const first: SpendingActivity = { ...head, status: r.own ?? r.status };
+  const all = [first, ...r.parts];
+  // every part done: the job's one line, every wallet named ("In your SOL and NEAR wallets."; the audit's M2), once its track ended
+  if (all.every((x) => x.status === "done")) { const t = rowTrack(r as Folded); return (t && jobLine(t)) || lineOf(first); }
+  return [...new Set(all.map(lineOf).filter(Boolean))].join(" · ");
+}
+
+/** A job's row's page facts (the audit's M3, 7 Nov): its To names every wallet the job goes to, in the plan's order ("SOL
+ *  wallet, NEAR wallet"), never the first part's one wallet. Any other row's facts as they are. Pure. */
+export function jobFacts<F extends { label: string; value: string }>(r: JobRow, facts: readonly F[], to: readonly string[] | undefined = carried(`move:${r.id}`)?.to): F[] {
+  if (!r.parts?.length) return [...facts];
+  const t = rowTrack(r as Folded);
+  const places = to?.length ? to : t?.money?.to ?? [];
+  const named = placesSaid(places);
+  if (!named) return [...facts];
+  // the plan's places only (the audit's SHOULD, 7 Nov): an unknown key is dropped, never printed
+  const list = places.filter((p) => ORDER.includes(p)).sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b)).map((p) => (p === "safe" ? "Safe" : `${NAMES[p]} wallet`));
+  const from = jobFrom(r);
+  return facts.map((f) => (f.label === "To" ? { ...f, value: list.join(", ") } : f.label === "From" && from ? { ...f, value: from } : f));
+}
+/** Who paid a job of several parts, in the sheet's row order ("Safe, Private, ETH (RH) wallet"; QA's SHOULD, 53, 7 Nov):
+ *  each part's own record: paid from Private with the Safe's fill, the Safe and Private; from Private alone, Private (the
+ *  ledger's own payments, paidFrom); the Safe's own send, the Safe; a wallet's move, that wallet. Pure. */
+export function jobFrom(r: JobRow): string | undefined {
+  const parts = [r, ...(r.parts ?? [])] as SpendingActivity[];
+  const who = new Set<string>();
+  for (const p of parts) {
+    if (p.via === "private") { for (const w of p.fill ? ["safe", "private"] : paidFrom(p)) who.add(w); }
+    else if (p.kind === "top-up") who.add("safe");
+    else if (p.network) who.add(p.network);
+  }
+  const list = FROM_ORDER.filter((w) => who.has(w)).map((w) => (w === "safe" ? "Safe" : w === "private" ? "Private" : `${NAMES[w]} wallet`));
+  return list.length ? list.join(", ") : undefined;
+}
+const FROM_ORDER = ["safe", "private", "sol", "hood", "near", "bsc"];
+const ORDER = ["safe", "sol", "hood", "near", "bsc"];
+const NAMES: Record<string, string> = { sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+
+/** What the Activity centre's store says ended (Home's tasks, "move:<row id>", "send:<movement id>"): its end and when. */
+export type TaskEnd = { state: "done" | "failed" | "stopped"; at: number; where?: string };
+export function endsOf(tasks: readonly Pick<Task, "app" | "id" | "state" | "startedAt" | "updatedAt" | "endedAt" | "where" | "detail">[]): Map<string, TaskEnd> {
+  return new Map(tasks.filter((t) => t.app === "home" && t.state !== "pending").map((t) => [t.id, { state: t.state as TaskEnd["state"], at: t.endedAt ?? t.updatedAt ?? t.startedAt, ...(t.where ?? t.detail ? { where: (t.where ?? t.detail)! } : {}) }]));
+}
+
+/** The Home tasks still going (Now's): their rows are in Now only (onScreen). */
+export const goingOf = (tasks: readonly Pick<Task, "app" | "id" | "state">[]): Set<string> => new Set(tasks.filter((t) => t.app === "home" && t.state === "pending").map((t) => t.id));
+
+/** A Home task that was pending and is not any more (ended, or gone): the list reads its rows again. */
+export const endedNow = (pending: ReadonlySet<string>, list: readonly { app: string; id: string; state: string }[]): boolean =>
+  [...pending].some((id) => { const t = list.find((x) => x.app === "home" && x.id === id); return !t || t.state !== "pending"; });
+
+/** A row's parts' tasks' ends (each core move is its own task: live-steps publishTracks). */
+const endOfRow = (r: JobRow, ends: ReadonlyMap<string, TaskEnd>): TaskEnd | undefined => {
+  // a job's row: its one task (live-steps watchLive: the job's track under its first row's id; its parts' own tasks dropped)
+  if (r.parts?.length && r.parts.every((p) => !ends.has(`move:${p.id}`))) return ends.get(`move:${r.id}`);
+  const all = [r, ...(r.parts ?? [])].map((x) => ends.get(`move:${x.id}`));
+  if (all.some((e) => !e)) return undefined;
+  return all.reduce((a, b) => (b!.at > a!.at ? b : a));
+};
+
+/** When a row ended, for the list's order (the walk, item 2: a Move sorted by its start sat under rows that ended during
+ *  it): its job's end as the store keeps it (kept across a reload, tasks.ts), else the latest of its own and its legs'
+ *  and parts' times; a ledger row is its updatedAtIso. */
+export function rowEndIso(r: JobRow, ends: ReadonlyMap<string, TaskEnd> = new Map()): string {
+  const e = endOfRow(r, ends);
+  if (e && Number.isFinite(e.at)) return new Date(e.at).toISOString();
+  const times = [r, ...(r.legs ?? []), ...(r.parts ?? []), ...(r.parts ?? []).flatMap((p) => p.legs ?? [])].map((x) => x.atIso).filter((x) => Number.isFinite(Date.parse(x)));
+  return times.reduce((a, b) => (b > a ? b : a), r.atIso);
+}
+
+/** The list newest END first: ledger rows by their end, Spending rows by rowEndIso. */
+export function byEnd(ledger: readonly Movement[], spending: readonly JobRow[], ends: ReadonlyMap<string, TaskEnd> = new Map()): ({ at: string; ledger: Movement } | { at: string; spending: JobRow })[] {
+  return [...ledger.map((m) => ({ at: m.updatedAtIso, ledger: m })), ...spending.map((s) => ({ at: rowEndIso(s, ends), spending: s }))].sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/**
+ * A row's face as drawn: its line and its mark. The job's end can come from the live watch's own read (live-steps
+ * watchLive, every 4 s, no spending.changed) while this list's copy of the row still says it is going: then the store's
+ * end is the truth (bug report, 6 Nov: the last job that ended was on no list), until this list reads it again.
+ */
+export function rowFace(s: JobRow, ends: ReadonlyMap<string, TaskEnd> = new Map(), now: number = Date.now()): { line: string; mark: "on" | "off" | "bad" } {
+  // the audit's M2 (7 Nov): a job's row ticks only once every part's own track landed (rowTrack ended ok), never on its rows' "done" alone
+  const landed = !s.parts?.length || rowTrack(s as Folded)?.end?.ok === true;
+  const own = { line: jobRowLine(s), mark: s.status === "failed" || s.status === "refused" || s.stoppedShort === true ? "bad" as const : [s, ...(s.parts ?? [])].every(rowTicked) && landed ? "on" as const : "off" as const };
+  const e = endOfRow(s, ends);
+  if (!e || !goingRow(s, now)) return own;
+  return { line: e.where ?? own.line, mark: e.state === "done" ? "on" : "bad" };
+}
+
+/** A Spending row (any of its parts) that its own record still shows going. */
+const goingRow = (r: JobRow, now: number): boolean => [r, ...(r.parts ?? [])].some((x) => goingTrack(moveTrack(x as Folded), now));
+const goingTrack = (t: LiveTrack | null, now: number) => !!t && !t.end && Number.isFinite(t.startMs) && now - t.startMs < SLOW_MS;
+
+/** A Send's row keeps its job's name once it ends (the walk, item 7: "Send $25.00 to bob.near" became "Paid · 5.6433
+ *  NEAR"), the title Home's row had. Its figure is what was signed and sent (audit, 7 Nov: never the typed figure where they
+ *  differ): the movement's own amount, exact in a dollar coin, else at its coin's price (sentUsd); the typed carry only
+ *  where neither is known. A Send that came back never reads as spent (audit): its line says it came back and where it is,
+ *  by the leg's own record (whereNow: paid from Private, Private; a NEAR wallet leg, the NEAR wallet; else the Safe).
+ *  None: not a Send this phone made (no carry). */
+export function sendRowOf(m: Movement, usd: string | undefined = carried(`send:${m.id}`)?.usd, tokens?: ReadonlyMap<string, Token>): { title: string; usd: string; line?: string } | null {
+  const t = sendJobOf(m, tokens, usd);
+  if (!t) return null;
+  return { title: rowTitle(t), usd: t.figure!, ...(m.status === "refunded" ? { line: backLine(m) } : {}) };
+}
+/** J2 (the copy review's walk, 7 Nov): a Send's page is the job face (LiveTracker, job-face.ts), the same as its Now row's, never the old
+ *  "Paid to" card page: its track by the same rules as Home's (live-steps sendTrack), its figure what was signed and sent
+ *  (sentUsd), else the typed carry. None: not a Send this phone made (no carry). Pure. */
+export function sendJobOf(m: Movement, tokens?: ReadonlyMap<string, Token>, usd: string | undefined = carried(`send:${m.id}`)?.usd): (LiveTrack & { figure?: string }) | null {
+  if (!usd) return null;
+  const figure = (tokens ? sentUsd(m, tokens) : undefined) ?? usd;
+  const t = sendTrack(m, sendFrom(m), m.to ? payeeWords(m.to) : "them", figure);
+  return t ? { ...t, figure } : null;
+}
+/** What a Send signed and sent, in dollars: its own amount, to the cent in a dollar coin (USDC, USDT), else at its coin's
+ *  price (format movementDollars). Unknown (no price): undefined. Pure. */
+export function sentUsd(m: Movement, tokens: ReadonlyMap<string, Token>): string | undefined {
+  const coin = tokens.get(m.from === "near" ? "nep141:wrap.near" : m.from ?? "");
+  if (coin && /^USD[CT]$/i.test(coin.symbol) && Number(m.amount) > 0) return `$${(Math.round(Number(m.amount) * 100) / 100).toFixed(2)}`;
+  const d = movementDollars(m, tokens as Map<string, Token>);
+  return d && d.startsWith("$") ? d : undefined;
+}
+/** A Send that came back: "Came back to Private." (whereNow's place, by the leg's own record). Pure. */
+export const backLine = (m: Movement): string => ACTIVITY_WORDS.cameBack(whereNow({ ...m, status: "refunded" }, "").replace(/^back in /, ""));
+
+/** A row's time (copy review, 7 Nov): an ended row says its date and time, "6 Nov", never "now"; one still going, how
+ *  long ago ("2 min"). Pure but for the phone's clock zone. */
+export const whenOf = (iso: string, ended: boolean, now: number): string => (ended ? untilDate(iso) || ago(iso, now) : ago(iso, now));
+/** A Spending row that ended (the list holds a slow one still going too). */
+export const rowEnded = (s: Pick<SpendingActivity, "status">): boolean => !["on-its-way", "waiting", "waiting-for-you"].includes(s.status);
+/** A ledger row that ended. */
+export const movementEnded = (m: Pick<Movement, "status">): boolean => m.status === "done" || m.status === "refunded" || m.status === "problem";
 
 /** One action, one row on Activity's screen (QA's Sim re-check, 5 Nov: a running Swap was a Now card and a
  *  Money row): the same covered-ids rule as `paid` above, widened to a job still going. Its live card (Now; live-steps
  *  watchLive draws every going job) is its one row until it ends, then the record row is. One gone slow (SLOW_MS) leaves
  *  Now, so it stays a row. The record itself (activityRows: the Statement, AgentZero) keeps every row. */
-export function onScreen(rows: { ledger: Movement[]; spending: SpendingActivity[] }, now: number = Date.now()): { ledger: Movement[]; spending: SpendingActivity[] } {
-  const going = (t: LiveTrack | null) => !!t && !t.end && Number.isFinite(t.startMs) && now - t.startMs < SLOW_MS;
+/** `ends` (endsOf the task store): a job the store says ended is on the list at once, even while this list's own copy of
+ *  its row still says going (bug report, 6 Nov): the store's end wins over a stale row. */
+/** `going` (goingOf the task store, the audit's M1, 7 Nov): a row any of whose parts is a going job in Now is in Now only, never a
+ *  row here too (04e: a ticked Move beside two of its parts "Moving"). */
+export function onScreen<S extends JobRow>(rows: { ledger: Movement[]; spending: S[] }, now: number = Date.now(), ends: ReadonlyMap<string, TaskEnd> = new Map(), going: ReadonlySet<string> = new Set()): { ledger: Movement[]; spending: S[] } {
   return {
     // a Send the live watch follows (its last hour, as watchLive), going
-    ledger: rows.ledger.filter((m) => !(Date.parse(m.startedAtIso) > now - 60 * 60_000 && going(sendTrack(m, sendFrom(m))))),
-    spending: rows.spending.filter((r) => !going(moveTrack(r as Folded))),
+    // and a coin of Private's way home while its one job is going (live-steps homeTracks: the job's own id, Now's row)
+    ledger: rows.ledger.filter((m) => !(Date.parse(m.startedAtIso) > now - 60 * 60_000 && !ends.has(`send:${m.id}`) && goingTrack(sendTrack(m, sendFrom(m)), now)) && !going.has(carried(`send:${m.id}`)?.job ?? "")),
+    spending: rows.spending.filter((r) => !(goingRow(r, now) && !endOfRow(r, ends)) && ![r, ...(r.parts ?? [])].some((x) => going.has(`move:${x.id}`))),
   };
 }
 

@@ -48,7 +48,7 @@ test("the proof run (5 Nov): the fill closed, the sheet promises only Private's 
   assert.equal(safeCoinMost([safe], false), 0, "an empty Private moves nothing from the Safe");
   const legs = [{ from: "safe" as const, to: "sol" as const, usd: 30 }];
   assert.equal(fillLine(legs, [safe, priv], false), null, "nothing fills Private, nothing promised");
-  assert.equal(fillLine(legs, [safe, priv], true), null, "control: $20 short, its step is $30, all of it paid on: the legs say it (Sim re-check: one amount, said once)");
+  assert.equal(fillLine(legs, [safe, priv], true), "Your Safe sends $40.00. $10.00 stays in Private.", "control: the core folds Private's $10 into one $40 fill (moveSplit; J2-1, 8 Nov): what stays is said once");
   assert.equal(safeMostLine(0, 10, true, false), "One Move can take up to $10 from Private.");
   assert.equal(safeMostLine(0, 0, true, false), "Moves pay from Private. It's empty right now.");
   assert.equal(safeMostLine(0, 0, false, false), MOVE_WORDS.reading);
@@ -62,14 +62,16 @@ test("Sim re-check (QA, 5 Nov): the Move sheet's legs and Private's row are what
   const priv = (usd: string) => ({ tokenId: USDC, symbol: "USDC", amount: usd, usd, listed: true, held: "private" });
   // the sheet's own legs as typedTo made them: Private's share first, the Safe the rest
   const big = fillLegs([{ from: "safe", to: "sol", usd: 35 }, { from: "private", to: "sol", usd: 15 }], fillOf([{ from: "safe", to: "sol", usd: 35 }, { from: "private", to: "sol", usd: 15 }], [safe, priv("15")]));
-  assert.deepEqual(big.legs, [{ from: "safe", to: "sol", usd: 40 }, { from: "private", to: "sol", usd: 10 }]);
-  assert.equal(big.privateUsd, -10, "Private falls $10.00, as it did");
-  assert.equal(fillLine([{ from: "safe", to: "sol", usd: 35 }, { from: "private", to: "sol", usd: 15 }], [safe, priv("15")]), null, "one amount, said once: the legs say it");
+  // J2-1 (audit, 8 Nov): the core's split, never the page's own: Private's $15 folds into one $60 fill, the Safe pays the $50
+  assert.deepEqual(big.legs, [{ from: "safe", to: "sol", usd: 50 }]);
+  assert.equal(big.privateUsd, 10, "Private rises $10.00 (+$60 fill, -$50 paid), as the core runs it");
+  assert.equal(fillLine([{ from: "safe", to: "sol", usd: 35 }, { from: "private", to: "sol", usd: 15 }], [safe, priv("15")]), "Your Safe sends $60.00. $10.00 stays in Private.", "what stays, said once");
   const legs2 = [{ from: "private" as const, to: "sol" as const, usd: 5 }, { from: "safe" as const, to: "sol" as const, usd: 4.74 }];
   const small = fillLegs(legs2, fillOf(legs2, [safe, priv("5")]));
   assert.deepEqual(small.legs, [{ from: "safe", to: "sol", usd: 9.74 }], "Private pays nothing of it");
-  assert.equal(small.privateUsd, 0.26, "Private rises $0.26, as it did");
-  assert.equal(fillLine(legs2, [safe, priv("5")]), "Your Safe sends $10.00. $0.26 stays in Private.");
+  // the core folds Private's $5 too: one $20 fill (the step over $9.74 and its gap), Private keeps $10.26 more
+  assert.equal(small.privateUsd, 10.26, "Private rises $10.26, as the core runs it");
+  assert.equal(fillLine(legs2, [safe, priv("5")]), "Your Safe sends $20.00. $10.26 stays in Private.");
   // the legs add up to the Move, whole cents
   for (const r of [big, small]) assert.equal(Math.round(r.legs.reduce((n, l) => n + l.usd, 0) * 100), Math.round((r === big ? 50 : 9.74) * 100));
   // controls: the fill closed, the sheet's own legs; Private covers it, all from Private

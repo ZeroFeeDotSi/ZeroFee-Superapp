@@ -17,7 +17,7 @@ export const TAB_NAME: Record<"all" | "safe" | RowChain, string> = { all: "All",
  *  build without one (the free build) keeps Send hidden, and every Send ask on the web ends at once (MoneyHost). */
 export const WEB_SEND_PRIVATE = true;
 /** Send on the web: private, and the build has the quote relay its one quote goes through (VITE_ZEROFEE_RELAY). */
-export const webSendOpen = (relay: string | undefined = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_RELAY): boolean => WEB_SEND_PRIVATE && /^https:\/\//.test(relay ?? "");
+export const webSendOpen = (relay: string | undefined = import.meta.env?.VITE_ZEROFEE_RELAY): boolean => WEB_SEND_PRIVATE && /^https:\/\//.test(relay ?? "");
 export const WEB_SEND_OPEN: boolean = webSendOpen();
 
 /** The web wallet's round actions: Add, and Send only while WEB_SEND_OPEN. Never Move (there is no Safe to move to or

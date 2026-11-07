@@ -142,7 +142,8 @@ struct SheetWords: Equatable {
     self.hint = hint
     // the core's `amountSaid` (a Move's split block: one amount, said once), as the web's sheet-amount.ts amountLine: the
     // "Amount:" line goes only while a line itself says the signed amount's dollars (the audit's condition); a flag alone never hides it
-    let dollars = amount.map { $0.components(separatedBy: " (")[0].trimmingCharacters(in: .whitespaces) } ?? ""
+    // a priced coin's "about $30.00 (6.7731 NEAR)": the same dollars a line says, as sheet-amount.ts strips its "about "
+    let dollars = amount.map { $0.components(separatedBy: " (")[0].trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "^about ", with: "", options: .regularExpression) } ?? ""
     let said = dollars.range(of: "^\\$[0-9,]+\\.[0-9]{2}$", options: .regularExpression) != nil && readLines.contains { $0.contains("· \(dollars)") || $0.contains(" \(dollars) ") }
     self.amount = (w["amountSaid"] as? Bool) == true && said ? nil : amount
     self.testNetwork = (w["testNetwork"] as? Bool) == true

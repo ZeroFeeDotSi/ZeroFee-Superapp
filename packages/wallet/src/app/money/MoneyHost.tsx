@@ -120,6 +120,7 @@ function Host({ ask: first, onEnd, onSame }: { ask: MoneyAsk; onEnd: (end: Money
     if (n.screen === "spending-cap") return setAsk({ kind: "cap" });
     if (n.screen === "receive" || n.screen === "wallet/receive") return setAsk({ kind: "receive" });
     close();
+    if (n.screen === "activity") return shell.openApp("wallet", "activity");
     if (n.screen.includes("/")) {
       const [app, tab] = n.screen.split("/");
       shell.openApp(app as never, tab);

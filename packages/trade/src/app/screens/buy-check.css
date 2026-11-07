@@ -9,3 +9,11 @@
 .tp-has { color: var(--mute, var(--ink-3)); text-align: center; }
 .tp-move { display: block; width: 100%; min-height: 44px; background: none; border: 0; padding: 0; color: var(--ink, currentColor); font: inherit; font-weight: 600; text-align: center; cursor: pointer; }
 .tp-move:disabled { opacity: .5; }
+/* T2-5 (the copy review's walk, 8 Nov): the over-wallet refusal's head, then "Nothing was spent."; its way on is the floor's quiet
+   second button, 44 px, under the lit "Buy $X instead" */
+.tp-refuse-head { text-align: center; color: var(--ink); margin: 0; }
+.tp-floor .tp-add-quiet { height: 44px; min-height: 44px; margin-top: 0; }
+/* with the second button the keys come up a step (46 px rows, still past 44) so both buttons sit whole on a 390 x 844
+   first frame, never under the edge */
+.tp:has(.tp-add-quiet) .tp-pad { margin-top: 8px; }
+.tp:has(.tp-add-quiet) .tp-pad .zf-keypad { grid-auto-rows: 46px; }

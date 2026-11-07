@@ -102,13 +102,6 @@ export const nearProblems = {
     money: { state: "safe", where: "back in your NEAR wallet" },
     next: { kind: "retry", label: "Try again" },
   }),
-  /** The swap ran (NEAR's final answer), and two nodes at a final block past it show the coin didn't reach the wallet. */
-  rheaNotArrived: (symbol: string): Problem => ({
-    code: "trade.near.not-arrived",
-    whatHappened: `The ${symbol} trade ran, but the coin didn't reach your wallet.`,
-    money: { state: "on-the-way", where: "with Rhea" },
-    next: { kind: "nothing", label: "OK" },
-  }),
   /** A NEAR coin with no plain Rhea pool against NEAR: not bought (product decision, 5 Nov: the chain's own protocols only). */
   rheaNoPool: (symbol: string): Problem => ({
     code: "trade.near.rhea-no-pool",

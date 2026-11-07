@@ -337,7 +337,7 @@ test("W4 switch: on by default since the relay's deploy (launch A7); VITE_WEB_SE
   assert.match(sheet, /if \(!WEB_SEND_TOKENS\) return;\n\s+let on = true;\n\s+void bridge\.call<[^>]+>\("subwallet\.sendCoins", \{\}\)/, "nothing is read while off");
   assert.doesNotMatch(sheet, /shown\?\.held|trade\.positions/, "never Trade's book of coins traded here");
   const src = readFileSync(new URL("./web-send.ts", import.meta.url), "utf8");
-  assert.match(src, /export const WEB_SEND_TOKENS: boolean = webSendTokensOn\(\(import\.meta as [^)]+\)\.env\?\.VITE_WEB_SEND_TOKENS\);/);
+  assert.match(src, /export const WEB_SEND_TOKENS: boolean = webSendTokensOn\(import\.meta\.env\?\.VITE_WEB_SEND_TOKENS\);/);
 });
 
 // Launch A7 (QA's live dry quotes through the deployed relay's case (h), 5 Nov): SOL USDC at $5, $50 and $500.

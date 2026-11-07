@@ -10,6 +10,7 @@ import type { Candle } from "../market/types.ts";
 import { chartTime, onTimeGrid, type GridCandle } from "./chart-math.ts";
 import { alpha, directionOf, GRID_ALPHA, lineColors, nearestCandle, sameCandles, SCRUB_ALPHA, volumeColor, type Direction } from "./chart-style.ts";
 import { price as fmtPrice } from "./format.ts";
+import { armScrub, type ScrubArm } from "./coin-words.ts";
 
 export type ChartMode = "line" | "candle";
 type Lib = typeof import("lightweight-charts");
@@ -84,7 +85,8 @@ export function Chart({ candles, mode = "line", dir: dirIn, height = 220, onScru
       grid: { vertLines: { visible: false }, horzLines: { visible: !line, color: alpha(p.text, GRID_ALPHA) } },
       rightPriceScale: { visible: !line, borderVisible: false, entireTextOnly: true, scaleMargins: line ? { top: 0.12, bottom: 0.06 } : { top: 0.08, bottom: 0.22 } },
       timeScale: { visible: false, borderVisible: false, rightOffset: line ? 0 : 2, fixLeftEdge: true, fixRightEdge: true },
-      crosshair: { mode: lib.CrosshairMode.Magnet, vertLine: { color: alpha(p.text, SCRUB_ALPHA), width: 1, style: lib.LineStyle.Solid, labelVisible: false }, horzLine: { visible: false, labelVisible: false } },
+      // no cursor until a finger (armScrub): the tap that opened the page leaves no line at mid-chart (copy review, 6 Nov, item 10)
+      crosshair: { mode: lib.CrosshairMode.Magnet, vertLine: { visible: false, color: alpha(p.text, SCRUB_ALPHA), width: 1, style: lib.LineStyle.Solid, labelVisible: false }, horzLine: { visible: false, labelVisible: false } },
       handleScroll: { vertTouchDrag: false, horzTouchDrag: false, mouseWheel: false, pressedMouseMove: false }, handleScale: { axisPressedMouseMove: false, mouseWheel: false, pinch: false },
       localization: { priceFormatter: priceLabel },
     });
@@ -93,13 +95,21 @@ export function Chart({ candles, mode = "line", dir: dirIn, height = 220, onScru
     const dp = decimalsFor(data.current.at(-1)?.c ?? 0);
     const priceFormat = { type: "price" as const, precision: dp, minMove: 10 ** -dp };
     const price = (line
-      ? chart.addSeries(lib.AreaSeries, { lineColor: lc.line, topColor: lc.top, bottomColor: lc.bottom, lineWidth: 2, lineType: lib.LineType.Simple, priceLineVisible: false, lastValueVisible: false, lastPriceAnimation: calm ? lib.LastPriceAnimationMode.Disabled : lib.LastPriceAnimationMode.OnDataUpdate, crosshairMarkerRadius: 4, crosshairMarkerBorderColor: p.bg, crosshairMarkerBackgroundColor: lc.line, priceFormat, autoscaleInfoProvider: floorAtZero })
+      ? chart.addSeries(lib.AreaSeries, { lineColor: lc.line, topColor: lc.top, bottomColor: lc.bottom, lineWidth: 2, lineType: lib.LineType.Simple, priceLineVisible: false, lastValueVisible: false, lastPriceAnimation: calm ? lib.LastPriceAnimationMode.Disabled : lib.LastPriceAnimationMode.OnDataUpdate, crosshairMarkerVisible: false, crosshairMarkerRadius: 4, crosshairMarkerBorderColor: p.bg, crosshairMarkerBackgroundColor: lc.line, priceFormat, autoscaleInfoProvider: floorAtZero })
       : chart.addSeries(lib.CandlestickSeries, { upColor: p.up, downColor: p.down, wickUpColor: p.up, wickDownColor: p.down, borderVisible: false, priceLineVisible: false, lastValueVisible: false, priceFormat, autoscaleInfoProvider: floorAtZero })) as unknown as Series;
     // candles only: the volume as faint bars underneath; the line stands alone
     const vol = line ? undefined : chart.addSeries(lib.HistogramSeries, { priceScaleId: "", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false }) as unknown as Series;
     if (!line) chart.priceScale("").applyOptions({ scaleMargins: { top: 0.86, bottom: 0 } });
+    let arm: ScrubArm = { armed: false };
+    const armWith = (e: PointerEvent, type: "down" | "move") => {
+      if (arm.armed) return;
+      arm = armScrub(arm, { type, x: e.clientX, y: e.clientY });
+      if (!arm.armed) return;
+      chart.applyOptions({ crosshair: { vertLine: { visible: true } } });
+      if (line) price.applyOptions({ crosshairMarkerVisible: true });
+    };
     chart.subscribeCrosshairMove((e) => {
-      if (!e.time || !e.point) { say(null); return; }
+      if (!arm.armed || !e.time || !e.point) { say(null); return; }
       say(nearestCandle(s.current.grid ?? data.current, Number(e.time), (ms) => chartTime(ms)));
     });
     s.current = { chart, price, vol, mode, dir };
@@ -128,8 +138,8 @@ export function Chart({ candles, mode = "line", dir: dirIn, height = 220, onScru
       chart.setCrosshairPosition(k.c, sec(k.t), price as never);
       say(k);
     };
-    const down = (e: PointerEvent) => { if (e.pointerType !== "mouse") { held = true; follow(e); } };
-    const move = (e: PointerEvent) => { if (held) follow(e); };
+    const down = (e: PointerEvent) => { armWith(e, "down"); if (e.pointerType !== "mouse") { held = true; follow(e); } };
+    const move = (e: PointerEvent) => { armWith(e, "move"); if (held) follow(e); };
     let held = false;
     const unscrub = () => { held = false; chart.clearCrosshairPosition(); say(null); };
     el.addEventListener("pointerdown", down);

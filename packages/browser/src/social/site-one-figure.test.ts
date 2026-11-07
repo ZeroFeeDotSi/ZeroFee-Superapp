@@ -44,7 +44,7 @@ test("one figure: spending.wallets counts the coins bought on the site, and the 
   const page = walletView({ site: "pump", name: "pump.fun", row, read: "ok", now: 0, coins: [{ network: "sol", coins: [SOL, BONK] }] });
   assert.equal(page.dollars, "$25.28", "the page's big number");
   assert.doesNotMatch(landedLine(undefined, "pump.fun"), /\$/, "crawl F9: the landing line carries no figure, so it never says another one than the page");
-  assert.deepEqual(siteWalletLines(r.ok).map((l) => [l.title, l.line]), [["pump.fun · $25.28", "Solana"]], "Settings says it too (the copy review's \"<site> · $X\")");
+  assert.deepEqual(siteWalletLines(r.ok).map((l) => [l.title, l.line]), [["pump.fun $25.28", "Solana"]], "Settings says it too (the copy review's S3, 7 Nov: \"<site> $X\")");
   // control: subwallet.coins not answering: the coin alone (never a smaller made-up total), from the balance and the price
   const c = await service("none").call<SpendingWallet[]>("spending.wallets");
   assert.ok("ok" in c);
@@ -61,11 +61,11 @@ test("Settings lists each site's wallet (never AgentZero's pocket or an older on
     { ...base, id: "old", role: "site", site: "pump", network: "sol", label: "Older pump.fun wallet", cashUsd: "1.00", current: false },
     { ...base, id: "t", role: "chain", network: "sol", label: "SOL wallet", cashUsd: "9.00", inCap: true },
   ] as SpendingWallet[];
-  assert.deepEqual(siteWalletLines(list), [{ id: "p", title: "pump.fun · $4.00", line: "Solana" }, { id: "g", title: "GMGN · Can't see it now", line: "Solana" }]);
+  assert.deepEqual(siteWalletLines(list), [{ id: "p", title: "pump.fun $4.00", line: "Solana" }, { id: "g", title: "GMGN · Can't see it now", line: "Solana" }], "the copy review's S3: a dollar figure follows the name; a word keeps its dot");
   assert.deepEqual(siteWalletLines(list.filter((w) => w.role !== "site")), [], "control: no site wallet, nothing listed");
   // the proof (5 Nov): an empty Base wallet said "GMGN · 0 ETH"; it is "$0.00" (control: one holding some says its amount)
   const base0 = { ...base, id: "b", role: "site", site: "gmgn", network: "base", label: "GMGN wallet", holds: "0 ETH" } as SpendingWallet;
-  assert.equal(siteWalletLines([base0])[0]!.title, "GMGN · $0.00");
+  assert.equal(siteWalletLines([base0])[0]!.title, "GMGN $0.00");
   assert.equal(siteWalletLines([{ ...base0, holds: "0.002 ETH" }])[0]!.title, "GMGN · 0.002 ETH", "control: an amount still says it");
 });
 

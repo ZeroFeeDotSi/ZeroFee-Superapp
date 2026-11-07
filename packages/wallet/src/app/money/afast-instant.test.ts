@@ -28,11 +28,14 @@ const privRow = (usd: string) => ({ tokenId: USDC, symbol: "USDC", amount: usd, 
 const SAFE_SOL: Leg[] = [{ from: "safe", to: "sol", usd: 5 }];
 
 function moveIo(answer: Promise<unknown>, fills: boolean | undefined) {
-  const seen = { made: [] as number[], refused: [] as Problem[], fire: undefined as ((yes: boolean) => void) | undefined };
+  const seen = { made: [] as number[], refused: [] as Problem[], fire: undefined as ((yes: boolean) => void) | undefined, signed: undefined as (() => void) | undefined };
+  // the core's job.signed names the Move's own key (its spending.topUp's `key`), as the real core does
+  let key: string | undefined;
   const o: MoveRunIo = {
-    call: async <T,>() => (await answer) as { ok: T } | { problem: Problem },
+    call: async <T,>(m: string, p: Record<string, unknown>) => { if (m === "spending.topUp") key = p.key as string; return (await answer) as { ok: T } | { problem: Problem }; },
     tasks, keyFor: (w) => `afast-${w.replace(/[^a-z0-9]/gi, "").slice(0, 20).padEnd(16, "x")}`,
     onApproval: (fn) => { seen.fire = fn; return () => { seen.fire = undefined; }; },
+    onSigned: (fn) => { seen.signed = () => fn(key); return () => { seen.signed = undefined; }; },
     asks: true, // the web and the Sim: the shell draws and hears the Safe's sheet
     ...(fills !== undefined ? { fills } : {}),
     say: () => {}, asking: () => {},
@@ -50,7 +53,7 @@ test("the fill rule before the tap: Private paying the Safe's side whole means t
   assert.equal(safeSigns(SAFE_SOL, [safeRow("40")], false), false, "the fill closed: only Private pays, no Safe sheet");
 });
 
-test("Move (Safe → SOL, Private pays it): \"Job created.\" in the tap's own turn on the web, with no Approve step on its row (control: a Move the Safe fills waits for its Approve's yes)", async () => {
+test("Move (Safe → SOL, Private pays it): \"Job created.\" in the tap's own turn on the web, with no Approve step on its row (control: a Move the Safe fills waits for its signature, one Face ID)", async () => {
   clear();
   const core = held<unknown>();
   const { o, seen } = moveIo(core.p, false);
@@ -69,7 +72,9 @@ test("Move (Safe → SOL, Private pays it): \"Job created.\" in the tap's own tu
   const r2 = runMove(SAFE_SOL, planOf(SAFE_SOL), ctl.o);
   assert.deepEqual(ctl.seen.made, [], "control: the Safe fills Private, so its sheet comes first");
   ctl.seen.fire?.(true);
-  assert.deepEqual(ctl.seen.made, [5], "control: made on the yes, in that same turn");
+  assert.deepEqual(ctl.seen.made, [], "control: a yes is not a signature (6 Nov)");
+  ctl.seen.signed?.();
+  assert.deepEqual(ctl.seen.made, [5], "control: made on the Safe's signature, in that same turn");
   c2.answer({ ok: { id: "m2", status: "moving" } });
   await r2;
 });
@@ -124,7 +129,9 @@ test("the sheets read the rule: SwapSheet's Safe route and MoveSheet's Move ask 
 
 test("Approve is never offered on an unbound quote: the Safe's sheet is the core's, drawn only after its quote, and the Swap's button is off while the swap is blocked (control: the web sheet arms before Approve counts)", () => {
   const swap = src("./SwapSheet.tsx");
-  assert.match(swap, /disabled=\{busy \|\| \(on\.tap === "swap" && \(nothing \|\| services\.down \|\| \(!!block && block !== SWAP_WORDS\.amount\)\)\)\}/);
+  assert.match(swap, /disabled=\{busy \|\| \(on\.tap === "swap" && \(nothing \|\| !!short \|\| services\.down \|\| \(!!block && block !== SWAP_WORDS\.amount\)\)\)\}/);
   const view = readFileSync(new URL("../../../../../apps/web/src/shell/ApprovalSheetView.tsx", import.meta.url), "utf8");
-  assert.match(view, /setTimeout\(\(\) => setArmed\(true\), ARM_MS\)/, "control: Approve arms after the words are up");
+  // R4 (audit, 6 Nov): ARM_MS from the Getting-ready sheet's start when the bound figures match it, from the words' own start otherwise
+  assert.match(view, /const left = Math\.max\(0, \(armAt \?\? Date\.now\(\)\) \+ ARM_MS - Date\.now\(\)\);/, "control: Approve arms after the words are up");
+  assert.match(view, /window\.setTimeout\(\(\) => setArmed\(true\), left\)/);
 });

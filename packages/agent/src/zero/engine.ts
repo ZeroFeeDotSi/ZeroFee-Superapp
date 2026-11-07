@@ -37,6 +37,8 @@ export const PRIVATE_OFF_LINE = "AgentZero can't pay this privately yet.";
 /** The core's "ask me above $X" refusal (core agent-private.ts ASK_FIRST_CODE). */
 const ASK_FIRST = "security.agent.ask-first";
 export const UNKNOWN_LINE = "Not sure it went. Check Activity before you pay again.";
+/** A plain throw in a money call (core money-calls.ts): nobody knows if it went, so never "Didn't move" (audit, 6 Nov). */
+export const unknownEnd = (p: { code: string } | undefined): boolean => !!p && p.code.endsWith(".unexpected.money");
 export const TOP_UP_OFF_LINE = "AgentZero can't fill your SOL wallet privately yet. Nothing moved.";
 /** How often a running keep job looks at Spending while ZeroFee is open. */
 export const TICK_MS = 30_000;
@@ -567,7 +569,8 @@ export function zeroEngine(bridge: Bridge, opts: { now?: () => number; tapCheck?
       }
       // Refused before anything was signed (the core said no) is "Didn't move". Signed and sent but not confirmed (a slow
       // node, the contract's own refusal) can't be told apart here: it is "not sure", never "didn't move" (review M3).
-      const sent = !("problem" in r);
+      // A plain throw in the core can't be told apart either (unknownEnd): the same "not sure", so Pay isn't offered again.
+      const sent = !("problem" in r) || unknownEnd(r.problem);
       const line = sent ? UNKNOWN_LINE : said ? `Didn't move: ${said}` : "Didn't move. Nothing was sent.";
       // The account said no: the job stops, so a refused payment isn't tried again and again (each try costs a network
       // fee from AgentZero's allowance; security design review M1). The person starts it again.

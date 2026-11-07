@@ -66,6 +66,9 @@ export interface Fill {
   txHash: string;
   /** The amount isn't the chain's balance (it couldn't be read): what arrived is "about" this. */
   estimated?: boolean;
+  /** A NEAR coin's Rhea trade whose coin out Ref kept on its side (the transfer to the wallet failed, the audit's MUST, 7 Nov):
+   *  unproven; its unchecked end shows the way back (trade.near.rhea-kept). */
+  kept?: true;
   /** buy: coins received; sell: native received (raw). */
   got: string;
   /** buy: native spent; sell: coins sent (raw). */
@@ -106,11 +109,19 @@ export interface ChainEngine {
    */
   txHash(signedTx: string): string;
   /** "confirmed", "failed" or "expired" only when two nodes agree; otherwise "pending" or "unknown". `step` says when it expires. */
-  status(txHash: string, step?: TxStep): Promise<TxStatus>;
+  /** `since`: when the trade started (its record), so a Solana "expired" can be proven from the wallet's own history. */
+  status(txHash: string, step?: TxStep, since?: number): Promise<TxStatus>;
   /** Speed (3 Nov): "landed" as soon as ONE node has it confirmed (Solana) or mined with status 1 (EVM). The screen says
    *  done on it; status() (two nodes) still follows it in the background and has the last word. Optional: an engine
    *  without it is followed by status() alone, as before. */
   landed?(txHash: string, step?: TxStep): Promise<"landed" | "pending">;
+  /**
+   * The slow look at a trade the tap's wait gave up on ("unconfirmed"), while its card is on screen (service.ts watch):
+   * only the history-backed reads (Solana: two nodes' full history and a caught-up indexer's list, as status()'s expired
+   * branch; EVM: two nodes' receipts and the nonce, status() itself, whose receipts are never a short cache). Never the
+   * tap's fast cache read, never a send. Optional: an engine without it is looked at again only on the next open.
+   */
+  recheck?(txHash: string, step?: TxStep, since?: number): Promise<TxStatus>;
   /** Solana: the slot this wallet's last trade landed in, as the landed check read it, while it is recent (undefined: none).
    *  The core's test run of the next trade is on state at or after it (subwallet.signTx / preflight `minSlot`). */
   freshSlot?(): number | undefined;
@@ -136,7 +147,20 @@ export interface ChainEngine {
    */
   /** `timing`: the engine's own signed, sent and landed (a NEAR coin's Rhea trade: landed on the first node);
    *  `verify`: another node's answer, true to book it, false if it didn't happen, undefined if it can't tell yet. */
-  settle?(p: Prepared, key: string, onMove?: (id: string, sessionEndsAtIso?: string) => void, session?: { perTxUsd: number; totalUsd: number; minutes: number }): Promise<{ fill: Fill; timing?: { signedAt: number; sentAt: number; landedAt: number }; verify?: Promise<boolean | undefined> } | { declined: true }>;
+  settle?(p: Prepared, key: string, onMove?: (id: string, sessionEndsAtIso?: string) => void, session?: { perTxUsd: number; totalUsd: number; minutes: number }): Promise<{ fill: Fill; timing?: { signedAt: number; sentAt: number; landedAt: number }; verify?: Promise<boolean | undefined>; again?: FinalAgain } | { declined: true }>;
+  /** A NEAR coin's Rhea trade after a restart (its `verify` gone with the app): another node's FINAL answer asked again
+   *  by its hash, true to book it, false if it didn't happen, undefined if it can't tell (the audit's MUST, 7 Nov). */
+  /** `fill`: an "about" fill (again.about) gets its proven figure here before true (the audit's MUST, 7 Nov). */
+  finalAgain?(again: FinalAgain, got: string, fill?: Fill): Promise<boolean | undefined>;
+  /** A NEAR coin's kept trade (Ref kept its coin out, the audit's MUST, 7 Nov): what Ref's lost and found holds of the coin for
+   *  the wallet (two nodes; null: can't tell), and its claim back (the wallet's measured rise; undefined: can't tell). */
+  keptHeld?(token: string): Promise<bigint | null>;
+  claimKept?(token: string): Promise<{ got: bigint; hash: string } | undefined>;
   /** NEAR coins: look again at a move the core is still finishing (after a restart, or a trade that outran the wait). */
   followMove?(id: string, symbol: string): Promise<{ fill: Fill } | "pending" | { problem: import("@zerofee/core/problem").Problem }>;
 }
+
+/** What a NEAR coin's Rhea trade needs to be asked again after a restart: its hash, its signer and what it asked. */
+/** `before`: the coin out's raw balance before the trade, as the core read it at its build block (a slow-path Rhea trade's
+ *  beforeOut): FINAL with no transfer line is then decided from it after a restart too (the audit's MUST (i), 7 Nov). */
+export interface FinalAgain { hash: string; signerId: string; ask: { side: "buy" | "sell"; coin: string; poolId: number; amountIn: string; minOut: string }; fast?: true; before?: string; about?: true; atHeight?: number }

@@ -14,7 +14,7 @@ test("the row's line per phase: on its way with the coins, bought with its time,
   assert.equal(rowBuyLine({ phase: "away", at: 0 }, "DOPE"), "On its way");
   assert.equal(rowBuyLine({ phase: "away", at: 0, got: "7,505 DOPE" }, "DOPE"), "On its way · about 7,505 DOPE");
   assert.equal(rowBuyLine({ phase: "landed", at: 0, got: "7,505 DOPE", ms: 1050 }, "DOPE"), "Bought · 7,505 DOPE");
-  assert.equal(rowBuyLine({ phase: "checking", at: 0 }, "DOPE"), "Sent · still checking");
+  assert.equal(rowBuyLine({ phase: "checking", at: 0 }, "DOPE"), "Not confirmed yet", "the copy review's row word (7 Nov)");
   assert.equal(rowBuyLine({ phase: "refused", at: 0, why: "You said no. Nothing moved." }, "DOPE"), "Didn't buy · You said no. Nothing moved.");
   assert.doesNotMatch(rowBuyLine({ phase: "landed", at: 0, got: "7,505 DOPE", ms: 1050 }, "DOPE"), /about/, "control: a landed line never says about");
 });
@@ -38,7 +38,7 @@ test("money rules in the source: the sheet's service with origin chip:<address>,
 });
 
 test("the chip is a sibling of the row (never a button inside the row's button), gone while the row is the receipt; 44 pt to hit; lit only under the finger", () => {
-  assert.match(src, /\/>\n    \{!refused && !buy && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}\n    <\/div>/);
+  assert.match(src, /\{noSale \? <span className="dc-nfs" data-testid="row-not-for-sale">\{NOT_FOR_SALE\}<\/span> : !buy && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}\n    <\/div>/);
   assert.doesNotMatch(src, /<button[^>]*className="dc-row[\s\S]*?<button[^>]*dc-qb[\s\S]*?<\/button>\s*<\/button>/, "control: no nested button");
   assert.match(css, /\.dc-qb \{[^}]*height: 44px/);
   assert.match(css, /\.dc-qb__pill \{[^}]*background: var\(--fill\)/);
@@ -48,20 +48,23 @@ test("the chip is a sibling of the row (never a button inside the row's button),
 
 test("QA's MUST: an unconfirmed trade is never shown as failed, never invites a second buy; the task stays open and the record is followed to its end", () => {
   // the checking branch: the task is updated (Sent done, Landed doing), never ended; no failed buzz; the row stays the receipt
-  const checking = src.slice(src.indexOf("// unconfirmed (QA's MUST)"), src.indexOf("} catch (e) {", src.indexOf("// unconfirmed (QA's MUST)")));
-  assert.match(checking, /tasks\?\.update\(taskId, \{ detail: "Sent · still checking", steps: \[\{ label: "Sent", state: "done", at: taskAt \}, \{ label: "Landed", state: "doing" \}/);
+  const checking = src.slice(src.indexOf("// unconfirmed (QA's MUST)"), src.indexOf("    try {", src.indexOf("// unconfirmed (QA's MUST)")));
+  assert.match(checking, /tasks\?\.update\(taskId, \{ detail: "Not confirmed yet", steps: \[\{ label: "Sent", state: "done", at: taskAt \}, \{ label: "Landed", state: "doing" \}/);
   assert.doesNotMatch(checking, /tasks\?\.end\(/, "the task is not ended while the trade may still land");
   assert.doesNotMatch(checking, /feel\.failed\(\)/, "no failed buzz");
   assert.match(checking, /onState\(\{ phase: "checking", at, got \}\)/);
-  assert.match(checking, /svc\.on\(\(\) => void svc\.activity\(\)\.then/, "the record is followed on the service's own events");
+  // 7 Nov (live re-check): followed by followRecord (unconfirmed-follow.ts: on the service's own events, its end once,
+  // unconfirmed-follow.test.ts), the Row's stop kept in follow.current
+  assert.match(checking, /follow\.current = followRecord\(svc, rec\.id, \(now\) => \{/, "the record is followed on the service's own events");
   assert.match(checking, /if \(e2\.phase === "landed"\) landed\(now\); else if \(e2\.phase === "refused"\) refused\(now, e2\.why\);/, "it ends only as the chain's answer says");
-  // QA's nits: the end fires once (two events can each start activity() first), and the Row stops the follow when it goes
-  assert.match(checking, /let ended = false;[\s\S]*?if \(ended\) return;[\s\S]*?ended = true;\n\s*off\(\);/);
-  assert.match(checking, /follow\.current = off;/);
+  // 7 Nov: the trade the service throws as its unconfirmed Problem (run()) is this same checking row, never "Didn't buy"
+  assert.match(src, /e\.problem\.code === UNCONFIRMED \? await recordOf\(svc, e\.problem\) : undefined;\n\s*if \(rec\) \{ stillChecking\(rec\); return; \}/);
+  // and while the row says so with Trade on screen, the service looks at it again (watch)
+  assert.match(src, /useEffect\(\(\) => \(checking && active \? svc\.watch\(\) : undefined\), \[checking, active, svc\]\);/);
   assert.match(src, /useEffect\(\(\) => \(\) => \{ follow\.current\?\.\(\); follow\.current = null; \}, \[\]\);/, "the Row's cleanup");
   // the row: checking is never cleared by the timer, so the chip (rendered only while !buy) cannot come back
   assert.match(src, /if \(!buy \|\| buy\.phase === "away" \|\| buy\.phase === "checking"\) return;/);
-  assert.match(src, /\{!refused && !buy && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}/, "control: the chip is drawn only while the row holds no trade");
+  assert.match(src, /: !buy && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}/, "control: the chip is drawn only while the row holds no trade");
   // control: landed and refused still end as before
   assert.match(src, /if \(end\.phase === "landed"\) \{ landed\(rec\); return; \}/);
   assert.match(src, /if \(end\.phase === "refused"\) \{ refused\(rec, end\.why\); return; \}/);

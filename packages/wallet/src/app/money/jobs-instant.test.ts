@@ -8,7 +8,7 @@ import type { Problem } from "@zerofee/core/problem";
 import { taskStore, type Task } from "@zerofee/shell-api/tasks.ts";
 import { JOB_WORDS } from "@zerofee/shell-api/job-start.ts";
 import { claim, onOwnApproval, runJob, type Answer } from "@zerofee/shell-api/job-run.ts";
-import { approvalAnswered, approvalOpened } from "@zerofee/shell-api/approval-answered.ts";
+import { approvalAnswered, approvalOpened, pendingShown } from "@zerofee/shell-api/approval-answered.ts";
 import { sendFrom } from "./live-steps.ts";
 import { runMove, MOVE_LOST, type MoveRunIo } from "../screens/move-run.ts";
 import { planOf, type Leg } from "../screens/move-split.ts";
@@ -32,6 +32,12 @@ function slow<T>() {
 function sheets() {
   const s: { fire?: (yes: boolean) => void; opened?: () => void } = {};
   const on = ((fn: (yes: boolean) => void, o: { opened?: () => void } = {}) => { s.fire = fn; s.opened = o.opened; return () => { s.fire = undefined; }; }) as typeof onOwnApproval;
+  return { s, on };
+}
+/** The core's job.signed stream, driven by the test (job-run's onSigned): the Safe's last signature made. */
+function signs() {
+  const s: { signed?: () => void } = {};
+  const on = (fn: () => void) => { s.signed = fn; return () => { s.signed = undefined; }; };
   return { s, on };
 }
 
@@ -98,37 +104,42 @@ test("a refusal after the job exists ends its row with the refusal's words, neve
   assert.equal(jobs().length, 0, "control: no row");
 });
 
-test("rule 2: a Safe job (Swap from the Safe) is \"Job created.\" at the tap, in under 100 ms, while its Face ID is still asked; a No or a refusal before its yes takes it away, nothing listed; a refusal after its yes is said on its row (control: a hot wallet's job, made at the tap as before)", async () => {
+test("bug report (6 Nov, one Face ID; was rule 2's made at the tap): a Safe job (Swap from the Safe) shows \"Check this\" at the tap and is \"Job created.\" only on its signature, in that same turn; a No or a refusal before it makes nothing, nothing listed; a refusal after it is said on its row (control: a hot wallet's job, made at the tap as before)", async () => {
   clear();
   const { s, on } = sheets();
+  const sig = signs();
   const c = slow<{ id: string }>();
   let made = 0;
-  const go = runJob({ tasks, title: "Swap $10.00 of NEAR for USDC", safe: true, money: ["safe"], call: c.call, declined: (r) => "ok" in r && "declined" in r.ok, made: () => { made++; }, onApproval: on });
-  // no wall clock: made inside the tap's own call (checked before any await), so instant on any machine
-  assert.equal(made, 1, "made at the tap, in the same turn, the Face ID not answered yet");
-  assert.equal(jobs().length, 1);
+  const go = runJob({ tasks, title: "Swap $10.00 of NEAR for USDC", safe: true, money: ["safe"], call: c.call, declined: (r) => "ok" in r && "declined" in r.ok, made: () => { made++; }, onApproval: on, onSigned: sig.on });
+  // no wall clock: the Check this sheet is up inside the tap's own call (checked before any await)
+  assert.equal(made, 0, "never made at the tap");
+  assert.equal(pendingShown()?.headline, "Swap $10.00 of NEAR for USDC", "Check this, at the tap");
   s.fire!(true);
+  assert.equal(made, 0, "a yes is not a signature");
+  sig.s.signed!();
+  assert.equal(made, 1, "made on the signature, in the same turn");
+  assert.equal(jobs().length, 1);
   c.answer({ ok: { id: "t1" } });
   await go;
-  // a No: the job is gone, nothing listed
+  // a No: nothing made, nothing listed
   clear();
   const no = sheets(), c2 = slow<{ id: string } | { declined: true }>();
-  const g2 = runJob({ tasks, title: "Swap", safe: true, money: ["safe"], call: c2.call, declined: (r) => "ok" in r && "declined" in r.ok, made: () => undefined, onApproval: no.on });
+  const g2 = runJob({ tasks, title: "Swap", safe: true, money: ["safe"], call: c2.call, declined: (r) => "ok" in r && "declined" in r.ok, made: () => undefined, onApproval: no.on, onSigned: signs().on });
   no.s.fire!(false);
   c2.answer({ ok: { declined: true } });
   const r2 = await g2;
-  assert.ok("declined" in r2 && r2.after);
+  assert.deepEqual(r2, { declined: true, after: false });
   assert.equal(jobs().filter((t) => t.state !== "done").length, 0);
-  // a refusal before any yes: the sheet's own Problem, no row
+  // a refusal before any signature: the sheet's own Problem, no row
   clear();
-  const pre = await runJob({ tasks, title: "Swap", safe: true, money: ["safe"], call: async () => ({ problem: { code: "x", whatHappened: "Too little.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } } as never }), declined: () => false, made: () => undefined, onApproval: sheets().on });
+  const pre = await runJob({ tasks, title: "Swap", safe: true, money: ["safe"], call: async () => ({ problem: { code: "x", whatHappened: "Too little.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } } as never }), declined: () => false, made: () => undefined, onApproval: sheets().on, onSigned: signs().on });
   assert.ok("refused" in pre);
   assert.equal(jobs().filter((t) => t.state !== "done").length, 0);
-  // a refusal after its yes: on the row
+  // a refusal after its signature: on the row
   clear();
-  const yes = sheets(), c3 = slow<{ id: string }>();
-  const g3 = runJob({ tasks, title: "Swap", safe: true, money: ["safe"], call: c3.call, declined: () => false, made: () => undefined, onApproval: yes.on });
-  yes.s.fire!(true);
+  const yes = signs(), c3 = slow<{ id: string }>();
+  const g3 = runJob({ tasks, title: "Swap", safe: true, money: ["safe"], call: c3.call, declined: () => false, made: () => undefined, onApproval: sheets().on, onSigned: yes.on });
+  yes.s.signed!();
   c3.answer({ problem: { code: "x", whatHappened: "NEAR didn't take it.", money: { state: "safe", where: "in your Safe" }, next: { kind: "retry", label: "Try again" } } as never } as never);
   const r3 = await g3;
   assert.ok("job" in r3 && "problem" in r3);
@@ -182,24 +193,24 @@ test("QA SHOULD 2: a Send from the Safe is made only once the core answers, afte
 
 test("each sheet's submit makes its job through runJob and draws the receipt (\"Job created.\") until closed (control: Trade's buys and sells never do)", () => {
   const swap = src("./SwapSheet.tsx");
-  assert.match(swap, /const end = await runJob<SpendingActivity \| \{ declined: true \}>\(\{\n\s+tasks: jobTasks, title: words, usd: said, etaSec: routeSec\(route\), safe, money: safe \|\| signs === false \? \["safe"\] : \[`row:\$\{pay\.place\}`\],/);
-  assert.match(swap, /\{made !== null \? <JobReceipt amount=\{made\} icon=\{<ActSwap \/>\} testid="swap-made" etaSec=\{route \? routeSec\(route\) : undefined\} onDone=\{finish\} \/> : coinTrade && payPick && getPick \?/, "the same sheet, never a new one sliding in (the picker is its own sheet over it)");
+  assert.match(swap, /const end = await runJob<SpendingActivity \| \{ declined: true \}>\(\{\n\s+tasks: jobTasks, title: words, usd: said, etaSec: routeSec\(route\), safe, \.\.\.\(signs === false \? \{ fromPrivate: true \} : \{\}\), money: swapMoney\(safe, signs, pay\.place\),/);
+  assert.match(swap, /\{made !== null \? <JobReceipt amount=\{made\} icon=\{<ActSwap \/>\} testid="swap-made" etaSec=\{route \? routeSec\(route\) : undefined\} said=\{madeSaid\?\.going\} landedSaid=\{madeSaid\?\.landed\} paidLine=\{paidLine\} job=\{madeJob\} onDone=\{finish\} \/> : coinTrade && payPick && getPick \?/, "the same sheet, never a new one sliding in (the picker is its own sheet over it)");
   assert.match(swap, /end\.job\.made\(\[`move:\$\{ok\.id\}`\]\);/);
   const send = src("./SendSheet.tsx");
   assert.match(send, /\{warn && !line && \(!flying \|\| warn\.kept\) && /, "the form's warning is gone on the receipt (test, 5 Nov), but a wallet's first payment, sent at the tap (rule 8)");
-  assert.match(send, /<JobReceipt amount=\{flying\} icon=\{<ActSend \/>\} testid="send-sent" etaSec=\{etaSec\} onDone=\{madeDone\} \/>/);
+  assert.match(send, /<JobReceipt amount=\{flying\} icon=\{<ActSend \/>\} testid="send-sent" etaSec=\{etaSec\} said=\{sentSaid\?\.going\} landedSaid=\{sentSaid\?\.landed\} job=\{flyingJob\} onDone=\{madeDone\} \/>/);
   assert.match(send, /end\.job\.made\(moved\.filter\(\(m\) => m\.status !== "waiting"\)\.map\(\(m\) => `send:\$\{m\.id\}`\)\);/);
   assert.doesNotMatch(send, /setTimeout\(done/, "the receipt stays until closed (QA: never closes by itself)");
   const priv = src("../screens/Private.tsx");
-  assert.match(priv, /tasks, title: `Move \$\{what\} to your Private balance`, safe: true, money: \["safe"\],/);
-  assert.match(priv, /tasks, title: "Move your Private balance to your Safe", usd: dollars\(privateUsd\(rows\)\), safe: false, money: \["private"\],/);
+  assert.match(priv, /tasks, title: `Move \$\{what\} to Private`, safe: true, money: \["safe"\],/);
+  assert.match(priv, /tasks, title: "Move money from Private to your Safe", usd, safe: false, money: \["private"\],/);
   assert.match(priv, /<JobReceipt amount=\{made\} icon=\{<PrivateMark size=\{44\} \/>\} testid="private-add-made"/);
   const fill = src("../../../../../apps/web/src/agentzero/use-agent-wallet.ts");
   assert.match(fill, /title: `Add \$\$\{usd\.toFixed\(2\)\} to AgentZero's wallet`, usd: `\$\$\{usd\.toFixed\(2\)\}`, etaSec: LEG_SEC\.nearToSafe, safe: false, money: \["agent", "row:near"\],/);
   const az = src("../../../../../apps/web/src/agentzero/AgentWallet.tsx");
   assert.match(az, /data-testid="az-fill-made"[^]*?\{JOB_WORDS\.created\}/);
   const made = src("./JobMade.tsx");
-  assert.match(made, /data-state="away"[^]*?\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{etaSec\} watch \/>/);
+  assert.match(made, /data-state="away"[^]*?\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/);
   const trade = src("../../../../trade/src/app/TradeApp.tsx");
   assert.doesNotMatch(trade, /runJob|startJob/, "control: Trade's buys and sells are not jobs");
 });
@@ -228,28 +239,28 @@ test("a Move whose call throws after its job was made ends the job's row (QA's c
 test("every job's receipt names NEAR Confidential under \"Job created.\", never \"privately\" (audit H1); Private's way home too", () => {
   const made = readFileSync(new URL("./JobMade.tsx", import.meta.url), "utf8");
   assert.match(made, /export const THROUGH_CONFIDENTIAL = "It goes through NEAR Confidential\.";/);
-  assert.match(made, /\{JOB_WORDS\.created\}<\/p>\n\s*\{through && <p className="zf-receipt__line" data-testid=\{`\$\{testid\}-through`\}>\{through\}<\/p>\}\n\s*<TimeLeft etaSec=\{etaSec\} watch \/>/, "under Job created, then the time left (Jobs hunt B3), above where to watch it");
+  // the copy review's what-happened line sits under "Job created.", above the protocol's (7 Nov; the product's words stand above it)
+  assert.match(made, /\{JOB_WORDS\.created\}<\/p>\n\s*\{line && <p className="zf-receipt__line" data-testid=\{`\$\{testid\}-said`\}>\{line\}<\/p>\}\n\s*\{through && <p className="zf-receipt__line" data-testid=\{`\$\{testid\}-through`\}>\{through\}<\/p>\}\n\s*<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/, "under Job created, then the time left (Jobs hunt B3), above where to watch it");
   // NEAR Confidential by default; only a NEAR wallet move that isn't its route (Spending's, Trade's Add/Take out) says none
   assert.match(made, /through = THROUGH_CONFIDENTIAL/, "every job names NEAR Confidential unless its caller says it isn't the route");
   assert.doesNotMatch(made.replace(/\/\*\*[^]*?\*\//g, ""), /privately|keeps it private/i, "control: says only what's true");
-  assert.match(readFileSync(new URL("../screens/Private.tsx", import.meta.url), "utf8"), /\{JOB_WORDS\.created\} \{THROUGH_CONFIDENTIAL\} \{PRIVATE_JOB_WATCH\}/);
+  assert.match(readFileSync(new URL("../screens/Private.tsx", import.meta.url), "utf8"), /\$\{JOB_WORDS\.created\} \$\{receiptLeft\(madeAt \+ HOME_ETA_SEC \* 1000, now, madeAt\)\} \$\{THROUGH_CONFIDENTIAL\} \$\{PRIVATE_JOB_WATCH\}/, "with its time left (B35, 8 Nov)");
 });
 
-test("QA's SHOULD (5 Nov): a Safe job made at the tap says \"Approve on your iPhone\" until its Face ID yes, then \"Approved\" with its tick, never a step that suggests money moving first (control: a hot wallet's job starts at \"Getting ready\", no approval step)", async () => {
+test("QA's SHOULD (5 Nov), since one Face ID (6 Nov): a Safe job is listed only once signed, its row already \"Approved\" with its tick, never a step that suggests money moving before the signature (control: a hot wallet's job starts at \"Getting ready\", no approval step)", async () => {
   clear();
-  const { s, on } = sheets();
+  const sig = signs();
   const c = slow<{ id: string }>();
-  const go = runJob({ tasks, title: "Swap $10.00 of NEAR for USDC", safe: true, money: ["safe"], call: c.call, declined: () => false, made: () => undefined, onApproval: on });
-  const [before] = jobs();
-  assert.deepEqual(before!.steps.map((x) => [x.label, x.state]), [[JOB_WORDS.approve, "doing"], [JOB_WORDS.starting, "waiting"]]);
+  const go = runJob({ tasks, title: "Swap $10.00 of NEAR for USDC", safe: true, money: ["safe"], call: c.call, declined: () => false, made: () => undefined, onApproval: sheets().on, onSigned: sig.on });
+  assert.equal(jobs().length, 0, "nothing listed before the signature");
   assert.equal(JOB_WORDS.approve, "Approve on your iPhone.", "the web's words (copy review, 5 Nov)");
-  assert.ok(!before!.steps.some((x) => /Leaving|Moving|signed/i.test(x.label)), "nothing says money is moving before the yes");
-  s.fire!(true);
+  sig.s.signed!();
   const [after] = jobs();
   assert.deepEqual(after!.steps.map((x) => [x.label, x.state]), [["Approved", "done"], [JOB_WORDS.starting, "doing"]]);
+  assert.ok(!after!.steps.some((x) => /Leaving|Moving/i.test(x.label)), "nothing says money is moving");
   c.answer({ ok: { id: "t1" } });
   await go;
-  // a refusal before the yes ends nothing listed (the job is gone); a No too: covered above. Control: a hot wallet's job
+  // control: a hot wallet's job
   clear();
   void runJob({ tasks, title: "Swap", safe: false, money: ["row:hood-should"], call: slow<{ id: string }>().call, declined: () => false, made: () => undefined, onApproval: sheets().on });
   assert.deepEqual(jobs()[0]!.steps.map((x) => [x.label, x.state]), [[JOB_WORDS.starting, "doing"]]);

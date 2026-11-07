@@ -45,6 +45,7 @@ import { OnYourPhone } from "@zerofee/shell-api/OnYourPhone.tsx";
 import { askedUsd, backLink, readBack, type BackTo } from "@zerofee/shell-api/back-to.ts";
 import { TEST_NOTE, dismissNote, isTestNote, noteDismissed } from "./test-note.ts";
 import { codeGate } from "./money/code-gate.ts";
+import { finishOpen } from "./finish-open.ts";
 import { watchSwapEnds } from "./money/swap-ended.ts";
 /** The pickers (a network, a coin to convert or move): asked for when one opens, outside Home's first load (the speed
  *  budget); drawn the moment their code is here. */
@@ -287,9 +288,14 @@ function WalletScreens() {
     if (next.kind === "open") {
       if (next.screen === "receive" || next.screen === "wallet/receive") return setView({ kind: "receive" });
       if (next.screen === "spending-cap") return shell.openMoney({ kind: "cap" });
+      // a move that may have gone: Activity's Money, never its Account (viewFor's "security/activity")
+      if (next.screen === "activity") return setView({ kind: "activity" });
       if (next.screen.startsWith("security/")) return setView(viewFor(next.screen) ?? { kind: "tabs" });
       // a held request the shell already opened in place, over Wallet
       if (next.screen.startsWith("held/")) return;
+      // an action's own sheet again (Finish the move, the audit's C2): its normal sheet, its own Face ID
+      const finish = finishOpen(next.screen);
+      if (finish) return shell.openMoney(finish);
       if (next.screen === "convert" || next.screen === "balance") {
         setTab(next.screen === "convert" && CONVERT_OPEN ? "convert" : "balance");
         return tabs();
@@ -463,10 +469,10 @@ function WalletScreens() {
       </PushedFrame>
     );
   } else if (view.kind === "private") {
-    body = <PushedFrame name="Private balance" onBack={tabs}><Suspense fallback={null}><PrivateScreen onAdd={() => setView({ kind: "toPrivate" })} onMove={() => shell.openMoney({ kind: "move", source: "private" }, moved)} onSetUp={openPrivate} onDefault={(on) => void setPrivateDefault(on)} onProblem={(p) => void problem(p)} /></Suspense></PushedFrame>;
+    body = <PushedFrame name="Private" onBack={tabs}><Suspense fallback={null}><PrivateScreen onAdd={() => setView({ kind: "toPrivate" })} onSetUp={openPrivate} onDefault={(on) => void setPrivateDefault(on)} onProblem={(p) => void problem(p)} /></Suspense></PushedFrame>;
   } else if (view.kind === "toPrivate") {
     body = (
-      <PushedFrame name="Add to your private balance" onBack={() => setView({ kind: "private" })}>
+      <PushedFrame name="Add to Private" onBack={() => setView({ kind: "private" })}>
         <Suspense fallback={null}>
           <AddToPrivate
             from={privateFrom}
@@ -564,7 +570,7 @@ function WalletScreens() {
       )}
       {sheet === "privateFrom" && Pick && (
         <Pick.PickSheet
-          title="Move to your private balance from"
+          title="Move to Private from"
           rows={privateCoins.map((b) => ({ key: keyOf(b), symbol: b.symbol, icon: b.icon, title: b.symbol, detail: placeOf(b, chains), right: amountOf(b.amount, b.symbol) }))}
           current={privateFrom ? keyOf(privateFrom) : undefined}
           onPick={(k) => { setPrivateKey(k); setSheet(null); }}

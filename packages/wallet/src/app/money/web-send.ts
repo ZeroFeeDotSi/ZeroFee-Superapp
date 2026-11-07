@@ -104,7 +104,7 @@ export function webSendCoins(held: readonly { chain: string; address: string; am
  * payout coin 400). The rollback: a build with VITE_WEB_SEND_TOKENS=0 shows no token chip and reads nothing (rule 1).
  */
 export const webSendTokensOn = (v: string | undefined): boolean => v !== "0";
-export const WEB_SEND_TOKENS: boolean = webSendTokensOn((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_WEB_SEND_TOKENS);
+export const WEB_SEND_TOKENS: boolean = webSendTokensOn(import.meta.env?.VITE_WEB_SEND_TOKENS);
 
 /** What the web Send's From row offers: each wallet's own coin, then, only with the tokens' switch on, every pinned token
  *  the wallets hold (the core's own read, subwallet.sendCoins). */

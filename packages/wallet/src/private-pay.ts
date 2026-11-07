@@ -45,7 +45,7 @@ export function createPrivatePay(x: PrivatePayDeps) {
     if (!pocket || !x.privateQuotes) throw new ProblemError(walletProblems.privateUnavailable());
     const cat = await catalogue();
     const toCoin = cat.coin(toTokenId);
-    if (!cat.coin(fromTokenId) || !toCoin) throw new ProblemError(walletProblems.quoteUnavailable("You can't pay with those coins from your private balance."));
+    if (!cat.coin(fromTokenId) || !toCoin) throw new ProblemError(walletProblems.quoteUnavailable("You can't pay with those coins from Private."));
     if (to.kind === "chain" && (to.memo || toCoin.chain !== to.chain || !validAddress(to.chain, to.address.trim()))) throw new ProblemError(walletProblems.addressInvalid(cat.network(to.chain)?.name ?? to.chain));
     if (to.kind === "ledger" && !ACCOUNT_ID.test(to.accountId.trim())) throw new ProblemError(walletProblems.recipientInvalid());
     const outUnits = toUnits(amountOut, toCoin.decimals);
@@ -63,7 +63,7 @@ export function createPrivatePay(x: PrivatePayDeps) {
       amountInExpected: amountIn,
       amountOut,
       ...(Number.isFinite(inUsd) && Number.isFinite(outUsd) ? { feeUsd: Math.max(0, inUsd - outUsd).toFixed(2) } : {}),
-      feeNote: "The swap fee is in this price. Paid from your private balance.",
+      feeNote: "The swap fee is in this price. Paid from Private.",
       ...(typeof r.quote.timeEstimate === "number" ? { etaSeconds: r.quote.timeEstimate } : {}),
       expiresAtIso: new Date(now() + x.quoteTtlMs).toISOString(),
       refundTo: pocket.address,
@@ -132,23 +132,43 @@ export function createPrivatePay(x: PrivatePayDeps) {
  * Out of the pocket (money is never stuck): every coin in it, or the one asked for, home to the same coin in the main
  * balance. The core moves it with the pocket's key, to the main account only (subwallet.private.home); each coin is a
  * movement, followed in Activity from the core's own record of it. Moved here from the ledger unchanged (speed budget).
+ * `upTo` (the audit's SHOULD, 8 Nov): what the person's Check this showed, per coin ({tokenId: decimal}): each coin moves at most
+ * that, and a coin it didn't show moves not at all, so money that reached Private after the sheet opened (a refund, a
+ * fill) stays private. Without it, all of each coin, as before. Only the amount the core is asked for changes.
  */
 export async function fromPrivate<M extends { id: string; status: string }>(p: Record<string, unknown>, caller: Caller, x: {
   rows: { tokenId: string; amount: string }[];
-  home: (tokenId: string, key: string) => Promise<{ ok: M } | { problem: Problem }>;
+  home: (tokenId: string, key: string, amount: string) => Promise<{ ok: M } | { problem: Problem }>;
+  /** The coin's decimals, as the rows were worked out with (needed only with `upTo`). */
+  decimals?: (tokenId: string) => number;
   status: (m: M) => Movement["status"];
   remember: (m: Movement) => Promise<void>;
   emit: (event: string, payload: unknown) => void;
   iso: () => string;
 }): Promise<Movement[]> {
+  const upTo = p.upTo;
+  if (upTo !== undefined && (typeof upTo !== "object" || upTo === null || Array.isArray(upTo) || Object.values(upTo).some((v) => typeof v !== "string"))) throw new ProblemError(walletProblems.amountInvalid());
   const coinsOut = x.rows.filter((r) => (p.tokenId === undefined || r.tokenId === p.tokenId) && Number(r.amount) > 0);
   const out: Movement[] = [];
   for (const row of coinsOut) {
+    // what this coin may move: all of it, or (upTo) the least of what it holds now and what the sheet showed
+    let amount = "all", said = row.amount;
+    if (upTo !== undefined) {
+      const shown = (upTo as Record<string, string>)[row.tokenId];
+      if (shown === undefined) continue;
+      const d = x.decimals?.(row.tokenId) ?? 0;
+      const have = toUnits(row.amount, d), most = toUnits(shown, d);
+      if (have === null || most === null) throw new ProblemError(walletProblems.amountInvalid());
+      const units = have < most ? have : most;
+      if (units <= 0n) continue;
+      amount = units.toString();
+      said = fromUnits(units, d);
+    }
     const key = `wallet-home-${row.tokenId.replace(/[^A-Za-z0-9]/g, "").slice(-24)}-${Date.now().toString(36)}`;
-    const moved = await x.home(row.tokenId, key);
+    const moved = await x.home(row.tokenId, key, amount);
     if ("problem" in moved) throw new ProblemError(moved.problem);
     const at = x.iso();
-    const m: Movement = { id: `home:${moved.ok.id}`, kind: "private", status: x.status(moved.ok), from: PRIVATE_KIND, to: row.tokenId, amount: row.amount, startedAtIso: at, updatedAtIso: at, explorerUrls: [], caller };
+    const m: Movement = { id: `home:${moved.ok.id}`, kind: "private", status: x.status(moved.ok), from: PRIVATE_KIND, to: row.tokenId, amount: said, startedAtIso: at, updatedAtIso: at, explorerUrls: [], caller };
     await x.remember(m);
     out.push(m);
   }

@@ -12,15 +12,11 @@
 // Pure, so every pair is a test.
 import { LEG_SEC } from "@zerofee/shell-api/job-steps.ts";
 import { HOME_LEG_MIN_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, leastHome, leastIn } from "@zerofee/core/float-floors";
-import type { Problem } from "@zerofee/core/problem";
-import { serviceOf } from "@zerofee/core/services";
 import { safeHeld, type EarnPart } from "../format.ts";
 import { feesFigure, intentsKept } from "@zerofee/core/zero-fee";
+import type { SwapCover } from "./swap-cover.ts";
 
-/** A swap's Problem the sheet says itself, with its own Try again: one whose one step is Try again and that names no
- *  service (a service's is the sheet's line, services.ts sheetLineOf). Never the shell's screen behind the sheet
- *  (QA, 4 Nov: "Solana's price isn't read yet" sat there 4 minutes, one more copy per hold). */
-export const saidOnSheet = (p: Problem): boolean => p.next.kind === "retry" && !serviceOf(p);
+export { saidOnSheet } from "./swap-refused.ts";
 
 /** 1Click's USDC on NEAR Intents: the NEAR wallet's cash and the Safe's USDC (the core's FLOAT_USDC). */
 export const ROW_USDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
@@ -97,11 +93,15 @@ export function arrives(r: SwapRoute, usd: number, price: number): { amount: num
  * "Your Safe sends $110.00. $10.00 stays in Private." Said before the tap; null when nothing is rounded or `sends`
  * isn't known.
  */
-export function swapStays(r: SwapRoute | null, usd: number, sends?: (usd: number) => number, privatePays = PRIVATE_PAYS): string | null {
+export function swapStays(r: SwapRoute | null, usd: number, sends?: (usd: number) => number, privatePays = PRIVATE_PAYS, cover: SwapCover | null = null): string | null {
   // the build's trace (S2, 5 Nov): the app pays the Safe's money on to a wallet from Private (trade runtime.ts fromPrivate, the
   // the HARD RULE; float-core paysPrivately: every Add but E7's), never the public Safe → NEAR wallet leg the grid
-  // rounds, so the place that pays is named and nothing is rounded
-  if (privatePays && r?.kind === "topup" && r.to !== "near" && usd > 0) return SWAP_WORDS.paidFrom(`$${usd.toFixed(2)}`);
+  // rounds, so the place that pays is named and nothing is rounded. T-F (6 Nov): "your Safe covers the rest" only when it
+  // will (swap-cover.ts swapCover); Private short with no cover: nothing here (the sub-line slot says it, the button off)
+  if (privatePays && r?.kind === "topup" && r.to !== "near" && usd > 0) {
+    if (cover?.kind === "refuse") return null;
+    return cover?.kind === "cover" ? SWAP_WORDS.paidFrom(`$${usd.toFixed(2)}`) : SWAP_WORDS.paidPrivate(`$${usd.toFixed(2)}`);
+  }
   if (!sends || !r || r.kind !== "topup" || r.coin !== "USDC" || r.to === "near" || !(usd > 0)) return null;
   const g = sends(usd);
   return g - usd >= 0.01 ? SWAP_WORDS.fill(`$${g.toFixed(2)}`, `$${(g - usd).toFixed(2)}`) : null;
@@ -226,7 +226,8 @@ export function swapFloor(o: { again: string | null; block: string | null; tried
 
 /** The one sub-line slot above the keypad: a swap that couldn't come back, else what arrives once an amount can go (the
  *  coin figure, as Send), else what one swap can take. */
-export function swapSub(o: { back: string | null; arrives: string | null; part: string | null }): { id: "swap-back" | "swap-arrives" | "swap-part"; text: string } | null {
+export function swapSub(o: { back: string | null; arrives: string | null; part: string | null; /** Private short, no cover (swap-cover.ts coverLine) */ short?: string | null }): { id: "swap-back" | "swap-arrives" | "swap-part" | "swap-short"; text: string } | null {
+  if (o.short) return { id: "swap-short", text: o.short };
   if (o.back) return { id: "swap-back", text: o.back };
   if (o.arrives) return { id: "swap-arrives", text: o.arrives };
   return o.part ? { id: "swap-part", text: o.part } : null;
@@ -250,6 +251,8 @@ export const SWAP_WORDS = {
   amount: "Pick an amount.",
   // the place that really pays a Safe → wallet swap (the build's trace, S2; words: the copy review
   paidFrom: (usd: string) => `${usd} leaves Private. If Private is short, your Safe covers the rest.`,
+  // Private pays it all, or the cover isn't known yet: no promise (T-F, 6 Nov; words provisional)
+  paidPrivate: (usd: string) => `${usd} leaves Private.`,
   // what the Safe sends past the typed amount, and what of it stays (Move's line, the copy review's words: move-split.ts MOVE_WORDS.fill)
   fill: (sends: string, stays: string) => `Your Safe sends ${sends}. ${stays} stays in Private.`,
   most: (usd: string) => `You can swap up to ${usd}.`,
@@ -344,3 +347,10 @@ export function payFor(wallet: "safe" | Wallet | undefined, pays: readonly PayHe
 
 /** A swap's own key (the same tap, the same job: a double tap never makes two). */
 export const swapKey = (): string => `home-swap-${Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("")}`;
+
+/** The money a Swap's job claims while its call is out (job-run claim; J3, the audit's MUST, 7 Nov): the Safe's own route
+ *  ("safe"); a Safe route Private pays whole (`signs` false, D143) is Private's money, never the Safe's, so a second
+ *  Private job is refused by name; a wallet's own swap, its row. Pure: a table test. */
+export function swapMoney(safe: boolean, signs: boolean | undefined, place: string): string[] {
+  return safe ? ["safe"] : signs === false ? ["private"] : [`row:${place}`];
+}

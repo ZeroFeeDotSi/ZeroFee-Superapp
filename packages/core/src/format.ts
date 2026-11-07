@@ -21,7 +21,11 @@ export interface Described {
    *  title's brackets; no "Amount:" line, no app's echo ("Wallet says: …"), no fee line, no balance rows. Warnings and
    *  details still show. Only a one-step approval honours it. */
   bare?: true;
-  /** The step's lines say what leaves (a Move's split block, intents.ts splitLines): the sheet draws no "Amount:" line,
+  /** A move into the account's own Private the core read as its own (intents.ts intoOwnWords, a Move's or a Send's fill):
+   *  paid as wNEAR wrapped from NEAR on the account, its set-up steps fold into one line (words.ts prepFold) as a bare
+   *  step's do; the sheet keeps its full form (T-F, 6 Nov: never "Let your account hold wNEAR, and 3 more steps"). */
+  folds?: true;
+  /** The step's lines say what leaves (a Move's fill rows, private-route.ts fillRows): the sheet draws no "Amount:" line,
    *  so one amount is said once (QA's Sim re-check, 5 Nov). The amount itself stays on the words for the job's hearing. */
   amountSaid?: true;
   /** The core's own swap into the person's NEAR wallet ("Swap … for USDC", intents.ts): a Move from the Safe on to a

@@ -39,7 +39,7 @@ export function Setup({ state, offerPrivate, onState, onReceive, onSetUpPrivate,
         </div>
         <div className="wl-setup-rows zf-enter-2">
           <div className="wl-row"><span className="zf-label wl-step">1</span><div><div className="t">Add money</div><div className="d">From a wallet or exchange you already use</div></div><span /></div>
-          {total === 2 && <div className="wl-row"><span className="zf-label wl-step">2</span><div><div className="t">Private balance</div><div className="d">A small separate wallet the public can't see into</div></div><span /></div>}
+          {total === 2 && <div className="wl-row"><span className="zf-label wl-step">2</span><div><div className="t">Private</div><div className="d">A small separate wallet the public can't see into</div></div><span /></div>}
         </div>
         <p className="zf-small wl-setup-note zf-enter-2">You can skip {total === 2 ? "any step" : "it"} and do it later.</p>
         <div className="zf-fill" />
@@ -71,19 +71,19 @@ function PrivateStep({ onChoose, onSetUp, onDefault }: { onChoose: (c: "set" | "
     <div className="wl wl-setup">
       <div className="zf-label wl-setup-step">Step 2 of 2</div>
       <div className="wl-setup-head wl-setup-mark"><PrivateMark size={56} /></div>
-      <h1 className="zf-title wl-setup-title">Set up your private balance?</h1>
+      <h1 className="zf-title wl-setup-title">Set up Private?</h1>
       <p className="zf-body wl-setup-lead">{PRIVATE_WORDS}</p>
-      <More label="What to know about your private balance" lines={[...PRIVATE_MORE, PRIVATE_SEEN, ...PRIVATE_HOW, "You can add money any time."]} />
+      <More label="What to know about Private" lines={[...PRIVATE_MORE, PRIVATE_SEEN, ...PRIVATE_HOW, "You can add money any time."]} />
       <div className="wl-setup-rows">
         <button className="wl-row wl-pick" onClick={() => setByDefault(!byDefault)} aria-pressed={byDefault}>
           <span className={`zf-tick${byDefault ? " on" : ""}`}>{byDefault && <Check />}</span>
-          <div><div className="t">Use it for payments by default</div><div className="d">Pay uses your private balance first. You can switch per payment.</div></div>
+          <div><div className="t">Use it for payments by default</div><div className="d">Pay uses Private first. You can switch per payment.</div></div>
           <span />
         </button>
       </div>
       <div className="zf-fill" />
       <div className="zf-floor">
-        <button className="zf-btn" disabled={busy} onClick={() => void setUp()}>{busy ? "Setting up…" : "Set up your private balance"}</button>
+        <button className="zf-btn" disabled={busy} onClick={() => void setUp()}>{busy ? "Setting up…" : "Set up Private"}</button>
         <button className="zf-link" onClick={() => onChoose("skipped")}>Not now</button>
       </div>
     </div>
@@ -122,7 +122,7 @@ function SetupDone({ state, withPrivate, onDone }: { state: SetupState; withPriv
       <div className="wl-setup-rows">
         <div className="wl-row"><span className={`zf-tick ${added ? "on" : "off"}`}>{added && <Check />}</span><div><div className="t">Add money</div><div className="d">{how}</div></div><span /></div>
         {withPrivate && (
-          <div className="wl-row"><span className={`zf-tick ${state.private === "set" ? "on" : "off"}`}>{state.private === "set" && <Check />}</span><div><div className="t">Private balance</div><div className="d">{state.private === "set" ? "Set up. Add money to it any time from Balance." : "Not now. Set it up any time from Balance."}</div></div><span /></div>
+          <div className="wl-row"><span className={`zf-tick ${state.private === "set" ? "on" : "off"}`}>{state.private === "set" && <Check />}</span><div><div className="t">Private</div><div className="d">{state.private === "set" ? "Set up. Add money to it any time from Balance." : "Not now. Set it up any time from Balance."}</div></div><span /></div>
         )}
       </div>
       <div className="zf-fill" />

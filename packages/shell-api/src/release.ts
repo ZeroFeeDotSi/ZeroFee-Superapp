@@ -7,7 +7,7 @@
 // payment (wallet format.ts PRIVATE_SEEN). Every money move already goes through the pocket; the lock only hid a screen.
 
 /** Is this the public release build? Under node (tests) and in every other build: false. */
-export const PUBLIC_RELEASE: boolean = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_PUBLIC === "1";
+export const PUBLIC_RELEASE: boolean = import.meta.env?.VITE_ZEROFEE_PUBLIC === "1";
 
 /** The public build's Sim mode (sample money; apps/web mode.ts): main.tsx marks the page (`data-public="sim"`) before
  *  any app code runs. Real is `data-public="real"`. False in every other build. */
@@ -18,12 +18,12 @@ export const simPage = (): boolean => PUBLIC_RELEASE && (globalThis as { documen
 export const webWallet = (): boolean => PUBLIC_RELEASE && (globalThis as { document?: Document }).document?.documentElement?.dataset.public === "web";
 /** Trade on the web wallet: on only when the build sets VITE_WEB_TRADE=1 (QA; deploy-app.sh sets it, a product
  *  call). The core's web allowlist (fork A) reads the same flag, so Trade shows exactly when it can sign. */
-export const WEB_TRADE: boolean = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_WEB_TRADE === "1";
+export const WEB_TRADE: boolean = import.meta.env?.VITE_WEB_TRADE === "1";
 /** The sample-money demo: ?demo, and the public site's Sim. */
 export const onDemoPage = (search: string = typeof location === "undefined" ? "" : location.search) => simPage() || new URLSearchParams(search).has("demo");
 
 /** The free build (VITE_ZEROFEE_FREE=1, apps/web build-free.sh on feat/free-zero-cost): no relay and no partner key. */
-export const FREE_BUILD: boolean = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_FREE === "1";
+export const FREE_BUILD: boolean = import.meta.env?.VITE_ZEROFEE_FREE === "1";
 /**
  * Is Private open here? In every build but the free one: the release (its Sim, its extension), the phone, testnet. The
  * web wallet has no Safe, so WalletApp sends its Private to the On your phone page before it asks this.
@@ -41,4 +41,4 @@ export const privateOpen = (free = FREE_BUILD) => !free;
 /** Native coins (product decision, 5 Nov, HOME-SAFE-HOT-SPEC §4-5): Trade's coin page for a Safe coin ("coin:intents:<assetId>")
  *  and its list of the 215 ("native"). On only when the build sets VITE_NATIVE_COINS=1 (the Trade builder's switch);
  *  off, a Safe coin opens Wallet's own coin screen and the Safe has no Buy (end to end or hidden). */
-export const NATIVE_COINS: boolean = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_NATIVE_COINS === "1";
+export const NATIVE_COINS: boolean = import.meta.env?.VITE_NATIVE_COINS === "1";

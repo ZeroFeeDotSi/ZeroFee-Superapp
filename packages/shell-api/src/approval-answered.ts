@@ -40,3 +40,71 @@ export function hostSheets(h: { safe: boolean }): () => void {
 }
 /** True when a sheet of this kind is drawn by the shell and its answer heard (approvalOpened / approvalAnswered). */
 export const sheetsHeard = (kind: "safe" | "hot"): boolean => hosts.some((h) => kind === "hot" || h.safe);
+
+/** The core's word that a Safe job's last signature is made (job.signed: the chip's, after its one Face ID, and Private's
+ *  leg released with it), before anything is sent (the audit's ruling c6, 6 Nov). Only the shell's ApprovalSheet tells it, from
+ *  the core's own event; a Safe job is made on it ("Job created."), never at the tap and never on a sheet's yes alone. */
+/** `jobKey`: the job its request named (TxRequest.job), when it named one. */
+const signedListeners = new Set<(jobKey?: string) => void>();
+export const jobSigned = (jobKey?: string): void => { for (const l of [...signedListeners]) l(jobKey || undefined); };
+/** Hear every Safe signature until the returned stop is called (job-run.ts runJob, move-run.ts). */
+export function onSafeSigned(listener: (jobKey?: string) => void): () => void {
+  signedListeners.add(listener);
+  return () => void signedListeners.delete(listener);
+}
+
+/** The core's word that a job's sheet is about to show (approval.asked, the audit's MUST, 7 Nov): its key only (TxRequest.job).
+ *  On the phone the chip's sheet is Swift's own, never heard here; this is how its job hears it, the web and the Sim the
+ *  same way. Only the shell's ApprovalSheet tells it, from the core's own event. */
+const askedListeners = new Set<(jobKey: string) => void>();
+export const approvalAsked = (jobKey?: string): void => { if (jobKey) for (const l of [...askedListeners]) l(jobKey); };
+/** Hear every job's sheet asked until the returned stop is called (job-run.ts safeAskedAfterAll). */
+export function onApprovalAsked(listener: (jobKey: string) => void): () => void {
+  askedListeners.add(listener);
+  return () => void askedListeners.delete(listener);
+}
+
+/**
+ * The "Check this" sheet at the tap (the copy review's W2, the audit's R4, 6 Nov): put up by the money sheet the moment Approve-to-be is
+ * tapped, with the typed headline, before the core has bound the exact amounts. The core's own sheet takes its place when
+ * it comes (approval.needed; on the iPhone, Swift's sheet over it with no motion). Its Close is the person's No: the money
+ * sheet's moneyClosed, so nothing unsigned is signed after it. `failed`: binding didn't come, Approve stays off.
+ */
+export type Pending = { headline: string; at: number; failed?: true };
+let pendingNow: Pending | null = null;
+const pendingListeners = new Set<(p: Pending | null) => void>();
+const tellPending = () => { for (const l of [...pendingListeners]) l(pendingNow); };
+/** Put up the Getting-ready sheet; the returned end takes it down (the call answered, or the core's sheet came). */
+export function pendingSheet(headline: string, at: number = Date.now()): { end: () => void; fail: () => void } {
+  const mine: Pending = { headline, at };
+  pendingNow = mine;
+  tellPending();
+  return {
+    end: () => { if (pendingNow === mine) { pendingNow = null; tellPending(); } },
+    fail: () => { if (pendingNow === mine) { pendingNow = { ...mine, failed: true }; tellPending(); } },
+  };
+}
+export const pendingShown = (): Pending | null => pendingNow;
+/** The sheet host hears the Getting-ready sheet (ApprovalSheet). */
+export function onPending(l: (p: Pending | null) => void): () => void {
+  pendingListeners.add(l);
+  return () => void pendingListeners.delete(l);
+}
+/** Close on the Getting-ready sheet: it goes, and whoever put it up hears the No. */
+const pendingCloseListeners = new Set<() => void>();
+export function closePending(): void {
+  if (!pendingNow) return;
+  pendingNow = null;
+  refusing = true;
+  tellPending();
+  for (const l of [...pendingCloseListeners]) l();
+}
+export function onPendingClosed(l: () => void): () => void {
+  pendingCloseListeners.add(l);
+  return () => void pendingCloseListeners.delete(l);
+}
+/** After a Close on the Getting-ready sheet, while its call still runs: a money sheet the core puts up for it is answered
+ *  No unseen (ApprovalSheet), so no late sheet comes for a job the person closed. runJob ends it with its call. */
+let refusing = false;
+export const refuseClosed = (on: boolean): void => { refusing = on; };
+export const refusingClosed = (): boolean => refusing;

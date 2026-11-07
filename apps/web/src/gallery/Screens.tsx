@@ -3,6 +3,7 @@
 // (apps get a MockBridge); the full app at "/" is the real thing.
 import { appsFor, mvpOn, publicApps } from "../shown-apps.ts";
 import { PUBLIC_BUILD } from "../mode.ts";
+import { SIM_KEY_KIND } from "@zerofee/shell-api/key-place.ts";
 import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
 import { createMockBridge, PUBLIC_SAMPLE_ACCOUNT_ID, SAMPLE_ACCOUNT_ID, type MockToken } from "@zerofee/shell-api/MockBridge.ts";
 import { faultFromQuery, faultedBridge } from "@zerofee/shell-api/faults.ts";
@@ -82,8 +83,9 @@ export const ACCOUNT: AccountInfo = {
   // Security says the account's rules from this: the mainnet ones the demo's MockBridge enforces (mainnetRules).
   network: "mainnet",
   keys: [
-    // The web demo is the iPhone app, simulated: its key is the phone's, in the secure chip.
-    { handle: "ml-dsa-65-hash:H62q59Xk3vT8pLmN2wQr7sYzA1bC4dE6fGh8iJkivyM", role: "device", kind: PUBLIC_BUILD ? "secure-chip" : "development", current: true },
+    // The Sim's key is a sample key, in no chip (the audit's MUST, 7 Nov): SIM_KEY_KIND on every build, so no screen fed by
+    // this data can say "secure chip" (it said so on the public build).
+    { handle: "ml-dsa-65-hash:H62q59Xk3vT8pLmN2wQr7sYzA1bC4dE6fGh8iJkivyM", role: "device", kind: SIM_KEY_KIND, current: true },
     { handle: "ml-dsa-65-hash:FxFFvgR2mK9pQ3sT6uV8wX1yZ4aB7cD9eF2gHhZX8", role: "recovery", kind: "recovery-words" },
   ],
   // Release 7: the default recovery wait, 48 hours (a change then waits 3 days; the words alone, 7 days).
@@ -114,6 +116,16 @@ const SEND_WORDS: PlainWords = {
   warnings: [{ kind: "first-time-recipient", text: "You've never sent to this address before." }],
   effect: [{ token: "USDC", before: "10,400", after: "8,400" }],
   hint: "Wallet says: rent for November",
+};
+// A Safe leg of two steps on an account that can't chain them (fix/safe-steps-one-faceid, 7 Nov): ONE sheet names both
+// steps in the copy review's words (words.ts plainWordsApart, the Sim's MockBridge the same), one fee for both,
+// one Approve, one Face ID. Before, each step was its own sheet and its own Face ID.
+const SAFE_STEPS_WORDS: PlainWords = {
+  // the headline is still the steps' own (the person's action follows B2's plan on the sheet)
+  title: "Let the NEAR account dddddd…dddd hold USDC, then Send 135 USDC to the NEAR account dddddd…dddd",
+  lines: ["1. Your Safe lets NEAR Intents take $135.00 in USDC.", "2. Your Safe sends it.", "Step 2 runs only if step 1 worked.", "Fee · about $0.01. A small NEAR deposit comes back to your Safe later."],
+  warnings: [],
+  effect: [{ token: "Your Safe after", before: "", after: "$1,090.50 in USDC" }],
 };
 // The longest sheet the core can produce: a 12-step contract call with an unbroken argument line and six effects. It
 // must scroll inside the sheet with Approve / Not now always on the floor, and nothing may run off the edge at 393×852.
@@ -222,8 +234,8 @@ export const sampleBridge: Bridge = {
     // proof): the demo's sample answers, read only, so every Security and Home entry here is the real screen, never "This
     // isn't available yet" (UI-SIMPLICITY round 2: eight entries couldn't be graded).
     if (method === "account.protection.get" || method === "account.state" || method === "device.store.get") return demoBridge.call<T>(method, params);
-    // The key card as the iPhone shows it: the chip's key, on the account on both nodes (the gallery is the phone's look).
-    if (method === "account.keyProof") return { ok: { kind: "secure-chip", fingerprint: "H62q59…ivyM", chipFingerprint: "H62q59…ivyM", chipHeld: true, madeAtIso: new Date(Date.now() - 86400e3).toISOString(), nodes: [{ node: "rpc.mainnet.fastnear.com", found: true }, { node: "free.rpc.fastnear.com", found: true }], matches: true } as T };
+    // The key card: no override here (the audit's MUST, 7 Nov: it answered a chip key, read from two real nodes, on the public
+    // Sim). The demo bridge answers it: the Sim's sample key, said so (MockBridge account.keyProof, sample: true).
     // The account's rules are this build's own: no update card.
     if (method === "account.rules") return { ok: { release: 9, current: 9 } as T };
     // Being someone's guardian: guarding kim.near, one payment waiting for a yes.
@@ -394,6 +406,7 @@ const ENTRIES: Entry[] = [
   { group: "The app", name: "Waiting · a protection change (says nothing changes once)", render: (back) => <WaitingView bridge={changeBridge} held={{ id: "c1", readyAtIso: new Date(Date.now() + 114e3).toISOString(), needsSecondDevice: false }} onClose={back} /> },
   { group: "The app", name: "Put away · nothing in Spending (says why, no grey button)", render: (back) => <div className="zf-screen"><Working text="" /><PutAwaySheet status={{ loaded: true, totalUsd: "0.00", cashUsd: "0.00", coinsUsd: "0.00", capUsd: "500", roomUsd: "500.00", ready: true, networks: [] } as unknown as SpendingStatus} onClose={back} onDone={() => back()} onOpen={noop} /></div> },
   { group: "Create your bank", name: "Approval sheet", render: () => <div className="zf-screen"><Working text="" /><ApprovalSheetView words={SEND_WORDS} onAnswer={noop} /></div> },
+  { group: "Create your bank", name: "Approval sheet · two Safe steps, one sheet, one Face ID", render: () => <div className="zf-screen"><Working text="" /><ApprovalSheetView words={SAFE_STEPS_WORDS} onAnswer={noop} /></div> },
   { group: "Create your bank", name: "Approval sheet · long (12 lines, 6 effects, scrolls)", render: () => <div className="zf-screen"><Working text="" /><ApprovalSheetView words={LONG_WORDS} onAnswer={noop} /></div> },
   { group: "Create your bank", name: "Approval sheet · change your protection on mainnet (every coin counts)", render: () => <div className="zf-screen"><Working text="" /><ApprovalSheetView words={CHANGE_WORDS} onAnswer={noop} /></div> },
   { group: "Create your bank", name: "Approval sheet · start moving your account to this device (summary first)", render: () => <div className="zf-screen"><Working text="" /><ApprovalSheetView words={START_MOVE_WORDS} onAnswer={noop} /></div> },

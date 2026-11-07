@@ -51,7 +51,7 @@ function relay() {
 /** The core as the phone wires it, with intents.near on a FakeChain: the Safe holds `safe.held` USDC there (`safe.down`:
  *  the nodes don't answer). `near: false`: a core with no NEAR reads. */
 async function takeOut(o: { near?: boolean } = {}) {
-  let clock = Date.parse("2026-11-05T12:00:00.000Z");
+  let clock = Date.now(); // from here only the injected clock moves; a fixed date expired against the quote's real deadline above (6 Nov)
   const safe = { held: 100_000_000n, down: false, reads: 0 };
   const chain = new FakeChain("mainnet");
   chain.contract(INTENTS.account, INTENTS.codeHashBase58, {

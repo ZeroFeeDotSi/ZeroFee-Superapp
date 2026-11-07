@@ -65,6 +65,8 @@ function relay(o: { amountIn?: (req: any) => string; minOut?: (req: any) => stri
 
 /** What the stand-in Solana nodes say about a sent transfer (RM-2's fix asks them). */
 let landedAs: ("ok" | "failed" | null)[] = [null, null];
+/** How often the stand-in chain was asked for a history-backed absence (absent()). */
+let absentCalls = 0;
 
 async function setup(o: Parameters<typeof relay>[0] = {}, answer = true, took = true) {
   const shown: PlainWords[] = [];
@@ -78,6 +80,9 @@ async function setup(o: Parameters<typeof relay>[0] = {}, answer = true, took = 
     balance: async () => 400_005_000n,
     // Where a sent transfer stands, as two nodes have it (the RM-2 fix reads it): by default, on neither.
     status: async () => landedAs,
+    // the audit's MUST (7 Nov): "never landed" needs history-backed proof (two full histories, the wallet's indexed list). In this
+    // world a transfer neither node has is truly absent; landed-proof.test.ts holds the cases where it isn't
+    absent: async () => (absentCalls++, landedAs.every((x) => x === null)),
     send: async (signed) => (sent.push(signed), took),
   };
   const evm = {
@@ -149,6 +154,19 @@ test("RM-2a (the other side): a move in whose transfer landed stays open, for 1C
   }
   const failed = await later(30 * 86_400_000, () => t.w.floatMove(m.id));
   assert.deepEqual([failed.status, failed.where], ["failed", "chain"], "once both nodes don't have it: failed, the money in the wallet");
+});
+
+test("the audit (7 Nov): the core's absent() has no height check of its own, so float-moves asks it only a day past the price's deadline (IN_GRACE_MS), when every indexer has long caught up", async () => {
+  const t = await setup();
+  const m = await t.w.floatIn("sol", 0, "100000000", key(954));
+  assert.ok(!("declined" in m));
+  absentCalls = 0;
+  // the stand-in quote's deadline is 3 days out (setup): 23 hours past it is still inside the day
+  const early = await later(3 * 86_400_000 + 23 * 3_600_000, () => t.w.floatMove(m.id));
+  assert.deepEqual([early.status, absentCalls], ["pending", 0], "inside the day past the deadline: never asked, never ended");
+  const late = await later(30 * 86_400_000, () => t.w.floatMove(m.id));
+  assert.deepEqual([late.status, late.where], ["failed", "chain"]);
+  assert.ok(absentCalls >= 1, "past the day: asked, and only then ended");
 });
 
 test("RM-2b: a move out whose intent 1Click never ran doesn't hold the float's count and its reconcile for ever", async () => {

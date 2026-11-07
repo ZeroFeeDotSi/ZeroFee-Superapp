@@ -10,7 +10,7 @@ import type { PrivateLegRecord } from "./private-route.ts";
 import { keyHandle } from "./key-handle.ts";
 import { base64ToBytes, bytesToBase64 } from "@fastnear/utils";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { signatureIsValid, type SheetRequest } from "./device-key.ts";
+import { signatureIsValid, type SheetRequest, type SheetSetRequest } from "./device-key.ts";
 import { ProblemError } from "./problem.ts";
 import { readableWords, type AccountInfo, type AccountKeyInfo, type BoundIntent, type PlainWords, type Signer, type TxOutcome, type TxRequest } from "./signer.ts";
 import type { Block, Chain, ChainKey, SendResult } from "./chain.ts";
@@ -22,6 +22,7 @@ import type { OneClickLookup, SendPayout } from "./intents.ts";
 import { ACCOUNT_POLICY, RECOVERY_POLICY, RELEASE_10, isAccountPolicy, isRecoveryPolicy, isSecondDeviceMethods, levelWords, policyVersion } from "./known-contracts.ts";
 import type { PolicyLevel } from "./known-contracts.ts";
 import { securityProblems } from "./security-problems.ts";
+import { unexpectedFor } from "./money-calls.ts";
 import { sheetSummary } from "./sheet-summary.ts";
 import { MAX_GAS, RequestError, actionsFromRequest, sameTransaction, serialize, signedBase64 } from "./tx-build.ts";
 import type { CoreAction, UnsignedTx } from "./tx-build.ts";
@@ -29,7 +30,7 @@ import { DecodeError, decodeTransaction } from "./tx-decode.ts";
 import type { DecodedAction, DecodedTx } from "./tx-decode.ts";
 import { availableYocto } from "./near-available.ts";
 import { bandsCountFewCoins, savedEveryCoinRules } from "./every-coin.ts";
-import { plainWords, plainWordsMany, sentToOf } from "./words.ts";
+import { plainWords, plainWordsApart, plainWordsMany, sentToOf } from "./words.ts";
 
 /** Anything that can sign a NEAR transaction hash: the chip key, a SoftwareKey, or a throwaway setup key. */
 export interface TxKey {
@@ -39,6 +40,8 @@ export interface TxKey {
   signHash(hash: Uint8Array): Promise<Uint8Array>;
   /** A key with its own sheet (AccountKey.signOnSheet): it is handed the bytes and the words shown, and signs itself. */
   signOnSheet?(request: SheetRequest): Promise<Uint8Array | null>;
+  /** Several txs of one action on ONE sheet, ONE Face ID (AccountKey.signSetOnSheet): a signature per tx, in order. */
+  signSetOnSheet?(request: SheetSetRequest): Promise<Uint8Array[] | null>;
 }
 
 /**
@@ -82,6 +85,26 @@ export interface DevSignerOptions {
   /** A Send's payout joined to a move into Private, by that move in's deposit address, as the core read it from 1Click's
    *  signed quote (subwallets sendPayout): a Send's fill sheet says it. */
   sendPayout?: (depositAddress: string) => Promise<SendPayout | null>;
+  /** The one Face ID (the audit's c1/R1, 6 Nov): a Send's leg 2 held for the address its fill pays (subwallets pairOf); released
+   *  once the chip's signatures check, signed and kept in the core's sealed vault before anything is sent (releasePair:
+   *  true); dropped on any other end (dropPair); its kept signature deleted when leg 1 is refused before it went (endPair). */
+  pairOf?: (paid: readonly string[]) => Promise<{ inDeposit: string; hash: string } | null>;
+  releasePair?: (inDeposit: string, hash: string) => Promise<true | null>;
+  dropPair?: (inDeposit: string) => void;
+  endPair?: (inDeposit: string) => Promise<void>;
+  /** An action's last signature is made, before anything is sent (bug report, 6 Nov): the core says job.signed, with the
+   *  request's job (TxRequest.job) when it named one, so another job's signature never lights this one (audit, 7 Nov). */
+  onSigned?: (job?: string) => void;
+  /** A sheet for a job's request is about to be shown (the audit's MUST, 7 Nov): the core says approval.asked with the job's key
+   *  (TxRequest.job), so that job's row waits on its Face ID, on the phone (the chip's own sheet, never heard by the page)
+   *  and the web alike. Once per sheet, just before it shows; never for a request refused before its sheet, nor one with
+   *  no job. */
+  onAsked?: (job: string) => void;
+  /** The fence (the audit's C1, 7 Nov): where the highest nonce of a set this key signed is kept, in the core's sealed store, so
+   *  it outlives a restart. The next request signs above max(the chain's nonce, this), so a signed step that was never
+   *  sent (separate steps stopped part way) dies when the next one lands. Written only for a set of more than one tx.
+   *  Absent (the agent's, recovery's and the second device's signers): a set is refused (the audit's MUST 2), a single tx signs. */
+  nonceMark?: { get(): Promise<string | null>; put(value: string): Promise<void> };
   /** Release 5 on: the level the contract really gives a change to the rules or keys (its floor, its set-up steps). */
   changeLevel?: (method: string, band: PolicyLevel, block: Block) => Promise<PolicyLevel>;
   /** The key a 1Click quote must be signed with. Default: 1Click's own; tests sign their quotes with a test key. */
@@ -91,6 +114,13 @@ export interface DevSignerOptions {
   /** NEAR in dollars for the sheet's words (fee and limits in $, D8); null or failing: NEAR alone. Never for signing. */
   nearUsd?: () => Promise<number | null>;
 }
+
+/** Who may ask for separate steps on one sheet (TxRequest.apart): ZeroFee's own Safe screens only, as forApps stamps them
+ *  (the review's ruling, 7 Nov: the same gate as the one-Face-ID pair, D5). Agent, Browser, Social, any site: refused. */
+export const APART_FROM: readonly string[] = ["wallet", "trade"];
+
+/** A job's own key (TxRequest.job), as the wallet makes it (16 to 64 letters, digits, - or _). */
+const JOB_KEY = /^[A-Za-z0-9_-]{16,64}$/;
 
 const REQUESTERS: readonly string[] = ["wallet", "pay", "trade", "extension", "browser", "social", "agent", "earn", "chat", "security"];
 
@@ -111,11 +141,20 @@ interface Group {
   payee?: { recipient: string; recipientType: string };
   /** A Move's fill (TxRequest.moveFill), on every group of the request: its sheet says the legs (the core's own figures). */
   moveFill?: true;
+  /** The whole Move's parts (TxRequest.movePlan, well formed only) and the Swap marker (TxRequest.moveSwap), with moveFill. */
+  movePlan?: string[];
+  moveSwap?: true;
   /** The core's own tag (BoundIntent), on every group: set only by request()/describe()'s second argument, never by
    *  fromApp (an app's request can't carry one). */
   intent?: BoundIntent;
+  /** More of the action's signatures come after this request (TxRequest.more): no job.signed for it. */
+  more?: true;
+  /** The job it is for (TxRequest.job, well formed only), on every group: said with approval.asked, never signed or shown. */
+  job?: string;
   /** A Send's fill (TxRequest.sendFill), on every group of the request: its sheet says the payout (the core's own record). */
   sendFill?: true;
+  /** Each group its own transaction (TxRequest.apart), on every group of a request of 2 to 4: one sheet, one Face ID. */
+  apart?: true;
 }
 
 interface Prepared {
@@ -124,6 +163,11 @@ interface Prepared {
   words: PlainWords;
   /** Whom it sends to (NEAR or any coin, words.ts sentToOf), read from the bytes: kept in the past-sends list once it lands. */
   sentTo: string[];
+  /** The deposit addresses the bytes pay (intents.ts paidAddresses): a Send's leg 2 is held for one of them (its pair). */
+  paid: string[];
+  /** Every transaction, in order: one, or one per step for separate steps (Group.apart), nonces one after another. Each
+   *  pays: whether its steps pay a deposit address (a Send's leg 2 is kept only until the paying one has gone). */
+  txs: { tx: UnsignedTx; bytes: Uint8Array; pays: boolean }[];
 }
 
 /** How long a sheet waits for the account's record of sends after its own reads are in (grade 02g, G18). */
@@ -148,11 +192,15 @@ export class DevSigner implements Signer {
   private readonly privateLeg: DevSignerOptions["privateLeg"];
   private readonly intentOf: DevSignerOptions["intentOf"];
   private readonly sendPayout: DevSignerOptions["sendPayout"];
+  private readonly pairs: Pick<DevSignerOptions, "pairOf" | "releasePair" | "dropPair" | "endPair" | "onSigned" | "onAsked">;
   private readonly changeLevel: DevSignerOptions["changeLevel"];
   private readonly ownWallets?: () => Promise<Map<string, string>>;
   private readonly nearUsd?: () => Promise<number | null>;
   /** One signature at a time, so two requests never pick the same nonce. */
   private queue: Promise<unknown> = Promise.resolve();
+  private readonly nonceMark: DevSignerOptions["nonceMark"];
+  /** The highest nonce this key may have signed (the fence): undefined until read from nonceMark. */
+  private mark: bigint | undefined;
 
   constructor(options: DevSignerOptions) {
     this.accountId = options.accountId;
@@ -167,10 +215,47 @@ export class DevSigner implements Signer {
     this.ownQuote = options.ownQuote;
     this.privateLeg = options.privateLeg;
     this.intentOf = options.intentOf;
+    this.pairs = { pairOf: options.pairOf, releasePair: options.releasePair, dropPair: options.dropPair, endPair: options.endPair, onSigned: options.onSigned, onAsked: options.onAsked };
     this.sendPayout = options.sendPayout;
     this.changeLevel = options.changeLevel;
     this.ownWallets = options.ownWallets;
     this.nearUsd = options.nearUsd;
+    this.nonceMark = options.nonceMark;
+  }
+
+  /** The fence's floor: the highest nonce this key may have signed, read once from the sealed store (0 when none, or kept
+   *  for another key). A store that can't be read refuses: signing below a dropped step could let it land later. */
+  private async nonceFloor(): Promise<bigint> {
+    if (this.mark !== undefined) return this.mark;
+    let raw: string | null;
+    try {
+      raw = this.nonceMark ? await this.nonceMark.get() : null;
+    } catch {
+      throw new ProblemError(securityProblems.nonceNotKept());
+    }
+    let kept = 0n;
+    try {
+      const j = raw ? (JSON.parse(raw) as { key?: unknown; nonce?: unknown }) : null;
+      if (j && j.key === handleOf(this.key.publicKey) && typeof j.nonce === "string" && /^\d{1,20}$/.test(j.nonce)) kept = BigInt(j.nonce);
+    } catch {
+      kept = 0n;
+    }
+    this.mark ??= kept;
+    return this.mark;
+  }
+
+  /** Keep `nonce` as the fence before anything is signed with it; false: it couldn't be kept, so nothing is signed. */
+  private async markNonce(nonce: bigint): Promise<boolean> {
+    const floor = await this.nonceFloor().catch(() => null);
+    if (floor === null) return false;
+    if (nonce <= floor) return true;
+    try {
+      await this.nonceMark?.put(JSON.stringify({ key: handleOf(this.key.publicKey), nonce: nonce.toString() }));
+    } catch {
+      return false;
+    }
+    this.mark = nonce;
+    return true;
   }
 
   /**
@@ -274,7 +359,19 @@ export class DevSigner implements Signer {
     if (payee) for (const g of groups) g.payee = payee;
     // a marker only: the figures the sheet says are the bytes' and the core's own (QA's MUST, 5 Nov)
     if (request?.moveFill === true) for (const g of groups) g.moveFill = true;
+    // words only (copy review, 7 Nov): checked against the core's own leg on the sheet (intents.ts legsBlock), never signed
+    const plan = request?.moveFill === true && Array.isArray(request.movePlan) && request.movePlan.length >= 2 && request.movePlan.length <= 4 && request.movePlan.every((u) => typeof u === "string" && /^\d{1,40}$/.test(u)) ? [...request.movePlan] : undefined;
+    if (plan) for (const g of groups) g.movePlan = plan;
+    if (request?.moveFill === true && request.moveSwap === true) for (const g of groups) g.moveSwap = true;
     if (request?.sendFill === true) for (const g of groups) g.sendFill = true;
+    if (request?.more === true) for (const g of groups) g.more = true;
+    // a label only (the audit's MUST, 7 Nov): the job's own key, said with approval.asked; never signed, never on the sheet
+    if (typeof request?.job === "string" && JOB_KEY.test(request.job)) for (const g of groups) g.job = request.job;
+    if (request?.apart === true) {
+      // provisional words (to 53): an app that isn't ZeroFee's own Safe screens can't ask for several steps on one sheet
+      if (!APART_FROM.includes(String(request.from))) throw new ProblemError(securityProblems.stepsNotAllowed());
+      if (groups.length > 1) for (const g of groups) g.apart = true;
+    }
     return groups;
   }
 
@@ -315,43 +412,62 @@ export class DevSigner implements Signer {
     if (unknown) this.warmPast();
     const block = await this.chain.commonBlock();
     this.warm(groups, block);
-    const [key, acct, gasPrice] = await Promise.all([
+    const [key, acct, gasPrice, floor] = await Promise.all([
       this.chain.accessKey(this.accountId, this.key.publicKey, block),
       this.chain.account(this.accountId, block),
       this.chain.gasPrice(block),
+      this.nonceFloor(),
     ]);
     if (!key || !acct) throw new ProblemError(securityProblems.keyMissing());
+    // the fence (the audit's C1): above the chain's nonce and above any this key may have signed and never sent
+    const base = key.nonce > floor ? key.nonce : floor;
     const many = groups.length > 1;
-    if (many && policyVersion(codeOf(acct), this.chain.network) < 2) {
+    // separate steps (an account that can't chain them, TxRequest.apart): each group its own transaction, built here
+    // before the one sheet, its nonce the next one in order, all at this block
+    const apart = many && groups.every((g) => g.apart);
+    if (many && !apart && policyVersion(codeOf(acct), this.chain.network) < 2) {
       throw new ProblemError(securityProblems.requestNotAllowed("More than one step in one approval needs your account's rules, version 2."));
     }
+    const policy = isAccountPolicy(codeOf(acct), this.chain.network);
     // With the account contract, the phone's key can't send anything itself: everything to another account goes
     // through the contract's execute() (or execute_many() for a chain), so the person's protection applies on-chain.
-    const wrapped = isAccountPolicy(codeOf(acct), this.chain.network) && (many || groups[0].receiverId !== this.accountId);
-    const txActions = !wrapped ? groups[0].actions : many ? [executeManyCall(groups)] : [executeCall(groups[0].receiverId, groups[0].actions)];
-    const tx: UnsignedTx = { signerId: this.accountId, publicKey: this.key.publicKey, nonce: key.nonce + 1n, receiverId: wrapped ? this.accountId : groups[0].receiverId, blockHash: block.hash, actions: txActions };
-    const bytes = serialize(tx);
-    let decoded;
-    try {
-      decoded = decodeTransaction(bytes);
-    } catch (e) {
-      if (e instanceof DecodeError) throw new ProblemError(securityProblems.decodeUnreadable());
-      throw e;
-    }
-    if (!sameTransaction(decoded, tx)) throw new ProblemError(securityProblems.decodeMismatch());
-    // What the person approves is read back out of the signed bytes: for execute(), the steps inside it.
-    const shown = !wrapped ? [decoded] : many ? unwrapExecuteMany(decoded) : [unwrapExecute(decoded)];
-    if (!shown || shown.length !== groups.length || shown.some((d, i) => !d || !sameTransaction(d, { ...tx, receiverId: groups[i].receiverId, actions: groups[i].actions }))) {
-      throw new ProblemError(securityProblems.decodeMismatch());
-    }
+    const build = (gs: Group[], nonce: bigint) => {
+      const one = gs.length > 1;
+      const wrapsIt = policy && (one || gs[0].receiverId !== this.accountId);
+      const txActions = !wrapsIt ? gs[0].actions : one ? [executeManyCall(gs)] : [executeCall(gs[0].receiverId, gs[0].actions)];
+      const tx: UnsignedTx = { signerId: this.accountId, publicKey: this.key.publicKey, nonce, receiverId: wrapsIt ? this.accountId : gs[0].receiverId, blockHash: block.hash, actions: txActions };
+      const bytes = serialize(tx);
+      let decoded;
+      try {
+        decoded = decodeTransaction(bytes);
+      } catch (e) {
+        if (e instanceof DecodeError) throw new ProblemError(securityProblems.decodeUnreadable());
+        throw e;
+      }
+      if (!sameTransaction(decoded, tx)) throw new ProblemError(securityProblems.decodeMismatch());
+      // What the person approves is read back out of the signed bytes: for execute(), the steps inside it.
+      const shown = !wrapsIt ? [decoded] : one ? unwrapExecuteMany(decoded) : [unwrapExecute(decoded)];
+      if (!shown || shown.length !== gs.length || shown.some((d, i) => !d || !sameTransaction(d, { ...tx, receiverId: gs[i].receiverId, actions: gs[i].actions }))) {
+        throw new ProblemError(securityProblems.decodeMismatch());
+      }
+      return { tx, bytes, decoded, wrapped: wrapsIt, shown: shown as DecodedTx[] };
+    };
+    const built = apart ? groups.map((g, i) => build([g], base + 1n + BigInt(i))) : [build(groups, base + 1n)];
+    const { tx, bytes } = built[0]!;
+    const wrapped = built.some((b) => b.wrapped);
+    const shown = built.flatMap((b) => b.shown);
+    // the fee the words say: every transaction's, as one (separate steps: their actions together)
+    const decoded: DecodedTx = apart ? { ...built[0]!.decoded, actions: built.flatMap((b) => b.decoded.actions) } : built[0]!.decoded;
     // The core's own tag (audit, 5 Nov): a core caller's, or its quote doors' record of an address this pays; read beside
     // the facts below, never from the app's request
-    const tagP = this.tagOf(groups, shown as DecodedTx[]);
+    const tagP = this.tagOf(groups, shown);
     void tagP.catch(() => undefined);
     // Known contracts: read what their words need; refuse spending coins the account doesn't have, plain NEAR to a
     // staking pool, and a partner payment whose terms don't match the bytes.
     const parts = [];
     let boundPaid = 0;
+    // the targets whose storage this request already made room for: once per target across its transactions (audit, 6 Nov)
+    const stored = new Set<string>();
     const sentTo = new Set<string>();
     let quoted = false;
     const nearUsd = await nearUsdP;
@@ -360,7 +476,7 @@ export class DevSigner implements Signer {
     // moment past the sheet's own reads (G18): not in by then, the warning says "from this device", which is true.
     // Words only: what is signed never depends on it.
     if (unknown && this.past && !this.pastRead) await Promise.race([this.past, new Promise<null>((r) => setTimeout(() => r(null), PAST_GRACE_MS))]);
-    for (const g of shown as DecodedTx[]) {
+    for (const g of shown) {
       const [intents, coins, modules, own] = await Promise.all([
         gatherIntentsFacts(g, this.chain, block, this.oneClick, this.quoteKey, this.ownQuote),
         gatherCoinFacts(g, this.chain, block),
@@ -377,7 +493,10 @@ export class DevSigner implements Signer {
         const leg = deps.length === 1 && this.privateLeg ? await this.privateLeg(deps[0]!).catch(() => null) : null;
         // and what the payment out of Private pays and to whom (the ruling, the audit and the copy review, 5 Nov: the title is the Move's figure)
         const units = (u: string | undefined) => (typeof u === "string" && /^\d{1,40}$/.test(u) ? u : undefined);
-        intents.moveFill = leg ? { privateTokenId: leg.tokenId, ...(units(leg.units) ? { privateUnits: leg.units } : {}), ...(units(leg.payUnits) ? { payUnits: leg.payUnits } : {}), ...(typeof leg.recipient === "string" ? { payee: leg.recipient, payeeOwn: leg.own === true } : {}) } : {};
+        const grp = groups[shown.indexOf(g)]!;
+        intents.moveFill = leg ? { privateTokenId: leg.tokenId, ...(units(leg.units) ? { privateUnits: leg.units } : {}), ...(units(leg.payUnits) ? { payUnits: leg.payUnits } : {}), ...(typeof leg.recipient === "string" ? { payee: leg.recipient, payeeOwn: leg.own === true } : {}), ...(typeof leg.toTokenId === "string" ? { payTokenId: leg.toTokenId } : {}), ...(grp.movePlan ? { plan: grp.movePlan } : {}), ...(grp.moveSwap ? { swap: true as const } : {}), ...(Array.isArray(leg.others) && leg.others.length ? { others: leg.others } : {}), ...(Array.isArray(leg.move) && leg.move.length ? { parts: leg.move, sheet: (await import("./move-plan.ts")).moveFillBlock } : {}) } : {};
+        // a Swap's coin out, read as every sheet coin is (ft_metadata at the sheet's block), so its title names it
+        if (leg && grp.moveSwap && typeof leg.toTokenId === "string") await (await import("./send-fill.ts")).sendPayoutCoin(intents, { destinationAsset: leg.toTokenId } as SendPayout, this.chain, block);
       }
       if (groups[shown.indexOf(g)]?.sendFill) {
         // a Send's fill (product decision, 5 Nov; QA's MUST 1, bind before you sign): the payout is the one the core
@@ -407,7 +526,7 @@ export class DevSigner implements Signer {
         if (tag && e instanceof ProblemError && e.problem.code === "security.quote.mismatch") throw new ProblemError(securityProblems.intentChanged(tag.kind));
         throw e;
       }
-      if (tag) boundPaid += checkBoundIntent(g, intents, this.accountId, tag.kind, tag.targets);
+      if (tag) boundPaid += checkBoundIntent(g, intents, this.accountId, tag.kind, tag.targets, stored);
       checkCoins(g, coins);
       quoted ||= intents.quotes.size > 0;
       for (const a of g.actions) { const to = sentToOf(a, g, intents); if (to) sentTo.add(to); }
@@ -415,13 +534,16 @@ export class DevSigner implements Signer {
     }
     const tag = await tagP;
     if (tag && boundPaid === 0) throw new ProblemError(securityProblems.intentChanged(tag.kind));
-    const words = readableWords(many ? plainWordsMany(parts, decoded, parts[0].ctx) : plainWords(parts[0].tx, parts[0].ctx));
+    const words = readableWords(apart ? plainWordsApart(parts, decoded, parts[0].ctx) : many ? plainWordsMany(parts, decoded, parts[0].ctx) : plainWords(parts[0].tx, parts[0].ctx));
     if (wrapped) {
-      // Say before Face ID what the protection will do with it: the contract's own answer, on two nodes.
-      const level = (await (many
-        ? this.chain.view(this.accountId, "level_for_many", { groups: groups.map((g) => executeArgs(g.receiverId, g.actions)) }, block)
-        : this.chain.view(this.accountId, "level_for", executeArgs(groups[0].receiverId, groups[0].actions), block))) as PolicyLevel | null;
-      if (!level) throw new ProblemError(securityProblems.nodesUnreachable());
+      // Say before Face ID what the protection will do with it: the contract's own answer, on two nodes. Separate steps:
+      // each wrapped one's own answer, and the sheet says the strictest
+      const levelOf = (gs: Group[]) => (gs.length > 1
+        ? this.chain.view(this.accountId, "level_for_many", { groups: gs.map((g) => executeArgs(g.receiverId, g.actions)) }, block)
+        : this.chain.view(this.accountId, "level_for", executeArgs(gs[0].receiverId, gs[0].actions), block)) as Promise<PolicyLevel | null>;
+      const levels = apart ? await Promise.all(groups.filter((_g, i) => built[i]!.wrapped).map((g) => levelOf([g]))) : [await levelOf(groups)];
+      if (levels.some((l) => !l)) throw new ProblemError(securityProblems.nodesUnreachable());
+      const level = strictest(levels as PolicyLevel[]);
       // A partner's price lasts about a minute: held any longer, the payment could never go through.
       // Rules saved before they counted every coin (H01: the first band names NEAR alone, or NEAR, USDC and USDT) hold
       // any wNEAR or other coin as a big payment: a Top up paid with NEAR always waits (mainnet 2 Nov, a test
@@ -444,7 +566,7 @@ export class DevSigner implements Signer {
       }
       words.protection = protectionOf(level, policyVersion(codeOf(acct), this.chain.network) >= 5);
       // before the closing "From …. Fee: …" line; a bare sheet (Home's Swap and Move, audit S1) has none: after its lines
-      words.lines.splice(/Fee: at most/.test(words.lines.at(-1) ?? "") ? words.lines.length - 1 : words.lines.length, 0, words.protection.text);
+      words.lines.splice(/Fee: at most|^Fee · /.test(words.lines.at(-1) ?? "") ? words.lines.length - 1 : words.lines.length, 0, words.protection.text);
     } else if (isAccountPolicy(codeOf(acct), this.chain.network) && groups[0].receiverId === this.accountId && groups[0].actions.some((a) => a.kind === "call" && STRICTEST_METHODS.has(a.method))) {
       // A change that loosens the rules goes through the strictest protection: say so before Face ID.
       const bands = (await this.chain.view(this.accountId, "protection", {}, block)) as { level: PolicyLevel }[] | null;
@@ -456,9 +578,9 @@ export class DevSigner implements Signer {
       const level = v5 && method?.kind === "call" && this.changeLevel ? await this.changeLevel(method.method, band, block) : band;
       words.protection = protectionOf(level, v5);
       // before the closing "From …. Fee: …" line; a bare sheet (Home's Swap and Move, audit S1) has none: after its lines
-      words.lines.splice(/Fee: at most/.test(words.lines.at(-1) ?? "") ? words.lines.length - 1 : words.lines.length, 0, words.protection.text);
+      words.lines.splice(/Fee: at most|^Fee · /.test(words.lines.at(-1) ?? "") ? words.lines.length - 1 : words.lines.length, 0, words.protection.text);
     }
-    return { tx, bytes, words, sentTo: [...sentTo] };
+    return { tx, bytes, words, sentTo: [...sentTo], paid: [...new Set(shown.flatMap(paidAddresses))], txs: built.map((b) => ({ tx: b.tx, bytes: b.bytes, pays: b.shown.some((d) => paidAddresses(d).length > 0) })) };
   }
 
   /**
@@ -484,60 +606,107 @@ export class DevSigner implements Signer {
     } catch (e) {
       return asOutcome(e);
     }
-    const { tx, bytes, words } = prepared;
+    const { words, txs } = prepared;
     // A key with its own sheet (the phone's chip) is approved on that sheet: it shows the words and signs only these
     // bytes there. The shell's approve names the words and holds its next sheet until this one has closed.
     const onSheet = this.key.signOnSheet?.bind(this.key);
+    const onSheetSet = this.key.signSetOnSheet?.bind(this.key);
+    // separate steps on a sheet key that can't sign them together: refused before the sheet, never split into sheets
+    // and a signer with no fence (the agent's, recovery's, the second device's: the audit's MUST 2): its floor would read 0, so a
+    // set's dropped step could land later; refused by name, never split
+    if (txs.length > 1 && ((onSheet && !onSheetSet) || !this.nonceMark)) return { status: "problem", problem: securityProblems.stepsNotTogether() };
     let shown = { words, id: "" };
     let closed = () => {};
     const next: SheetNext | undefined = onSheet ? { native: true, shown: (w, id) => (shown = { words: w, id }), finished: new Promise<void>((r) => (closed = r)) } : undefined;
-    const hash = sha256(bytes);
-    let signature: Uint8Array;
+    const hashes = txs.map((t) => sha256(t.bytes));
+    // the one Face ID (the audit's c1, 6 Nov): a Send's fill pays leg 1's address, for which the core holds leg 2 (its pair);
+    // the sheet carries leg 2's hash, and leg 2 is released only after these bytes' signature checks, before any send
+    const pair = groups.some((g) => g.sendFill) && this.pairs.pairOf ? await this.pairs.pairOf(prepared.paid).catch(() => null) : null;
+    const dropPair = () => { if (pair) this.pairs.dropPair?.(pair.inDeposit); };
+    // the audit's MUST (7 Nov): the sheet is about to show, so its job's row waits on the Face ID (approval.asked, the job's key)
+    const job = groups[0]?.job;
+    const asked = () => void (job && this.pairs.onAsked?.(job));
+    let signatures: Uint8Array[];
     try {
+      // a key with no sheet of its own: approve() is the sheet
+      if (!onSheet) asked();
       // a named refusal (the web's check that the person is there didn't pass: D143) says why; any other failure is a no
       const yes = await approve(words, next).catch((e: unknown) => (e instanceof ProblemError ? e : false));
-      if (yes instanceof ProblemError) return { status: "problem", problem: yes.problem };
-      if (!yes) return { status: "declined" };
-      if (onSheet) {
-        const signed = await onSheet({ id: shown.id, words: shown.words, bytes, summary: sheetSummary(tx) });
-        if (!signed) return { status: "declined" };
-        signature = signed;
+      if (yes instanceof ProblemError) { dropPair(); return { status: "problem", problem: yes.problem }; }
+      if (!yes) { dropPair(); return { status: "declined" }; }
+      // the fence (the audit's C1, 7 Nov): a set's highest nonce is kept in the sealed store BEFORE it signs, so the next request
+      // signs above it even after a restart, and a signed step that never went can't land later. One tx needs no note
+      // (the audit's MUST 1): dropped, the next request signs the same nonce and kills it
+      if (txs.length > 1 && !(await this.markNonce(txs.at(-1)!.tx.nonce))) { dropPair(); return { status: "problem", problem: securityProblems.nonceNotKept() }; }
+      if (onSheetSet && txs.length > 1) {
+        asked();
+        const signed = await onSheetSet({ id: shown.id, words: shown.words, txs: txs.map((t) => ({ bytes: t.bytes, summary: sheetSummary(t.tx) })), ...(pair ? { pairHash: pair.hash } : {}) });
+        if (!signed) { dropPair(); return { status: "declined" }; }
+        if (signed.length !== txs.length) { dropPair(); return { status: "problem", problem: securityProblems.signatureInvalid() }; }
+        signatures = signed;
+      } else if (onSheet) {
+        asked();
+        const signed = await onSheet({ id: shown.id, words: shown.words, bytes: txs[0]!.bytes, summary: sheetSummary(txs[0]!.tx), ...(pair ? { pairHash: pair.hash } : {}) });
+        if (!signed) { dropPair(); return { status: "declined" }; }
+        signatures = [signed];
       } else {
-        signature = await this.key.signHash(hash);
+        signatures = [];
+        for (const h of hashes) signatures.push(await this.key.signHash(h));
       }
     } catch {
       // On the phone this is Face ID cancelled or failed: the person didn't sign, so nothing happened.
+      dropPair();
       return { status: "declined" };
     } finally {
       closed();
     }
-    if (this.key.publicKey.startsWith("ml-dsa-65:") && !signatureIsValid(hash, signature, this.key.publicKey)) {
+    if (this.key.publicKey.startsWith("ml-dsa-65:") && signatures.some((sig, i) => !signatureIsValid(hashes[i]!, sig, this.key.publicKey))) {
+      dropPair();
       return { status: "problem", problem: securityProblems.signatureInvalid() };
     }
+    // leg 2, released by this signature only (once; a second ask, or another hash, gets nothing), signed and kept in the
+    // sealed vault BEFORE leg 1 is sent (the audit's MUST, 6 Nov: L2): nothing is sent yet, so a refusal here sends nothing at all
+    if (pair && (await this.pairs.releasePair?.(pair.inDeposit, pair.hash).catch(() => null)) !== true) return { status: "problem", problem: securityProblems.sendUnbound() };
+    // leg 1 refused before it went (a named refusal, or the chain's failure): leg 2's kept signature is deleted, never sent.
+    // Separate steps: only while the step that pays hasn't gone (the steps before it, or itself)
+    const lastPays = txs.reduce((at, t, i) => (t.pays ? i : at), txs.length - 1);
+    const unkeep = async (i: number) => { if (pair && i <= lastPays) await this.pairs.endPair?.(pair.inDeposit).catch(() => undefined); };
+    // the action's last signature is made: the job is made now ("Job created."), before the network (the audit's c6)
+    if (!groups.some((g) => g.more)) this.pairs.onSigned?.(job);
 
-    const txHash = txHashOf(bytes);
-    const link = explorerUrl(this.chain.network, txHash);
-    let result: SendResult;
-    try {
-      result = await this.chain.send(signedBase64(tx, signature), txHash, this.accountId);
-    } catch (e) {
-      if (e instanceof ProblemError) return { status: "problem", problem: e.problem };
-      // Signed and possibly sent: never claim it didn't happen.
-      return { status: "problem", problem: securityProblems.sendUnconfirmed(link) };
-    }
-    if (result.status === "failed") {
-      // The contract's cap on payments counted in 24 hours: nothing was sent; every one counted now has aged out a day on.
-      if (/too many payments in the last 24 hours/.test(result.failure ?? "")) {
-        const until = new Date(Date.now() + 86_400_000);
-        return { status: "problem", problem: securityProblems.paymentsMany(until.toISOString(), `${until.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} tomorrow`) };
+    // In order: a step's bytes leave the core only once every receipt of the step before it ended well (the audit's C1a, C4).
+    // A step that fails, fails partly or is held stops it there; the steps after it are dropped here, never kept or sent.
+    const explorerUrls: string[] = [];
+    let txHash = "";
+    let link = "";
+    for (const [i, t] of txs.entries()) {
+      txHash = txHashOf(t.bytes);
+      link = explorerUrl(this.chain.network, txHash);
+      let result: SendResult;
+      try {
+        result = await this.chain.send(signedBase64(t.tx, signatures[i]!), txHash, this.accountId);
+      } catch (e) {
+        if (e instanceof ProblemError) return (await unkeep(i), { status: "problem", problem: e.problem });
+        // Signed and possibly sent: never claim it didn't happen.
+        return { status: "problem", problem: securityProblems.sendUnconfirmed(link) };
       }
-      return { status: "problem", problem: securityProblems.sendFailed(link) };
+      if (result.status === "failed") {
+        // The contract's cap on payments counted in 24 hours: nothing was sent; every one counted now has aged out a day on.
+        if (/too many payments in the last 24 hours/.test(result.failure ?? "")) {
+          const until = new Date(Date.now() + 86_400_000);
+          await unkeep(i);
+          return { status: "problem", problem: securityProblems.paymentsMany(until.toISOString(), `${until.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} tomorrow`) };
+        }
+        await unkeep(i);
+        return { status: "problem", problem: securityProblems.sendFailed(link) };
+      }
+      // Accepted at the top but a later step failed: never "done".
+      if (result.partly) return { status: "problem", problem: securityProblems.sendPartly(link) };
+      explorerUrls.push(link);
+      // The account contract answers whether it ran now or is held (waiting, or for the second device).
+      const held = waitingOf(result.value);
+      if (held) return { status: "waiting", txHash, explorerUrl: link, ...held, ...(txs.length > 1 ? { explorerUrls, unsent: txs.length - 1 - i } : {}) };
     }
-    // Accepted at the top but a later step failed: never "done".
-    if (result.partly) return { status: "problem", problem: securityProblems.sendPartly(link) };
-    // The account contract answers whether it ran now or is held (waiting, or for the second device).
-    const held = waitingOf(result.value);
-    if (held) return { status: "waiting", txHash, explorerUrl: link, ...held };
     // Everyone it sent to, NEAR or a coin: the next sheet to them isn't "first time"
     for (const to of prepared.sentTo) {
       if (!this.known.has(to)) {
@@ -545,7 +714,7 @@ export class DevSigner implements Signer {
         this.onNewRecipient?.(to);
       }
     }
-    return { status: "done", txHash, explorerUrl: link };
+    return { status: "done", txHash, explorerUrl: link, ...(txs.length > 1 ? { explorerUrls } : {}) };
   }
 }
 
@@ -630,6 +799,14 @@ export function unwrapExecute(outer: DecodedTx): DecodedTx | null {
   }
 }
 
+/** The strictest of several steps' levels (separate steps, each its own execute()): FaceId, Device, a wait, both; the
+ *  longer wait of two of a kind. */
+export function strictest(levels: PolicyLevel[]): PolicyLevel {
+  const rank = (l: PolicyLevel) => (l === "FaceId" ? 0 : l === "Device" ? 1 : "Wait" in l ? 2 : 3);
+  const secs = (l: PolicyLevel) => (typeof l === "object" ? Number("Wait" in l ? l.Wait.seconds : l.Both.seconds) : 0);
+  return levels.reduce((a, b) => (rank(b) > rank(a) || (rank(b) === rank(a) && secs(b) > secs(a)) ? b : a));
+}
+
 function protectionOf(level: PolicyLevel, backupWordsStop = false): NonNullable<PlainWords["protection"]> {
   const text = levelWords(level, backupWordsStop);
   if (level === "FaceId") return { level: "faceid", waitSeconds: 0, text };
@@ -677,7 +854,7 @@ function hintOf(request: TxRequest): string | undefined {
 export function asOutcome(e: unknown): TxOutcome {
   if (e instanceof ProblemError) return { status: "problem", problem: e.problem };
   if (e instanceof RequestError) return { status: "problem", problem: securityProblems.requestInvalid(e.message) };
-  return { status: "problem", problem: securityProblems.unexpected("sign", e) };
+  return { status: "problem", problem: unexpectedFor("sign", e) };
 }
 
 /** How NEAR lists a key: post-quantum keys by their "ml-dsa-65-hash:…" handle, classical keys as themselves. */

@@ -230,4 +230,4 @@ const chartKey = (c: NativeCoin, r: Range) => `chart:${c.assetId}:${r}`;
 
 /** The one data source the screens share (the page's own fetch). */
 let shared: NativeData | undefined;
-export const nativeData = (): NativeData => (shared ??= createNativeData({ relay: (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_RELAY, listed: safeCanSell }));
+export const nativeData = (): NativeData => (shared ??= createNativeData({ relay: import.meta.env?.VITE_ZEROFEE_RELAY, listed: safeCanSell }));

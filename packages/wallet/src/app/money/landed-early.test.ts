@@ -1,5 +1,6 @@
-// the copy review's one rule for every job's receipt (5 Nov, real app and Sim alike): a job that lands before its estimate reads
-// "Landed early." Never a frozen "About 4 min left", never "Slower than usual." over money already there. The receipt's
+// the copy review's one rule for every job's receipt (5 Nov, real app and Sim alike; words 7 Nov): a job that landed says how long it
+// took ("Done in under a second.", "Done in 50 seconds."), never "Landed early.". Never a frozen "About 4 min left", never
+// "Slower than usual." over money already there. The receipt's
 // TimeLeft follows its job in the shared task store (the rows made since it opened) on an injected clock here.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -26,16 +27,16 @@ function job(landAt: number | null) {
   return { list: () => store.list(), endsAt };
 }
 
-test("landed before its estimate, the receipt says \"Landed early.\" and stays so as time goes on (never \"About 4 min left\" or \"Slower than usual.\"); landed after it, the past-estimate words as they stood at the landing; control: still moving, the time left", () => {
+test("landed before its estimate, the receipt says how long it took and stays so as time goes on (never \"About 4 min left\" or \"Slower than usual.\"); landed after it, how long too (copy review, 7 Nov: was \"Almost there.\" frozen); control: still moving, the time left", () => {
   const early = job(T + 50_000);
   const landed = landedOf(early.list(), T);
   assert.equal(landed, T + 50_000, "the job's row landed at 50 s");
-  for (const at of [T + 50_000, T + 120_000, T + 600_000]) assert.equal(receiptLeft(early.endsAt, at, T, landed), "Landed early.", `at ${(at - T) / 1000} s`);
-  assert.equal(TIME_WORDS.early, "Landed early.");
+  for (const at of [T + 50_000, T + 120_000, T + 600_000]) assert.equal(receiptLeft(early.endsAt, at, T, landed), "Done in 50 seconds.", `at ${(at - T) / 1000} s`);
+  assert.equal(TIME_WORDS.underSecond, "Done in under a second.");
 
   const late = job(T + 270_000);
   const lateAt = landedOf(late.list(), T);
-  assert.equal(receiptLeft(late.endsAt, T + 600_000, T, lateAt), TIME_WORDS.almost, "landed 30 s past the estimate: \"Almost there.\" as it stood then, never \"Slower than usual.\" later");
+  assert.equal(receiptLeft(late.endsAt, T + 600_000, T, lateAt), "Done in 5 min.", "landed 30 s past the estimate: how long it took, never \"Slower than usual.\" later");
 
   const going = job(null);
   assert.equal(landedOf(going.list(), T), undefined, "control: still moving, not landed");
@@ -55,7 +56,7 @@ test("what counts as the receipt's job: the tap's starting row (ended when the r
 
 test("every receipt's clock is this one: TimeLeft follows its job in the shared store and stops once it landed; Home's money-on-its-way row has no job to follow", () => {
   const made = here("./JobMade.tsx");
-  assert.match(made, /const read = \(\) => setLanded\(landedOf\(s\.list\(\), startMs\)\);/);
+  assert.match(made, /const read = \(\) => setLanded\(landedOf\(s\.list\(\), startMs, mine\)\);/);
   assert.match(made, /const time = receiptLeft\(endsAt, now, startMs, landed\);/);
   assert.match(made, /if \(endsAt === undefined \|\| landed !== undefined\) return;/, "the clock stops once landed");
   assert.match(here("../screens/Home.tsx"), /<Left etaSec=\{m\.etaSec\} endsAt=\{m\.endsAt\} follow=\{false\} line=\{movingWords\?\.sub\} \/>/);

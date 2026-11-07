@@ -115,7 +115,8 @@ export function rangeChange(c: readonly Candle[]): { usd: number; pct: number; d
 
 /** The words after the header's change, one per range. */
 export const RANGE_WORDS: Record<"1H" | "1D" | "1W" | "1M" | "1Y" | "ALL", string> = {
-  "1H": "in 1 hour", "1D": "in 24 hours", "1W": "in 1 week", "1M": "in 1 month", "1Y": "in 1 year", "ALL": "all time",
+  // the copy review's final words (7 Nov, T1): "in the last 24 hours", "this week"; the rest as Native's own (provisional)
+  "1H": "in the last hour", "1D": "in the last 24 hours", "1W": "this week", "1M": "this month", "1Y": "this year", "ALL": "all time",
 };
 
 /** The words after the header's change: the range's own, or "since it started" when the range is longer than the coin

@@ -10,6 +10,7 @@
 //
 // The sheet's view alone (ApprovalSheetView and its words), apart from the shell's ApprovalSheet that asks the iPhone's
 // Face ID: the second device's site (second-device.tsx) draws this and needs nothing of the phone's host.
+import { effectText } from "./effect-text.ts";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PlainWords } from "@zerofee/core/signer";
 import { amountLine } from "@zerofee/core/sheet-amount";
@@ -17,9 +18,11 @@ import { Close, Face } from "@zerofee/design/icons.tsx";
 import { More } from "@zerofee/design/More.tsx";
 import { useBack } from "@zerofee/design/back.ts";
 import { onPhone } from "@zerofee/shell-api/approval-words.ts";
+import { sheetFoot } from "@zerofee/shell-api/key-place.ts";
 import { simPage } from "@zerofee/shell-api/release.ts";
 import { markTap, personTapped } from "../unlock/activation.ts";
 import { APPROVAL_PASSWORD_WORDS } from "./approval-password.ts";
+import { ARM_MS, COSTS_MORE_HEAD } from "./approval-arm.ts";
 import { groupAddress, isLandsLine, isLeadLine, toAddress, ungroup } from "./sheet-address.ts";
 import "./approval.css";
 
@@ -32,8 +35,8 @@ const simulated = !phone && simPage();
  *  item 11: every money move waited a full second on it). */
 export const FACE_ID_MS = 600;
 
-/** How long Approve stays off after a sheet appears, so a tap meant for the app can't land on it. */
-export const ARM_MS = 700;
+/** How long Approve stays off after a sheet appears (approval-arm.ts, one home). */
+export { ARM_MS };
 
 /** "120" → "2 minutes", "3600" → "1 hour", "172800" → "2 days". */
 export function waitWords(seconds: number): string {
@@ -66,7 +69,14 @@ export function protectionWords(protection: PlainWords["protection"]): string | 
  * the DOM handler from the browser's event itself (personTapped), which then marks `id` for the bridge (activation.ts,
  * audits K-6, K2-2). On the phone, Approve passes Face ID instead.
  */
-export function ApprovalSheetView({ id, words, onAnswer: answer, password }: { id?: string; words: PlainWords; onAnswer: (approve: boolean, password?: string) => void | Promise<void | string | null>; /** the web wallet: Approve takes the password */ password?: boolean }) {
+/** The Getting-ready sheet's own words (the copy review's W2, 6 Nov). The bound lines' labels, said with "Checking" until they come. */
+export const PENDING_WORDS = { sub: "Working out the exact amounts.", failed: "Couldn't get the exact amounts. Close and try again.", checking: "Checking", labels: ["From", "To", "Fee"] } as const;
+
+export function ApprovalSheetView({ id, words, onAnswer: answer, password, pending, armAt }: { id?: string; words: PlainWords; onAnswer: (approve: boolean, password?: string) => void | Promise<void | string | null>; /** the web wallet: Approve takes the password */ password?: boolean;
+  /** The Getting-ready sheet (W2): the typed headline, the bound lines' labels with "Checking", Approve off; `failed`: binding didn't come. */
+  pending?: { failed?: true };
+  /** When the 700 ms arm began (the audit's R4): the Getting-ready sheet's own start when the bound figures are the same; absent, this sheet's mount. */
+  armAt?: number }) {
   const [typed, setTyped] = useState("");
   const [why, setWhy] = useState<string | null>(null);
   /** A password sheet's yes: the core checks it; a wrong one or a wait keeps the sheet, with its line, to type again. */
@@ -85,10 +95,17 @@ export function ApprovalSheetView({ id, words, onAnswer: answer, password }: { i
   const [faceId, setFaceId] = useState<null | "scan" | "done">(null);
   // Once the end has been seen it stays seen: scrolling back up to re-read doesn't take Approve away again.
   const reached = useRef(false);
+  // R4: off while getting ready; armed ARM_MS after armAt (the Getting-ready sheet's start when the bound figures match
+  // it, so the same figures never restart it), else after this sheet came
+  const waiting = !!pending;
   useEffect(() => {
-    const t = window.setTimeout(() => setArmed(true), ARM_MS);
+    if (waiting) return void setArmed(false);
+    const left = Math.max(0, (armAt ?? Date.now()) + ARM_MS - Date.now());
+    if (left === 0) return void setArmed(true);
+    setArmed(false);
+    const t = window.setTimeout(() => setArmed(true), left);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [waiting, armAt]);
   // Does the body scroll, and has it been scrolled to the end? Re-measured as it scrolls and whenever its size changes
   // (the keyboard, a rotation, fonts arriving).
   useLayoutEffect(() => {
@@ -115,7 +132,7 @@ export function ApprovalSheetView({ id, words, onAnswer: answer, password }: { i
   // The core's lines usually carry the protection's own sentence ("It waits 1 hour. You, or your backup words, can stop
   // it."): then the clock line would only say the wait again (grade 02g, E15: "waits 1 hour" three times).
   const protection = words.protection && words.lines.includes(words.protection.text) ? null : protectionWords(words.protection);
-  const canApprove = armed && atEnd && (!password || typed.length > 0);
+  const canApprove = !pending && armed && atEnd && (!password || typed.length > 0);
   return (
     <div className="approval" role="dialog" aria-modal="true" aria-labelledby="approval-title">
       {faceId && (
@@ -134,6 +151,11 @@ export function ApprovalSheetView({ id, words, onAnswer: answer, password }: { i
         <div className="approval__body" ref={body}>
           <div className="zf-label">Check this{words.testNetwork && <span className="approval__test"> · Test network</span>}</div>
           <h2 id="approval-title" className="approval__title">{words.title}</h2>
+          {pending && (
+            <div className="approval__effects approval__pending" data-testid="approval-pending">
+              {PENDING_WORDS.labels.map((l) => <div key={l} className="approval__kv"><span>{l}</span><span className="approval__checking">{PENDING_WORDS.checking}</span></div>)}
+            </div>
+          )}
           {/* The payment in dollars, the coin amount after it (grade 02g, G11), before every other line. */}
           {amountLine(words) && <p className="approval__amount">Amount: {amountLine(words)}</p>}
           {words.lines.map((line, i) => {
@@ -142,6 +164,8 @@ export function ApprovalSheetView({ id, words, onAnswer: answer, password }: { i
             const to = toAddress(line);
             if (to) return <div key={i} className="approval__to"><span className="approval__to-cap">To</span><FullAddress label="The address" address={to} /></div>;
             if (isLandsLine(line)) return <p key={i} className="approval__line approval__lands">{line}</p>;
+            // a signed quote past the plan's bound (the audit's ruling (c)): its head, in ink, said first
+            if (line === COSTS_MORE_HEAD) return <p key={i} className="approval__line approval__lead" role="alert">{line}</p>;
             if (isLeadLine(line)) return <p key={i} className="approval__line approval__lead">{line}</p>;
             // an open detail (a payee's full address) sits right under its line, never folded
             const full = words.details?.find((d) => d.open?.after === line);
@@ -155,7 +179,7 @@ export function ApprovalSheetView({ id, words, onAnswer: answer, password }: { i
           {words.effect.length > 0 && (
             <div className="approval__effects">
               {words.effect.map((e, i) => (
-                <div key={i} className="approval__kv"><span>{e.token}</span><span>{e.before} → {e.after}</span></div>
+                <div key={i} className="approval__kv"><span>{e.token}</span><span>{effectText(e)}</span></div>
               ))}
             </div>
           )}
@@ -170,6 +194,7 @@ export function ApprovalSheetView({ id, words, onAnswer: answer, password }: { i
           {words.hint && <p className="approval__hint">{words.hint}</p>}
         </div>
         <div className={`approval__foot${overflows ? " scrolls" : ""}`}>
+          {pending && <p className="approval__more" role="status">{pending.failed ? PENDING_WORDS.failed : PENDING_WORDS.sub}</p>}
           {overflows && !atEnd && <p className="approval__more">Read to the end to approve.</p>}
           {password && (
             <div className="approval__password">
@@ -211,9 +236,12 @@ export function ApprovalSheetView({ id, words, onAnswer: answer, password }: { i
             </div>
             <button className="zf-link" onClick={() => answer(false)}>Not now</button>
           </div>
-          {/* What Approve is here, said plainly (D20): in a browser it is the tap itself, with the key kept on this device,
-              encrypted. On the phone the sheet asks Face ID and says nothing more. */}
-          {!phone && !simulated && !password && <p className="approval__demo">Approve is your yes. Your key stays here, encrypted.</p>}
+          {/* What Approve is here, said plainly (D20): in a browser it is the tap itself. Where the key is (key-place.ts;
+              the copy review and the audit, 7 Nov): "this device", never "this phone", and only on a sheet the Safe's own key signs: its
+              protection is on it, set only by the Safe's signer (core dev-signer.ts:464, :476). A trading wallet's sheet
+              (hot-sheets.ts, subwallets.ts, near-coin.ts: never a protection) says the yes alone, as its key can be shown
+              and leave. On the phone the sheet asks Face ID and says nothing more. */}
+          {!phone && !simulated && !password && <p className="approval__demo">{sheetFoot(words.protection !== undefined, false)}</p>}
         </div>
       </div>
     </div>
@@ -228,7 +256,8 @@ function FullAddress({ label, address }: { label: string; address: string }) {
     <button type="button" className="approval__addr" data-testid="approval-full-address" aria-label={`${label}: ${address}. Copy`} translate="no"
       onCopy={(e) => { e.preventDefault(); e.clipboardData.setData("text/plain", ungroup(window.getSelection()?.toString() || address)); }}
       onClick={() => { void navigator.clipboard?.writeText(address).then(() => setCopied(true), () => undefined); }}>
-      {groupAddress(address)}{copied && <span className="approval__addr-copied"> · Copied</span>}
+      {/* J2-2 (copy review, 8 Nov): a 44 px row, the address and its Copy, never a 22 px line */}
+      <span className="approval__addr-text">{groupAddress(address)}</span><span className="approval__addr-copy" aria-hidden="true">{copied ? "Copied" : "Copy"}</span>
     </button>
   );
 }

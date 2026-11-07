@@ -33,7 +33,9 @@ test("a site's top-up refused after its job exists is said on the job's row, nev
 
 test("the site Add's receipt keeps only the live time left under \"Job created.\": never a fixed \"NEAR takes 3–4 minutes.\" (control: the TimeLeft is there, from the route's measured time)", () => {
   const receipt = site.slice(site.indexOf("if (made !== null) {"), site.indexOf("// ST1 (product decision, 2 Nov)"));
-  assert.match(receipt, /\{JOB_WORDS\.created\}<\/p>\n(?:\s+\{\/\*[^\n]*\*\/\}\n)?\s+<TimeLeft etaSec=\{LEG_SEC\.privateOut\} \/>\n\s+<\/div>/, "control: the live TimeLeft, and nothing after it");
-  assert.doesNotMatch(receipt, /SITE_ADD_WATCH|zf-receipt__line/, "no second line beside it");
+  assert.match(receipt, /\{JOB_WORDS\.created\}<\/p>\n(?:\s+\{\/\*[^\n]*\*\/\}\n)?\s+<SaidLine testid="site-add-said" \{\.\.\.addWords\(made, name, network\)\} job=\{madeJob\} \/>\n\s+<TimeLeft etaSec=\{LEG_SEC\.privateOut\} job=\{madeJob\} \/>\n\s+<\/div>/, "control: the live TimeLeft, and nothing after it");
+  // the copy review's item 1 (7 Nov): its one line is what happened, "Added $10.00 to your pump.fun wallet."; nothing fixed beside it
+  assert.doesNotMatch(receipt, /SITE_ADD_WATCH/, "no fixed line beside it");
+  assert.equal((receipt.match(/zf-receipt__line|<SaidLine/g) ?? []).length, 1, "the said line only");
   assert.doesNotMatch(receipt, /NEAR takes 3–4 minutes/);
 });

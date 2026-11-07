@@ -148,11 +148,19 @@ test("rule 4, the test phone: Trade's own Solana sale that puts up the one-tap s
   }
 });
 
+/** The core's own plain send (subwallet.send's door is shut, no screen sends it): its signing rules still hold under it. */
+const plain = async (core: unknown, to: string) => {
+  const c = core as { ready: () => Promise<unknown>; subwallets: { sendPlain: (...a: unknown[]) => Promise<{ status: string }> } };
+  await c.ready();
+  try { return { ok: await c.subwallets.sendPlain("sol", to, "1", undefined, "ZeroFee", "wallet") }; }
+  catch (e) { return { problem: (e as { problem?: unknown }).problem ?? e }; } // as core.call answers
+};
+
 test("rule 4 controls: a send to an outside address past the cap still asks Face ID after the sheet, every time; a failed check signs nothing", async () => {
   // Home's Send of 1 SOL ($150, past the $100 cap) from the Solana wallet to a stranger: the sheet with no tap, then the passkey
   for (let n = 1; n <= 2; n++) {
     const { core, stepUps, shown } = await webCore({});
-    const r = await core.call<{ status: string }>("subwallet.send", { app: "wallet", chain: "sol", to: STRANGER, amount: "1" });
+    const r = await plain(core, STRANGER);
     assert.equal(shown.length, 1);
     assert.equal(shown[0]!.tap, undefined, "Face ID's sheet");
     assert.equal(stepUps.length, 1, `send ${n}: asked again`);
@@ -160,20 +168,20 @@ test("rule 4 controls: a send to an outside address past the cap still asks Face
   }
   // the passkey says no: declined, nothing signed or sent
   const no = await webCore({}, false);
-  assert.equal(ok(await no.core.call<{ status: string }>("subwallet.send", { app: "wallet", chain: "sol", to: STRANGER, amount: "1" })).status, "declined");
+  assert.equal(ok(await plain(no.core, STRANGER)).status, "declined");
   assert.equal(no.stepUps.length, 1);
 });
 
 test("the audit's pin: with the tap-skip in place, an outside payee's sheet still asks the passkey after Approve; control: the same send past the cap to the person's own wallet is one tap and asks none", async () => {
   const out = await webCore({});
-  await out.core.call("subwallet.send", { app: "wallet", chain: "sol", to: STRANGER, amount: "1" });
+  await plain(out.core, STRANGER);
   assert.equal(out.shown.length, 1);
   assert.equal(out.shown[0]!.tap, undefined, "an outside payee: the sheet carries no tap");
   assert.equal(out.stepUps.length, 1, "an outside payee: the passkey (Face ID) is asked");
   // control: past the cap to one of the person's own wallets (decision C: one tap)
   const own = await webCore({});
   const mine = ok(await own.core.call<{ address: string }>("subwallet.create", { kind: "browser", chain: "sol" }));
-  await own.core.call("subwallet.send", { app: "wallet", chain: "sol", to: mine.address, amount: "1" });
+  await plain(own.core, mine.address);
   assert.equal(own.shown.length, 1);
   assert.equal(own.shown[0]!.tap, true, "their own wallet: one tap");
   assert.deepEqual(own.stepUps, [], "their own wallet: no passkey");

@@ -35,7 +35,7 @@ export default function PerpsTab() {
     let live = true;
     void sample.then(async (yes) => {
       // D157: the Chrome extension has no Sim at all (read inline, so the sample perps don't ship there)
-      const s = yes && !((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_TARGET === "extension" && (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_EXTENSION_CHECK !== "1") ? (await import("./sample.ts")).sampleSource() : bridgeSource(shell.bridge);
+      const s = yes && !(import.meta.env?.VITE_ZEROFEE_TARGET === "extension" && import.meta.env?.VITE_ZEROFEE_EXTENSION_CHECK !== "1") ? (await import("./sample.ts")).sampleSource() : bridgeSource(shell.bridge);
       kept.set(shell.bridge, { source: s });
       if (live) setSource(s);
     });

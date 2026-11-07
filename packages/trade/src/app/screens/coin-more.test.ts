@@ -19,9 +19,10 @@ test("no More row or sheet: every section More held is drawn inline on the coin 
 
 test("the stats' labels are short (one line on a phone) and nothing reads as a dash", () => {
   const page = src("CoinPage.tsx");
-  // a16: "Market cap" names the figure the list says alone ("name · $3.7K")
-  for (const l of ["Market cap", "Liquidity", "Traded 24h", "Holders", "Age", "Top 10 hold"]) assert.match(page, new RegExp(`label="${l}"`), l);
-  assert.doesNotMatch(page, /Money in its market|Top 10 wallets hold"/, "control: the long labels are gone");
+  // a16: "Market cap" names the figure the list says alone ("name · $3.7K"); the copy review's final words (7 Nov, T2, fix/trade-list-coin)
+  // made the rest plain: "Money in the pool", "Traded in the last day", "People holding", "Top 10 wallets own"
+  for (const k of ["cap", "pool", "traded", "holders", "age", "top10"]) assert.match(page, new RegExp(`label=\\{STAT_LABELS\\.${k}\\}`), k);
+  assert.doesNotMatch(page, /label="(Liquidity|Traded 24h|Holders|Top 10 hold)"/, "control: the short jargon labels are gone");
   assert.doesNotMatch(page, /"—"/, "no dash for a figure not known");
 });
 

@@ -132,7 +132,7 @@ const ALLOWED = ["account.state", "account.id", "approval.answer", "subwallet.se
 /** Home's Swap in place (product decision, 5 Nov): Wallet's own calls only. */
 const IN_PLACE = ["subwallet.float.swapQuote", "subwallet.float.swap", "subwallet.float.move"];
 const TRADE = ["subwallet.signTx", "subwallet.sign", "subwallet.session.start", "subwallet.session.end", "subwallet.preflight"];
-const NEVER = ["subwallet.send", "subwallet.near.trade", "subwallet.near.wallet", "subwallet.near.register", "subwallet.near.rheaSwap", "subwallet.near.rheaAdd", "subwallet.add.quote", "subwallet.site.moveBack", "subwallet.site.moveBackAll", "subwallet.export", "subwallet.site.forHost", "subwallet.site.moveBacks", "subwallet.site.signIns", "subwallet.site.addCost", "subwallet.signMessage", "subwallet.signTypedData", "subwallet.float.out", "subwallet.float.move", "subwallet.privatePay", "account.create", "tx.request"];
+const NEVER = ["subwallet.send", "subwallet.near.trade", "subwallet.near.wallet", "subwallet.near.register", "subwallet.near.rheaSwap", "subwallet.near.rheaAdd", "subwallet.near.rheaClaim", "subwallet.add.quote", "subwallet.site.moveBack", "subwallet.site.moveBackAll", "subwallet.export", "subwallet.site.forHost", "subwallet.site.moveBacks", "subwallet.site.signIns", "subwallet.site.addCost", "subwallet.signMessage", "subwallet.signTypedData", "subwallet.float.out", "subwallet.float.move", "subwallet.privatePay", "account.create", "tx.request"];
 
 test("web wallet allowlist: every core method off the list is refused by name, whatever app asks; on it, only its own asks", async () => {
   assert.ok(EVERY.length > 100, "read the core's methods");
@@ -191,9 +191,10 @@ test("the HARD RULE: the web's only Send is the private one: the public transfer
   assert.deepEqual([sent.length, tries(), sheets.length], [0, 0, 0]);
 });
 
-test("decision A: the phone (no web door) is unchanged: sendPlain gets no gate, so an outside send never asks a password there", () => {
+test("the public send's door is shut on every build (the HARD RULE, the audit: 6 Nov), the phone too; sendPlain itself keeps its gate rule", () => {
   const src = readFileSync(new URL("./demo-core.ts", import.meta.url), "utf8");
-  assert.match(src, /String\(p\.app\), this\.web \? \(\) => this\.web!\.passwordFirst\(p\.password\) : undefined\)\);/);
+  assert.match(src, /case "subwallet\.send":\n\s+return Promise\.reject\(new ProblemError\(securityProblems\.requestNotAllowed\(/);
+  assert.doesNotMatch(src, /this\.subwallets\.sendPlain\(/, "no call path left in the core");
   const sw = readFileSync(new URL("./subwallets.ts", import.meta.url), "utf8");
   assert.match(sw, /const outside = !\(await this\.ownPayee\(to\)\);\n[\s\S]{0,500}if \(outside && outsideGate\) await outsideGate\(\);\n\s+\/\/ audit C1[\s\S]{0,1200}if \(outside\) \{\n\s+if \(!outsideGate && [\s\S]{0,400}\} else \{\n\s+const capped = await this\.capGate\(usd\);/, "checked before the cap counts it; once it ran, no second ask (QA, 5 Nov), and an outside send is never counted");
 });

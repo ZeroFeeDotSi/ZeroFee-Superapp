@@ -1,6 +1,7 @@
 // A Send's fill sheet, the move in's own cost (audit, 6 Nov): what stays in Private is what the move in signs to bring less
 // the payout, and its cost joins "Fees". Before, any cost of the move in printed as money staying in Private.
 import assert from "node:assert/strict";
+import { SEND_LEG_WORDS } from "./private-route.ts";
 import { test } from "node:test";
 import type { IntentsFacts, QuoteFacts, SendPayout } from "./intents.ts";
 import { sendFillWords } from "./send-fill.ts";
@@ -14,35 +15,39 @@ const payout = (amountIn: string, origin = USDC, usd: { in?: string; out?: strin
 const lines = (q: QuoteFacts, s: SendPayout) => sendFillWords(q, s, facts)!.lines;
 
 test("no cost on the move in (today's USDC quote, amountOut = amountIn): the figures are as they were", () => {
-  assert.deepEqual(lines(leg1("300000000", "300000000"), payout("250000000")), ["Your Safe sends · $300.00", "Stays in Private · $50.00", "Fees · about $2.50", "NEAR Intents and the network keep this. ZeroFee takes nothing."]);
+  assert.deepEqual(lines(leg1("300000000", "300000000"), payout("250000000")), ["From your Safe · $300.00", "Private keeps the rest · about $50.00", "Fees · about $2.50", "NEAR Intents and the network keep this. ZeroFee takes nothing."], "QA's ledger re-walk (6 Nov): a whole-step fill says why more leaves (changed pin: the why line)");
 });
 
 test("a cost on the move in is a fee, not money staying; the lines add up to what the Safe sends", () => {
   const l = lines(leg1("300000000", "299700000"), payout("250000000"));
-  assert.deepEqual(l.slice(0, 3), ["Your Safe sends · $300.00", "Stays in Private · $49.70", "Fees · about $2.80"]);
+  assert.deepEqual(l.slice(0, 3), ["From your Safe · $300.00", "Private keeps the rest · about $49.70", "Fees · about $2.80"], "J2-2 (8 Nov): no why line, the rest row says it");
   // Y = Z + T + the move in's cost, read from the sheet itself; $2.50 of the fees is the payout's, inside T
   const cents = (i: number) => Math.round(Number(l[i]!.split("$")[1]) * 100);
   const title = sendFillWords(leg1("300000000", "299700000"), payout("250000000"), facts)!.title;
-  assert.equal(title, "Send $250.00 from your Safe");
+  assert.equal(title, "Send $250.00 to payee.test");
   assert.equal(cents(0), cents(1) + 25000 + (cents(2) - 250));
 });
 
 test("the slippage room still stays: a payout at the signed minimum leaves the rest of what arrives", () => {
-  assert.deepEqual(lines(leg1("5000000", "5000000"), payout("4950000", USDC, { out: "4.74" })).slice(0, 3), ["Your Safe sends · $5.00", "Stays in Private · $0.05", "Fees · about $0.21"]);
+  assert.deepEqual(lines(leg1("5000000", "5000000"), payout("4950000", USDC, { out: "4.74" })).slice(0, 3), ["From your Safe · $5.00", "Private keeps the rest · about $0.05", "Fees · about $0.21"], "control: $5.00 is no whole step, the $0.05 is slippage room: no why line");
 });
 
 test("a coin that isn't dollars: stays in its own units, the move in's cost from the quote's two dollar figures", () => {
   const l = lines(leg1("2000000000", "1990000000", SOL, { in: "200.00", out: "199.00" }), payout("1000000000", SOL, { in: "100.00", out: "99.50" }));
-  assert.equal(l[0], "Your Safe sends · 2 SOL");
-  assert.equal(l[1], "Stays in Private · 0.99 SOL");
+  assert.equal(l[0], "From your Safe · 2 SOL");
+  assert.equal(l[1], "Private keeps the rest · about 0.99 SOL");
+  // the audit's MUST (6 Nov): the chain shows 2 SOL, round only in dollars at that moment, so no "round sum" line for a coin that isn't dollars
+  assert.ok(!l.includes(SEND_LEG_WORDS.why), "no round-sum claim for a priced coin");
+  // J2-2 (8 Nov): no why sentence for any coin (the rest row says it)
   assert.equal(l[2], "Fees · about $1.50", "$1.00 moving in + $0.50 on the payout");
 });
 
 test("no usable amountOut, or one above what went in: the bytes' amountIn, as before; what stays is never negative", () => {
   for (const out of [undefined, "", "not a number", "400000000"]) {
-    assert.equal(lines(leg1("300000000", out), payout("250000000"))[1], "Stays in Private · $50.00", String(out));
+    assert.equal(lines(leg1("300000000", out), payout("250000000"))[1], "Private keeps the rest · about $50.00", String(out));
   }
   const l = lines(leg1("300000000", "200000000"), payout("250000000"));
-  assert.equal(l[0], "Your Safe sends · $300.00");
-  assert.ok(!l.some((x) => x.startsWith("Stays in Private")), "a payout above what arrives: nothing is said to stay");
+  assert.equal(l[0], "From your Safe · $300.00");
+  assert.ok(!l.some((x) => x.startsWith("Private keeps the rest")), "a payout above what arrives: nothing is said to stay");
+  assert.equal(l[1], "From Private · about $50.00", "J2-1: Private pays the difference on net, said");
 });

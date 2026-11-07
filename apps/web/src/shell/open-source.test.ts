@@ -9,7 +9,7 @@ import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
 import { createServer, type ViteDevServer } from "vite";
 import type { Bridge, BridgeResult } from "@zerofee/core/bridge";
-import { CODE_FALLBACK, CODE_LABEL, NOTICES, POSITIONING, noticeMeta, openInBrowserSheet, type Notices } from "./open-source.ts";
+import { CODE_FALLBACK, CODE_LABEL, NOTICES, POSITIONING, licencesLabel, noticeMeta, openInBrowserSheet, plainName, type Notices } from "./open-source.ts";
 // @ts-expect-error: a plain .mjs build script, no types
 import { buildNotices, importedPackages, OUT, render, repositoryUrl, TRADINGVIEW } from "../../../../tools/shell/notices.mjs";
 
@@ -53,7 +53,7 @@ test("the screen says what ZeroFee is (the positioning line), then the notices, 
   assert.ok(html.includes(POSITIONING.replace(/'/g, "&#x27;")));
   assert.ok(html.indexOf("Third-party notices") > html.indexOf("ZeroFee is built in the open"));
   assert.ok(html.indexOf("Charts by TradingView") < html.indexOf(">react<"));
-  for (const p of NOTICES.packages) assert.ok(html.includes(`>${p.name}<`), p.name);
+  for (const p of NOTICES.packages) assert.ok(html.includes(`>${plainName(p.name)}<`), p.name);
   assert.doesNotMatch(POSITIONING, /safe|guarantee|unhackable|recommend/i);
 });
 
@@ -129,4 +129,20 @@ test("nothing personal or local in the notices: no machine paths", () => {
   const text = readFileSync(OUT, "utf8");
   assert.ok(!text.includes(homedir()));
   assert.doesNotMatch(text, /\/Users\/|\/home\/[a-z]|[A-Z]:\\\\/);
+});
+
+// the copy review's S6 (7 Nov): the list folds under "Licences (N)", each package by its plain name, and "Licence text" is a 44 px
+// target (it was 75x32). Failed on main (plainName and licencesLabel did not exist; .os__link was min-height 32px).
+test("Licences (N) folds the list; plain names, never a raw scoped id; Licence text is 44 px (control: an unscoped name is itself)", () => {
+  assert.equal(plainName("@anthropic-ai/sdk"), "sdk (anthropic-ai)");
+  assert.equal(plainName("@fastnear/borsh-schema"), "borsh-schema (fastnear)");
+  assert.equal(plainName("react"), "react", "control");
+  assert.equal(licencesLabel(3), "Licences (3)");
+  const html = renderToString(OpenSourceScreen({ onClose: () => {}, onOpenUrl: () => {} }));
+  assert.ok(html.includes(`>${licencesLabel(NOTICES.packages.length)}<`));
+  for (const p of NOTICES.packages.filter((p) => p.name.startsWith("@"))) assert.ok(!html.includes(`>${p.name}<`), `${p.name} raw on screen`);
+  assert.ok(html.indexOf('class="os__all"') < html.indexOf('class="os__list"'), "the list sits inside the one row");
+  const css = readFileSync(new URL("./open-source.css", import.meta.url), "utf8");
+  assert.match(css, /\.os__link \{[^}]*min-height: 44px/);
+  assert.doesNotMatch(css, /\.os__link \{[^}]*min-height: 32px/);
 });

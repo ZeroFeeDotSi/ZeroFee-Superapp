@@ -35,11 +35,11 @@ test("the landed receipt has its transaction's proof: the network and View (cont
   await runtime.mount(done({ tx: { chain: "sol", hash: SIG } }));
   const withTx = runtime.text();
   runtime.unmount();
-  assert.match(withTx, /On Solana\nView/);
+  assert.match(withTx, /On Solana · \nSee proof/, "T2-6 (the copy review's walk): its page is there: See proof");
   await runtime.mount(done({}));
   const without = runtime.text();
   runtime.unmount();
-  assert.doesNotMatch(without, /On Solana|View/, "control");
+  assert.doesNotMatch(without, /On Solana|See proof|View/, "control");
   const sheet = readFileSync(new URL("../../../../packages/trade/src/app/screens/TradeSheet.tsx", import.meta.url), "utf8");
   assert.match(sheet, /const last = rec\.hashes\?\.\[rec\.hashes\.length - 1\];/);
   assert.match(sheet, /\{\.\.\.\(moment\.phase === "done" && moment\.tx \? \{ tx: moment\.tx \} : \{\}\)\}/);

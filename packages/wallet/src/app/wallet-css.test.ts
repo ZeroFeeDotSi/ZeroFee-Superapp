@@ -41,7 +41,7 @@ test("Phantom's shape on Send: the Send button (one tap, no hold) stands on the 
   assert.doesNotMatch(css, /position: sticky/, "control: no sticky left in Send");
   // control: the fee block, then the hold, end the form, and the form sits in Send's box (else the rules pin nothing)
   const form = readFileSync(new URL("./money/SendForm.tsx", import.meta.url), "utf8");
-  assert.match(form, /<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">\{label\}<\/button>\}\n\s*<\/div>\n\s*<\/div>\n\s*\);\n\}/);
+  assert.match(form, /<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">\{floor\.label\}<\/button>\}\n\s*<\/div>\n\s*<\/div>\n\s*\);\n\}/);
   assert.match(form, /<div className="wl-send2__floor">/, "the button and its line stand on the floor");
   assert.equal((form.match(/className="zf-btn wl-hold"/g) ?? []).length, 3, "control: Swap first and Move back take the pinned place too");
   assert.match(readFileSync(new URL("./money/SendSheet.tsx", import.meta.url), "utf8"), /<div className="wl-send">[\s\S]{0,200}<SendForm /);

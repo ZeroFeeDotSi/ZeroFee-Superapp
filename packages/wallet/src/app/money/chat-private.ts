@@ -9,21 +9,21 @@ import { EVM_CHAINS } from "../../addresses.ts";
  *  account isn't on the public chain" line is gone (privacy audit, 4 Nov): nothing used it, and the step in is public. */
 export const OPEN_AMOUNT_LINE = "Anyone can see the amount when it lands.";
 /** The one tap when Private is short. */
-export const MOVE_TO_PRIVATE = "Move money to your private balance";
+export const MOVE_TO_PRIVATE = "Move money to Private";
 /** Private isn't set up on this device yet: the same one tap opens it, where Set up is the first button. */
-export const SET_UP_PRIVATE = "Your private balance isn't set up yet. Set it up, then move money in.";
+export const SET_UP_PRIVATE = "Private isn't set up yet. Set it up, then move money in.";
 /** Private can't pay this at all (a coin or route it doesn't hold): nothing moves. */
-export const CANT_PRIVATE = "Your private balance can't pay this one yet. Nothing moved.";
+export const CANT_PRIVATE = "Private can't pay this one yet. Nothing moved.";
 
 /** Room for the swap service's fee on a Private payment (its price is a little over what lands): 1%. */
 export const FEE_ROOM = 1.01;
 
 /** "Your Private balance is $3 short. Move money to Private first." (the dollars when known, rounded up to the cent). */
 export function shortLine(shortUsd: number | null): string {
-  if (shortUsd === null || !Number.isFinite(shortUsd) || shortUsd <= 0) return "Your private balance is short. Move money to it first.";
+  if (shortUsd === null || !Number.isFinite(shortUsd) || shortUsd <= 0) return "Private is short. Move money to it first.";
   const cents = Math.ceil(shortUsd * 100) / 100;
   const said = cents >= 1 && Number.isInteger(cents) ? `$${cents}` : `$${cents.toFixed(2)}`;
-  return `Your private balance is ${said} short. Move money to it first.`;
+  return `Private is ${said} short. Move money to it first.`;
 }
 
 /**
@@ -62,9 +62,9 @@ export const SEND_PLAIN = "Send it plain";
 /** Hidden can't carry this coin or this chain today: say which, and offer Plain ("Hidden can't send DOGE yet. Send it plain?"). */
 export function hiddenCantLine(symbol: string | undefined, network?: string): string {
   const coin = symbol && /^[A-Za-z0-9.]{1,12}$/.test(symbol) ? symbol.toUpperCase() : null;
-  if (coin) return `Your private balance can't send ${coin} yet. Send it plain?`;
-  if (network && /^[A-Za-z0-9 ]{1,24}$/.test(network)) return `Your private balance can't send to ${network} yet. Send it plain?`;
-  return "Your private balance can't send this yet. Send it plain?";
+  if (coin) return `Private can't send ${coin} yet. Send it plain?`;
+  if (network && /^[A-Za-z0-9 ]{1,24}$/.test(network)) return `Private can't send to ${network} yet. Send it plain?`;
+  return "Private can't send this yet. Send it plain?";
 }
 /** The Hidden answers that mean "this corridor isn't one Hidden carries" (not "too little in Hidden": that stops, D85). */
 export function hiddenCantCarry(code: string): boolean {

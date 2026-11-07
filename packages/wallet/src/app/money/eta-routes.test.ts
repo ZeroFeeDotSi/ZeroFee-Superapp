@@ -11,9 +11,9 @@ const src = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 test("the site top-up and AgentZero's Add money count down from their routes' measured times, on the receipt and the job's row (control: no estimate says none)", () => {
   const site = src("./SiteMoney.tsx");
   assert.match(site, /startJob\(tasks, \{ title: `Add \$\{amount\} to your \$\{name\} wallet`, usd: amount, etaSec: LEG_SEC\.privateOut \}\)/, "the job's row");
-  assert.match(site, /\{JOB_WORDS\.created\}<\/p>\n\s*<TimeLeft etaSec=\{LEG_SEC\.privateOut\} \/>/, "the receipt");
+  assert.match(site, /\{JOB_WORDS\.created\}<\/p>\n\s*<SaidLine testid="site-add-said" \{\.\.\.addWords\(made, name, network\)\} job=\{madeJob\} \/>\n\s*<TimeLeft etaSec=\{LEG_SEC\.privateOut\} job=\{madeJob\} \/>/, "the receipt");
   const az = src("../../../../../apps/web/src/agentzero/AgentWallet.tsx");
-  assert.match(az, /\{JOB_WORDS\.created\}<\/p>\n\s*<TimeLeft etaSec=\{LEG_SEC\.nearToSafe\} watch \/>/, "AgentZero's receipt");
+  assert.match(az, /\{JOB_WORDS\.created\}<\/p>\n\s*<TimeLeft etaSec=\{LEG_SEC\.nearToSafe\} watch job=\{fillJob\} \/>/, "AgentZero's receipt");
   assert.match(src("../../../../../apps/web/src/agentzero/use-agent-wallet.ts"), /etaSec: LEG_SEC\.nearToSafe, safe: false/, "AgentZero's job row");
   // the table is the measured times (HOPS.md): SOL → NEAR 79–112 s, NEAR wallet → Safe 10 s
   assert.deepEqual([LEG_SEC.chainIn, LEG_SEC.nearToSafe], [112, 10]);

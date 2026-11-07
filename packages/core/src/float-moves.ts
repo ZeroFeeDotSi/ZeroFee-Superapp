@@ -297,9 +297,9 @@ export interface FloatMoveDeps {
   unpaid?: (chain: TradeChain, ref: WalletRef, depositAddress: string, tried?: PayTry) => Promise<boolean>;
   /**
    * Where one of the core's own transfers stands on that chain, as two nodes have it (audit RM-2): "ok" landed, "failed",
-   * "none" (neither node has it), or null when they can't say.
+   * "none" (it provably never landed: `proof`, the audit's MUST 7 Nov), or null when they can't say. Without `proof`, never "none".
    */
-  landed?: (chain: TradeChain, txId: string) => Promise<"ok" | "failed" | "none" | null>;
+  landed?: (chain: TradeChain, txId: string, proof?: { ref: WalletRef; since: number; tried?: PayTry }) => Promise<"ok" | "failed" | "none" | null>;
   /** The newest confirmed transactions at an Add's one-time address (SOL only today, at most ADD_HINT_TXS), for 1Click's
    *  deposit hint: several, so dust sent there after the real deposit can't hide it. */
   depositTxs?: (chain: AddChain, address: string) => Promise<string[]>;
@@ -1582,7 +1582,8 @@ export class FloatMoves {
     // failed or don't have it at all; landed (1Click refunds a late deposit) or unknown, it stays open.
     else if (status === "PENDING_DEPOSIT" && quote && k.submitted && !k.add && k.move.kind !== "in" && Date.parse(quote.deadline) + OUT_GRACE_MS <= this.now()) Object.assign(k.move, { status: "failed", where: "float" });
     else if (status === "PENDING_DEPOSIT" && quote && k.submitted && k.move.kind === "in" && k.move.chain && k.paidTx && this.d.landed && Date.parse(quote.deadline) + IN_GRACE_MS <= this.now()) {
-      const there = await this.d.landed(k.move.chain, k.paidTx).catch(() => null);
+      // "none" only when it provably never landed (the audit's MUST, 7 Nov: a status-cache null or a node error was "none" here)
+      const there = await this.d.landed(k.move.chain, k.paidTx, { ref: refOf(k.move), since: Date.parse(k.move.startedAtIso), ...(k.tried ? { tried: k.tried } : {}) }).catch(() => null);
       if (there === "none" || there === "failed") Object.assign(k.move, { status: "failed", where: "chain" });
     }
     // D119 landing 3 (review L4): a Take out of Perps that Hyperliquid sent (its transfers are final in seconds) but

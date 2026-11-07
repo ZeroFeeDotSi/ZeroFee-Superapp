@@ -32,18 +32,18 @@ every code there is listed here. The ledger also passes on these from the Securi
 | `ledger.deposit.failed` | Your coins from {chainName} didn't reach your Safe. | needs you: with the bridge, on Solana | Go back (nothing). Provisional: the dust proof will show what the bridge's FAILED really means, and these words follow it. |
 | `ledger.hold.cancelled` | You cancelled it, so nothing moved. | safe: in your Safe | Done (nothing) |
 | `ledger.hold.declined` | Your second device said no, so nothing moved. | safe: in your Safe | Done (nothing) |
-| `ledger.hold.part-sent` | Only the first part went after the wait. The rest wasn't sent. | safe: in your Safe | Done (nothing) |
+| `ledger.hold.part-sent` | Only the first part went after the wait. The rest wasn't sent. | safe: in your Safe | Finish the move (open: the action's own sheet, finishScreen) |
 | `ledger.hold.unknown` | This isn't waiting any more, and NEAR hasn't shown yet if it went. | needs you: in your Safe, or sent. Your Safe shows which | Check your Safe (open → balance) |
 | `ledger.send.failed` | NEAR didn't take it. Your coins never left your Safe. | safe: in your Safe | Done (nothing) |
 | `ledger.send.unread` | NEAR hasn't confirmed yet that it reached {to}. | needs you: with trip.near, or still in your Safe. Your Safe shows which | Check your Safe (open → balance) |
 | `ledger.transfer.part-returned` | trip.near kept 10 USDC and sent the rest back. | safe: what came back is in your Safe | Check your Safe (open → balance) |
 | `ledger.movement.unknown` | That isn't in Activity, so nothing changed. | not involved | Go back (nothing) |
 | `ledger.start.refund-needed` | Add the Solana address you're sending from. Then any refund comes back to you. | not involved | Add the address (nothing) |
-| `ledger.hidden-row.back` | The {coin} came back. It's in your private balance now. Nothing was paid. | safe: in your private balance | Go back (nothing) |
-| `ledger.hidden-row.short` | Less {coin} reached your private balance than the payment needs, so it wasn't paid. Your money is in your private balance. | safe: in your private balance | Go back (nothing) |
+| `ledger.hidden-row.back` | The {coin} came back. It's in Private now. Nothing was paid. | safe: in your private balance | Go back (nothing) |
+| `ledger.hidden-row.short` | Less {coin} reached Private than the payment needs, so it wasn't paid. Your money is in Private. | safe: in your private balance | Go back (nothing) |
 | `ledger.send.payee-not-set-up` | {account} can't take {coin} yet. Nothing left your Safe. | safe: in your Safe | Check the account (fix-input) |
 | `ledger.send.same-coin-short` | NEAR Confidential would pay them less {coin} than you typed. Nothing left your Safe. | safe: in your Safe | Try again (retry) |
-| `ledger.hidden-row.slow` | NEAR Intents didn't confirm the {coin} reached your private balance, so nothing was paid. Your money is there or on its way. | safe: in your private balance | Go back (nothing) |
+| `ledger.hidden-row.slow` | NEAR Intents didn't confirm the {coin} reached Private, so nothing was paid. Your money is there or on its way. | safe: in your private balance | Go back (nothing) |
 | `ledger.send.relay-limit` | ZeroFee's price server takes up to $10,000 a send. Nothing was sent. | safe: in your Safe | Change the amount (nothing) |
 | `ledger.send.unknown` | It may have gone. Activity will say. (src/send-job.ts: the payment was handed to 1Click; only its own status ends it) | on the way: to the person you paid, or back to you | Wait (wait) |
 | `ledger.send.back` | The {coin} came back. Nothing was paid. | safe: in your private balance on NEAR | Done (nothing) |
@@ -51,20 +51,21 @@ every code there is listed here. The ledger also passes on these from the Securi
 | `ledger.send.slow` | The {coin} hasn't arrived yet, so nothing was paid. | on the way: to your private balance on NEAR | Wait (wait) |
 | `ledger.send.no-figure` | The {coin} arrived, but the swap service didn't say how much, so nothing was paid. | safe: in your private balance on NEAR | Done (nothing) |
 | `ledger.send.not-paid` | It wasn't paid. The money came back to you. | safe: in your private balance on NEAR | Done (nothing) |
-| `ledger.send.part-went` | Only the part from your private balance was sent. Activity shows it. (src/safe-send.ts: a No on the Safe's sheet after the private balance's part went, never read as nothing sent) | on the way: the private balance's part, to the person you paid; the rest in your Safe | Done (nothing) |
+| `ledger.send.part-went` | Only the part from Private was sent. Activity shows it. (src/safe-send.ts, pocketPartWent: the Safe's part stopped with nothing of it moved, by a No or a refusal, after Private's part went; never read as nothing sent, never a second go) | on the way: Private's part, to the person you paid; the rest in your Safe | See what happened (open activity) |
 | `ledger.safe-send.most` | Up to {most} {coin} can go now. The rest stays in your Safe. | safe: in your Safe | Change the amount (nothing) |
 | `ledger.safe-send.shut` | Sending from your Safe opens soon. Your money is still in your Safe. | safe: in your Safe | Go back (nothing) |
-| `ledger.private.unavailable` | Your private balance isn't set up on this phone yet. Nothing was sent. | safe: in your Safe | Go back (nothing) |
+| `ledger.private.unavailable` | Private isn't set up on this phone yet. Nothing was sent. | safe: in your Safe | Go back (nothing) |
 | `ledger.label.invalid` | This app named the payment with letters ZeroFee can't show. Nothing was sent. | safe: in your Safe | Go back (nothing) |
-| `ledger.private.child` | A child's account has no private balance. Nothing was sent. | safe: in your Safe | Go back (nothing) |
+| `ledger.private.child` | A child's account can't use Private. Nothing was sent. | safe: in your Safe | Go back (nothing) |
 | `ledger.private.cap` | A private move goes up to $10,000. There's room for ${room} more. | safe: in your Safe | Change the amount (nothing) |
 | `ledger.card.cap` | Your card wallet holds up to $250. It has $230.00, so you can add up to $20.00. | safe: in your Safe | Change the amount (nothing) |
 | `ledger.private.coin` | {symbol} can't go in privately yet. USDC, USDT and NEAR can. | safe: in your Safe | Choose another coin (nothing) |
-| `ledger.convert.stuck` | NEAR Intents hasn't started changing your coins yet. They're with it, not lost. | on the way: with the swap service, waiting to convert | Wait a little longer (wait) |
-| `ledger.convert.failed` | NEAR Intents couldn't change your coins. | needs you: with the swap service, coming back to your Safe | Done (nothing). Provisional until the dust proof shows what 1Click's FAILED leaves behind. |
-| `ledger.swap.near-failed` | NEAR Intents didn't finish this swap. | unsure: either in your NEAR wallet or still with NEAR Intents; check the NEAR wallet's balance first | Done (nothing) |
-| `ledger.swap.near-unread` | This swap is more than a week old, so ZeroFee can't read how it ended. | unsure: either in your NEAR wallet or still with NEAR Intents; check the NEAR wallet's balance first | Done (nothing) |
-| `ledger.topup.failed` | Your move to your NEAR wallet hasn't landed yet. Activity shows it. | on the way: with NEAR Intents. It ends up in Spending | Done (nothing). 1Click's FAILED for a Top up: its refund goes to Spending's cash (the Add quote's refundTo). The details are its Spending row's words: "The swap service is still finishing it (its id: …) · if it can't, it sends the money back to Spending". |
+| `ledger.convert.stuck` | NEAR Intents hasn't started this yet. | unsure: either in where its refund goes or still with NEAR Intents. Check that place first (copy review, 7 Nov: "Check your Safe first."). | Wait a little longer (wait). PENDING_DEPOSIT or a failed read: no deposit seen, so no promise. |
+| `ledger.convert.failed` | NEAR Intents didn't finish this swap (payment, move). | unsure: either in your Safe (Private for a move into it or a payment from it) or still with NEAR Intents. Check that place first (copy review, 7 Nov: "Check your Safe first."). | Done (nothing). 1Click's FAILED: its docs promise a refund only for REFUNDED. |
+| `ledger.swap.near-failed` | NEAR Intents didn't finish this swap. | unsure: either in your NEAR wallet or still with NEAR Intents; check your NEAR wallet first | Done (nothing) |
+| `ledger.swap.near-unread` | This swap is more than a week old, so ZeroFee can't read how it ended. | unsure: either in your NEAR wallet or still with NEAR Intents; check your NEAR wallet first | Done (nothing) |
+| `ledger.topup.failed` | NEAR Intents didn't finish this move. | unsure: either in your NEAR wallet or still with NEAR Intents. Check that place first (copy review, 7 Nov: "Check your Safe first."). | Done (nothing). 1Click's FAILED for a Top up; the refund goes to the Add quote's refundTo. |
+| `ledger.steps.too-many` | This has more steps than one Face ID covers, so ZeroFee stopped it. Your money hasn't moved. | safe: in your Safe | Close (nothing) |
 | `ledger.quote.unavailable` | NEAR Intents gave no price right now. Nothing moved. | safe: in your Safe | Try again (retry) |
 | `ledger.swap.server-refused` | ZeroFee's price server didn't pass on this swap. Nothing moved. | safe: in your Safe | Try again (retry) |
 | `ledger.swap.not-yet` | You can't swap this coin from your Safe yet. Nothing moved. | safe: in your Safe | Go back (nothing) |
@@ -72,6 +73,7 @@ every code there is listed here. The ledger also passes on these from the Securi
 | `ledger.quote.expired` | NEAR Intents' price ran out before you approved. Nothing moved. | safe: in your Safe | Get a new price (retry) |
 | `ledger.method.unknown` | This part of Wallet isn't ready yet. | not involved | Go back (nothing) |
 | `ledger.unexpected` | ZeroFee hit a problem on its side. Nothing moved. | safe: in your Safe | Try again (retry) |
+| `ledger.unexpected.money` | ZeroFee hit a problem on its side. Check Activity before you try again. | unsure: in your own wallets, or on its way | See what happened (open → activity) |
 
 Still to come with convert (same rule: a code, a test, a row): a deposit below the minimum and one sent on the wrong
 network (once the dust proof shows what the bridge does), a pair that's paused, a refund under way.

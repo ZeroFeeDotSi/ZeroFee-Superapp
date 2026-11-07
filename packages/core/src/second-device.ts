@@ -26,6 +26,7 @@ import { ACCOUNT_POLICY, isSecondDeviceMethods, knownReleaseBySha, policyVersion
 import { codeOf } from "./chain.ts";
 import { ProblemError } from "./problem.ts";
 import { securityProblems } from "./security-problems.ts";
+import { unexpectedFor } from "./money-calls.ts";
 import type { PlainWords, TxOutcome } from "./signer.ts";
 import type { Vault } from "./vault.ts";
 
@@ -196,7 +197,7 @@ export class SecondDeviceCore implements Bridge {
       }
     } catch (e) {
       if (e instanceof ProblemError) return { problem: e.problem };
-      return { problem: securityProblems.unexpected(method, e) };
+      return { problem: unexpectedFor(method, e) };
     }
   }
 

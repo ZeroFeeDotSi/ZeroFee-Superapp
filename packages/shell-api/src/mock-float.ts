@@ -31,6 +31,9 @@ export interface FloatMockOptions {
   swapMs?: number;
   /** A NEAR coin's sample price and decimals by its id (default: SAMPLE_NEAR_COINS); none: 1Click doesn't trade it. */
   nearCoin?: (tokenId: string) => { usd: number; decimals: number; symbol: string } | undefined;
+  /** Tests: the timer a move's landing runs on, in place of setTimeout (MockBridge's `timers`, the same shape), so a test
+   *  holds its moves on its own clock, never on the wall clock (default: setTimeout). */
+  timers?: { set(run: () => void, ms: number): unknown; clear(handle: unknown): void };
 }
 
 /** NEAR coins 1Click trades in the demo, at their recorded prices (GeckoTerminal's near list, 2 Nov 2026). NEARLY trades on
@@ -136,7 +139,8 @@ export function createFloatMock(o: FloatMockOptions, wallets: () => { id: string
     return movesToday() >= PER_DAY && decline();
   };
   /** Each pending move's own timer: when it lands (an absolute time, so a reload carries on from it) and its wallet. */
-  const pending = new Map<string, { dueAt: number; walletId?: string; timer?: ReturnType<typeof setTimeout> }>();
+  const pending = new Map<string, { dueAt: number; walletId?: string; timer?: unknown }>();
+  const timers = o.timers ?? { set: (run: () => void, ms: number): unknown => setTimeout(run, ms), clear: (h: unknown) => clearTimeout(h as ReturnType<typeof setTimeout>) };
   /** How a move ends, from the move's own fields alone (so a restored move ends exactly as the one that started it). */
   const settle = (move: FloatMove, walletId: string | undefined) => {
     const sent = BigInt(move.sent.amount), expected = BigInt(move.expected.amount);
@@ -171,15 +175,15 @@ export function createFloatMock(o: FloatMockOptions, wallets: () => { id: string
     const p = pending.get(id);
     const move = moves.find((m) => m.id === id);
     if (!p || !move || move.status !== "pending") return;
-    clearTimeout(p.timer);
+    timers.clear(p.timer);
     pending.delete(id);
     settle(move, p.walletId);
     hooks.changed?.(true);
   };
   const arm = (id: string, dueAt: number, walletId?: string) => {
-    const p: { dueAt: number; walletId?: string; timer?: ReturnType<typeof setTimeout> } = { dueAt, walletId };
+    const p: { dueAt: number; walletId?: string; timer?: unknown } = { dueAt, walletId };
     pending.set(id, p);
-    p.timer = setTimeout(() => land(id), Math.max(0, dueAt - Date.now()));
+    p.timer = timers.set(() => land(id), Math.max(0, dueAt - Date.now()));
   };
   const start = (m: Omit<FloatMove, "id" | "status" | "where" | "startedAtIso" | "updatedAtIso">, walletId?: string, id = `fm-${moves.length + 1}`): FloatMove => {
     const move: FloatMove = { id, status: "pending", where: "in-flight", startedAtIso: now(), updatedAtIso: now(), ...m };
@@ -210,7 +214,7 @@ export function createFloatMock(o: FloatMockOptions, wallets: () => { id: string
     }),
     /** Back to a snapshot: pending moves re-armed for what's left of their time (MockBridge lands any already due, with `land`, in time order with its own steps). */
     restore(s: FloatSnapshot) {
-      for (const p of pending.values()) clearTimeout(p.timer);
+      for (const p of pending.values()) timers.clear(p.timer);
       pending.clear();
       held.clear();
       for (const [k, v] of s.held) held.set(k, BigInt(v));

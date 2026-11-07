@@ -26,6 +26,7 @@ import { FakeChain } from "./testing/fake-chain.ts";
 import { base64 } from "./sol/bytes.ts";
 import { signedQuote, TEST_QUOTE_KEY } from "./quote-test-key.ts";
 import { securityProblems } from "./security-problems.ts";
+import { ProblemError } from "./problem.ts";
 import { sendRoom, SEND_FLOOR_USD } from "./send-fill.ts";
 import { fillStepUsd } from "./private-route.ts";
 
@@ -38,7 +39,18 @@ const OUT = "d".repeat(64);
 const DEADLINE = new Date(Date.now() + 3 * 86_400_000).toISOString();
 const NONCE = base64(new Uint8Array(32).fill(3));
 
-type Tamper = { leg1?: (q: any) => any; leg2?: (q: any) => any; noTag?: true };
+type Tamper = { leg1?: (q: any) => any; leg2?: (q: any) => any; noTag?: true; no?: true; leg1Status?: () => { status: string; amountOut?: string }; /** a fixed Safe key (sheet-words-only: the same bytes on two commits) */ seed?: true };
+
+/** The core's sealed vault, its every write seen with how many transactions the chain had taken by then (the audit's MUST: leg
+ *  2's keep comes before leg 1 is sent). */
+class SeenVault extends MemoryVault {
+  readonly writes: { name: string; sent: number }[] = [];
+  sentNow = () => -1;
+  override async put(name: string, bytes: Uint8Array) {
+    this.writes.push({ name, sent: this.sentNow() });
+    return super.put(name, bytes);
+  }
+}
 
 async function setup(t: Tamper = {}) {
   const quoted = new Map<string, any>();
@@ -51,8 +63,9 @@ async function setup(t: Tamper = {}) {
       quoted.set(depositAddress, req);
       return { quote: { depositAddress }, zerofeeStatusTag: "tag-for-this-quote-0001" };
     },
-    generateIntent: async () => null, submitIntent: async () => null, status: async () => null,
+    generateIntent: async () => null, submitIntent: async (signed: unknown) => (submitted.push(signed), null), status: async () => null,
   };
+  const submitted: unknown[] = [];
   // 1Click's status, as signed: leg 2 (OUT) to the payee on Solana; leg 1 (the deposit) as the core asked it
   const privateStatus = async (a: string) => {
     if (a === OUT && leg2) {
@@ -62,16 +75,20 @@ async function setup(t: Tamper = {}) {
     const req = quoted.get(a);
     if (!req) return null;
     const quoteRequest = t.leg1 ? t.leg1(req) : req;
-    return { status: "PENDING_DEPOSIT", quoteResponse: signedQuote({ quoteRequest, quote: { depositAddress: a, amountIn: req.amount, amountInUsd: "300.00", minAmountOut: ((BigInt(req.amount) * 99n) / 100n).toString(), deadline: DEADLINE } }) };
+    const st = t.leg1Status?.() ?? { status: "PENDING_DEPOSIT" };
+    return { status: st.status, ...(st.amountOut ? { swapDetails: { amountOut: st.amountOut } } : {}), quoteResponse: signedQuote({ quoteRequest, quote: { depositAddress: a, amountIn: req.amount, amountInUsd: "300.00", minAmountOut: ((BigInt(req.amount) * 99n) / 100n).toString(), deadline: DEADLINE } }) };
   };
   const sol = { balance: async () => 10n ** 12n, latestBlockhash: async () => "11111111111111111111111111111111", send: async () => true, status: async () => ["ok", "ok"] } as unknown as SolChain;
-  const w = new SubWallets({ vault: new MemoryVault(), sol, evm: {} as never, approve: async () => true, emit: () => {}, quoteKey: TEST_QUOTE_KEY, floatRelay: relay, privateStatus, pocketUsd: async () => 0, confirm: { everyMs: 1, forMs: 5 } } as never);
+  const vault = new SeenVault();
+  const options = { vault, sol, evm: {} as never, approve: async () => true, emit: () => {}, quoteKey: TEST_QUOTE_KEY, floatRelay: relay, privateStatus, pocketUsd: async () => 0, confirm: { everyMs: 1, forMs: 5 } };
+  const w = new SubWallets(options as never);
   pocket = (await w.create("private", "near")).address;
   const pocketId = (await w.list()).find((x) => x.address === pocket)!.id;
 
   // the Safe on NEAR: 900 USDC in its NEAR Intents balance
   const chain = new FakeChain("mainnet");
-  const key = SoftwareKey.generate();
+  vault.sentNow = () => chain.sent.length;
+  const key = t.seed ? SoftwareKey.fromSeed(new Uint8Array(32).fill(9), "development") : SoftwareKey.generate();
   chain.fund("alice.near", key.publicKey);
   chain.contract(INTENTS.account, INTENTS.codeHashBase58, { mt_balance_of: ({ token_id }) => (token_id === USDC ? "900000000" : "0") });
   chain.contract(USDC_ID, "usdc", { ft_metadata: () => ({ symbol: "USDC", decimals: 6 }) });
@@ -79,8 +96,12 @@ async function setup(t: Tamper = {}) {
   const shown: PlainWords[] = [];
   // DemoCore's wiring (demo-core.ts, `this.device = new DevSigner({ ... })`), its own-quote read and the two records
   const ownQuote = async (d: string) => (await w.floatAddFacts(d)) ?? (await w.privateInFacts(d)) ?? (await w.safeSwapFacts(d));
-  const signer = new DevSigner({
-    accountId: "alice.near", chain, key, approve: async (words) => (shown.push(words), true), quoteKey: TEST_QUOTE_KEY,
+  const events: string[] = [];
+  const signerFor = (w: SubWallets) => new DevSigner({
+    accountId: "alice.near", chain, key, approve: async (words) => (shown.push(words), !t.no), quoteKey: TEST_QUOTE_KEY,
+    // the one Face ID (DemoCore's wiring): leg 2 held for the fill's one sheet, released by its signature only
+    pairOf: (paid) => w.pairOf(paid), releasePair: (d, h) => w.releasePair(d, h), dropPair: (d) => w.dropPair(d), endPair: (d) => w.pairEnd(d),
+    onSigned: () => events.push(`signed, ${chain.sent.length} sent`),
     ownWallets: async () => new Map((await w.list()).map((x) => [x.address, x.kind === "private" ? PRIVATE_POCKET : x.address])),
     oneClick: async (d) => (await ownQuote(d)) ?? null,
     ownQuote,
@@ -89,6 +110,9 @@ async function setup(t: Tamper = {}) {
     // fix/bind-intent: the core's own record of what its Swap and Move doors asked (demo-core.ts intentOf)
     ...(t.noTag ? {} : { intentOf: (d: string) => w.intentOf(d) }),
   });
+  const signer = signerFor(w);
+  /** The app killed and opened again: a new core on the same sealed vault and chain, nothing in memory kept. */
+  const restart = () => { const w2 = new SubWallets(options as never); return { w: w2, signer: signerFor(w2) }; };
 
   /** The Send's two legs, as the wallet builds them (safe-send.ts fromSafe): leg 1's quote, leg 2 signed and bound. */
   const legs = async (units = "300000000") => {
@@ -99,12 +123,20 @@ async function setup(t: Tamper = {}) {
     await w.privatePay(pocketId, OUT, { payload }, "Send", "tag-for-this-quote-0001", leg1.depositAddress, undefined, { recipient: PAYEE, recipientType: "DESTINATION_CHAIN", destinationAsset: SOL_IN });
     return leg1;
   };
+  /** The same two legs with leg 2 HELD for the Safe's one sheet (the audit's c1): checked, not signed. */
+  const pairLegs = async (units = "300000000") => {
+    const leg1 = await w.privateQuoteIn(USDC, units, false, true, true);
+    leg2 = { amountIn: "250000000" };
+    const payload = { message: JSON.stringify({ deadline: DEADLINE, intents: [{ intent: "transfer", receiver_id: OUT, tokens: { [`imt:${MINTER}:${USDC}`]: leg2.amountIn } }], signer_id: pocket }), nonce: NONCE, recipient: "intents.far" };
+    const held = await w.privatePay(pocketId, OUT, { payload }, "Send", "tag-for-this-quote-0001", leg1.depositAddress, undefined, { recipient: PAYEE, recipientType: "DESTINATION_CHAIN", destinationAsset: SOL_IN }, true);
+    return { leg1, held, payload };
+  };
   /** The Safe's one transaction (convert.ts mtTransfer, to-private.ts payIntoPocket's last step with `sendFill`). */
   const fill = (deposit: string, units: string, token = USDC, method = "mt_transfer"): TxRequest => ({
     receiverId: INTENTS.account, actions: [{ kind: "call", method, args: { receiver_id: deposit, token_id: token, amount: units, approval: null, ...(method === "mt_transfer_call" ? { msg: "" } : {}) }, depositYocto: "1", gas: "30000000000000" }],
     why: "Send", from: "wallet", sendFill: true,
   } as TxRequest);
-  return { w, signer, chain, shown, legs, fill, pocket, quoted };
+  return { w, signer, chain, shown, legs, pairLegs, fill, pocket, quoted, events, vault, submitted, restart };
 }
 
 test("the gate (real core sign path): a Send's fill, quoted INTENTS and paid by the Safe's one mt_transfer, is accepted, shown once (the payee, the split, what they get) and signed and sent; the payout bound by the pocket's own signed leg 2", async () => {
@@ -123,10 +155,10 @@ test("the gate (real core sign path): a Send's fill, quoted INTENTS and paid by 
   assert.equal(s.shown.length, 1, "one sheet, Face ID's");
   const w = s.shown[0]!;
   assert.equal(w.title, "Send $250.00 from your Safe");
-  assert.deepEqual(w.lines.filter((l) => /^(They get|Your Safe sends|From your Safe|Stays in Private|Together|Fees) · /.test(l)), ["They get · 1.2345 SOL ($247.50)", "Your Safe sends · $300.00", "Stays in Private · $50.00", "Fees · about $2.50"]);
+  assert.deepEqual(w.lines.filter((l) => /^(They get|Your Safe sends|From your Safe|Private keeps the rest|Stays in Private|Together|Fees) · /.test(l)), ["They get · 1.2345 SOL (about $247.50)", "From your Safe · $300.00", "Private keeps the rest · about $50.00", "Fees · about $2.50"]);
   assert.equal(w.lines.filter((l) => /They get/.test(l)).length, 1, `"They get" said exactly once: ${String(w.lines)}`);
   // the full address first, unfolded, then where it lands (the audit's D37 condition, the copy review's words)
-  assert.deepEqual(w.lines.slice(0, 2), [`To ${PAYEE}`, "Public on Solana."], String(w.lines));
+  assert.deepEqual(w.lines.slice(0, 2), [`To ${PAYEE}`, "Public on Solana. Anyone can see the Safe's part on NEAR."], String(w.lines)); // the copy review (6 Nov): one public line
   assert.ok(w.lines.some((l) => l.startsWith("They get · 1.2345 SOL ")), `the signed coin figure (MUST 4): ${String(w.lines)}`);
   assert.ok(w.amount && w.tap === undefined, "Face ID's sheet");
   assert.equal(s.chain.sent.length, 1, "the Safe's transaction went");
@@ -302,3 +334,161 @@ test("the gate on 1Click's own answers: both live quotes are signed by 1Click's 
   assert.deepEqual(Object.fromEntries(terms.map((k) => [k, asked[k]])), Object.fromEntries(terms.map((k) => [k, moveIn.request[k]])));
   assert.deepEqual([asked.recipient, asked.refundTo, asked.dry], [s.pocket, s.pocket, false], "to and back to its own pocket; a real quote");
 });
+
+test("T4 (the audit's c1/c3/R1, 6 Nov): leg 2 is held, unsigned, until the Safe's one signature of leg 1 checks; then released once, before anything is sent, with job.signed; a second redeem, another hash, a No or a foreign asker gets nothing signed (control: today's path signs leg 2 before the sheet)", async () => {
+  const s = await setup();
+  const { leg1, held } = await s.pairLegs();
+  assert.ok("pair" in held && /^[0-9a-f]{64}$/.test(held.pair.hash), "held: its hash, no signature");
+  assert.ok(!("signedData" in held));
+  const out = await s.signer.request(s.fill(leg1.depositAddress, "300000000"));
+  assert.equal(out.status, "done", JSON.stringify(out));
+  // released: signed and kept in the core's sealed vault, never handed back to the app (the audit's MUST)
+  assert.ok(!JSON.stringify(out).includes("signature"), `nothing of leg 2 comes back: ${JSON.stringify(out).slice(0, 300)}`);
+  assert.ok(s.vault.writes.some((x) => x.name === "send-pair-kept"), "kept in the vault");
+  assert.deepEqual(s.events, ["signed, 0 sent"], "job.signed once, before the network");
+  assert.equal(s.shown.length, 1, "one sheet");
+  assert.equal(await s.w.releasePair(leg1.depositAddress, (held as { pair: { hash: string } }).pair.hash), null, "redeemed once only");
+  // another hash: nothing, and the pair is gone
+  const h = await setup();
+  const two = await h.pairLegs();
+  assert.equal(await h.w.releasePair(two.leg1.depositAddress, "0".repeat(64)), null);
+  assert.equal(await h.w.releasePair(two.leg1.depositAddress, (two.held as { pair: { hash: string } }).pair.hash), null, "dropped by the wrong ask");
+  // Not now: nothing signed, the pair dropped, no job.signed
+  const n = await setup({ no: true });
+  const three = await n.pairLegs();
+  assert.equal((await n.signer.request(n.fill(three.leg1.depositAddress, "300000000"))).status, "declined");
+  assert.deepEqual([n.chain.sent.length, n.events.length], [0, 0]);
+  assert.equal(await n.w.releasePair(three.leg1.depositAddress, (three.held as { pair: { hash: string } }).pair.hash), null, "Not now dropped it");
+  // only Wallet's own Send asks a pair (the audit's c4)
+  const { pairAsked } = await import("./send-words.ts");
+  for (const [p, ok] of [[{ pair: true, app: "wallet" }, true], [{ pair: true, app: "agent" }, false], [{ pair: true, app: "browser" }, false], [{ pair: true, app: "social" }, false], [{ pair: true }, false], [{ pair: "true", app: "wallet" }, false]] as const) assert.equal(pairAsked(p), ok, JSON.stringify(p));
+  // control: without the pair, leg 2 is signed at once, before any sheet
+  const c = await setup();
+  await c.legs();
+  assert.equal(c.shown.length, 0);
+});
+
+const keptOf = async (v: MemoryVault): Promise<Record<string, { signed: unknown }>> => {
+  const raw = await v.get("send-pair-kept");
+  return raw ? JSON.parse(new TextDecoder().decode(raw)) : {};
+};
+
+test("T8 (the audit's MUST a, 6 Nov): leg 2, signed with leg 1's one Face ID, is kept in the core's sealed vault BEFORE leg 1 is sent; a killed app between leg 1 sent and the keep can't be, the keep is first (control: a No keeps nothing)", async () => {
+  const s = await setup();
+  const { leg1 } = await s.pairLegs();
+  assert.equal((await s.signer.request(s.fill(leg1.depositAddress, "300000000"))).status, "done");
+  const keep = s.vault.writes.find((x) => x.name === "send-pair-kept");
+  assert.ok(keep, "kept in the sealed vault");
+  assert.equal(keep.sent, 0, "kept while nothing had been sent");
+  assert.equal(s.chain.sent.length, 1, "then leg 1 went, once");
+  const kept = (await keptOf(s.vault))[leg1.depositAddress];
+  assert.ok(kept && typeof (kept.signed as { signature?: unknown }).signature === "string", "the kept record is leg 2's signature");
+  assert.equal(s.submitted.length, 0, "not handed to 1Click on its own");
+  // control: Not now keeps nothing at all
+  const n = await setup({ no: true });
+  const two = await n.pairLegs();
+  assert.equal((await n.signer.request(n.fill(two.leg1.depositAddress, "300000000"))).status, "declined");
+  assert.deepEqual([n.vault.writes.filter((x) => x.name === "send-pair-kept").length, n.chain.sent.length], [0, 0]);
+});
+
+test("T9 (the audit's MUST b): the core hands leg 2 to 1Click only once leg 1 reads SUCCESS with at least leg 2's amount; a table over leg 1's status (control: SUCCESS with enough hands it, and again harmlessly)", async () => {
+  const { leg1Landed } = await import("./send-words.ts");
+  const rows: [Parameters<typeof leg1Landed>[0], boolean][] = [
+    [null, false], [{ status: "PENDING_DEPOSIT" }, false], [{ status: "PROCESSING", swapDetails: { amountOut: "300000000" } }, false],
+    [{ status: "REFUNDED", swapDetails: { amountOut: "300000000" } }, false], [{ status: "FAILED" }, false], [{ status: "SUCCESS" }, false],
+    [{ status: "SUCCESS", swapDetails: { amountOut: "249999999" } }, false], [{ status: "SUCCESS", swapDetails: { amountOut: "x" } }, false],
+    [{ status: "SUCCESS", swapDetails: { amountOut: "250000000" } }, true], [{ status: "SUCCESS", swapDetails: { amountOut: "297000000" } }, true],
+  ];
+  for (const [st, ok] of rows) assert.equal(leg1Landed(st, "250000000"), ok, JSON.stringify(st));
+  let st = { status: "PENDING_DEPOSIT" } as { status: string; amountOut?: string };
+  const s = await setup({ leg1Status: () => st });
+  const { leg1 } = await s.pairLegs();
+  assert.equal((await s.signer.request(s.fill(leg1.depositAddress, "300000000"))).status, "done");
+  assert.deepEqual(await s.w.pairHand(leg1.depositAddress), { handed: false });
+  st = { status: "SUCCESS", amountOut: "100" };
+  assert.deepEqual(await s.w.pairHand(leg1.depositAddress), { handed: false }, "short: not handed");
+  assert.equal(s.submitted.length, 0);
+  st = { status: "SUCCESS", amountOut: "297000000" };
+  assert.deepEqual(await s.w.pairHand(leg1.depositAddress), { handed: true });
+  assert.equal(s.submitted.length, 1);
+  assert.deepEqual(s.submitted[0], (await keptOf(s.vault))[leg1.depositAddress]!.signed, "the kept signature, as is");
+});
+
+test("T10 (the audit's MUST c): leg 2's kept signature is deleted when its job ends, and when leg 1 is refused before it went; a No, a refusal before the keep, or a dead pair keep nothing (control: kept until then)", async () => {
+  // the job ends: deleted, and nothing can be handed after
+  let st = { status: "PENDING_DEPOSIT" } as { status: string; amountOut?: string };
+  const s = await setup({ leg1Status: () => st });
+  const { leg1 } = await s.pairLegs();
+  await s.signer.request(s.fill(leg1.depositAddress, "300000000"));
+  st = { status: "SUCCESS", amountOut: "300000000" };
+  assert.ok((await keptOf(s.vault))[leg1.depositAddress], "control: kept");
+  await s.w.pairEnd(leg1.depositAddress);
+  assert.equal((await keptOf(s.vault))[leg1.depositAddress], undefined);
+  assert.deepEqual(await s.w.pairHand(leg1.depositAddress), { handed: false });
+  assert.equal(s.submitted.length, 0);
+  // leg 1 refused by the chain before it went (a named refusal): kept, then deleted, nothing sent
+  const r = await setup();
+  const two = await r.pairLegs();
+  (r.chain as unknown as { send: unknown }).send = async () => { throw new ProblemError(securityProblems.sendUnbound()); };
+  assert.equal((await r.signer.request(r.fill(two.leg1.depositAddress, "300000000"))).status, "problem");
+  assert.ok(r.vault.writes.some((x) => x.name === "send-pair-kept"), "it was kept first");
+  assert.equal((await keptOf(r.vault))[two.leg1.depositAddress], undefined, "and deleted on the refusal");
+  // leg 1 maybe sent (no answer): kept, the follower decides by leg 1's own status
+  const u = await setup();
+  const three = await u.pairLegs();
+  (u.chain as unknown as { send: unknown }).send = async () => { throw new Error("timeout"); };
+  assert.equal((await u.signer.request(u.fill(three.leg1.depositAddress, "300000000"))).status, "problem");
+  assert.ok((await keptOf(u.vault))[three.leg1.depositAddress], "kept: leg 1 may have gone");
+  // a dead pair (another hash): nothing signed, nothing kept
+  const d = await setup();
+  const four = await d.pairLegs();
+  assert.equal(await d.w.releasePair(four.leg1.depositAddress, "0".repeat(64)), null);
+  assert.equal(d.vault.writes.filter((x) => x.name === "send-pair-kept").length, 0);
+});
+
+test("T11 (the audit's MUST d): killed after the keep, before leg 1 went: the restart never sends leg 1 again and never hands leg 2 without leg 1; once leg 1 lands, leg 2 goes once (control: the restart's core still has it)", async () => {
+  let st = { status: "PENDING_DEPOSIT" } as { status: string; amountOut?: string };
+  const s = await setup({ leg1Status: () => st });
+  const { leg1 } = await s.pairLegs();
+  // the kill: leg 1's send never comes back and never reaches the chain (the app died there)
+  (s.chain as unknown as { send: unknown }).send = () => new Promise(() => {});
+  void s.signer.request(s.fill(leg1.depositAddress, "300000000"));
+  for (let i = 0; i < 200 && !s.vault.writes.some((x) => x.name === "send-pair-kept"); i++) await new Promise((r) => setTimeout(r, 1));
+  assert.ok((await keptOf(s.vault))[leg1.depositAddress], "killed after the keep");
+  assert.equal(s.chain.sent.length, 0, "before leg 1 went");
+  // the restart: a new core on the same vault
+  const again = s.restart();
+  delete (s.chain as unknown as { send?: unknown }).send;
+  // leg 2 is never handed while leg 1 hasn't landed
+  assert.deepEqual(await again.w.pairHand(leg1.depositAddress), { handed: false });
+  assert.equal(s.submitted.length, 0, "never leg 2 without leg 1");
+  // the same leg 1 asked again after the restart: refused before any sheet, never sent twice (its payout record and its
+  // pair died with the app; leg 1's address is marked paid)
+  const out = await again.signer.request(s.fill(leg1.depositAddress, "300000000"));
+  assert.notEqual(out.status, "done", JSON.stringify(out).slice(0, 200));
+  assert.equal(s.chain.sent.length, 0, "leg 1 never sent: once or never, never twice");
+  // and a second leg 2 for that leg 1 is never held again: the address is used
+  // control: had leg 1 landed (sent by the app before it died), the restart's core hands leg 2, once per ask
+  st = { status: "SUCCESS", amountOut: "297000000" };
+  assert.deepEqual(await again.w.pairHand(leg1.depositAddress), { handed: true });
+  assert.equal(s.submitted.length, 1);
+});
+
+// the audit's condition 1 on J2-2 (8 Nov): the Send's sheet rows changed as words only. The same Send through the real sign path
+// sends the transaction 9b41a3dc0 sent (sha-256 of every field but the randomized signature, pinned from that commit), and
+// the pair hash the sheet carries is leg 2's own payload hash, which no sheet word reaches.
+test("the audit's condition 1 (J2-2): a Send's fill signs 9b41a3dc0's transaction and carries leg 2's own payload hash; only its sheet's words changed", async () => {
+  const { sha256 } = await import("@noble/hashes/sha2.js");
+  const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  const s = await setup({ seed: true });
+  const { leg1, held, payload } = await s.pairLegs();
+  assert.ok("pair" in held);
+  assert.equal(held.pair.hash, hex(sha256(new TextEncoder().encode(JSON.stringify(payload)))), "the pair hash is leg 2's payload, nothing of the sheet");
+  const out = await s.signer.request(s.fill(leg1.depositAddress, "300000000"));
+  assert.equal(out.status, "done", JSON.stringify(out));
+  const tx = hex(sha256(new TextEncoder().encode(JSON.stringify(s.chain.sent[0], (k, v) => (k === "signature" ? undefined : typeof v === "bigint" ? v.toString() : v instanceof Uint8Array ? hex(v) : v)))));
+  if (process.env.ZF_PRINT_TX) console.log(`TX send ${tx}`);
+  assert.equal(tx, SEND_TX_BEFORE, "the signed transaction is 9b41a3dc0's");
+  assert.ok(s.shown[0]!.lines.includes("From your Safe · $300.00"), "the words did change: " + s.shown[0]!.lines.join(" | "));
+});
+const SEND_TX_BEFORE = "ede368d07ef0ce80cd80da20408a43aa153542b117ea9be276e975538cf79843";

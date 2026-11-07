@@ -194,8 +194,13 @@ export function createHiddenRow(x: HiddenRowDeps) {
     // one saved job (send-job.ts): leg 2 is handed to 1Click only after leg 1 landed with enough, marked handed first,
     // then followed to its own end; a restart finds it (security review H1: an unknown outcome is never "not paid")
     const job: SendJob = { id: movement.id, inDeposit: leg1.depositAddress, ...(leg1.statusTag ? { inTag: leg1.statusTag } : {}), outDeposit, ...(real.zerofeeStatusTag ? { outTag: real.zerofeeStatusTag } : {}), signedData, leg2In: String(real.quote.amountIn), coin: rowCoin.symbol, coinId: coinIn, startedAtIso: at, ...deadlineOf(intent.payload) };
-    await remember(movement);
-    await (await x.jobs()).start(job);
+    // leg 1 went: a write that fails here is never "Nothing moved" and a second leg 1 (audit, 6 Nov)
+    try {
+      await remember(movement);
+      await (await x.jobs()).start(job);
+    } catch (e) {
+      throw e instanceof ProblemError ? e : new ProblemError(walletProblems.hiddenRowSlow(rowCoin.symbol));
+    }
     emit("ledger.balancesChanged", {});
     return movement;
   }

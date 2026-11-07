@@ -29,6 +29,14 @@ export function TradeProvider({ bridge, active, children }: { bridge: Bridge; ac
   // twice and keeps one, and a registered twin would answer with sample balances the app never moved
   useEffect(() => { setAppRuntime(rt); }, [rt]);
   useEffect(() => rt.svc.on(() => setTick((n) => n + 1)), [rt]);
+  // the live re-check of an unconfirmed trade runs only while the app is in the foreground (service.ts foreground)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const seen = () => rt.svc.foreground(document.visibilityState === "visible");
+    seen();
+    document.addEventListener("visibilitychange", seen);
+    return () => { document.removeEventListener("visibilitychange", seen); rt.svc.foreground(false); };
+  }, [rt]);
   const [resumed, setResumed] = useState(false);
   useEffect(() => { if (active && !resumed) { setResumed(true); void rt.svc.resume().catch(() => undefined); } }, [rt, active, resumed]);
   // the Trade session starts as Trade comes on screen, never at the tap (product decision, 4 Nov), and

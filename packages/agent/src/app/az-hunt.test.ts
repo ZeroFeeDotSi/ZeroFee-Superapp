@@ -103,13 +103,14 @@ test("W9-5b: the funding receipt stops its clock and \"It keeps going\" once the
   const { receiptLeft } = await import("@zerofee/shell-api/job-steps.ts");
   const { JOB_WORDS, watchShown } = await import("@zerofee/shell-api/job-start.ts");
   const t = 1_000_000;
-  assert.equal(receiptLeft(t + 10_000, t, undefined, t + 1_000), "Landed early.");
+  assert.equal(receiptLeft(t + 10_000, t, t, t + 400), "Done in under a second.", "53, 7 Nov: never \"Landed early.\"");
   assert.equal(watchShown(t + 1_000), false);
-  assert.equal(receiptLeft(t + 10_000, t), "About 10 s left.", "control");
+  assert.equal(receiptLeft(t + 10_000, t), "About 10 seconds left.", "control");
   assert.equal(watchShown(undefined), true, "control");
-  assert.match(app, /receiptLeft\(funded\.endsAt, Date\.now\(\), undefined, funded\.landedAt\)/);
-  assert.match(app, /\{watchShown\(funded\.landedAt\) && <p className="zf-receipt__line">\{JOB_WORDS\.watch\}<\/p>\}/);
-  assert.equal((app.match(/fundedLanded\(\);/g) ?? []).length, 2, "the Sim's limit and a real account's fill");
+  assert.match(app, /receiptLeft\(funded\.endsAt, Date\.now\(\), funded\.startAt, funded\.landedAt\)/);
+  // the audit's SHOULD (7 Nov): the slow face drops it too
+  assert.match(app, /\{watchShown\(funded\.landedAt\) && !funded\.slow && <p className="zf-receipt__line">\{JOB_WORDS\.watch\}<\/p>\}/);
+  assert.equal((app.match(/fundedLanded\(\)/g) ?? []).length, 2, "the Sim's limit and a real account's fill");
   assert.ok(JOB_WORDS.watch.length > 0);
 });
 

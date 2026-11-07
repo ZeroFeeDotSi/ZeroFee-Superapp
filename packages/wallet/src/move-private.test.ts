@@ -75,14 +75,16 @@ test("Private short, the fill closed (VITE_SAFE_FILL_OPEN off): refused before a
 });
 
 test("the fill open: route B opens for THIS call only; Private's share pays first, the Safe fills the rest by a whole step (fill ≠ payout, the extra stays in Private), and the payout goes only after the fill landed (controls: every other route B caller still sees it closed)", async () => {
-  const s = setup({ pocketUnits: "12500000", fillOpen: true });
-  const r = await pay(s, [{ wallet: "sw-trade-sol", usd: 30 }]);
+  // one Face ID (6 Nov): Private's $450 plus a whole fill's step would pass its $500 buffer, so the fill doesn't fold the
+  // Move whole (the audit's R2; T3 holds the fold): Private's own part first, the Safe's fill for the rest
+  const s = setup({ pocketUnits: "450000000", fillOpen: true });
+  const r = await pay(s, [{ wallet: "sw-trade-sol", usd: 600 }]);
   assert.ok("ok" in r, "problem" in r ? `${r.problem.code} ${r.problem.whatHappened}` : "");
   assert.deepEqual(r.ok.parts[0]!.ids.map((id) => id.split(":")[0]), ["pocket-send", "safe-send"]);
-  // short $17.50: its fill is $20 (a $10 step over $17.50 and its 3 % gap), never $17.50
+  // short $150: its fill is $200 (a $50 step over $150 and its 3 % gap), never $150
   const fill = Number(s.core.privateIns[0]!.amount) / 1e6;
-  assert.ok(fill >= 19.9 && fill <= 20.1, String(fill));
-  assert.notEqual(Math.round(fill * 100), 1750);
+  assert.ok(fill >= 199.9 && fill <= 200.1, String(fill));
+  assert.notEqual(Math.round(fill * 100), 15000);
   assert.equal(s.core.signed.length, 1, "the Safe's own sheet (Face ID) for the fill");
   // the payout is the asked share of what the fill promises (send-job.ts hands it over only once 1Click says it landed with enough)
   const leg2 = s.asked.filter((q) => !q.dry).at(-1);
@@ -102,8 +104,10 @@ test("the fill open: route B opens for THIS call only; Private's share pays firs
 });
 
 test("QA (5 Nov): a combined Move (Private's leg and the Safe's to one wallet) is one Safe sheet with Face ID, marked a Move's fill so the core says both legs from its own figures; the pocket's share goes first on its own payment; a Private-only Move asks no Face ID (controls: no app figures ride on the sheet; another Safe sheet carries no marker)", async () => {
-  const s = setup({ pocketUnits: "12500000", fillOpen: true });
-  const r = await pay(s, [{ wallet: "sw-trade-sol", usd: 30 }]);
+  // one Face ID (6 Nov): Private's $450 plus a whole fill's step would pass its $500 buffer, so the fill doesn't fold the
+  // Move whole (the audit's R2; T3 holds the fold): Private's own part first, the Safe's fill for the rest
+  const s = setup({ pocketUnits: "450000000", fillOpen: true });
+  const r = await pay(s, [{ wallet: "sw-trade-sol", usd: 600 }]);
   assert.ok("ok" in r, "problem" in r ? `${r.problem.code} ${r.problem.whatHappened}` : "");
   assert.equal(s.core.signed.length, 1, "one Safe sheet: Face ID for the Safe's leg");
   assert.equal(s.core.signed[0]!.moveFill, true, "marked: the core's sheet says the legs");
@@ -390,5 +394,5 @@ test("the audit (5 Nov): every NEW part the real ledger pays carries its minOut,
   }
   // the code: both payouts (Private's own, and the fill's exit) stamp it from their quote
   const src = (await import("node:fs")).readFileSync(new URL("./safe-send.ts", import.meta.url), "utf8");
-  assert.equal(src.match(/private: true, \.\.\.leastOf\(real\.quote\)/g)?.length, 2);
+  assert.equal(src.match(/private: true, \.\.\.leastOf\(real\.quote\)/g)?.length, 3, "Private's own, the fill's exit, and the one fill's legs (fillMove: the audit's one fill, 7 Nov)");
 });

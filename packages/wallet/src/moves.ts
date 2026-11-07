@@ -14,6 +14,7 @@
 //   sendNear          plain NEAR to a NEAR account
 //   ftTransfer        a NEAR coin to a NEAR account
 //   ftIntoLedgerOf    a NEAR coin into someone's intents.near balance (ft_transfer_call, msg = their account)
+import { STORAGE_DEPOSIT_MAX_YOCTO } from "@zerofee/core/near-gate";
 import type { TxRequest } from "@zerofee/core/signer";
 import { INTENTS } from "@zerofee/core/intents";
 import { ProblemError } from "@zerofee/core/problem";
@@ -29,7 +30,7 @@ export const WRAP_STORAGE_YOCTO = "1250000000000000000000";
  * contract's own storage_balance_bounds, so a contract could ask for anything; NEAR's coins ask 0.00125 (wrap.near, USDC,
  * USDT), so this is 8x what they need. Above it, nothing is signed.
  */
-export const MAX_STORAGE_DEPOSIT_YOCTO = 10_000_000_000_000_000_000_000n;
+export const MAX_STORAGE_DEPOSIT_YOCTO = STORAGE_DEPOSIT_MAX_YOCTO;
 
 type Ask = Pick<TxRequest, "receiverId" | "actions" | "why">;
 const ask = (r: Ask): TxRequest => ({ ...r, from: "wallet" });
@@ -100,19 +101,32 @@ export function ftIntoLedgerOf(o: { contract: string; owner: string; units: bigi
   });
 }
 
-/** NEAR on the account, wrapped and handed to `to` as wNEAR (its storage paid first when it has none): one transaction. */
-export function nearAsWnearTo(o: { accountId: string; to: string; yocto: bigint; registerTo: boolean; why: string }): TxRequest {
+/** NEAR on the account, wrapped and handed to `to` as wNEAR (its storage paid first when it has none): one transaction.
+ *  The account's own storage step is left out only when `meRegistered` is true (wrapRegistered read it there). */
+export function nearAsWnearTo(o: { accountId: string; to: string; yocto: bigint; registerTo: boolean; meRegistered?: boolean; why: string }): TxRequest {
   const storage = (account_id: string) => ({ kind: "call" as const, method: "storage_deposit", args: { account_id, registration_only: true }, depositYocto: WRAP_STORAGE_YOCTO, gas: gas(10) });
   return ask({
     receiverId: "wrap.near",
     actions: [
-      storage(o.accountId),
+      ...(o.meRegistered === true ? [] : [storage(o.accountId)]),
       ...(o.registerTo ? [storage(o.to)] : []),
       { kind: "call", method: "near_deposit", args: {}, depositYocto: o.yocto.toString(), gas: gas(10) },
       { kind: "call", method: "ft_transfer", args: { receiver_id: o.to, amount: o.yocto.toString() }, depositYocto: ONE_YOCTO, gas: gas(30) },
     ],
     why: o.why,
   });
+}
+
+/** wrap.near's storage_balance_of answer says the account is set up there: a { total } read. Null (none), anything else,
+ *  or a read that failed: not known to be, so its storage step stays (audit, 6 Nov: never skip on an unknown). */
+export const isRegisteredRead = (v: unknown): boolean => !!v && typeof v === "object" && typeof (v as { total?: unknown }).total === "string";
+/** Is `accountId` set up on wrap.near? Read once before a wrap; a failed read is false. */
+export async function wrapRegistered(view: (contract: string, method: string, args: Record<string, unknown>) => Promise<unknown>, accountId: string): Promise<boolean> {
+  try {
+    return isRegisteredRead(await view("wrap.near", "storage_balance_of", { account_id: accountId }));
+  } catch {
+    return false;
+  }
 }
 
 /** Storage on a coin contract for `accountId`, so a transfer of that coin to it isn't refused. Refunded if already paid. */

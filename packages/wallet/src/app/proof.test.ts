@@ -8,7 +8,7 @@ import type { SpendingActivity } from "@zerofee/core/spending";
 import { PROOF_HOSTS, moveProof, proofUrlOk, shortTx, txProof, txUrl } from "@zerofee/core/tx-proof";
 import { moveAnswer } from "../../../trade/src/float-core.ts";
 import type { Movement } from "../types.ts";
-import { PROOF_WORDS, addPage, movementPage, spendingPage, txFromUrl, type ProofPage } from "./proof.ts";
+import { PROOF_WORDS, addPage, headFinished, movementPage, spendingPage, txFromUrl, type ProofEnd, type ProofPage } from "./proof.ts";
 
 const here = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 const SOL_TX = "5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW";
@@ -56,8 +56,10 @@ test("a Move from the Safe to the SOL wallet: started by the Safe's transaction,
   assert.deepEqual(p.started, { tx: { chain: "near", hash: NEAR_TX, url: `https://nearblocks.io/txns/${NEAR_TX}` } }, "started: the Safe's own transaction");
   assert.deepEqual(p.finished, { tx: { chain: "sol", hash: SOL_TX, url: `https://solscan.io/tx/${SOL_TX}` } }, "finished: the one that landed it on Solana");
   assert.deepEqual(p.steps.map((s) => s.label), ["Safe → NEAR wallet", "NEAR wallet → SOL wallet"]);
-  assert.deepEqual(p.steps[0]!.end, { private: true }, "into the private balance: no public record");
-  assert.deepEqual(p.steps[1]!.start, { private: true }, "out of it: no public record");
+  // fix/move-leg-steps (QA's MUST, 83, 7 Nov): "This step is private" only when every leg had no public tx; this Move's
+  // Safe send and Solana landing are public, so neither step says it
+  assert.equal(p.steps[0]!.end, undefined, "into the private balance: no line, the job has public legs");
+  assert.equal(p.steps[1]!.start, undefined, "out of it: no line either");
   assert.equal(p.swaps.length, 2, "each 1Click swap's id");
   assert.equal(PROOF_WORDS.private, "This step is private. It has no public record.");
   const moving = spendingPage({ ...move, status: "on-its-way", legs: [{ ...leg, status: "on-its-way", proof: { privateStart: true } }] }, [add]);
@@ -107,7 +109,8 @@ test("the page: every row opens it (a hold its Waiting screen), it loads on the 
   assert.doesNotMatch(act, /device\.openUrl/, "control: no Safari sheet from Activity any more");
   assert.equal((act.match(/<div className="wl-row" key=/g) ?? []).length, 0, "no row that a tap does nothing on");
   assert.match(act, /onClick=\{\(\) => \(s\.held \? onHeld\(s\.held\) : show\(spendingOf\(s\)\)\)\}/);
-  assert.match(act, /m\.status === "waiting" && m\.held \? \(\) => onHeld\(m\.held!\) : \(\) => show\(ledgerPage\(m\)\)/);
+  // J2 (copy review, 7 Nov): a Send this phone made opens the job face (its proof under it, JobProof); every other row its page
+  assert.match(act, /m\.status === "waiting" && m\.held \? \(\) => onHeld\(m\.held!\) : sj && Tracker \? \(\) => openJob\(sj, m\) : \(\) => show\(ledgerPage\(m\)\)/);
   assert.match(page, /const view = \(url: string\) => openApp\("browser", undefined, url\);/, "View opens the Browser");
   assert.match(page, /<Sheet title=\{W\.bar\} onClose=\{onClose\} \{\.\.\.\(onBack \? \{ onBack \} : \{\}\)\}>/, "one full-screen page (D135), its bar \"Activity\" (R2)");
   assert.match(page, /<h2 className="wl-detail__title">\{title\}<\/h2>/, "R2: the row's whole title in the page, never cut in the bar");
@@ -196,5 +199,20 @@ test("finding 57: a receipt that says Done ends every step: the last, \"NEAR wal
   for (const s of legs.steps) assert.ok(s.end || s.ended, `${s.label} is ended`);
   assert.equal(spendingPage(row({ status: "on-its-way", legs: [row({ id: "y", status: "on-its-way" })] })).steps.some((s) => s.ended), false, "control: a Move on its way");
   const page = here("./screens/ActivityDetail.tsx");
-  assert.match(page, /\{s\.end \? end\(W\.finished, s\.end, `f\$\{i\}`\) : s\.ended && <div className="wl-row wl-row-2" data-testid="proof-step-done"><div><div className="t">\{W\.finished\}<\/div><div className="d">\{W\.doneNoLink\}<\/div>/, "the step says Finished · Done.");
+  // pin changed (T-B, the UI reviewer, 6 Nov, line 26): an ended step says Done once on its own line (stepLine), no Finished / Done row
+  assert.match(page, /\{stepLine\(s, dayFirst && s\.atIso \? dayTime\(s\.atIso\) : when\(s\.atIso\)\)\}/, "the step says Done on its line");
+});
+
+test("Finished is said once: the head drops it where a listed step carries the same end (QA 20, the copy review: \"Finished / This step is private\" twice)", () => {
+  const priv = { private: true as const };
+  const tx = { tx: { chain: "near", hash: "h1" } } as unknown as ProofEnd;
+  const table: [Parameters<typeof headFinished>[0], ProofEnd | undefined][] = [
+    [{ finished: priv, steps: [{ label: "a" }, { label: "b", end: priv }] }, undefined],
+    [{ finished: tx, steps: [{ label: "a" }, { label: "b", end: tx }] }, undefined],
+    [{ finished: priv, steps: [{ label: "a", end: priv }] }, priv],
+    [{ finished: priv, stepsShown: true, steps: [{ label: "a", end: priv }] }, undefined],
+    [{ finished: tx, steps: [{ label: "a" }, { label: "b", end: priv }] }, tx],
+    [{ steps: [{ label: "a" }, { label: "b", end: priv }] }, undefined],
+  ];
+  for (const [page, want] of table) assert.deepEqual(headFinished(page), want, JSON.stringify(page));
 });

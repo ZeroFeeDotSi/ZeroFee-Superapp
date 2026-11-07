@@ -56,10 +56,12 @@ export function convertRequest(route: ConvertRoute, o: { from: string; to: strin
 }
 
 /** The transactions that pay the quote's deposit address exactly `units`. */
-export function fundingSteps(route: ConvertRoute, o: { tokenId: string; units: bigint; depositAddress: string; registered: boolean; storageYocto: string; me: string; why: string }): TxRequest[] {
+/** `meRegistered`: NEAR on the account only, the account itself is already set up on wrap.near (moves.ts wrapRegistered),
+ *  so its own storage step is left out; absent or false, it stays. */
+export function fundingSteps(route: ConvertRoute, o: { tokenId: string; units: bigint; depositAddress: string; registered: boolean; storageYocto: string; me: string; meRegistered?: boolean; why: string }): TxRequest[] {
   if (route === "intents") return [mtTransfer({ to: o.depositAddress, tokenId: o.tokenId, units: o.units, why: o.why })];
   if (route === "near-account" && o.tokenId === NATIVE_NEAR) {
-    return [nearAsWnearTo({ accountId: o.me, to: o.depositAddress, yocto: o.units, registerTo: !o.registered, why: o.why })];
+    return [nearAsWnearTo({ accountId: o.me, to: o.depositAddress, yocto: o.units, registerTo: !o.registered, meRegistered: o.meRegistered === true, why: o.why })];
   }
   const contract = originAsset(o.tokenId).slice("nep141:".length);
   const storage = o.registered ? [] : [registerOn({ contract, accountId: o.depositAddress, yocto: o.storageYocto, why: "Let the swap service's address receive this coin" })];

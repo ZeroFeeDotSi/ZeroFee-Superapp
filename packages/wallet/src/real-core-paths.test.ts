@@ -330,7 +330,8 @@ test("control: route B (leg 1 ORIGIN_CHAIN, ft_withdraw) through the same entry 
 // sign. Only reads the core answers for the screens (account.state, list, balances) come from the replay core.
 // FAILS on main ff77b6a01 without 737644f57 (fix/intents-join-intents: the join took leg 1 ORIGIN_CHAIN only); passes with it.
 
-async function ledgerEntry(o: { pocketUnits: string; solNamed?: boolean }) {
+async function ledgerEntry(o: { pocketUnits: string; solNamed?: boolean; /** the Safe's coin that pays (USDC by default; NEAR: T-F, 6 Nov) */ coin?: string; /** the Safe's NEAR on the account ("near"), not in NEAR Intents */ onAccount?: boolean; /** the Safe on wrap.near (onAccount): set up, not (the default), or its read fails */ wrap?: "registered" | "unregistered" | "fails"; /** what reaches the core instead of the app's own request */ tamper?: (r: TxRequest) => TxRequest; /** the NEAR wallet (the float) set up, and the relay answering the core's own Add quote (subwallet.float.quoteAdd), as the core reads it */ float?: boolean }) {
+  const COIN = o.coin ?? SWAP_USDC;
   const { SubWallets } = await import("@zerofee/core/subwallets");
   const { MemoryVault } = await import("@zerofee/core/vault");
   const { base64 } = await import("@zerofee/core/sol/bytes");
@@ -348,7 +349,12 @@ async function ledgerEntry(o: { pocketUnits: string; solNamed?: boolean }) {
       quoted.set(depositAddress, req);
       return { quote: { depositAddress }, zerofeeStatusTag: "tag-for-this-quote-0001" };
     },
-    generateIntent: async () => null, submitIntent: async () => null, status: async () => null,
+    generateIntent: async () => null, submitIntent: async () => null,
+    // the Add's quote read back through the relay as 1Click signs it (float-moves.ts quoteAdd, addFacts); off by default
+    status: async (a: string) => {
+      const req = o.float ? quoted.get(a) : undefined;
+      return req ? { status: "PENDING_DEPOSIT", quoteResponse: sign(req as Record<string, any>, a, ((BigInt(String(req.amount)) * 99n) / 100n).toString(), "10000000") } : null;
+    },
   };
   // 1Click's status as it signs it: leg 1 (the core's own ask) and leg 2 (the ledger's ask), each read back as asked
   const privateStatus = async (a: string) => {
@@ -358,34 +364,51 @@ async function ledgerEntry(o: { pocketUnits: string; solNamed?: boolean }) {
     return { status: "PENDING_DEPOSIT", quoteResponse: sign(clean, a, ((BigInt(clean.amount) * 99n) / 100n).toString(), ((BigInt(clean.amount) * 98n) / 100n).toString()) };
   };
   const sol = { balance: async () => 10n ** 12n, latestBlockhash: async () => "11111111111111111111111111111111", send: async () => true, status: async () => ["ok", "ok"] };
-  const w = new SubWallets({ vault: new MemoryVault(), sol, evm: {}, approve: async () => true, emit: () => {}, quoteKey: TEST_QUOTE_KEY, floatRelay: relay, privateStatus, pocketUsd: async () => 0, confirm: { everyMs: 1, forMs: 5 } } as never);
+  const chain = new FakeChain("mainnet");
+  const key = SoftwareKey.generate();
+  chain.fund(ME, key.publicKey, o.onAccount ? 100n : undefined);
+  // the core's own reads for a Move's plan (the audit's MUST, 7 Nov): Private as the screens' ledger holds it, the Safe on the
+  // same chain the signer reads, wNEAR at 1Click's price (the catalogue's)
+  const w = new SubWallets({ vault: new MemoryVault(), sol, evm: {}, approve: async () => true, emit: () => {}, quoteKey: TEST_QUOTE_KEY, floatRelay: relay, privateStatus, pocketUsd: async () => 0, pocketHeld: async (t: string) => (t === COIN ? BigInt(o.pocketUnits) : 0n), near: chain, mainAccount: async () => ME, tokenPrice: async (t: string) => (t === NEAR ? { usd: 4.39, decimals: 24 } : null), confirm: { everyMs: 1, forMs: 5 } } as never);
   const p = await w.create("private", "near");
   pocket = p.address;
   await w.create("trade", "sol");
+  if (o.float) await w.create("trade", "near");
   const list = (await w.list()) as { id: string; kind: string; chain: string; address: string }[];
   // the real core's signer, as DemoCore's deviceSigner wires it
-  const chain = new FakeChain("mainnet");
-  const key = SoftwareKey.generate();
-  chain.fund(ME, key.publicKey);
-  chain.contract(INTENTS.account, INTENTS.codeHashBase58, { mt_balance_of: () => "500000000" });
+  chain.contract(INTENTS.account, INTENTS.codeHashBase58, { mt_balance_of: () => (COIN === NEAR && !o.onAccount ? (100n * 10n ** 24n).toString() : "500000000") });
   chain.contract(USDC, "usdc", { ft_metadata: () => ({ symbol: "USDC", decimals: 6 }) });
+  if (COIN === NEAR) chain.contract("wrap.near", "wrap", { ft_metadata: () => ({ symbol: "wNEAR", decimals: 24 }) });
   // the payout's coin, named with its decimals (the audit's ruling, 5 Nov: unnamed, the fill is refused before its sheet)
   if (o.solNamed) chain.contract("sol.omft.near", "sol", { ft_metadata: () => ({ symbol: "SOL", decimals: 9 }) });
   const names = (x: { kind: string; chain: string }) => (x.kind === "private" ? PRIVATE_POCKET : x.kind === "trade" && x.chain === "near" ? TRADING_BALANCE : x.chain === "sol" ? "your SOL wallet" : `your ${x.chain} wallet`);
+  // DemoCore's ownQuote (demo-core.ts): the Add's quote, then Private's move in
   const shown: PlainWords[] = [];
-  const own = (a: string) => w.privateInFacts(a);
+  /** the core's approval.asked and job.signed (demo-core.ts onAsked, onSigned) around each sheet, in order */
+  const events: string[] = [];
+  const own = async (a: string) => (await w.floatAddFacts(a)) ?? (await w.privateInFacts(a));
   const signer = new DevSigner({
-    accountId: ME, chain, key, approve: async (x) => (shown.push(x), true), quoteKey: TEST_QUOTE_KEY,
+    accountId: ME, chain, key, approve: async (x) => (shown.push(x), events.push("sheet"), true), quoteKey: TEST_QUOTE_KEY,
+    onAsked: (j) => events.push(`asked:${j}`), onSigned: (j) => events.push(`signed:${j ?? ""}`),
     ownWallets: async () => new Map(list.map((x) => [x.address, names(x)])), oneClick: own, ownQuote: own, privateLeg: async (a) => w.privateLeg(a), sendPayout: async (a) => w.sendPayout(a),
     // fix/bind-intent: the core's own record of what its Swap and Move doors asked (demo-core.ts intentOf)
     intentOf: (a) => w.intentOf(a),
   });
-  const screens = fakeCore({ accountId: ME, pocket: [{ tokenId: SWAP_USDC, amount: o.pocketUnits }], subwallets: list as never });
+  const screens = fakeCore({ accountId: ME, pocket: [{ tokenId: COIN, amount: o.pocketUnits }], subwallets: list as never });
   const real: string[] = [];
+  /** each tx the real core was asked to sign: its methods and the core's answer */
+  const txs: { methods: string[]; args: Record<string, unknown>[]; outcome: { status?: string; problem?: { code: string } } }[] = [];
   const route = async (m: string, q: Record<string, any>) => {
-    if (m === "subwallet.private.quoteIn") return { ok: await w.privateQuoteIn(q.tokenId, q.amount, q.outside === true, q.through === true, q.intents === true) };
-    if (m === "subwallet.privatePay") return { ok: await w.privatePay(q.id, q.depositAddress, q.intent, q.why, q.statusTag, q.inDeposit, q.send === true, q.payee) };
-    if (m === "tx.request") return { ok: await signer.request(q.request) };
+    if (m === "subwallet.private.quoteIn") return { ok: await w.privateQuoteIn(q.tokenId, q.amount, q.outside === true, q.through === true, q.intents === true, q.job) };
+    if (m === "subwallet.movePlan") return { ok: await w.movePlan(q.job, q.tokenId, q.parts, q.share, q.price, q.decimals, q.whole, q.safeHas) };
+    if (m === "subwallet.float.quoteAdd" && o.float) return { ok: await w.floatQuoteAdd(q.amount, q.tokenId, q.job) };
+    if (m === "subwallet.privatePay") return { ok: await w.privatePay(q.id, q.depositAddress, q.intent, q.why, q.statusTag, q.inDeposit, q.send === true, q.payee, q.pair === true && q.app === "wallet", q.job) };
+    if (m === "tx.request") {
+      const req = o.tamper ? o.tamper(q.request as TxRequest) : (q.request as TxRequest);
+      const out = await signer.request(req);
+      txs.push({ methods: req.actions.map((a: any) => a.method), args: req.actions.map((a: any) => a.args), outcome: out as any });
+      return { ok: out };
+    }
     return null;
   };
   const bridgeFor = (app: string) => ({
@@ -412,14 +435,14 @@ async function ledgerEntry(o: { pocketUnits: string; solNamed?: boolean }) {
     },
     generateIntent: async (_via: string, signerId: string, dep: string) => {
       const req = asked.find((q) => q.__dep === dep)!;
-      return { payload: { message: JSON.stringify({ deadline: req.deadline, intents: [{ intent: "transfer", receiver_id: dep, tokens: { [`imt:${MINTER}:${SWAP_USDC}`]: req.amount } }], signer_id: signerId }), nonce: base64(new Uint8Array(32).fill(3)), recipient: "intents.far" } };
+      return { payload: { message: JSON.stringify({ deadline: req.deadline, intents: [{ intent: "transfer", receiver_id: dep, tokens: { [`imt:${MINTER}:${req.originAsset ?? SWAP_USDC}`]: req.amount } }], signer_id: signerId }), nonce: base64(new Uint8Array(32).fill(3)), recipient: "intents.far" } };
     },
     submitIntent: async () => ({ intentHash: "h" }),
     status: async () => ({ status: "SUCCESS" }) as any,
   };
-  const ledger = createLedgerService({ bridgeFor, chain: fakeNear(ME, { ledger: { [SWAP_USDC]: "500000000" } }, { [QUOTE_ADDRESS]: { ledger: {} } }), apis, routes: { intents: false, nearOrigin: false }, trackMs: 2, readCall: async () => ({ kind: "ran" }), privateQuotes: RELAY, safeFillOpen: true } as never);
+  const ledger = createLedgerService({ bridgeFor, chain: fakeNear(ME, o.onAccount ? { ledger: {}, nearYocto: 100n * 10n ** 24n, ...(o.wrap === "registered" ? {} : o.wrap === "fails" ? { storageReadFails: true } : { unregistered: ["wrap.near"] }) } : { ledger: COIN === NEAR ? { [NEAR]: (100n * 10n ** 24n).toString() } : { [SWAP_USDC]: "500000000" } }, { [QUOTE_ADDRESS]: { ledger: {} } }), apis, routes: { intents: false, nearOrigin: false }, trackMs: 2, readCall: async () => ({ kind: "ran" }), privateQuotes: RELAY, safeFillOpen: true } as never);
   const sol1 = list.find((x) => x.kind === "trade" && x.chain === "sol")!;
-  return { ledger, shown, real, sol1, pocket: () => pocket, sent: () => chain.sent.length };
+  return { ledger, shown, real, txs, sol1, events, pocket: () => pocket, sent: () => chain.sent.length };
 }
 const said = (r: any) => ("problem" in r ? `${r.problem.code}: ${r.problem.whatHappened} ${r.problem.more ?? ""}` : "");
 
@@ -433,6 +456,84 @@ test("ENTRY 8. Move via Private with the Safe's top-up, from the ledger's own Mo
   assert.equal(s.sent(), 1, "the fill sent");
 });
 
+test("the audit's MUST (7 Nov): a Move via Private whose Safe fills it after all (ledger.moveFromPrivate with its job key): the Safe's request carries the key, and the real core says approval.asked with it just before the one sheet, then job.signed with it (control: a Send from the Safe, no job, says none)", async () => {
+  const s = await ledgerEntry({ pocketUnits: "12500000" });
+  const job = "home-swap-2123456789abcdef01234567";
+  const r = await s.ledger.call<any>("ledger.moveFromPrivate", { parts: [{ wallet: s.sol1.id, usd: 30 }], job, caller: "trade" });
+  assert.ok("ok" in r && !r.ok.parts.some((x: any) => x.stopped), `${said(r)} via ${s.real.join(", ")}`);
+  assert.deepEqual(s.events, [`asked:${job}`, "sheet", `signed:${job}`]);
+  const c = await ledgerEntry({ pocketUnits: "0", solNamed: true });
+  const rc = await c.ledger.call<any>("ledger.sendFromSafe", { tokenId: SWAP_USDC, amount: "20", to: { kind: "chain", chain: "sol", address: STRANGER }, fill: true }, "wallet" as never);
+  assert.ok("ok" in rc, said(rc));
+  assert.deepEqual(c.events, ["sheet", "signed:"], "a Send that names no job: nothing asked by key");
+});
+
+test("the audit's MUST, B13's one fill (7 Nov): a two-part Move (fillMove: one leg 1, both legs held) says approval.asked with the Move's key once, just before its ONE sheet", async () => {
+  const s = await ledgerEntry({ pocketUnits: "12500000", solNamed: true, float: true });
+  const job = "home-move-3123456789abcdef01234567";
+  const r = await s.ledger.call<any>("ledger.moveFromPrivate", { parts: [{ wallet: s.sol1.id, usd: 30 }, { wallet: "near", usd: 5 }], job, caller: "trade" });
+  assert.ok("ok" in r && !r.ok.parts.some((x: any) => x.stopped), `${said(r)} via ${s.real.join(", ")}`);
+  assert.equal(s.shown.length, 1, "one Safe sheet");
+  assert.deepEqual(s.events, [`asked:${job}`, "sheet", `signed:${job}`]);
+});
+
+test("the audit's MUST (7 Nov): the Safe's Send with the fill (ledger.sendFromSafe with its job) and the Safe's Add to the NEAR wallet (ledger.toTrading with its job: Swap's and the top-up's way) each say approval.asked with their own key just before their one sheet, then job.signed with it", async () => {
+  const c = await ledgerEntry({ pocketUnits: "0", solNamed: true });
+  const send = "home-send-4123456789abcdef01234567";
+  const rc = await c.ledger.call<any>("ledger.sendFromSafe", { tokenId: SWAP_USDC, amount: "20", to: { kind: "chain", chain: "sol", address: STRANGER }, fill: true, job: send }, "wallet" as never);
+  assert.ok("ok" in rc, said(rc));
+  assert.deepEqual(c.events, [`asked:${send}`, "sheet", `signed:${send}`]);
+  const a = await ledgerEntry({ pocketUnits: "0", coin: NEAR, onAccount: true, float: true });
+  const add = "home-swap-5123456789abcdef01234567";
+  const ra = await a.ledger.call<any>("ledger.toTrading", { amount: "5", tokenId: "near", caller: "trade", job: add });
+  assert.ok("ok" in ra, said(ra));
+  assert.deepEqual(a.events, [`asked:${add}`, "sheet", `signed:${add}`]);
+});
+
+test("the audit's SHOULD (7 Nov): Home's and Trade's Safe-only \"Move to your NEAR wallet\" each ask spending.topUp with their own job key (topUpAsk), which the core hands its engine's Add and the real ledger's toTrading puts on the Safe's request: the real core says approval.asked with that key just before the one sheet, then job.signed with it (control: the old ask, no key, says none) [fails before: the sheets sent no key]", async () => {
+  const { createSpendingService } = await import("@zerofee/core/spending");
+  const { topUpAsk } = await import("@zerofee/shell-api/topup-ask.ts");
+  /** the core's spending.topUp over the real ledger and core: the engine's Add asks ledger.toTrading with the call's key
+   *  (float-core.ts add: `job: jobKey` on the Add's ask), as the app's engine does */
+  const topUp = async (params: Record<string, unknown>) => {
+    const a = await ledgerEntry({ pocketUnits: "0", coin: NEAR, onAccount: true, float: true });
+    const engine = {
+      snapshot: () => ({ loaded: true, totalUsd: 0, reserveUsd: 0, takeableUsd: 0, chains: [], moves: [] }),
+      subscribe: () => () => undefined, refresh: async () => undefined, setCap() {},
+      async add(usd: number, _from: unknown, _ready: unknown, _legs: unknown, _then: unknown, _asker: unknown, jobKey?: string) {
+        const r = await a.ledger.call<any>("ledger.toTrading", { amount: "5", tokenId: "near", caller: "trade", ...(jobKey ? { job: jobKey } : {}) });
+        assert.ok("ok" in r, said(r));
+        return { id: `mv-${jobKey ?? "x"}`, kind: "add", usd, status: "moving", at: 0 };
+      },
+      async takeOut() { throw new Error("not here"); }, async moveNow() { throw new Error("not here"); },
+    };
+    const store = new Map<string, string>();
+    const svc = createSpendingService({
+      engine: () => engine as never,
+      async call<T>(method: string, q: Record<string, unknown>): Promise<T> {
+        if (method === "device.store.get") return { value: store.get(String(q.key)) ?? null } as T;
+        if (method === "device.store.set") { store.set(String(q.key), String(q.value)); return { ok: true } as T; }
+        if (method === "account.protection.get") return { bands: [{ up_to: null, level: "FaceId" }], usd: [{ upToUsd: 500, level: "faceid" }] } as T;
+        if (method === "ledger.balances") return [{ tokenId: "near", symbol: "NEAR", amount: "40", usd: "160", listed: true }] as T;
+        throw new Error(`no answer for ${method}`);
+      },
+    });
+    const r = await svc.call("spending.topUp", params);
+    assert.ok("ok" in r, JSON.stringify(r));
+    return a;
+  };
+  for (const prefix of ["home-topup", "trade-topup"]) {
+    const ask = topUpAsk(new Map(), "5", prefix);
+    assert.match(ask.key, new RegExp(`^${prefix}-[0-9a-f]{24}$`));
+    const a = await topUp(ask.params);
+    assert.equal(a.shown.length, 1, `${prefix}: one Safe sheet`);
+    assert.deepEqual(a.events, [`asked:${ask.key}`, "sheet", `signed:${ask.key}`], prefix);
+  }
+  // control: the ask as both sheets made it before (no key): the core names no job, so runJob had nothing to match
+  const old = await topUp({ usd: "5" });
+  assert.deepEqual(old.events, ["sheet", "signed:"]);
+});
+
 test("ENTRY 3. Send from the Safe with the fill (ledger.sendFromSafe, fill), to an outside Solana payee, Private empty: leg 1, the join, the payout bound, the Safe's fill under one sheet naming the payee, all through the real core (SAFE_SEND_FILL_OPEN)", async () => {
   const s = await ledgerEntry({ pocketUnits: "0", solNamed: true });
   const r = await s.ledger.call<any>("ledger.sendFromSafe", { tokenId: SWAP_USDC, amount: "20", to: { kind: "chain", chain: "sol", address: STRANGER }, fill: true }, "wallet" as never);
@@ -443,11 +544,11 @@ test("ENTRY 3. Send from the Safe with the fill (ledger.sendFromSafe, fill), to 
   // the full address first, unfolded, then where it lands (the audit's D37 condition, the copy review's words)
   assert.match(s.shown[0]!.title, /^Send \$[\d.]+ from your Safe$/, s.shown[0]!.title);
   // the UI lead's ruling (5 Nov): what they get (the payout's amountIn), what the Safe sends, what stays; Y = Z + T + the move in's own cost
-  const legs = s.shown[0]!.lines.filter((l) => /^(They get|Your Safe sends|Stays in Private|From your Safe|Together|Fees) · /.test(l));
-  assert.match(legs[0]!, /^They get · \d[\d,]*(\.\d{1,4})? SOL \(\$19\.40\)$/, `the named coin's signed figure, then what it is worth to them: ${legs[0]}`);
-  assert.deepEqual(legs.slice(1), ["Your Safe sends · $30.00", "Stays in Private · $10.10", "Fees · about $0.50"], "the fill: a whole step over the $20 payout; the move in brings $29.70 (audit, 6 Nov: its $0.30 is a fee, not money staying); $30.00 = $10.10 + T $19.60 + $0.30; T $19.60 = $19.40 + $0.20");
+  const legs = s.shown[0]!.lines.filter((l) => /^(They get|Your Safe sends|Private keeps the rest|Stays in Private|From your Safe|Together|Fees) · /.test(l));
+  assert.match(legs[0]!, /^They get · \d[\d,]*(\.\d{1,4})? SOL \(about \$19\.40\)$/, `the named coin's signed figure, then what it is worth to them: ${legs[0]}`);
+  assert.deepEqual(legs.slice(1), ["From your Safe · $30.00", "Private keeps the rest · about $10.10", "Fees · about $0.50"], "the fill: a whole step over the $20 payout; the move in brings $29.70 (audit, 6 Nov: its $0.30 is a fee, not money staying); $30.00 = $10.10 + T $19.60 + $0.30; T $19.60 = $19.40 + $0.20");
   assert.ok(!s.shown[0]!.lines.some((l) => /unnamed coin/.test(l)), "control: never the unnamed words");
-  assert.deepEqual(s.shown[0]!.lines.slice(0, 2), [`To ${STRANGER}`, "Public on Solana."], s.shown[0]!.lines.join(" | "));
+  assert.deepEqual(s.shown[0]!.lines.slice(0, 2), [`To ${STRANGER}`, "Public on Solana. Anyone can see the Safe's part on NEAR."], s.shown[0]!.lines.join(" | ")); // the copy review (6 Nov): one public line
   assert.equal(s.shown[0]!.hint, `Wallet says: Send 20 USDC to ${STRANGER}`);
   assert.equal(s.sent(), 1, "the fill sent");
 });
@@ -469,6 +570,192 @@ test("ENTRY 4. A site's top-up, Private short (ledger.moveFromPrivate with whole
   assert.ok(s.real.includes("subwallet.privatePay") && s.real.includes("tx.request"), s.real.join(", "));
   assert.equal(s.shown.length, 1, "one Safe sheet");
   assert.match(s.shown[0]!.title, /^Move \$[\d.]+ to your SOL wallet$/, s.shown[0]!.title);
-  assert.ok(s.shown[0]!.lines.includes("Your Safe adds $10.00 to Private first."), "one fill of the whole, a $10 step");
+  assert.ok(s.shown[0]!.lines.includes("From your Safe · $10.00"), `one fill of the whole, a $10 step: ${s.shown[0]!.lines.join(" | ")}`);
   assert.equal(s.sent(), 1, "the fill sent");
+});
+
+// T-F (the UI reviewer's walk, 6 Nov, B-9): Home's Swap of the Safe's NEAR to the SOL wallet, Private short. Spending
+// the copy review's (a) and (c), 7 Nov: the wallet's Move carries its whole plan to the core (private-move.ts -> safe-send.ts FillMark ->
+// to-private.ts TxRequest.movePlan), and the core says it only once it finds the leg it built among the parts; a Swap
+// (spending's then.swap -> float-private -> ledger.moveFromPrivate swap) is titled as one once the core's own record of
+// the payment pays out SOL. Leg 1 here signs a 2 % minimum, so the payment is the part's asked share of it ($29.40 of $30).
+test("the copy review's (a), (c) and J4 through the real ledger and core: a two-part Move ($30.00 to the SOL wallet, $5.00 to the NEAR wallet) is titled \"Your Safe adds $29.40 to this $34.40 Move\" and says \"$29.40 from your Safe, $5.00 from Private. $34.40 in all.\" under its title, then the rows; with swap, \"Swap $29.40 of USDC for SOL\" (controls: one part, no line; no swap, the Move's title)", async () => {
+  const run = async (parts: (sol: string) => { wallet: string; usd: number }[], swap: boolean) => {
+    const s = await ledgerEntry({ pocketUnits: "12500000", solNamed: true, float: true });
+    const r = await s.ledger.call<any>("ledger.moveFromPrivate", { parts: parts(s.sol1.id), job: "move-private-7123456789abcdef0123", caller: "trade", ...(swap ? { swap: true } : {}) });
+    assert.ok("ok" in r && !r.ok.parts.some((x: any) => x.stopped), `${said(r)} ${JSON.stringify("ok" in r ? r.ok : null)} via ${s.real.join(", ")}`);
+    assert.equal(s.shown.length, 1, "one Safe sheet");
+    return s.shown[0]!;
+  };
+  const two = (sol: string) => [{ wallet: sol, usd: 30 }, { wallet: "near", usd: 5 }];
+  const move = await run(two, false);
+  // the copy review's layout (7 Nov, the one fill's sheet): the person's action, every wallet, was "Your Safe adds $29.40 to this $34.40 Move"
+  assert.equal(move.title, "Move $34.40 to your SOL and NEAR wallets", "J4: the whole Move, every wallet, never the leg's figure alone");
+  // the audit (7 Nov): what stays is what the fill's quote brings ($39.60 of the $40.00 step) less the leg, about (its minimum is
+  // less); the fee is the step less what it brings, about; the rows add up (J2-1, Private by its net change): $40.00 = $34.40 + $5.20 + $0.40
+  // fix/move-row-truth (QA's rule, the copy review's words, 7 Nov): no sources line, no why sentence
+  // the audit's ruling (c), 8 Nov: each wallet what its leg 2's signed quote gives (the fake 1Click's amountOutUsd), at least its
+  // minAmountOut; what the legs keep joins the fill's $0.40: $40.00 = $29.11 + $4.95 + $5.20 + $0.74
+  assert.deepEqual(move.lines.slice(0, 7), ["Your SOL wallet gets · about $29.11, at least $28.81", "Your NEAR wallet gets · about $4.95, at least $4.90", "From your Safe · $40.00", "Private keeps the rest · about $5.20", "Fee · about $0.74", "Face ID approves the Safe's part. Private sends on its own.", "Anyone can see the Safe's part."], move.lines.join(" | "));
+  const swap = await run(two, true);
+  assert.equal(swap.title, move.title, "a Move of more parts is titled by the whole, Swap or not");
+  assert.deepEqual(swap.lines.slice(0, 7), move.lines.slice(0, 7));
+  const one = await run((sol) => [{ wallet: sol, usd: 30 }], false);
+  assert.deepEqual([one.title, one.lines[0]], ["Move $29.40 to your SOL wallet", "Your SOL wallet gets · about $29.11, at least $28.81"], "control: a single-leg Move keeps its title; its destination first, from its quote");
+  const oneSwap = await run((sol) => [{ wallet: sol, usd: 30 }], true);
+  assert.equal(oneSwap.title, "Swap $29.40 of USDC for SOL", "Home's Swap (one leg) through the real ledger and core");
+});
+
+// sends it as a Move paid in NEAR (spending.ts topUp, swap "NEAR": ledger.moveFromPrivate with tokenId NEAR); the real
+// ledger pays Private's wNEAR first and fills the rest from the Safe's NEAR (safe-send.ts fillUnits, at NEAR's price),
+// exactly as for USDC. This proves the real core takes that NEAR fill: leg 1, the join, the Safe's mt_transfer of wNEAR.
+test("ENTRY 8, NEAR (T-F): a Swap of the Safe's NEAR to the SOL wallet with Private short (ledger.moveFromPrivate, tokenId NEAR, fill open): Private's wNEAR, the join, the Safe's NEAR fill, all through the real core; one Safe sheet titled as the Move (control: the same Move in USDC, ENTRY 8 above)", async () => {
+  const s = await ledgerEntry({ pocketUnits: (2n * 10n ** 24n).toString(), coin: NEAR, solNamed: true });
+  const amount = (25 / 4.39).toFixed(6);
+  const r = await s.ledger.call<any>("ledger.moveFromPrivate", { parts: [{ wallet: s.sol1.id, usd: 25, amount }], tokenId: NEAR, job: "home-swap-0123456789abcdef01234567", caller: "trade" });
+  assert.ok("ok" in r && !r.ok.parts.some((x: any) => x.stopped), `${said(r)} ${JSON.stringify("ok" in r ? r.ok : null)} via ${s.real.join(", ")}`);
+  assert.ok(s.real.includes("subwallet.privatePay") && s.real.includes("subwallet.private.quoteIn") && s.real.includes("tx.request"), s.real.join(", "));
+  assert.equal(s.shown.length, 1, "one Safe sheet");
+  assert.match(s.shown[0]!.title, /^Move .+ to your SOL wallet$/, s.shown[0]!.title);
+  assert.equal(s.sent(), 1, "the fill sent");
+  const ids = r.ok.parts[0].ids as string[];
+  // one Face ID (6 Nov): Private's share folds into the Safe's one fill while Private stays under its buffer (the audit's R2)
+  assert.deepEqual(ids.map((id) => id.split(":")[0]), ["safe-send"], `the Safe's one fill, Private's share folded in: ${ids.join(", ")}`);
+});
+
+// T-F, fixed (the audit's ruling, 6 Nov): the Safe's NEAR on its ACCOUNT fills Private. The fill's tx (convert.ts fundingSteps
+// near-account: nearAsWnearTo) wraps on wrap.near, and opens with a storage_deposit for the Safe itself when it isn't set
+// up there. The core's move tag (intents.ts checkBoundIntent) now allows exactly that one step (ownWrapStorage: wrap.near,
+// the signer, registration_only, at most 0.00125 NEAR); before, it refused it (security.intent.changed) after Private's
+// own share already went: "Only the part from Private was sent." Already set up, the step is left out (wrapRegistered).
+const onAccountSwap = async (o: { wrap?: "registered" | "unregistered" | "fails"; tamper?: (r: TxRequest) => TxRequest }, refused = false) => {
+  const s = await ledgerEntry({ pocketUnits: (2n * 10n ** 24n).toString(), coin: NEAR, solNamed: true, onAccount: true, ...o });
+  const amount = (25 / 4.39).toFixed(6);
+  const r = await s.ledger.call<any>("ledger.moveFromPrivate", { parts: [{ wallet: s.sol1.id, usd: 25, amount }], tokenId: "near", job: "home-swap-1123456789abcdef01234567", caller: "trade" });
+  if (!refused) assert.ok("ok" in r, said(r));
+  return { s, r, fill: s.txs.find((t) => t.methods.includes("near_deposit")) };
+};
+const filled = ({ s, r, fill }: Awaited<ReturnType<typeof onAccountSwap>>) => {
+  assert.ok(fill, JSON.stringify(s.txs));
+  assert.equal(fill!.outcome.status, "done", JSON.stringify(fill!.outcome));
+  assert.ok(!r.ok.parts.some((x: any) => x.stopped), `no part stopped: ${JSON.stringify(r.ok)}`);
+  assert.equal(s.shown.length, 1, "one Safe sheet");
+  assert.match(s.shown[0]!.title, /^Move .+ to your SOL wallet$/, s.shown[0]!.title);
+  assert.equal(s.sent(), 1, "the fill sent");
+  const ids = r.ok.parts[0].ids as string[];
+  // one Face ID (6 Nov): Private's share folds into the Safe's one fill while Private stays under its buffer (the audit's R2)
+  assert.deepEqual(ids.map((id) => id.split(":")[0]), ["safe-send"], `the Safe's one fill, Private's share folded in: ${ids.join(", ")}`);
+};
+const selfStorage = (fill: { methods: string[]; args: Record<string, unknown>[] }) => fill.methods.filter((m, i) => m === "storage_deposit" && fill.args[i]?.account_id === "kid.near").length;
+
+test("T-F, fixed: a Swap of the Safe's NEAR on its account with Private short, the Safe not set up on wrap.near: Private's share, then the Safe's wrap-and-fill with its own storage step, accepted by the real core; one sheet, sent, no part stopped [fails without ownWrapStorage]", async () => {
+  const run = await onAccountSwap({});
+  filled(run);
+  assert.equal(run.fill!.methods[0], "storage_deposit");
+  assert.equal(selfStorage(run.fill!), 1, "the Safe's own storage, once");
+  // the sheet is the Move's, its set-up one line (words.ts prepFold with intents.ts `folds`), never "and 3 more steps"
+  const sheet = run.s.shown[0]!;
+  assert.ok(sheet.lines.includes("Setting up the coin costs at most 0.0025 NEAR."), sheet.lines.join(" | "));
+  assert.ok(!sheet.lines.some((l) => /^Let (your account|the swap service) hold/.test(l)) && !/more step/.test(sheet.title), sheet.title);
+});
+
+test("T-F, the saving: the Safe already set up on wrap.near: its storage step is left out, accepted by the real core [fails without wrapRegistered]", async () => {
+  const run = await onAccountSwap({ wrap: "registered" });
+  filled(run);
+  assert.equal(selfStorage(run.fill!), 0, `no storage step for the Safe: ${run.fill!.methods.join(", ")}`);
+});
+
+test("T-F, unknown: wrap.near's storage read fails: the Safe's storage step stays (never skipped on an unknown), accepted by the real core", async () => {
+  const run = await onAccountSwap({ wrap: "fails" });
+  filled(run);
+  assert.equal(selfStorage(run.fill!), 1, "kept on a failed read");
+});
+
+test("T-F, control: the same fill with its storage_deposit for another account is refused by the real core under the move's tag; nothing of the Safe's sent", async () => {
+  const other = (r: TxRequest): TxRequest => ({ ...r, actions: r.actions.map((a: any) => (a.method === "storage_deposit" && a.args?.account_id === "kid.near" ? { ...a, args: { ...a.args, account_id: "someone-else.near" } } : a)) });
+  const { s, r, fill } = await onAccountSwap({ tamper: other }, true);
+  assert.ok(fill, JSON.stringify(s.txs));
+  assert.deepEqual([fill!.outcome.status, (fill!.outcome as any).problem?.code], ["problem", "security.intent.changed"]);
+  assert.equal(s.sent(), 0, "the Safe's part never went");
+  // one Face ID (6 Nov): Private's share is folded into the fill, so no part went before it: the Move's own refusal
+  assert.ok("problem" in r && r.problem.code === "security.intent.changed", said(r) || JSON.stringify(r.ok));
+});
+
+test("T-F, Send: Send from the Safe with the fill (ledger.sendFromSafe, fill), paid from the Safe's NEAR on its account, Private empty, the Safe not set up on wrap.near: its own storage step, the wrap and the move in, accepted by the real core under one sheet naming the Send; sent [fails without ownWrapStorage]", async () => {
+  const s = await ledgerEntry({ pocketUnits: "0", coin: NEAR, solNamed: true, onAccount: true });
+  const r = await s.ledger.call<any>("ledger.sendFromSafe", { tokenId: "near", amount: "5", to: { kind: "chain", chain: "sol", address: STRANGER }, fill: true }, "wallet" as never);
+  assert.ok("ok" in r, `${said(r)} via ${s.real.join(", ")}`);
+  const fill = s.txs.find((t) => t.methods.includes("near_deposit"));
+  assert.ok(fill, JSON.stringify(s.txs));
+  assert.deepEqual([fill!.outcome.status, selfStorage(fill!)], ["done", 1], JSON.stringify(fill!.outcome));
+  assert.equal(s.shown.length, 1, "one Safe sheet");
+  assert.match(s.shown[0]!.title, /^Send .+ from your Safe$/, s.shown[0]!.title);
+  assert.ok(s.shown[0]!.lines.includes("Setting up the coin costs at most 0.0025 NEAR.") && !/more step/.test(s.shown[0]!.title), s.shown[0]!.lines.join(" | "));
+  assert.equal(s.sent(), 1, "the fill sent");
+});
+
+// The Add of the Safe's NEAR on its account into the NEAR wallet (ledger.toTrading, tokenId "near"; 83, 6 Nov): the core's
+// own Add quote (subwallet.float.quoteAdd, a move tag), then ONE wrap.near transaction from convert.ts fundingSteps
+// near-account (nearAsWnearTo): the Safe's own storage step, the deposit address's, the wrap, the ft_transfer, through the
+// real core. A proof of today's code (ownWrapStorage, 4a268691d; targetStorage keeps it): it passes on main.
+const addNear = async (tamper?: (r: TxRequest) => TxRequest) => {
+  const s = await ledgerEntry({ pocketUnits: "0", coin: NEAR, onAccount: true, float: true, ...(tamper ? { tamper } : {}) });
+  const r = await s.ledger.call<any>("ledger.toTrading", { amount: "5", tokenId: "near", caller: "trade" });
+  return { s, r };
+};
+const refusedAdd = ({ s, r }: Awaited<ReturnType<typeof addNear>>) => {
+  assert.equal(s.txs.length, 1, JSON.stringify(s.txs));
+  assert.deepEqual([s.txs[0]!.outcome.status, (s.txs[0]!.outcome as any).problem?.code], ["problem", "security.intent.changed"]);
+  assert.ok("problem" in r, JSON.stringify(r));
+  assert.deepEqual([s.shown.length, s.sent()], [0, 0], "no sheet, nothing sent");
+};
+
+test("ADD, NEAR (audit, 6 Nov): Add the Safe's NEAR on its account into the NEAR wallet (ledger.toTrading), the Safe not set up on wrap.near: one sheet, sent once, its own storage step accepted by the real core under the Add's move tag [a proof of today's code: passes on main]", async () => {
+  const { s, r } = await addNear();
+  assert.ok("ok" in r, `${said(r)} via ${s.real.join(", ")}`);
+  assert.ok(s.real.includes("subwallet.float.quoteAdd") && s.real.includes("tx.request"), s.real.join(", "));
+  assert.equal(s.txs.length, 1, "one transaction");
+  const [t] = s.txs;
+  assert.deepEqual(t!.methods, ["storage_deposit", "storage_deposit", "near_deposit", "ft_transfer"], "its own storage, the deposit address's, wrap, pay");
+  assert.deepEqual([t!.args[0]!.account_id, t!.args[0]!.registration_only, t!.args[1]!.registration_only], ["kid.near", true, true]);
+  assert.equal(t!.outcome.status, "done", JSON.stringify(t!.outcome));
+  assert.equal(s.shown.length, 1, "one Safe sheet");
+  // the core's Add-in-another-coin sheet (intents.ts intoOwnWords, audit 2 Nov S1): a swap for the NEAR wallet's USDC
+  assert.match(s.shown[0]!.title, /^Swap \$[\d.]+ \(5 NEAR\) for USDC$/, s.shown[0]!.title);
+  assert.match(s.shown[0]!.lines[0]!, /^From your Safe\. At least .+ lands in your NEAR wallet\.$/, s.shown[0]!.lines.join(" | "));
+  assert.equal(s.sent(), 1, "sent once");
+});
+
+test("ADD, NEAR, control: the same Add with the Safe's own storage step one yocto over the bound is refused by the real core under the Add's move tag; no sheet, nothing sent", async () => {
+  refusedAdd(await addNear((r) => ({ ...r, actions: r.actions.map((a: any) => (a.method === "storage_deposit" && a.args?.account_id === "kid.near" ? { ...a, depositYocto: (BigInt(a.depositYocto) + 1n).toString() } : a)) })));
+});
+
+test("ADD, NEAR, control: the deposit address's storage step without registration_only is refused by the real core under the Add's move tag (targetStorage, 83, 6 Nov) [fails without targetStorage]", async () => {
+  refusedAdd(await addNear((r) => ({ ...r, actions: r.actions.map((a: any) => (a.method === "storage_deposit" && a.args?.account_id !== "kid.near" ? { ...a, args: { account_id: a.args.account_id } } : a)) })));
+});
+
+// The Sim's mirror (7 Nov): for the same Private balance and plan, the Sim (MockBridge) fills the Move exactly as the real
+// ledger and core do. the audit's ruling (7 Nov, the owner's "prompt, success, prompt"): ONE fill for the whole Move, so ONE Safe
+// sheet, its "From your Safe" the one fill (Private $0, $30 + $5: $40, never $10 then $40). Pin changed: it held one sheet
+// per part (31472605d).
+test("the Sim's fill matches the real ledger's: ONE Safe sheet for the whole Move, the same figure (Private $12.50, $5.00 or none; parts $30.00 SOL and $5.00 or $25.00 NEAR) [one sheet fails on 31472605d]", async () => {
+  const { createMockBridge } = await import("@zerofee/shell-api/MockBridge.ts");
+  const fromSafe = (w: PlainWords) => w.lines.find((l) => /^From your Safe · /.test(l)) ?? w.title;
+  const cases: [string, number, number, string][] = [["12500000", 12.5, 5, "From your Safe · $40.00"], ["5000000", 5, 25, "From your Safe · $60.00"], ["0", 0, 5, "From your Safe · $40.00"]];
+  for (const [pocketUnits, priv, near, one] of cases) {
+    const s = await ledgerEntry({ pocketUnits, solNamed: true, float: true });
+    const r = await s.ledger.call<any>("ledger.moveFromPrivate", { parts: [{ wallet: s.sol1.id, usd: 30 }, { wallet: "near", usd: near }], job: "move-private-7123456789abcdef0123", caller: "trade" });
+    assert.ok("ok" in r, `${said(r)} via ${s.real.join(", ")}`);
+    const real = s.shown.map(fromSafe);
+    assert.deepEqual(real, [one], `Private $${priv}, parts $30 SOL and $${near} NEAR: one Safe sheet, the one fill`);
+    assert.equal(s.sent(), 1, "one fill sent");
+    const sim = createMockBridge({ latencyMs: 0, settleMs: 5, hiddenStart: { usdc: String(priv), near: "0" }, safeFillOpen: true } as any);
+    const asked: string[] = [];
+    sim.on("approval.needed", (e: any) => { asked.push(fromSafe(e.words)); void sim.call("approval.answer", { id: e.id, approve: true }); });
+    const sol = await sim.call<any>("subwallet.create", { kind: "trade", chain: "sol" });
+    assert.ok("ok" in sol, JSON.stringify(sol));
+    const m = await sim.call<any>("ledger.moveFromPrivate", { parts: [{ wallet: sol.ok.id, usd: 30 }, { wallet: "near", usd: near }], job: "move-private-7123456789abcdef0123", app: "wallet" });
+    assert.ok("ok" in m, JSON.stringify(m));
+    assert.deepEqual(asked, real, `Private $${priv}, parts $30 SOL and $${near} NEAR: the Sim's sheets ${JSON.stringify(asked)}, the ledger's ${JSON.stringify(real)}`);
+  }
 });

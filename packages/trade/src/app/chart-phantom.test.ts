@@ -45,9 +45,12 @@ test("the header says which range it is (1H, 1D, 1W …), never '24 hours' on ev
     assert.match(p, /className=\{`cp-move cp-move--\$\{moved\.dir\}`\}/, "the figure in the range's colour");
   assert.match(p, /\{rangeWords\(range, whole\)\}/);
   const { rangeWords } = await import("./chart-math.ts");
-  assert.equal(rangeWords("1Y", false), "in 1 year");
+  // the copy review's final words (7 Nov, T1, fix/trade-list-coin): "in the last 24 hours", "this week" (the others Native's own)
+  assert.equal(rangeWords("1Y", false), "this year");
+  assert.equal(rangeWords("1D", false), "in the last 24 hours");
+  assert.equal(rangeWords("1W", false), "this week");
   assert.equal(rangeWords("1Y", true), "since it started", "a coin younger than the range: its whole life");
-  assert.equal(rangeWords("1H", true), "in 1 hour", "LIVE is always the last hour");
+  assert.equal(rangeWords("1H", true), "in the last hour", "LIVE is always the last hour");
   assert.doesNotMatch(p, /<span className="tr-mute">in 24 hours<\/span>/, "control: the fixed 24-hour words are gone");
   assert.match(css(), /\.cp-move--up \{ color: var\(--up\); \}/);
   assert.match(css(), /\.cp-move--down \{ color: var\(--down\); \}/);

@@ -1,18 +1,24 @@
 // Private (D27): a small separate wallet for private payments, Security's pocket with an ordinary key, capped at $100.
 // Its own screen says what it is in Security's words, verbatim; Add to Private is the one pill. Moving money in shows on
 // chain, which the screen and the approval sheet both say; what's done with it after doesn't.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { runJob } from "@zerofee/shell-api/job-run.ts";
 import { JOB_WORDS } from "@zerofee/shell-api/job-start.ts";
+import { LEG_SEC, receiptLeft } from "@zerofee/shell-api/job-steps.ts";
+import { carryTo } from "@zerofee/shell-api/job-carry.ts";
 import { mark } from "@zerofee/design/tap.ts";
 import { JobReceipt, THROUGH_CONFIDENTIAL } from "../money/JobMade.tsx";
+import "../money/move-swap.css";
 import type { Problem } from "@zerofee/core/problem";
 import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
 import { Keypad } from "@zerofee/design/Keypad.tsx";
 import { isPositive } from "@zerofee/design/keypad.ts";
 import type { Balance, Movement, Quote } from "../../types.ts";
 import { More } from "@zerofee/design/More.tsx";
+import { Sheet } from "@zerofee/design/Sheet.tsx";
+import type { Tasks } from "@zerofee/shell-api/tasks.ts";
+import type { Bridge } from "@zerofee/core/bridge";
 import { PRIVATE_HOW, PRIVATE_MORE, PRIVATE_SEEN, PRIVATE_WORDS, amountOf, coins, dollars, placeOf, oldWalletsLine, privateAllUsd, privateUsd } from "../format.ts";
 import { Down, PrivateMark } from "../icons.tsx";
 import { useWallet } from "../runtime.tsx";
@@ -20,48 +26,221 @@ import { useWallet } from "../runtime.tsx";
 /** Under "Job created." on Private's way home (copywriter, 5 Nov). */
 export const PRIVATE_JOB_WATCH = "Watch it in Activity.";
 
-/** `onMove`: Move with Private as its source (the copy review's walk, 5 Nov), offered once Private holds money. */
-export function PrivateScreen({ onAdd, onSetUp, onDefault, onProblem, onMove }: { onAdd: () => void; onSetUp: () => void; onDefault: (on: boolean) => void; onProblem: (p: Problem) => void; onMove?: () => void }) {
-  const { pocket, bridge, refresh } = useWallet();
+/** Check this before Private's way home (the audit's MUST 1, 8 Nov): what reaches the Safe is public, so a mis-tap can't be undone.
+ *  A hot key going only to the person's own Safe: no Face ID (D143), Approve alone. */
+export const MOVE_ALL_WORDS = {
+  open: "Move it all to your Safe",
+  bar: "Check this",
+  head: (usd: string) => `Move ${usd} from Private to your Safe`,
+  gets: "Your Safe gets",
+  /** the copy review's rule (8 Nov): never "Stays in Private" on a Check this; the leftover, only above $0 */
+  keeps: "Private keeps the rest",
+  seen: "Anyone can see what reaches your Safe.",
+  approve: "Approve",
+  notNow: "Not now",
+  moving: "Moving…",
+} as const;
+
+/** Private's own Move (the copy review's A2-2, 8 Nov): one slider, Private to the Safe, never the all-wallets sheet. */
+export const PRIVATE_MOVE_WORDS = {
+  /** the copy review's trim (8 Nov): the one-slider sheet is a Check this too */
+  bar: "Check this",
+  head: "Move money from Private to your Safe",
+  slider: "How much to move",
+  /** QA QA's SHOULD (the copy review's words): while the job goes, the page says where the money is, never "$0.00 / Nothing here yet." */
+  onWay: (usd: string) => `${usd} on its way to your Safe`,
+  /** the copy review's trim (8 Nov): once the job landed, in the on-its-way slot under the figure, for LANDED_SHOWN_MS, then gone */
+  landed: "Landed in your Safe.",
+} as const;
+
+/** The way home's time (job-steps LEG_SEC.privateNear: Private to the Safe is one NEAR Confidential transfer): its row and
+ *  its page count down from the tap (product decision, 5 Nov and the time left). */
+export const HOME_ETA_SEC = LEG_SEC.privateNear;
+/** How long "Landed in your Safe." stays under the figure (copy review, 8 Nov). */
+export const LANDED_SHOWN_MS = 60_000;
+/** The page's "Job created." line while the job goes (pure: `now` given): the time left, the protocol, where to watch it. */
+export const madeLine = (madeAt: number, now: number): string =>
+  `${JOB_WORDS.created} ${receiptLeft(madeAt + HOME_ETA_SEC * 1000, now, madeAt)} ${THROUGH_CONFIDENTIAL} ${PRIVATE_JOB_WATCH}`;
+/** Whether "Landed in your Safe." still shows (pure). */
+export const landedShown = (landedAt: number | null, now: number): boolean => landedAt !== null && now - landedAt < LANDED_SHOWN_MS;
+/** The page's clock (tests: their own; never the wall's in a test). */
+export type PageClock = { now: () => number; set: (run: () => void, ms: number) => unknown; clear: (h: unknown) => void };
+const WALL: PageClock = { now: () => Date.now(), set: (run, ms) => setTimeout(run, ms), clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>) };
+
+/** What the person's sheet showed, per coin (the ledger's `upTo`: each coin at most this; the audit's SHOULD, 8 Nov). */
+export type HomeCaps = Record<string, string>;
+
+/**
+ * The coins a figure takes from Private, as the sheet shows it (pure): the whole figure, every coin whole (the rows'
+ * own amounts, coins with no price too); less, the dearest coins first, whole while they fit, then a part of the next
+ * (rounded down: the most it may move). `usd` is what the plan moves, the sheet's "Your Safe gets".
+ */
+export function homePlan(rows: readonly Balance[], usd: number): { caps: HomeCaps; usd: number } {
+  const held = rows.filter((r) => Number(r.amount) > 0);
+  const total = Number(privateUsd([...held]));
+  if (usd >= total - 0.005) return { caps: Object.fromEntries(held.map((r) => [r.tokenId, r.amount])), usd: total };
+  const caps: HomeCaps = {};
+  let left = Math.round(usd * 100) / 100, took = 0;
+  for (const r of [...held].filter((x) => Number(x.usd) > 0).sort((a, b) => Number(b.usd) - Number(a.usd))) {
+    if (left < 0.01) break;
+    const has = Number(r.usd);
+    if (left >= has - 0.005) { caps[r.tokenId] = r.amount; left = Math.round((left - has) * 100) / 100; took += has; continue; }
+    const part = Math.floor((Number(r.amount) * left) / has * 1e6) / 1e6;
+    if (part > 0) { caps[r.tokenId] = part.toFixed(6).replace(/\.?0+$/, ""); took += left; }
+    left = 0;
+  }
+  return { caps, usd: Math.round(took * 100) / 100 };
+}
+
+/** The way home's steps: the trigger, its Check this, the call before its job, the job made. */
+export type HomeStep = "no" | "check" | "asking" | "sent";
+
+/** The way home's taps (the audit's MUST 1): the trigger opens Check this and calls nothing; Not now and Close close it and call
+ *  nothing; Approve alone runs it, once (`step` is read as set, never a render behind: a double tap runs one job). */
+export function homeTaps(o: { step: () => HomeStep; set: (s: HomeStep) => void; run: () => Promise<void> }) {
+  return {
+    open: () => { if (o.step() === "no") o.set("check"); },
+    close: () => { if (o.step() === "check") o.set("no"); },
+    approve: () => { if (o.step() === "check") void o.run(); },
+  };
+}
+
+// The way out, always offered while anything is in the pocket (even while Private is closed to new money).
+// the job (bug report, 5 Nov): the private balance is a hot key, so the job is made on Approve ("Job created.", its row
+// on Home and in Activity, the bell's pulse); a refusal after is said on its row, one before it (taken) here
+// `caps`/`usd`: what the sheet showed (homePlan), read when it opened: the core moves at most that (the audit's SHOULD, 8 Nov: a
+// refund or a fill reaching Private between the sheet and Approve stays private); `onMade`: the job and its figure, for
+// the page's "on its way" line (QA QA's SHOULD): its figure at the tap, the moves the core made once it answered (none:
+// a refusal, which its job's row says)
+export async function homeFromPrivate({ tasks, caps, usd, bridge, set, onProblem, refresh, onMade }: { tasks: Tasks | undefined; caps: HomeCaps; usd: string; bridge: Pick<Bridge, "call">; set: (s: HomeStep) => void; onProblem: (p: Problem) => void; refresh: () => void; onMade?: (o: { usd: string; ids: string[] | null } | null) => void }): Promise<void> {
+  mark("tap");
+  set("asking");
+  const end = await runJob<Movement[]>({
+    tasks, title: "Move money from Private to your Safe", usd, safe: false, money: ["private"],
+    etaSec: HOME_ETA_SEC,
+    call: () => bridge.call<Movement[]>("ledger.fromPrivate", { upTo: caps }),
+    declined: (r) => "problem" in r && /declined$/.test(r.problem.code),
+    made: () => { mark("away"); onMade?.({ usd, ids: null }); set("sent"); },
+  });
+  if ("declined" in end) { onMade?.(null); return set("no"); }
+  if ("refused" in end) { onMade?.(null); set("no"); return onProblem(end.refused); }
+  if ("problem" in end) { onMade?.(null); return void mark("refused"); }
+  onMade?.({ usd, ids: end.ok.map((m) => m.id) });
+  // the audit's MUST (8 Nov): no live track was ever made for a "send:" id out of Private (live-steps sendTrack leaves them out),
+  // so its row went after HANDOFF_MS and Jobs had none. Now every coin's movement is a part of this ONE job (its carry),
+  // and the job's own row goes on in place: live-steps homeTracks follows the parts under this id, going -> done
+  const ids = end.ok.map((m) => `send:${m.id}`);
+  // and the job's own carry keeps its parts by id the moment the core answered (the audit's ruling, 8 Nov): a reload resumes it
+  if (ids.length) { carryTo(ids, { job: end.job.id }); carryTo([end.job.id], { parts: end.ok.map((m) => m.id) }); }
+  end.job.made(ids.length ? [end.job.id] : []);
+  refresh();
+}
+
+/** Check this (D135: the whole screen, Close in its bar, its size fixed): the dollars Private holds now, what the Safe gets,
+ *  what Private keeps (only above $0; the way home moves it all), the privacy line right under the rows, then Approve (lit)
+ *  and Not now right under it (copy review, 8 Nov: no void). `slide`: Private's own Move, one slider over what Private holds. */
+export function MoveAllSheet({ usd, stays, slide, onApprove, onClose }: { usd: string; stays?: string; slide?: { value: number; max: number; onChange: (v: number) => void }; onApprove: () => void; onClose: () => void }) {
+  const w = MOVE_ALL_WORDS;
+  const p = slide && slide.max > 0 ? Math.max(0, Math.min(100, (slide.value / slide.max) * 100)) : 0;
+  return (
+    <Sheet title={slide ? PRIVATE_MOVE_WORDS.bar : w.bar} onClose={onClose}>
+      <h2 className="zf-title wl-moveall__head" data-testid="private-home-head">{slide ? PRIVATE_MOVE_WORDS.head : w.head(usd)}</h2>
+      {slide && <input type="range" className="wl-mv-range wl-moveall__range" min={0} max={slide.max} step={0.01} value={slide.value} aria-label={PRIVATE_MOVE_WORDS.slider} aria-valuetext={usd}
+        style={{ ["--p" as string]: `${p}%` } as CSSProperties} data-testid="private-move-slider" onChange={(e) => slide.onChange(Number(e.target.value))} />}
+      <div className="wl-kv" data-testid="private-home-gets"><span>{w.gets}</span><span>{usd}</span></div>
+      {stays !== undefined && Number(stays.replace(/[^0-9.]/g, "")) > 0 && <div className="wl-kv" data-testid="private-home-stays"><span>{w.keeps}</span><span>about {stays}</span></div>}
+      <p className="zf-small wl-moveall__seen" data-testid="private-home-seen">{w.seen}</p>
+      {/* Approve and Not now together on the floor (a pinned .wl-sheet-go's ground band would cover a link under it) */}
+      <div className="wl-moveall__foot">
+        <button className="zf-btn" disabled={Number(usd.replace(/[^0-9.]/g, "")) < 0.01} onClick={onApprove} data-testid="private-home-approve">{w.approve}</button>
+        <button className="zf-link" onClick={onClose} data-testid="private-home-notnow">{w.notNow}</button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** The way home's row (the audit's MUST 2): "Job created." stays while its job is made, whatever the rows say after (the refresh
+ *  reads $0 once it all left); before, the 44 px quiet trigger while anything is in Private. */
+/** `line`: the page's own words while its job goes (madeLine, with the time left); null once it landed (its slot under
+ *  the figure says so). */
+export function HomeRow({ step, has, onOpen, line }: { step: HomeStep; has: boolean; onOpen: () => void; line?: string | null }) {
+  // its own block, 16 px above and below (copy review, 8 Nov), never run together with another line
+  if (step === "sent") return line === null ? null : <p className="zf-small wl-explain wl-private-made" role="status" data-testid="private-home-made">{line ?? `${JOB_WORDS.created} ${THROUGH_CONFIDENTIAL} ${PRIVATE_JOB_WATCH}`}</p>;
+  if (!has) return null;
+  return <button className="zf-btn zf-btn--quiet wl-capsule" disabled={step === "asking"} onClick={onOpen} data-testid="private-home-open">{step === "asking" ? MOVE_ALL_WORDS.moving : MOVE_ALL_WORDS.open}</button>;
+}
+
+/** Whether a way home's money is still on its way (pure): until the core answered (`ids` null), and then while any of its
+ *  moves is not yet read ended in Activity (the Safe has it: done; or it ended otherwise, which its row says). */
+export const stillOnWay = (ids: readonly string[] | null, activity: readonly Pick<Movement, "id" | "status">[] | null): boolean =>
+  ids === null || ids.some((id) => { const m = activity?.find((x) => x.id === id); return !m || m.status === "moving" || m.status === "waiting"; });
+
+/** The money a way home made a job of, on the page while it goes (QA QA's SHOULD, 8 Nov: "$0.00 / Nothing here yet." read
+ *  as money gone): the figure its sheet showed, until Activity reads its moves ended (stillOnWay), then the line goes. */
+/** `onEnd(landed)`: landed, every coin read done in the Safe; else it ended otherwise (its Jobs row says how). */
+export const allLanded = (ids: readonly string[] | null, activity: readonly Pick<Movement, "id" | "status">[] | null): boolean =>
+  ids !== null && ids.every((id) => activity?.find((x) => x.id === id)?.status === "done");
+export function OnItsWay({ away, activity, onEnd }: { away: { usd: string; ids: string[] | null }; activity: readonly Pick<Movement, "id" | "status">[] | null; onEnd: (landed: boolean) => void }) {
+  const going = stillOnWay(away.ids, activity);
+  useEffect(() => { if (!going) onEnd(allLanded(away.ids, activity)); }, [going]);
+  return going ? <p className="zf-small wl-explain" role="status" data-testid="private-on-way">{PRIVATE_MOVE_WORDS.onWay(away.usd)}</p> : null;
+}
+
+/** A coin's row, dollars first ("USDC · $25.00"), its units on the line under it, mute (the copy review's A2-2). */
+export const coinRowLine = (r: Balance): string => (r.usd !== undefined && r.usd !== null ? `${r.symbol} · ${dollars(String(r.usd))}` : r.symbol);
+
+export function PrivateScreen({ onAdd, onSetUp, onDefault, onProblem, clock = WALL }: { onAdd: () => void; onSetUp: () => void; onDefault: (on: boolean) => void; onProblem: (p: Problem) => void; clock?: PageClock }) {
+  const { pocket, bridge, refresh, activity } = useWallet();
   const { tasks } = useShell();
   const rows = pocket?.rows ?? [];
   const ready = pocket?.ready ?? false;
-  const [moving, setMoving] = useState<"no" | "asking" | "sent">("no");
-  // The way out, always offered while anything is in the pocket (even while Private is closed to new money).
-  // the job (bug report, 5 Nov): the private balance is a hot key, so the job is made at the tap ("Job created.", its row
-  // on Home and in Activity, the bell's pulse); a refusal after is said on its row, one before it (taken) here
-  const home = async () => {
-    if (moving === "asking") return;
-    mark("tap");
-    setMoving("asking");
-    const end = await runJob<Movement[]>({
-      tasks, title: "Move your Private balance to your Safe", usd: dollars(privateUsd(rows)), safe: false, money: ["private"],
-      call: () => bridge.call<Movement[]>("ledger.fromPrivate", {}),
-      declined: (r) => "problem" in r && /declined$/.test(r.problem.code),
-      made: () => { mark("away"); setMoving("sent"); },
-    });
-    if ("declined" in end) return setMoving("no");
-    if ("refused" in end) { setMoving("no"); return onProblem(end.refused); }
-    if ("problem" in end) return void mark("refused");
-    end.job.made(end.ok.map((m) => `send:${m.id}`));
-    refresh();
-  };
+  const [moving, setMoving] = useState<HomeStep>("no");
+  const step = useRef<HomeStep>("no");
+  const set = (s: HomeStep) => { step.current = s; setMoving(s); };
+  // the rows as the sheet opened on them (the audit's SHOULD): its figure and the most the core may move, never re-read under it
+  const [shown, setShown] = useState<{ rows: Balance[]; slide: boolean } | null>(null);
+  const [pick, setPick] = useState(0);
+  const [away, setAway] = useState<{ usd: string; ids: string[] | null } | null>(null);
+  // the job's tap and its landing, on the page's clock: "Job created." counts down; "Landed in your Safe." for 60 s
+  const [madeAt, setMadeAt] = useState<number | null>(null);
+  const [landedAt, setLandedAt] = useState<number | null>(null);
+  const [, setTick] = useState(0);
+  const onMade = (o: { usd: string; ids: string[] | null } | null) => { setAway(o); if (o && o.ids === null) { setMadeAt(clock.now()); setLandedAt(null); } };
+  const onEnd = (landed: boolean) => { setAway(null); if (landed) setLandedAt(clock.now()); else set("no"); };
+  useEffect(() => {
+    if (moving !== "sent") return;
+    if (landedAt !== null) { const h = clock.set(() => { setLandedAt(null); set("no"); }, Math.max(0, LANDED_SHOWN_MS - (clock.now() - landedAt))); return () => clock.clear(h); }
+    let h: unknown;
+    const tick = () => { setTick((n) => n + 1); h = clock.set(tick, 1000); };
+    h = clock.set(tick, 1000);
+    return () => clock.clear(h);
+  }, [moving, landedAt]);
+  const shownTotal = shown ? Number(privateUsd(shown.rows)) : 0;
+  const plan = homePlan(shown?.rows ?? [], shown?.slide ? pick : shownTotal);
+  const usd = dollars(plan.usd.toFixed(2));
+  // what Private keeps: the rest of what the sheet showed (the way home moves it all: $0, so its row never shows)
+  const stays = dollars(Math.max(0, shownTotal - plan.usd).toFixed(2));
+  const taps = homeTaps({ step: () => step.current, set, run: () => homeFromPrivate({ tasks, caps: plan.caps, usd, bridge, set, onProblem, refresh, onMade }) });
+  const openSheet = (slide: boolean) => { if (step.current !== "no") return; setShown({ rows: [...rows], slide }); setPick(Number(privateUsd(rows))); taps.open(); };
+  const has = rows.length > 0;
   return (
     <div className="wl wl-coin zf-enter">
       <div className="wl-total">
         <PrivateMark size={44} />
         <p className="wl-display">{dollars(pocket ? privateAllUsd(pocket) : privateUsd(rows))}</p>
-        <p className="zf-small">Private · up to $10,000</p>
+        {/* QA 20 (8 Nov): where the money is, right under the figure ($0.00 once it left), then its landing, for 60 s */}
+        {away && <OnItsWay away={away} activity={activity} onEnd={onEnd} />}
+        {!away && moving === "sent" && landedShown(landedAt, clock.now()) && <p className="zf-small wl-explain" role="status" data-testid="private-landed">{PRIVATE_MOVE_WORDS.landed}</p>}
+        {/* the copy review's A2-2: "Private" once (the title); this the one line under the figure */}
+        <p className="zf-small">{PRIVATE_WORDS}</p>
       </div>
       <div className="wl-where">
-        <div className="zf-label">In Private</div>
         {rows.map((r) => (
-          <div className="wl-kv" key={r.tokenId}>
-            <span><CoinIcon symbol={r.symbol} icon={r.icon} size={20} />{r.symbol}</span>
-            <span>{amountOf(r.amount, r.symbol)}</span>
+          <div className="wl-kv" key={r.tokenId} data-testid="private-row">
+            <span><CoinIcon symbol={r.symbol} icon={r.icon} size={20} /><span className="wl-private-coin"><span>{coinRowLine(r)}</span><span className="zf-small">{amountOf(r.amount, r.symbol)} {r.symbol}</span></span></span>
           </div>
         ))}
-        {rows.length === 0 && !pocket?.oldWords && <p className="zf-small wl-explain">{ready ? "Nothing here yet." : "Not set up yet."}</p>}
+        {rows.length === 0 && !pocket?.oldWords && !away && <p className="zf-small wl-explain">{ready ? "Nothing here yet." : "Not set up yet."}</p>}
         {/* Security audit 4 Nov, finding 2: money under replaced words, moving here; never hidden, with Try again. */}
         {pocket?.oldWords && (
           <>
@@ -82,18 +261,17 @@ export function PrivateScreen({ onAdd, onSetUp, onDefault, onProblem, onMove }: 
             <span>{pocket?.defaultOn ? "On" : "Off"}</span>
           </button>
         )}
-        {rows.length > 0 && (moving === "sent"
-          ? <p className="zf-small wl-explain" role="status" data-testid="private-home-made">{JOB_WORDS.created} {THROUGH_CONFIDENTIAL} {PRIVATE_JOB_WATCH}</p>
-          : <button className="zf-link" disabled={moving === "asking"} onClick={() => void home()}>{moving === "asking" ? "Moving…" : "Move it all to your Safe"}</button>)}
-        <p className="zf-small wl-explain">{PRIVATE_WORDS}</p>
-        <More label="What to know about your private balance" lines={[...PRIVATE_MORE, PRIVATE_SEEN, ...PRIVATE_HOW]} />
+        <HomeRow step={moving} has={has} onOpen={() => openSheet(false)} line={landedAt !== null ? null : madeAt !== null ? madeLine(madeAt, clock.now()) : undefined} />
+        <More label="What to know about Private" lines={[...PRIVATE_MORE, PRIVATE_SEEN, ...PRIVATE_HOW]} />
       </div>
       <div className="zf-fill" />
       <div className="zf-floor">
-        {/* data and handler only; its look is the copy review's */}
-        {ready && rows.length > 0 && onMove && <button className="zf-btn" data-testid="private-move" onClick={onMove}>Move</button>}
-        <button className="zf-btn" onClick={ready ? onAdd : onSetUp}>{ready ? "Add to your private balance" : "Set up your private balance"}</button>
+        {/* the copy review's A2-2: one lit button, Move while Private holds money, else Add to Private; the other quiet. Move opens
+            Private's own one-slider sheet, never the all-wallets one */}
+        {ready && has && <button className="zf-btn" data-testid="private-move" onClick={() => openSheet(true)}>Move</button>}
+        <button className={ready && has ? "zf-btn zf-btn--quiet" : "zf-btn"} data-testid="private-add" onClick={ready ? onAdd : onSetUp}>{ready ? "Add to Private" : "Set up Private"}</button>
       </div>
+      {moving === "check" && shown && <MoveAllSheet usd={usd} stays={stays} {...(shown.slide ? { slide: { value: pick, max: shownTotal, onChange: setPick } } : {})} onApprove={taps.approve} onClose={taps.close} />}
     </div>
   );
 }
@@ -116,6 +294,8 @@ export function AddToPrivate({ from, onPickFrom, onDone, onProblem, onHeld }: {
   const { tasks } = useShell();
   /** The job is made: what it moves, and the receipt shows ("Job created.") until Done. */
   const [made, setMade] = useState<string | null>(null);
+  /** The job its receipt follows (runJob's made): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [madeJob, setMadeJob] = useState<string | null>(null);
   const ended = useRef<{ m?: Movement; closed?: boolean }>({});
   const [amount, setAmount] = useState("0");
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -150,10 +330,10 @@ export function AddToPrivate({ from, onPickFrom, onDone, onProblem, onHeld }: {
     setBusy(true);
     const what = `${coins(amount, decimals)} ${symbol}`.trim();
     const end = await runJob<Movement>({
-      tasks, title: `Move ${what} to your Private balance`, safe: true, money: ["safe"],
+      tasks, title: `Move ${what} to Private`, safe: true, money: ["safe"],
       call: () => bridge.call<Movement>("ledger.toPrivate", { quoteId: quote.id }),
       declined: (r) => "problem" in r && /declined$/.test(r.problem.code),
-      made: () => { setMade(what); setBusy(false); },
+      made: (j) => { setMadeJob(j.id); setMade(what); setBusy(false); },
     });
     setBusy(false);
     if ("declined" in end) return setMade(null);
@@ -171,7 +351,7 @@ export function AddToPrivate({ from, onPickFrom, onDone, onProblem, onHeld }: {
   if (made !== null) {
     return (
       <div className="wl wl-convert">
-        <JobReceipt amount={made} icon={<PrivateMark size={44} />} testid="private-add-made" onDone={doneMade} />
+        <JobReceipt amount={made} icon={<PrivateMark size={44} />} testid="private-add-made" job={madeJob} onDone={doneMade} />
       </div>
     );
   }
@@ -187,12 +367,12 @@ export function AddToPrivate({ from, onPickFrom, onDone, onProblem, onHeld }: {
       <div className="wl-amount">
         <p className="wl-big">{coins(amount, decimals)} <small>{symbol}</small></p>
         <p className="zf-small" aria-live="polite">
-          {quote ? `In your private balance: about ${amountOf(quote.amountOut, symbol)} ${symbol} · at least ${amountOf(quote.minOut, symbol)}` : why ?? (isPositive(amount) && from ? "Getting a price…" : " ")}
+          {quote ? `In Private: about ${amountOf(quote.amountOut, symbol)} ${symbol} · at least ${amountOf(quote.minOut, symbol)}` : why ?? (isPositive(amount) && from ? "Getting a price…" : " ")}
         </p>
       </div>
       <Keypad value={amount} decimals={decimals} onChange={setAmount} />
       <div className="zf-floor">
-        <button className="zf-btn" disabled={!quote || busy} onClick={() => void go()}>{busy ? "Moving…" : `Move ${coins(amount, decimals)} ${symbol} to your private balance`.replace(/\s+/g, " ").trim()}</button>
+        <button className="zf-btn" disabled={!quote || busy} onClick={() => void go()}>{busy ? "Moving…" : `Move ${coins(amount, decimals)} ${symbol} to Private`.replace(/\s+/g, " ").trim()}</button>
         <p className="zf-small" data-testid="private-is">{PRIVATE_IS}</p>
         <p className="zf-small">{PRIVATE_SEEN}</p>
       </div>

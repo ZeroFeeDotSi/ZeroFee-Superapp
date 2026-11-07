@@ -18,13 +18,13 @@ const T0 = Date.parse("2026-10-27T10:00:00.000Z");
 /** 1Click's deposit address with its USDC storage already paid (the fake chain knows it). */
 const REGISTERED = "3e".repeat(32);
 
-function setup(o: { core?: CoreOptions; usdc?: string; wnear?: string; nearYocto?: bigint; storageBytes?: bigint; now?: () => number; relay?: boolean; status?: "SUCCESS" | "REFUNDED" | "FAILED" } = {}) {
+function setup(o: { core?: CoreOptions; usdc?: string; wnear?: string; nearYocto?: bigint; storageBytes?: bigint; now?: () => number; relay?: boolean; status?: "SUCCESS" | "REFUNDED" | "FAILED"; unregistered?: string[] } = {}) {
   const now = o.now ?? (() => T0);
   const core = fakeCore({ accountId: ME, now, ...o.core });
   const fetch = replayFetch({ privateQuotes: SERVER, ...(o.status ? { privateStatus: o.status } : {}) });
   const ledger = createLedgerService({
     bridge: core,
-    chain: fakeNear(ME, { ledger: { [TRADING_USDC]: o.usdc ?? "500000000", "nep141:wrap.near": o.wnear ?? "0" }, ...(o.nearYocto === undefined ? {} : { nearYocto: o.nearYocto, storageBytes: o.storageBytes ?? 0n }) }, { [REGISTERED]: { account: { [TRADING_USDC]: "0" } } }),
+    chain: fakeNear(ME, { ledger: { [TRADING_USDC]: o.usdc ?? "500000000", "nep141:wrap.near": o.wnear ?? "0" }, ...(o.nearYocto === undefined ? {} : { nearYocto: o.nearYocto, storageBytes: o.storageBytes ?? 0n }), ...(o.unregistered ? { unregistered: o.unregistered } : {}) }, { [REGISTERED]: { account: { [TRADING_USDC]: "0" } } }),
     apis: createApis(fetch),
     trackMs: 5,
     now,
@@ -120,10 +120,12 @@ test("the Add is paid like toPrivate's route B: one ft_withdraw from intents.nea
   assert.equal(activity[0]?.id, m.id, "it's in Activity");
 });
 
-test("a deposit address without storage gets it first: two approvals (storage, then the withdraw)", async () => {
+test("a deposit address without storage gets it first: two steps (storage, then the withdraw) on ONE sheet", async () => {
   const { ledger, core } = setup();
   await ok<Movement>(ledger, "ledger.toTrading", { amount: "10" });
   assert.equal(core.signed.length, 2);
+  // changed (fix/safe-steps-one-faceid, 7 Nov): an account that can't chain asks ONE request of separate steps, one Face ID
+  assert.deepEqual(core.requests.map((r) => [r.apart, r.then?.length]), [[true, 1]]);
   assert.deepEqual(core.signed.map((r) => (r.actions[0] as { method: string }).method), ["storage_deposit", "ft_withdraw"]);
   const storage = core.signed[0]!.actions[0] as { args: { account_id: string }; depositYocto: string };
   assert.deepEqual([core.signed[0]!.receiverId, storage.args.account_id, storage.depositYocto], [TRADING_USDC.slice("nep141:".length), QUOTE_ADDRESS, "1250000000000000000000"], "the coin contract's own minimum, read on chain");
@@ -155,19 +157,25 @@ test("the job's states: held by the protection it waits (nothing moved); a no is
   await ok<Movement>(failed.ledger, "ledger.toTrading", { amount: "10" });
   const f = await ended;
   // a Top up's refund goes to Spending's cash (the Add quote's refundTo), never "your balance": its Spending row's words
-  assert.deepEqual([f.status, f.problem?.code, f.problem?.money], ["problem", "ledger.topup.failed", { state: "on-the-way", where: "with NEAR Intents. It ends up in your NEAR wallet" }]);
-  assert.equal(f.problem?.more, `NEAR Intents is still finishing it (its id: ${f.depositAddress}) · if not, the money comes back to your NEAR wallet`);
+  assert.deepEqual([f.status, f.problem?.code, f.problem?.money], ["problem", "ledger.topup.failed", { state: "unsure", where: "either in your NEAR wallet or still with NEAR Intents", check: "Check your NEAR wallet first." }]);
+  assert.equal(f.problem?.whatHappened, "NEAR Intents didn't finish this move.");
+  assert.equal(f.problem?.more, `NEAR Intents' id: ${f.depositAddress}`, "its own quiet line, never inside the sentence");
   assert.ok(f.depositAddress, "control: the id it names is the Top up's own deposit address");
   assert.doesNotMatch(`${f.problem?.whatHappened} ${f.problem?.more}`, /your Safe|conversion/, "never Convert's words");
 });
 
-test("1Click's FAILED for a Top up says the words its Spending row says (512f3d3f addEnd); a Convert's FAILED keeps its own", async () => {
+test("1Click's FAILED never promises a refund, and names where each move's refund goes (audit, 6 Nov): a Top up the NEAR wallet, its Spending row the same; a swap the Safe; a payment from Private, Private", async () => {
   const { addEnd } = await import("../../trade/src/float-core.ts");
   const { walletProblems } = await import("./wallet-problems.ts");
+  const { problemLine } = await import("@zerofee/core/services");
   const dep = "3".repeat(64);
   const p = walletProblems.topUpFailed(dep);
-  assert.equal(p.more, addEnd({ status: "problem", problem: { code: p.code }, depositAddress: dep }).note, "Wallet's Activity and Trading's row: one story");
-  assert.match(walletProblems.convertFailed().more!, /back to your Safe/, "control: Convert's own refund comes back to the Safe");
+  assert.equal(problemLine(p), "NEAR Intents didn't finish this move. Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet first.");
+  assert.equal(addEnd({ status: "problem", problem: { code: p.code }, depositAddress: dep }).note, "NEAR Intents didn't finish this. It's either in your NEAR wallet or still with NEAR Intents.");
+  assert.equal(problemLine(walletProblems.convertFailed()), "NEAR Intents didn't finish this swap. Your money is either in your Safe or still with NEAR Intents. Check your Safe first.");
+  assert.equal(problemLine(walletProblems.convertFailed("Private", "payment")), "NEAR Intents didn't finish this payment. Your money is either in Private or still with NEAR Intents. Check Private first.");
+  assert.equal(walletProblems.convertFailed().more, undefined);
+  for (const q of [p, walletProblems.convertFailed(), walletProblems.convertFailed("Private", "payment")]) assert.doesNotMatch(problemLine(q), /comes? back|coming back|still finishing/, "never a promise");
 });
 
 test("who may ask: Wallet and Trade; Pay or any other app is refused before anything is read; a child's or unready account is refused by the core's state", async () => {
@@ -206,7 +214,7 @@ test("the Add paid in another coin of the main balance: the core quotes that coi
 
 const NEAR = 10n ** 24n;
 /** A vault holding only NEAR on the account (nothing in NEAR Intents): 3 NEAR, 2,000 bytes of storage (0.02 NEAR). */
-const nearOnly = (o: { core?: CoreOptions; nearYocto?: bigint } = {}) => setup({ usdc: "0", nearYocto: o.nearYocto ?? 3n * NEAR, storageBytes: 2_000n, ...(o.core ? { core: o.core } : {}) });
+const nearOnly = (o: { core?: CoreOptions; nearYocto?: bigint; unregistered?: string[] } = {}) => setup({ usdc: "0", nearYocto: o.nearYocto ?? 3n * NEAR, storageBytes: 2_000n, ...(o.core ? { core: o.core } : {}), ...(o.unregistered ? { unregistered: o.unregistered } : {}) });
 
 test("a vault with only NEAR on the account: balances shows it as the account's own NEAR, storage and the 0.06 NEAR fee reserve left out", async () => {
   const { ledger } = nearOnly();
@@ -237,7 +245,8 @@ test("D146: Spending's engine (Trade's call) names the app that asked it, and th
 });
 
 test("the Add paid with NEAR on the account: the core quotes wrap.near, and one transaction wraps exactly amountIn and sends it to the deposit address", async () => {
-  const { ledger, core } = nearOnly({ core: { quoteAdd: { amountIn: "2500000000000000000000000" } } });
+  // the Safe not set up on wrap.near yet (audit, 6 Nov: its own storage step only then)
+  const { ledger, core } = nearOnly({ core: { quoteAdd: { amountIn: "2500000000000000000000000" } }, unregistered: ["wrap.near"] });
   const m = await ok<Movement>(ledger, "ledger.toTrading", { amount: "2.5", tokenId: "near", caller: "trade" });
   assert.deepEqual(core.asked, [{ amount: "2500000000000000000000000", tokenId: "nep141:wrap.near" }], "NEAR's 24 decimals, quoted as wNEAR (the only NEAR 1Click lists)");
   assert.equal(core.signed.length, 1, "one transaction, one sheet");
@@ -253,10 +262,15 @@ test("the Add paid with NEAR on the account: the core quotes wrap.near, and one 
   assert.deepEqual([m.kind, m.from, m.to, m.amount, m.status, m.caller], ["trading", "near", "trading", "2.5", "moving", "trade"]);
 
   // The deposit address already registered on wrap.near: no storage for it, still one transaction.
-  const reg = nearOnly({ core: { quoteAdd: { depositAddress: REGISTERED, amountIn: "1000000000000000000000000" } } });
+  const reg = nearOnly({ core: { quoteAdd: { depositAddress: REGISTERED, amountIn: "1000000000000000000000000" } }, unregistered: ["wrap.near"] });
   await ok<Movement>(reg.ledger, "ledger.toTrading", { amount: "1", tokenId: "near" });
   assert.equal(reg.core.signed.length, 1);
   assert.deepEqual((reg.core.signed[0]!.actions as { method: string }[]).map((a) => a.method), ["storage_deposit", "near_deposit", "ft_transfer"]);
+  // The Safe itself already set up on wrap.near (its storage_balance_of says so): its own storage step is left out
+  const me = nearOnly({ core: { quoteAdd: { amountIn: "1000000000000000000000000" } } });
+  await ok<Movement>(me.ledger, "ledger.toTrading", { amount: "1", tokenId: "near" });
+  const meActs = me.core.signed[0]!.actions as { method: string; args: Record<string, unknown> }[];
+  assert.deepEqual(meActs.map((a) => [a.method, a.args.account_id ?? null]), [["storage_deposit", QUOTE_ADDRESS], ["near_deposit", null], ["ft_transfer", null]]);
 });
 
 test("an Add of the account's NEAR keeps back its wrap's own gas while it's out (110 Tgas: 0.12 NEAR); a hair more, or too little NEAR, is ledger.balance.low with nothing asked or signed", async () => {

@@ -253,9 +253,28 @@ const agent: Bridge = {
  */
 export const spending = hostSpending(() => appBridge("trade"), () => forApps(routeBridge(core, { device, ledger }), "trade"));
 beforeSuspend(() => spending.settle());
+// Settings → Status (rule 9b): read-only checks of every service, only while Settings or its Status sheet is open (the
+// row and the sheet ask; nothing here asks by itself), kept 30 s. The checks' code, and NEAR's "switched to its public
+// servers" flag (trade near/switched.ts, the trade sheet's own), load with the first look, never in Home's first load.
+// On the mainnet copy (VITE_FORK=1) it never asks the relay's doors (the copy's own reads don't use them).
+// Phase 2: the person's own server per chain (own-servers.ts), kept only through device.store (sealed in the vault here,
+// the Keychain on the phone) under Trade's slot, read into the doors once after the unlock (App.tsx startHome asks
+// status.own.get); on the phone a Test of a host outside its approved list says it can't be reached (own-reach.ts).
+const ownStore = {
+  async get(key: string): Promise<string | null> {
+    const r = await device.call<{ value: string | null }>("device.store.get", { app: "trade", key });
+    if (!("ok" in r)) throw new Error("locked");
+    return r.ok.value;
+  },
+  async set(key: string, value: string | null): Promise<void> {
+    const r = await device.call("device.store.set", { app: "trade", key, value });
+    if (!("ok" in r)) throw new Error("not kept");
+  },
+};
+const status = laterBridge(() => Promise.all([import("@zerofee/core/status-probe"), import("@zerofee/trade/near/switched.ts"), import("@zerofee/core/hood-proxy"), host ? import("./own-reach.ts") : null]).then(([m, s, h, r]) => m.statusService({ relay: FORK ? null : RELAY ?? null, nearSwitched: s.isSwitched, store: ownStore, apply: (c) => { if (c === "hood") h.setOwnHood(); }, ...(r ? { reach: r.phoneReaches } : {}) })));
 // Every read a screen waits on answers within 10 s, else "the network is slow" with Try again (grade 1 Nov b, N2): no
 // screen waits for ever. Sends, signatures and anything that waits for the person have no deadline.
-const routed: Bridge = withReadDeadline(guardian.withApprovals(routeBridge(core, { device, ledger, earn, trade, spending, guardian: guardian.service, partner, agent })));
+const routed: Bridge = withReadDeadline(guardian.withApprovals(routeBridge(core, { device, ledger, earn, trade, spending, guardian: guardian.service, partner, agent, status })));
 // More than $5,000 in the vault needs a second device: Add money and Receive ask for one first (vault-gate.ts).
 // In a browser, Approve counts only with a person's own tap (audit K-6): a script's yes is answered no. On the phone the
 // sheet's Approve passes Face ID first.

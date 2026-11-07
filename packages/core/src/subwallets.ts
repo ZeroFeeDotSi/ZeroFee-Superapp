@@ -13,6 +13,8 @@
 // caps, with two nodes agreeing. Anything else still asks.
 // Trade's float (float.ts) is a NEAR wallet like the private pocket, one per account: the balance its trading wallets
 // are filled from. It signs no transactions and has no fast sessions.
+import { intentsRefused } from "./intents-refused.ts";
+import { cents } from "./cents.ts";
 import { OUTSIDE_WORDS, PRIVATE_LANDS, landsOn } from "./send-words.ts";
 import type { Chain } from "./chain.ts";
 import { NEAR_CLOSED, NEAR_COIN_WALLET, NEAR_GATE } from "./near-gate.ts";
@@ -177,11 +179,12 @@ export interface OldWordsSweep {
   unread?: true;
 }
 const sweepTag = (id: string, tokenId: string) => `sweep-${id}-${tokenId.replace(/[^A-Za-z0-9]/g, "").slice(-24)}`;
-/** 1Click's own no for an amount under its minimum (its words: "too low", "too small", "minimum", "at least"), as
- *  PocketMoves passes it on; never the core's own refusals. */
+/** 1Click's own no for an amount under its minimum (its words: "too low", "too small", "minimum", "at least"), read from
+ *  the refusal's cause (the audit's M9: PocketMoves keeps the service's text off the screen, on the error's cause); never the
+ *  core's own refusals. */
 const tooSmall = (e: unknown) => {
-  const more = String((e as { problem?: { more?: unknown } })?.problem?.more ?? "");
-  return more.startsWith("NEAR Intents said no.") && /too (low|small)|minimum|at least/i.test(more);
+  const x = e as { problem?: { more?: unknown }; cause?: { refused?: unknown; message?: unknown } } | null;
+  return String(x?.problem?.more ?? "").startsWith("NEAR Intents said no.") && x?.cause?.refused === true && /too (low|small)|minimum|at least/i.test(String(x.cause.message ?? ""));
 };
 
 interface Session {
@@ -254,8 +257,13 @@ export function outsideLines(to: string, inUsd: string | undefined, outUsd: stri
   const a = usdOk(inUsd), b = usdOk(outUsd);
   if (a === null || b === null || !(a > 0) || b > a) return { lines: [OUTSIDE_WORDS.to(to), OUTSIDE_WORDS.seen(network)], warnings: [] };
   const fee = a - b, pct = ((fee / a) * 100).toFixed(1);
+  // the audit's Send audit M7 (7 Nov): in whole cents, once: the title's cents (as its toFixed(2) says them), what they get by
+  // the app's one rounding rule (core cents.ts), the fee the difference, so the rows add up to the title by construction
+  // (5.0049 in, 4.9851 out said $5.00, "about $4.99", "about $0.02": $5.01; now $4.99 and $0.01)
+  const aC = Math.round(Number(a.toFixed(2)) * 100), bC = Math.min(aC, Math.round(cents(b) * 100));
+  const c2 = (c: number) => (c / 100).toFixed(2);
   return {
-    lines: [OUTSIDE_WORDS.to(to), OUTSIDE_WORDS.get(b.toFixed(2)), OUTSIDE_WORDS.fees(fee.toFixed(2)), OUTSIDE_WORDS.kept, OUTSIDE_WORDS.seen(network)],
+    lines: [OUTSIDE_WORDS.to(to), OUTSIDE_WORDS.get(c2(bC)), OUTSIDE_WORDS.fees(c2(aC - bC)), OUTSIDE_WORDS.kept, OUTSIDE_WORDS.seen(network)],
     warnings: fee / a > OUTSIDE_FEE_WARN ? [{ kind: "large-amount", text: OUTSIDE_WORDS.high(pct) }] : [],
   };
 }
@@ -2239,7 +2247,7 @@ export class SubWallets {
         if (e instanceof ProblemError) throw e;
         // the relay's own limit on one quote, said as the relay's (never "1Click said no")
         if ((e as { code?: unknown } | null)?.code === "quotes.request.too-big") throw new ProblemError(securityProblems.subwalletRefused(`ZeroFee's price server takes up to ${/\$\d[\d,]*(\.\d+)?/.exec(String((e as Error)?.message ?? ""))?.[0] ?? POCKET_MAX_TEXT} a send. Nothing moved.`));
-        throw new ProblemError(securityProblems.subwalletRefused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`));
+        throw intentsRefused(e, outside ? "where it was" : "in your Safe");
       });
     const depositAddress = raw?.quote?.depositAddress;
     if (typeof depositAddress !== "string" || !(outside ? /^[A-Za-z0-9]{20,100}$/.test(depositAddress) && !/^[0-9a-f]{64}$/.test(depositAddress) : /^[0-9a-f]{64}$/.test(depositAddress))) throw new ProblemError(securityProblems.subwalletRefused("NEAR Intents gave no address to pay. Nothing moved."));
@@ -2529,7 +2537,7 @@ export class SubWallets {
    * `send` (Home's Send, D128: the pocket is no longer a pot with a $100 cap): the pocket pays its own share of a Send
    * straight out, on a Send's own words; the core's $100 is gone from it (the quote relay's own limit on one quote holds).
    */
-  async privatePay(id: unknown, depositAddress: unknown, intent: unknown, why: unknown, statusTag?: unknown, inDeposit?: unknown, send?: unknown, payee?: unknown, pair?: unknown, job?: unknown): Promise<{ signedData: ReturnType<typeof signNep413> } | { pair: { hash: string } }> {
+  async privatePay(id: unknown, depositAddress: unknown, intent: unknown, why: unknown, statusTag?: unknown, inDeposit?: unknown, send?: unknown, payee?: unknown, pair?: unknown, job?: unknown, sendJob?: unknown): Promise<{ signedData: ReturnType<typeof signNep413> } | { pair: { hash: string } }> {
     const w = await this.find(id);
     if (w.kind !== "private") throw new ProblemError(securityProblems.subwalletRefused("Only your private balance pays this way."));
     if (w.oldWords) throw new ProblemError(securityProblems.subwalletRefused("This private balance is from your old backup words. Its money moves to your new one. Nothing was paid."));
@@ -2579,6 +2587,11 @@ export class SubWallets {
       if (leg && typeof inDeposit === "string") throw new ProblemError(securityProblems.subwalletRefused("Private pays this Move only with your Safe's one approval, so ZeroFee stopped this. Nothing moved."));
       const signed = await this.sendPay(w, payload, t, usd, typeof inDeposit === "string" ? inDeposit : undefined);
       leg?.take();
+      // the audit's Send audit M9 (7 Nov): a Send Private pays whole (the ledger names its job only then: no Safe part follows) has
+      // its last signature here, after its Face ID (an outside payee) or straight (one of the person's own): the core says
+      // job.signed with the Send's key now, so its job is made at the signature, never after 1Click's whole answer. A label,
+      // never signed; a Move's leg (job, its plan) never says it here
+      if (typeof inDeposit !== "string" && send === true && !leg && typeof sendJob === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(sendJob)) this.o.emit("job.signed", { jobKey: sendJob });
       // a Move's two legs to one payee, said on the Safe's one sheet from this record (privateLeg)
       if (typeof inDeposit === "string") {
         this.joinPrivateLeg(inDeposit, quote!, await this.ownPayee(quote!.recipient));
@@ -3122,7 +3135,7 @@ export class SubWallets {
       .catch((e: unknown) => {
         if (e instanceof ProblemError) throw e;
         if ((e as { code?: unknown } | null)?.code === "quotes.request.too-big") throw new ProblemError(securityProblems.subwalletRefused(`ZeroFee's price server takes up to ${/\$\d[\d,]*(\.\d+)?/.exec(String((e as Error)?.message ?? ""))?.[0] ?? POCKET_MAX_TEXT} a send. Nothing moved.`));
-        throw new ProblemError(securityProblems.subwalletRefused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`));
+        throw intentsRefused(e, `in your ${row.row}`);
       });
     const depositAddress = raw?.quote?.depositAddress;
     const shape = chain === "sol" ? /^[1-9A-HJ-NP-Za-km-z]{32,44}$/ : /^0x[0-9a-fA-F]{40}$/;

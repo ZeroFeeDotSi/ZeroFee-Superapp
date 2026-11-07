@@ -37,7 +37,7 @@ test("the sheet reads the core's lines: \"To <address>\" is the full address (ne
 });
 
 test("the view: the To caption above the address, the address a copy button in groups, mono 15 px ink, wrapping and never ellipsised; the lands line --mute; nothing in a fold", () => {
-  const lines = view.slice(view.indexOf("{words.lines.map("), view.indexOf("{words.warnings.map("));
+  const lines = view.slice(view.indexOf("{words.lines.slice(costsMoreHead(words.lines)).map("), view.indexOf("{words.warnings.map("));
   assert.match(lines, /const to = toAddress\(line\);\n\s+if \(to\) return <div key=\{i\} className="approval__to"><span className="approval__to-cap">To<\/span><FullAddress label="The address" address=\{to\} \/><\/div>;/);
   assert.match(lines, /if \(isLandsLine\(line\)\) return <p key=\{i\} className="approval__line approval__lands">\{line\}<\/p>;/);
   assert.match(lines, /words\.details\?\.filter\(\(d\) => !d\.open\)\.map\(\(d, i\) => <More /, "control: only the other details fold");
@@ -66,7 +66,7 @@ test("an open detail survives the core's readable pass, still under its line (co
 test("a Send fill sheet's first leg (the UI lead's rulings, 5 Nov): \"They get · 1.2345 SOL ($40.00)\" in --ink, the Safe's and Private's legs --mute (controls: \"They get about $2.71\" stays a plain line)", () => {
   assert.ok(isLeadLine("They get · 1.2345 SOL ($40.00)") && isLeadLine("They get · $40.00"));
   for (const l of ["Your Safe sends · $50.00", "Stays in Private · $10.00", "They get 0.2 SOL", "They get about $2.71", "From your Safe · $20.00", "Together · $30.00"]) assert.ok(!isLeadLine(l), `control: ${l}`);
-  const lines = view.slice(view.indexOf("{words.lines.map("), view.indexOf("{words.warnings.map("));
+  const lines = view.slice(view.indexOf("{words.lines.slice(costsMoreHead(words.lines)).map("), view.indexOf("{words.warnings.map("));
   assert.match(lines, /if \(isLeadLine\(line\)\) return <p key=\{i\} className="approval__line approval__lead">\{line\}<\/p>;/);
   assert.match(css, /\.approval__line\.approval__lead \{ color: var\(--ink\); \}/);
   assert.match(css, /\.approval__line \{ font: 400 15px\/20px var\(--font\); color: var\(--mute\);/, "control: every other line stays --mute");

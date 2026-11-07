@@ -126,7 +126,8 @@ test("the engine keeps each leg's transactions: the core from 1Click's status at
   const core = here("../../../core/src/float-moves.ts"), jobs = here("../../../trade/src/float-jobs.ts"), rows = here("../../../trade/src/float-core.ts"), spend = here("../../../core/src/spending.ts"), send = here("../send-job.ts");
   assert.match(core, /const proof = moveProof\(raw, \{ from: chainOf\(from\), to: chainOf\(arrived\), deposit: k\.depositAddress/);
   assert.match(jobs, /return \{ \.\.\.settled\(a\), \.\.\.\(a\.proof \? \{ proof: a\.proof \} : \{\}\) \};/);
-  assert.match(rows, /\.\.\.\(j\.proof \? \{ proof: j\.proof \} : \{\}\) \};/);
+  // changed pin (m5core, 7 Nov): the row carries what landed after its proof (the audit's Send audit M5)
+  assert.match(rows, /\.\.\.\(j\.proof \? \{ proof: j\.proof \} : \{\}\), \.\.\.\(j\.state === "done" && j\.got \? \{ got: j\.got \} : \{\}\) \};/);
   assert.match(spend, /\.\.\.\(m\.proof \? \{ proof: m\.proof \} : \{\}\) \};/);
   assert.match(send, /const proof = moveProof\(s, \{ from: "private", to: m\.toChain \?\? "near", deposit: job\.outDeposit/);
 });

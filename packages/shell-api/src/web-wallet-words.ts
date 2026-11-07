@@ -102,9 +102,5 @@ export const WEB_WALLETS = [
 ] as const;
 export type WebWalletId = (typeof WEB_WALLETS)[number]["wallet"];
 
-/** Where the phone app is: a self-hosted build's VITE_PHONE_APP_URL (an https:// address), else ZeroFee's site. */
-export const phoneAppUrl = (raw: string | undefined): string => {
-  const v = raw?.trim() ?? "";
-  return /^https:\/\/[a-z0-9.-]+(\/[^\s"'<>]*)?$/i.test(v) ? v : "https://zerofee.si";
-};
-export const PHONE_APP_URL = phoneAppUrl(import.meta.env?.VITE_PHONE_APP_URL);
+/** Where the phone app is. */
+export const PHONE_APP_URL = "https://zerofee.si";

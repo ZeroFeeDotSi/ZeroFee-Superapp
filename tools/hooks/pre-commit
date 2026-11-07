@@ -18,7 +18,7 @@ if [ -n "$pats" ]; then
   done || fail=1
 fi
 # 4. Image metadata (EXIF/GPS) and Xcode per-user / signing files.
-if git diff --cached --name-only | grep -Eiv '(^|/)\.env\.example$' | grep -Eiq '(xcuserdata|\.xcuserstate$|\.mobileprovision$|\.p12$|Local\.xcconfig$|\.env)'; then echo "leak-guard: a per-user, signing or env file is staged"; fail=1; fi
+if git diff --cached --name-only | grep -Eiq '(xcuserdata|\.xcuserstate$|\.mobileprovision$|\.p12$|Local\.xcconfig$|\.env)'; then echo "leak-guard: a per-user, signing or env file is staged"; fail=1; fi
 if git diff --cached --name-only | grep -Eiq '\.(jpe?g|heic|tiff?)$'; then echo "leak-guard: photo staged — strip EXIF first (exiftool -all= FILE), then add an allow note"; fail=1; fi
 if git diff --cached -U0 | grep -Eq '^\+.*DEVELOPMENT_TEAM *= *[A-Z0-9]{10}'; then echo "leak-guard: an Apple team ID is staged (keep it in Local.xcconfig)"; fail=1; fi
 # 5. Secrets by their shape (keys, tokens, private keys, backup words).

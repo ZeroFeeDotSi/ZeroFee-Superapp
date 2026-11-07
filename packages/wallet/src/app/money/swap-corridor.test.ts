@@ -46,20 +46,20 @@ test("no pick-then-refuse: a pair no core path finishes is never listed (BNB whi
 test("what arrives, before any quote: 'At least' where the core holds every leg to a floor, 'About' where 1Click's own quote is on the Approve; and about how long", () => {
   // SOL → ETH (RH), $50 at ETH $3,000: the move in's floor, then the move out sized from it less its fee room
   const line = arrivesLine({ kind: "move", from: "sol", to: "hood" }, "hood", 50, 3000);
-  assert.match(line, /^At least 0\.01\d{0,2} ETH arrives\. About 1 min\.$/);
+  assert.match(line, /^At least 0\.01\d{0,2} ETH arrives\. In 1 min\.$/);
   const a = arrives({ kind: "move", from: "sol", to: "hood" }, 50, 3000);
   assert.ok(a.amount * 3000 < 50 && a.amount * 3000 > 45, String(a.amount));
-  assert.match(arrivesLine({ kind: "home", from: "sol" }, "safe-usdc", 20, 1), /^At least 1[89]\.\d+ USDC arrives\. About 1 min\.$/);
-  assert.match(arrivesLine({ kind: "topup", coin: "USDC", to: "near" }, "near", 10, 1), /^About 10 USDC arrives\. About 30 s\.$/);
-  assert.match(arrivesLine({ kind: "safe" }, "safe-usdc", 10, 1), /^About 9\.\d+ USDC arrives\. About 1 min\.$/);
+  assert.match(arrivesLine({ kind: "home", from: "sol" }, "safe-usdc", 20, 1), /^At least 1[89]\.\d+ USDC arrives\. In 1 min\.$/);
+  assert.match(arrivesLine({ kind: "topup", coin: "USDC", to: "near" }, "near", 10, 1), /^About 10 USDC arrives\. In 30 s\.$/);
+  assert.match(arrivesLine({ kind: "safe" }, "safe-usdc", 10, 1), /^About 9\.\d+ USDC arrives\. In 1 min\.$/);
   // D137: the network's own time, one 1Click leg about 30 s, two about a minute; control: no line says the old "About 10 min."
   assert.doesNotMatch(arrivesLine({ kind: "move", from: "sol", to: "hood" }, "hood", 50, 3000), /10 min/);
-  assert.match(arrivesLine({ kind: "home", from: "near" }, "safe-usdc", 10, 1), /About 30 s\.$/, "one leg home: about 30 s (D137: no gap)");
-  assert.match(arrivesLine({ kind: "move", from: "sol", to: "near" }, "near", 10, 1), /About 30 s\.$/);
+  assert.match(arrivesLine({ kind: "home", from: "near" }, "safe-usdc", 10, 1), /In 30 s\.$/, "one leg home: about 30 s (D137: no gap)");
+  assert.match(arrivesLine({ kind: "move", from: "sol", to: "near" }, "near", 10, 1), /In 30 s\.$/);
   // a UI test (4 Nov) measured about 4 min on the old public route (the Safe into the NEAR wallet, then 1Click out);
   // since the product's HARD RULE it is paid from Private by NEAR Confidential, the route the job's row counts down (Sim
   // re-check, 5 Nov: "About 4 min left." on a Swap that landed at once)
-  assert.match(arrivesLine({ kind: "topup", coin: "USDC", to: "sol" }, "sol", 10, 100), /About 1 min\.$/);
+  assert.match(arrivesLine({ kind: "topup", coin: "USDC", to: "sol" }, "sol", 10, 100), /In 1 min\.$/);
   assert.equal(routeSec({ kind: "topup", coin: "USDC", to: "sol" }), LEG_SEC.privateSwap);
 });
 
@@ -172,8 +172,8 @@ test("UI's AgentZero walk (4): Move's and Swap's sheets and their words never sa
 
 test("UI's mainnet rehearsal (10): what a $2 SOL → USDC swap really brings comes first, the floor as \"at least\"; fees over 10 % are said with where they fall under 5 % (controls: no price back, the floor line as before; 7.5 % says only the fee)", () => {
   const home = { kind: "home", from: "sol" } as const;
-  assert.equal(arrivesWith(home, "safe-usdc", 2, 1, { arrivesUsd: 1.98, feeUsd: 0.02 }), "About 1.98 USDC arrives, at least 1.4. About 1 min.");
-  assert.equal(arrivesWith(home, "safe-usdc", 2, 1, null), "At least 1.4 USDC arrives. About 1 min.", "control: no price back yet");
+  assert.equal(arrivesWith(home, "safe-usdc", 2, 1, { arrivesUsd: 1.98, feeUsd: 0.02 }), "About 1.98 USDC arrives, at least 1.4. In 1 min.");
+  assert.equal(arrivesWith(home, "safe-usdc", 2, 1, null), "At least 1.4 USDC arrives. In 1 min.", "control: no price back yet");
   // QA (5 Nov): the real figure before the tap; product decision, 5 Nov: never scary, who gets it, ZeroFee takes nothing
   assert.equal(feesLine({ arrivesUsd: 1.45, feeUsd: 0.55 }), "Fees · about $0.55");
   assert.ok(feeHigh(2, { arrivesUsd: 1.45, feeUsd: 0.55 }) && !feeHigh(20, { arrivesUsd: 19.45, feeUsd: 0.55 }), "control: under 5 % is not over");
@@ -221,7 +221,7 @@ test("audit H1: Home's money sheets (Swap, Move, Send, Add, a site's Put money i
 
 test("R3 (the design review §4.4): Swap's pickers say the coin over where it sits (never \" · your SOL wallet\" wrapped), a line chevron not ▾; what arrives is the one line under the dollars with its room kept; the privacy line is a \"Who can see this?\" row; \"Pick an amount.\" is never a line above Hold (the $0 and the off button say it) (controls: the old markup)", () => {
   const sheet = readFileSync(new URL("./SwapSheet.tsx", import.meta.url), "utf8");
-  assert.match(sheet, /<span className="zf-body wl-sw-name">\{SWAP_COIN\[pay\.place\]\.label\}<span className="zf-small wl-sw-where">\{SWAP_COIN\[pay\.place\]\.where\}<\/span><\/span>/);
+  assert.match(sheet, /<span className="zf-body wl-sw-name">\{SWAP_COIN\[pay\.place\]\.label\}<span className="zf-small wl-sw-where">\{payer\?\.where \?\? SWAP_COIN\[pay\.place\]\.where\}<\/span><\/span>/, "J3-3: where it sits is the real payer's");
   assert.doesNotMatch(sheet, /wl-sw-where"> · \{SWAP_COIN\[(pay\.place|get)\]|aria-hidden="true">▾</, "control: the wrapped phrase and the ▾ glyph (the list's one-line rows keep theirs)");
   assert.match(sheet, /<div className="wl-swap2__sub" data-testid="swap-sub">/, "the one slot, always rendered, so nothing jumps");
   assert.match(sheet, /arrives: route && !block \? arrivesWith\(/);

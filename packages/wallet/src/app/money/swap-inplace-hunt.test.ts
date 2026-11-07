@@ -66,7 +66,7 @@ test("item 5: a refusal before the swap started names no step that 'didn't finis
 test("item 9: the least the tap signs is shown with the quote", () => {
   const { etaSeconds: _e, ...noTime } = Q;
   assert.equal(inplaceArrives("buy", noTime, "ZEC"), "You get about 0.01 ZEC, at least 0.0099 ZEC.");
-  assert.equal(inplaceArrives("buy", Q, "ZEC"), `You get about 0.01 ZEC, at least 0.0099 ZEC. About ${Q.etaSeconds} s.`, "the quote's own time, here");
+  assert.equal(inplaceArrives("buy", Q, "ZEC"), `You get about 0.01 ZEC, at least 0.0099 ZEC. In ${Q.etaSeconds} s.`, "the quote's own time, here");
   assert.equal(inplaceArrives("sell", { ...noTime, amountOut: "9940000", minAmountOut: "9840600" }, "ZEC"), "You get about $9.94, at least $9.84.");
 });
 

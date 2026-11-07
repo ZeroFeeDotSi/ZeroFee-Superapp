@@ -11,7 +11,7 @@ import "@zerofee/design/receipt.css";
 import { LiveRow, progressOf, timeSlot, type LiveRowState } from "@zerofee/design/LiveRow.tsx";
 import { checkpointAt } from "@zerofee/design/checkpoints.ts";
 import { Checkpoints } from "@zerofee/design/Checkpoints.tsx";
-import { jobFace, linePhrases } from "./job-face.ts";
+import { FACE_CARD, jobEnds, jobFace, linePhrases } from "./job-face.ts";
 import { shortElapsed, tickEvery } from "@zerofee/design/time.ts";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import type { Bridge } from "@zerofee/core/bridge";
@@ -233,7 +233,7 @@ export function LiveTracker({ track: t, onClose, onNext, onBack, when, proof }: 
   const f = jobFace(t);
   const left = f.state === "going" ? rowParts(t, now).time : undefined;
   const tap = (go: StopGo) => (go.kind === "close" ? onClose() : onNext ? onNext(go) : onClose());
-  const ends = t.money && t.money.from.length && t.money.to.length ? { from: cardWords(t.money.from), to: cardWords(t.money.to) } : null;
+  const ends = jobEnds(t);
   return (
     <Sheet title={f.bar} onClose={onClose} {...(onBack ? { onBack } : {})}>
       <div className="lv-tracker lv-job" data-face={f.state}>
@@ -267,7 +267,3 @@ export function LiveTracker({ track: t, onClose, onNext, onBack, when, proof }: 
   );
 }
 
-/** The From and To card's words (Home's names, no "your"): "Safe", "ETH (RH) wallet". */
-const FACE_CARD = { from: "From", to: "To" } as const;
-const CARD_NAME: Record<string, string> = { safe: "Safe", private: "Private", sol: "SOL wallet", hood: "ETH (RH) wallet", near: "NEAR wallet", bsc: "BNB wallet" };
-const cardWords = (ws: readonly string[]) => [...new Set(ws)].map((w) => CARD_NAME[w] ?? "Wallet").join(", ");

@@ -24,9 +24,14 @@ test("c6, the audit's condition: the cent figure is display only; the typed amou
   // the ask (onSend) and the fee's quote carry the coin amount the keypad worked from the typed figure, and the raw dollars
   assert.match(form, /onSend\(\{\s*source, recipient: who\.recipient, network, [^\n]*amountIn: amount\.replace\(\/\\\.\$\/, ""\), usd,/);
   assert.match(form, /feeOf\(\{ source, recipient: who\.recipient, network, amountIn: amount\.replace\(\/\\\.\$\/, ""\), usd \}\)/);
-  // `figure` (the rounded cents) is read only by the keypad's text and the button's words
+  // `figure` (the rounded cents) is read only by the keypad's text, the button's words, and (M1, the audit's audit) handed to the
+  // sheet beside the ask's amountIn for its words alone
   const uses = form.split("\n").filter((l) => /\bfigure\b/.test(l) && !/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(l));
-  assert.ok(uses.every((l) => /const figure =|const shown =|const label =/.test(l)), uses.join("\n"));
+  assert.ok(uses.every((l) => /const figure =|const shown =|const label =|figure\?: string;|usd, \.\.\.\(figure !== null \? \{ figure \} : \{\}\),/.test(l)), uses.join("\n"));
+  // the sheet reads a.figure for its words only (the pending headline, the Jobs row, the receipt), never the ask's amount
+  const sheetSrc = readFileSync(new URL("./SendSheet.tsx", import.meta.url), "utf8");
+  assert.deepEqual(sheetSrc.split("\n").filter((l) => /a\.figure/.test(l)).length, 1);
+  assert.match(sheetSrc, /const figure = a\.figure !== undefined \? Number\(a\.figure\)\.toFixed\(2\)/);
   // the quote's amount is the ask's amountIn, as typed: 1.5486 NEAR stays 1.5486, never re-worked from "6.85"
   const source = { id: "safe:near", row: null, tokenId: "near", label: "", place: "your Safe", symbol: "NEAR", chain: "near", amount: "1.5486", usd: "6.86", max: "1.5486" };
   assert.equal(safeAmount({ source: source as never, amountIn: "1.5486", usd: 1.5486 * 4.4297 }), "1.5486");

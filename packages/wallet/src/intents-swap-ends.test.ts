@@ -253,7 +253,7 @@ test("M1: the Safe swap's privacy line is on its quote screen, Buy and Sell, bef
 test("M2: the Safe's total holds a Safe swap in flight (moving only, at its price), with its row; Hot's number doesn't take it", () => {
   const home = source("./app/screens/Home.tsx");
   assert.match(home, /const swapping = \(activity \?\? \[\]\)\.filter\(\(m\) => m\.kind === "swap" && m\.status === "moving" && m\.source === "safe"\);/, "control: an ended swap, or a NEAR wallet's, isn't counted");
-  assert.match(home, /const addsUsd = [^\n]*swapping\.reduce\(\(t, m\) => t \+ \(Number\(usdOf\(m\.amount, tokens\.get\(m\.from \?\? ""\)\?\.priceUsd\)\) \|\| 0\), 0\);/);
+  assert.match(home, /const addsUsd = [^\n]*swapping\.reduce\(\(t, m\) => t \+ \(Number\(usdOf\(m\.amount, tokens\.get\(m\.from \?\? ""\)\?\.priceUsd\)\) \|\| 0\), 0\)(?: \+ homingUsd\(homes, [^\n]*\))?;/);
   assert.match(home, /const tabUsd = tab === "safe" \? \(!shown \? null : safeUsd && addsUsd > 0 \? plusUsd\(safeUsd, addsUsd\.toFixed\(2\)\) : safeUsd\) : hotUsd;/, "on the Safe tab only");
   assert.match(home, /\.\.\.swapping\.map\(\(m\) => \{[\s\S]{0,420}HOME_WORDS\.swapping/, "its own row says where it is");
 });

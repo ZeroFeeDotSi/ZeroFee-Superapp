@@ -125,6 +125,9 @@ export function routeSec(r: SwapRoute): number {
   // LEG_SEC.privateSwap). Sim re-check (5 Nov): the sheet said "About 4 min left." for a Swap that landed at once
   return oneLeg ? 30 : r.kind === "topup" ? LEG_SEC.privateSwap : 60;
 }
+/** the audit's Send audit M6 (7 Nov): the time on a line that already says "About" its figure, said plainly ("In 1 min."), so
+ *  a line has one "about" (the arrives lines; the receipt keeps aboutTime). */
+export const inTime = (r: SwapRoute): string => aboutTime(r).replace(/^About /, "In ");
 /** About how long, in words (routeSec). */
 export function aboutTime(r: SwapRoute): string {
   const s = routeSec(r);
@@ -145,7 +148,7 @@ export function coinFigure(x: number, dir: "down" | "up"): string {
 export function arrivesLine(r: SwapRoute, get: SwapPlace, usd: number, price: number): string {
   const a = arrives(r, usd, price);
   const sym = SWAP_COIN[get].symbol;
-  return `${a.least ? "At least" : "About"} ${coinFigure(a.amount, "down")} ${sym} arrives. ${aboutTime(r)}`;
+  return `${a.least ? "At least" : "About"} ${coinFigure(a.amount, "down")} ${sym} arrives. ${inTime(r)}`;
 }
 
 /**
@@ -158,13 +161,13 @@ export function arrivesLine(r: SwapRoute, get: SwapPlace, usd: number, price: nu
 // they are now a plain warning with the real figure before the tap (and a second price finds where they fall under it)
 export const FEE_OK_SHARE = 0.05, FEE_SAY_SHARE = FEE_OK_SHARE;
 export interface SwapPrice { arrivesUsd: number; feeUsd: number }
-/** "About 1.98 USDC arrives, at least 1.4. About 1 min." (no quote back: the floor line, as before). */
+/** "About 1.98 USDC arrives, at least 1.4. In 1 min." (no quote back: the floor line, as before). */
 export function arrivesWith(r: SwapRoute, get: SwapPlace, usd: number, price: number, cost: SwapPrice | null): string {
   if (!cost || !(price > 0)) return arrivesLine(r, get, usd, price);
   const a = arrives(r, usd, price);
   const about = cost.arrivesUsd / price;
   const floor = a.least && a.amount < about ? `, at least ${coinFigure(a.amount, "down")}` : "";
-  return `About ${coinFigure(about, "down")} ${SWAP_COIN[get].symbol} arrives${floor}. ${aboutTime(r)}`;
+  return `About ${coinFigure(about, "down")} ${SWAP_COIN[get].symbol} arrives${floor}. ${inTime(r)}`;
 }
 /** The least whole dollars where fees fall under FEE_OK_SHARE, from two quotes (fees = fixed + a share): null when a
  *  bigger swap doesn't bring them under it. */

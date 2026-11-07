@@ -106,7 +106,7 @@ function RowWaits({ row, to }: { row: AddRow; to: AddTo }) {
   return (
     <div className="wl-addline wl-addrow" data-chain={row.chain} data-to={to} data-testid="add-row-wait" aria-busy="true">
       <Mark row={row} to={to} size={40} />
-      <span className="wl-addline__text"><span className="wl-addline__name">{W.rowName(row.name, to)}</span><span className="wl-addline__addr" aria-hidden="true">{"\u00a0"}</span><span className="wl-addline__addr" aria-hidden="true">{"\u00a0"}</span></span>
+      <span className="wl-addline__text"><span className="wl-addline__name">{W.rowName(row.name, to)}</span>{to === "safe" && <span className="wl-addline__addr">{W.rowLands}</span>}<span className="wl-addline__addr" aria-hidden="true">{"\u00a0"}</span><span className="wl-addline__addr" aria-hidden="true">{"\u00a0"}</span></span>
       <button className="wl-addline__icon" disabled aria-label={W.copyAddress}><CopyGlyph /></button>
       <button className="wl-addline__icon wl-addline__qr" disabled aria-label={W.qr}><QrGlyph /></button>
     </div>
@@ -150,7 +150,7 @@ export function AddressRow({ bridge, row, to, slot, onQr, initialKey, onAddress,
   // 2.5 s the rule line keeps its words, lit in --up, and the end's line reads "Copied." in --up, then comes back; no word
   // added, so the row never changes height. A failed ask: why, then "Tap QR for a new address." (Copy off, the QR asks again)
   // the copy review's grid: the two lines run the row's full text width under the icons, each phrase kept whole (Phrases)
-  const rule = a ? addRule(a, row) : null;
+  const rule = a ? addRule(a, row, to) : null;
   const lit = copied && !!rule && !why;
   const one = why ?? (rule ? rule.only : "\u00a0");
   const two = why ? W.tapQr : rule ? (lit ? W.rowCopied : rule.until) : "\u00a0";
@@ -160,6 +160,8 @@ export function AddressRow({ bridge, row, to, slot, onQr, initialKey, onAddress,
       <span className="wl-addline__text" aria-live="polite" role={why ? "alert" : undefined}>
         <span className="wl-addline__name">{name}</span>
         <span className="wl-addline__lines">
+          {/* J3-5: the Safe's row first says what it lands as (its QR sheet says it too); a wallet's row has no such line */}
+          {to === "safe" && !why && <span className="wl-addline__addr" data-testid="add-lands">{W.rowLands}</span>}
           <span className={`wl-addline__addr${lit ? " is-copied" : ""}`} data-testid="add-rule">{rule && !why ? <Phrases line={one} /> : one}</span>
           <span className={`wl-addline__addr${lit ? " is-copied" : ""}`} data-testid="add-until">{rule && !why ? <Phrases line={two} /> : two}</span>
         </span>

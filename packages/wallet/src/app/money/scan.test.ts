@@ -174,7 +174,7 @@ test("POISONED 3, an amount ten times what the code's own words say: the unit gu
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
   // changed pin (S1, 6 Nov): the slot's words are send-cap.ts underAmount's, read as behaviour
   assert.equal(underAmount({ over: false, exact: { amount: "12.5", symbol: "USDC" }, amount: "12.5", symbol: "USDC", place: "your Safe", maxLine: null }).coins, "They asked for 12.5 USDC.");
-  assert.match(form, /const under = underAmount\(\{ over, exact: exact \?\? null,/);
+  assert.match(form, /const under = underAmount\(\{ over, stable, exact: exact \?\? null,/);
   assert.match(form, /const usd = exact \? \(\(\) => \{ const t = tokens\?\.byAsset\(exact\.tokenId\); return t\?\.priceUsd \? Number\(exact\.amount\) \* Number\(t\.priceUsd\) : null; \}\)\(\)/);
 });
 

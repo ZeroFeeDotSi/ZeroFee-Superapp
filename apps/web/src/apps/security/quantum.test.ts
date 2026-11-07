@@ -20,10 +20,10 @@ test("the test is the handle NEAR lists: ml-dsa-65 handles are quantum-safe, a c
 test("On only when every money key is ML-DSA-65; each row ticks only for a key that is on the account", () => {
   const q = quantumOf([PHONE, WORDS, AGENT]);
   assert.equal(q.on, true);
-  assert.deepEqual(q.rows.map((r) => [r.id, r.safe]), [["phone", true], ["laptop", false], ["words", true], ["agent", true]]);
+  assert.deepEqual(q.rows.map((r) => [r.id, r.safe]), [["phone", true], ["words", true], ["agent", true]]);
   assert.equal(q.rows[0]!.line, "In its secure chip");
   assert.deepEqual(q.old, []);
-  assert.equal(quantumOf([PHONE, WORDS, AGENT, LAPTOP]).rows[1]!.safe, true);
+  assert.equal(quantumOf([PHONE, WORDS, AGENT, LAPTOP]).rows[1]!.safe, true, "a laptop on the account: its row (the audit's T15)");
 });
 
 test("26: a classical function-call key outside every role (a session key) never turns the card Off; it is listed for what it is", () => {

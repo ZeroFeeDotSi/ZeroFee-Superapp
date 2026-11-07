@@ -8,6 +8,7 @@
 import { SOL_READ_METHODS } from "../../../apps/quotes/read-limits.mjs";
 import { solReadOf } from "../../../apps/quotes/sol-read-shape.mjs";
 import { httpsOrigin } from "./https-url.ts";
+import { ownServer } from "./own-servers.ts";
 
 export const SOL_PROXY: { url: string | null; restUntil: number } = { url: null, restUntil: 0 };
 /** Not deployed (404) or refusing this page (403): left alone this long; resting or without its key (503): a minute. */
@@ -44,7 +45,9 @@ export function solProxyFor(method: string, now = Date.now(), params?: readonly 
  * copy, a resting relay): the free nodes answer as before.
  */
 export function solPaidDoors(now = Date.now()): string[] {
-  return SOL_PROXY.url && now >= SOL_PROXY.restUntil ? [SOL_PROXY.url, `${SOL_PROXY.url}?door=alchemy`] : [];
+  // a person's own Solana server first (Settings → Status, own-servers.ts), ZeroFee's doors after it
+  const own = ownServer("solana");
+  return [...(own ? [own] : []), ...(SOL_PROXY.url && now >= SOL_PROXY.restUntil ? [SOL_PROXY.url, `${SOL_PROXY.url}?door=alchemy`] : [])];
 }
 
 /** Is `url` the relay's sol-read, through either of its doors? */

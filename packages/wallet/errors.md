@@ -45,7 +45,7 @@ every code there is listed here. The ledger also passes on these from the Securi
 | `ledger.send.same-coin-short` | NEAR Confidential would pay them less {coin} than you typed. Nothing left your Safe. | safe: in your Safe | Try again (retry) |
 | `ledger.hidden-row.slow` | NEAR Intents didn't confirm the {coin} reached Private, so nothing was paid. Your money is there or on its way. | safe: in your private balance | Go back (nothing) |
 | `ledger.send.relay-limit` | ZeroFee's price server takes up to $10,000 a send. Nothing was sent. | safe: in your Safe | Change the amount (nothing) |
-| `ledger.send.unknown` | It may have gone. Activity will say. (src/send-job.ts: the payment was handed to 1Click; only its own status ends it) | on the way: to the person you paid, or back to you | Wait (wait) |
+| `ledger.send.unknown` | It's on its way to bob.near, or back in Private. Check Activity for where this is. (src/send-job.ts: the payment was handed to 1Click; only its own status ends it; never "may", the audit's M4) | on its way to the payee, or back in Private | Wait (wait) |
 | `ledger.send.back` | The {coin} came back. Nothing was paid. | safe: in your private balance on NEAR | Done (nothing) |
 | `ledger.send.short` | Less {coin} arrived than the payment needs, so nothing was paid. | safe: in your private balance on NEAR | Done (nothing) |
 | `ledger.send.slow` | The {coin} hasn't arrived yet, so nothing was paid. | on the way: to your private balance on NEAR | Wait (wait) |

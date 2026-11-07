@@ -183,6 +183,8 @@
 .dc-move { height: 44px; margin-top: -2px; }
 /* the chips name their wallet in words, so the coin mark goes: both chips, Move and Settings fit 390 pt (after-walk, 7 Nov) */
 .dc-tabs { gap: 14px; }
-/* T2-5 (the copy review's walk, 8 Nov): "Not for sale" in mute where a refused coin's Buy was; the row keeps room for it */
-.dc-rr--nfs .dc-row { padding-right: 86px; }
+/* T2-5 (the copy review's walk, 8 Nov): "Not for sale" in mute where a refused coin's Buy was; the row keeps room for it. the copy review's walk:
+   in every phase too (the receipt's padding-right: 0 above is 3 classes, so a refused trap's price and change ran under
+   "Not for sale"); the price and change stay where they are, the row keeps its height */
+.dc-rr--nfs .dc-row, .dc-rr--nfs.is-away .dc-row, .dc-rr--nfs.is-landed .dc-row, .dc-rr--nfs.is-checking .dc-row, .dc-rr--nfs.is-refused .dc-row { padding-right: 86px; }
 .dc-nfs { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: var(--mute); font: 500 13px/1 var(--font); white-space: nowrap; pointer-events: none; }

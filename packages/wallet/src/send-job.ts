@@ -5,7 +5,7 @@
 // of that payment says how it ended. A submit that errors, or a restart, never reads "nothing was paid" (a person would
 // send again, and the payee would be paid twice). The job is marked `handed` on the device BEFORE the submit; from then
 // on it is only followed: SUCCESS is paid; REFUNDED, FAILED, or still waiting for its deposit past the payment's own
-// deadline is not paid; anything else is "It may have gone. Activity will say." with no Try again. Sending the same
+// deadline is not paid; anything else says where it can be ("on its way to bob.near, or back in Private. Check Activity for where this is.") with no Try again. Sending the same
 // signed payment again is harmless (its one-time number is spent once), so a payment 1Click hasn't seen is handed over
 // again, never signed again.
 //
@@ -117,9 +117,17 @@ export function deadlineOf(payload: { message: string }): { outDeadline?: number
 }
 
 /** The words for each ending; none of them says "Try again" while money may be moving (H1). */
+/** the copy review's unsure words (8 Nov): the one way on when no read says where it is. */
+export const UNSURE_CHECK = "Check Activity for where this is.";
 export const sendWords = {
   /** handed over, outcome not known yet (a submit that errored, a restart, a status that doesn't say) */
-  unknown: (): Problem => ({ code: "ledger.send.unknown", whatHappened: "It may have gone. Activity will say.", money: { state: "on-the-way", where: "to the person you paid, or back to you" }, next: { kind: "wait", label: "Wait" } }),
+  /** the audit's audit M4 (7 Nov): never "may" (the copy review's unsure rule, 8 Nov): what is known, where the money is now (on its way to
+   *  the payee, or back in Private: a private payment's refund lands there, private-pay.ts refundTo), and "Check Activity
+   *  for where this is." `to`: the payee as stored; a NEAR name is said, any other address "the person you paid". */
+  unknown: (to?: string): Problem => {
+    const who = to && /^[a-z0-9._-]{2,64}\.near$/.test(to) ? to : "the person you paid";
+    return { code: "ledger.send.unknown", whatHappened: `It's on its way to ${who}, or back in Private. ${UNSURE_CHECK}`, money: { state: "on-the-way", where: `on its way to ${who}, or back in Private` }, next: { kind: "wait", label: "Wait" } };
+  },
   /** leg 1 came back before anything was paid */
   back: (coin: string): Problem => ({ code: "ledger.send.back", whatHappened: `The ${coin} came back. Nothing was paid.`, money: { state: "safe", where: "in Private" }, next: { kind: "nothing", label: "Done" } }),
   /** leg 1 brought less than the payment needs, so the payment was never handed over */
@@ -242,7 +250,7 @@ export function createSendJobs(x: SendJobDeps) {
       else await apis.submitIntent(relayed!, job.signedData);
       if (m.problem) await remember({ ...m, problem: undefined, updatedAtIso: iso() });
     } catch {
-      await remember({ ...m, status: "moving", problem: sendWords.unknown(), updatedAtIso: iso() });
+      await remember({ ...m, status: "moving", problem: sendWords.unknown(m.to), updatedAtIso: iso() });
       emit("ledger.balancesChanged", {});
     }
     return marked;
@@ -373,7 +381,7 @@ export function createSendJobs(x: SendJobDeps) {
     }
     for (const m of list) {
       if (m.status !== "moving" || !prefixes.some((p) => m.id.startsWith(p)) || following.has(m.id) || m.id in all || m.problem?.code === "ledger.send.unknown") continue;
-      await remember({ ...m, problem: sendWords.unknown(), updatedAtIso: iso() });
+      await remember({ ...m, problem: sendWords.unknown(m.to), updatedAtIso: iso() });
     }
   }
 

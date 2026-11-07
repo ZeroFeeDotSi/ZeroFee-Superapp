@@ -5,8 +5,8 @@
 // build where full-app.tsx's TOP_NOTE is false drops this module whole (speed-budget.test.ts checks the phone build).
 import { useState, type ReactNode } from "react";
 import {
-  TOP_NOTE_CLOSE_LABEL, TOP_NOTE_CLOSE_NAME, TOP_NOTE_LAPTOP_LABEL, TOP_NOTE_LINE_1, TOP_NOTE_LINE_2,
-  TOP_NOTE_LINE_3, TOP_NOTE_SELFHOST_LABEL, TOP_NOTE_TITLE, laptopHref, selfHostHref,
+  TOP_NOTE_CLOSE_LABEL, TOP_NOTE_CLOSE_NAME, TOP_NOTE_LAPTOP_LABEL, TOP_NOTE_LAPTOP_URL, TOP_NOTE_LINE_1, TOP_NOTE_LINE_2,
+  TOP_NOTE_LINE_3, TOP_NOTE_SELFHOST_LABEL, TOP_NOTE_TITLE, selfHostHref,
 } from "./top-note-words.ts";
 
 /** The public web build, Sim and Real (copy review, 5 Nov late: the web app opens on the Sim, so the note is there too); never the
@@ -26,7 +26,7 @@ export function TopNote({ onClose, codeUrl }: { onClose: () => void; codeUrl: st
         <button type="button" className="zf-btn zf-top-note__close" aria-label={TOP_NOTE_CLOSE_NAME} onClick={onClose}>{TOP_NOTE_CLOSE_LABEL}</button>
       </div>
       <p className="zf-small zf-top-note__line">{TOP_NOTE_LINE_1}</p>
-      <p className="zf-small zf-top-note__line">{TOP_NOTE_LINE_2} {out(laptopHref(import.meta.env?.VITE_SECOND_DEVICE_SITE), TOP_NOTE_LAPTOP_LABEL)}</p>
+      <p className="zf-small zf-top-note__line">{TOP_NOTE_LINE_2} {out(TOP_NOTE_LAPTOP_URL, TOP_NOTE_LAPTOP_LABEL)}</p>
       <p className="zf-small zf-top-note__line">{TOP_NOTE_LINE_3} {out(selfHostHref(codeUrl), TOP_NOTE_SELFHOST_LABEL)}</p>
     </section>
   );

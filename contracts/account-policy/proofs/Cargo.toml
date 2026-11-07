@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-# Proof harnesses for the frozen release-7 contract (release 6 in the repo at 35e84f4 before it). build.rs copies ../src/lib.rs (sha256-pinned) into generated/ and
+# Proof harnesses for the frozen release-7 contract (release 6 at Hackathon 35e84f4 before it). build.rs copies ../src/lib.rs (sha256-pinned) into generated/ and
 # appends the proof modules as CHILD modules of the contract, so they reach its private functions and state without
 # one line of the contract changing. `cargo kani` runs the bounded proofs; `cargo test --release` runs the explicit-state
 # checker, the model conformance and the contract's own unit tests.

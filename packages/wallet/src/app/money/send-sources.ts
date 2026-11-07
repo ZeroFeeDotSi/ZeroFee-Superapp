@@ -161,6 +161,22 @@ export function siteSources(wallets: readonly SpendingWallet[] | null): SendSour
   });
 }
 
+/** M1 (the audit's Send audit, 7 Nov): what one send from this source pays at most, in coins: at Max the core pays maxSend's
+ *  `pays` (the grid's gap kept, safe-send.ts / hidden-row.ts), under the raw `max` (Safe USDC 9.996512 paid 9.61165 while
+ *  the button said $9.99 and the receipt $10.00). Worked once here, rounded down by the units; every figure on the form
+ *  reads it. `decimals` unknown or nothing to round: the source's own max. */
+/** Builder 3 (7 Nov): past what Private holds, a Safe coin that isn't Private-only goes through the fill (SendSheet's
+ *  `fill: true`), and the core's fill path (safe-send.ts sendFill) pays the WHOLE Send through Private, Private's share
+ *  left where it is: its Max is maxSend over the Safe's part with nothing from Private. Counting Private's share said
+ *  another figure than the core paid (Safe $1,210, Private $25: $1,067.96 on the form, $1,165.05 paid). Private holding
+ *  all of it (max = Private's share): Private pays it all, no grid, as before. */
+export function sendable(s: Pick<SendSource, "max" | "pocket" | "privateOnly">, decimals: number | undefined): string {
+  if (!(Number(s.max) > 0) || decimals === undefined) return s.max;
+  const upTo = toUnits(s.max, decimals), pocket = s.pocket ? toUnits(s.pocket, decimals) ?? 0n : 0n;
+  const m = upTo === null || upTo <= pocket ? null : maxSend(upTo, s.privateOnly ? pocket : 0n);
+  return m ? fromUnits(m.pays, decimals) : s.max;
+}
+
 /** Max's words (privacy audit, 4 Nov): Max sends a grid amount and keeps the grid's gap, so the sheet says exactly what
  *  goes to the payee and that the rest stays in the private balance. Null when Max isn't picked or nothing is rounded;
  *  `decimals` unknown: the same line without the figure. */
@@ -178,7 +194,7 @@ export function maxSendLine(s: Pick<SendSource, "max" | "symbol" | "pocket">, am
  * The source Send opens on for Home's wallet preset (Send from a wallet's own page): "sol" and "hood" their wallet, "safe"
  * the Safe's first coin that can go. With no preset (Home's own Send), D70: a send goes from Private, so the Safe's coin
  * that can send the most dollars now (its private part, ledger.sendFromSafe); none: the dropdown's first (a web test
- * 16:43: Send opened on the SOL wallet). A wallet Send can't send from yet (NEAR, BNB): the same.
+ * Send opened on the SOL wallet). A wallet Send can't send from yet (NEAR, BNB): the same.
  */
 export function startSource(wallet: string | null | undefined, sources: readonly SendSource[], coin?: string): string | null {
   const canUsd = (s: SendSource) => { const a = Number(s.amount), u = Number(s.usd); return a > 0 && u > 0 ? (Number(s.max) * u) / a : 0; };

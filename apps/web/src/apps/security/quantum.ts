@@ -133,11 +133,14 @@ export function quantumOf(keys: readonly AccountKeyInfo[], phoneWord = "This pho
   const safe = (pick: (k: AccountKeyInfo) => boolean) => keys.some((k) => pick(k) && isQuantumSafe(k));
   const mine = (k: AccountKeyInfo) => k.role === "device" && k.current === true;
   const chip = keys.some((k) => mine(k) && k.kind === "secure-chip");
+  // the audit's Trade audit T15 (8 Nov): only keys the account has. A laptop or AgentZero never set up is no "Not yet" under
+  // "Your Safe's keys are built to resist the computers of the future." (the backup words are every account's: kept)
+  const has = (role: AccountKeyInfo["role"]) => keys.some((k) => k.role === role);
   const rows: QuantumRow[] = [
     { id: "phone", label: phoneWord, ...(chip ? { line: "In its secure chip" } : {}), safe: safe(mine) },
-    { id: "laptop", label: "Your laptop", safe: safe((k) => k.role === "second-device") },
+    ...(has("second-device") ? [{ id: "laptop" as const, label: "Your laptop", safe: safe((k) => k.role === "second-device") }] : []),
     { id: "words", label: "Your backup words", safe: safe((k) => k.role === "recovery") },
-    { id: "agent", label: "AgentZero", safe: safe((k) => k.role === "agent") },
+    ...(has("agent") ? [{ id: "agent" as const, label: "AgentZero", safe: safe((k) => k.role === "agent") }] : []),
   ];
   const full = (k: AccountKeyInfo) => rules && k.access === "full";
   const bypass = keys.filter(full).map((k) => ({ handle: k.handle, remove: isQuantumSafe(k) && k.current !== true }));

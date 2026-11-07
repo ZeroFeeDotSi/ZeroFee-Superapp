@@ -1,4 +1,3 @@
-Names and labels rewritten for the public export; the results are unchanged.
 0/4 the contract's release constants (built without short-waits: a day is the least delay)
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.07s
 1/4 sandbox near-sandbox (sha256 pinned) on 127.0.0.1:56379, home $TMPDIR/tmp.o1wetCs8jE/sandbox

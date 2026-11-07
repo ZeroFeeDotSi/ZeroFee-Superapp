@@ -13,7 +13,7 @@ import { PROOF_WORDS, stepLine } from "../proof.ts";
 const sheet = readFileSync(new URL("./MoveSheet.tsx", import.meta.url), "utf8");
 const L = (from: Leg["from"], to: Leg["to"], usd: number): Leg => ({ from, to, usd });
 
-test("item 1: one summary line, the plan's own total to its places by name; none on an empty or blocked plan", () => {
+test("item 1: one summary line, where the plan moves it by name (its total the Leaves row's, said once: the audit's M6); none on an empty or blocked plan", () => {
   const table: [Leg["to"][], string][] = [
     [["sol"], "your SOL wallet"],
     [["sol", "hood"], "your SOL and ETH (RH) wallets"],
@@ -24,8 +24,8 @@ test("item 1: one summary line, the plan's own total to its places by name; none
   ];
   for (const [to, words] of table) assert.equal(placesWords(to), words, to.join(","));
   const plan = [L("safe", "sol", 112.96), L("private", "hood", 22.04)];
-  assert.equal(moveSummary(plan, false), "Moves $135.00 to your SOL and ETH (RH) wallets.");
-  // its figure is the plan's "Leaves" row's, the same source
+  assert.equal(moveSummary(plan, false), "Moves it to your SOL and ETH (RH) wallets.");
+  // its figure is the plan's "Leaves" row's alone, said once (the audit's M6)
   assert.equal(costRows(plan)!.rows[0]!.value, "$135.00");
   assert.equal(moveSummary([], false), null, "control: an empty plan");
   assert.equal(moveSummary(plan, true), null, "control: a plan that can't go");
@@ -65,10 +65,10 @@ test("item 4: the Safe's row says what really stays (its whole fill out), and it
     ["control: no plan", [], fillLegs([], null), true, 5254.15],
   ];
   for (const [what, legs, p, cut, want] of table) assert.ok(Math.abs(safeAfter(start, legs, p, cut) - want) < 0.015, `${what}: ${safeAfter(start, legs, p, cut)} vs ${want}`);
-  // the note: the row's figure, then the reason; never the least it keeps as a second figure
+  // the note: the reason only, the row says the figure (changed pin, QA 16's move-44px grade, 7 Nov: move-sheet-figures)
   const now: PlaceNow[] = [{ place: "safe", usd: 5254.15, lo: 4951.7 }];
-  assert.equal(safeKeeps(now, { coinUsd: 5254.15, roomUsd: 500, capUsd: "500" }, 5004.15), "$5,004.15 stays in your Safe. Your rule: wallets hold up to $500 in all.");
-  assert.equal(safeKeeps(now, { coinUsd: 300, roomUsd: 500, capUsd: "500" }, 5004.15), "$5,004.15 stays in your Safe. One coin per move.");
+  assert.equal(safeKeeps(now, { coinUsd: 5254.15, roomUsd: 500, capUsd: "500" }, 5004.15), "The rest stays in your Safe. Your rule: wallets hold up to $500 in all.");
+  assert.equal(safeKeeps(now, { coinUsd: 300, roomUsd: 500, capUsd: "500" }, 5004.15), "The rest stays in your Safe. One coin per move.");
   assert.equal(safeKeeps(now, { coinUsd: 5254.15, roomUsd: 500, capUsd: "500" }), "$4,951.70 stays in your Safe. Your rule: wallets hold up to $500 in all.", "control: no row figure given, the old least");
   assert.match(sheet, /x\.place === "safe" \? safeShown : said\(split\)/);
   assert.match(sheet, /const keeps = safeKeeps\(now, \{ coinUsd: coinMost, roomUsd: Number\(status\.roomUsd\) \|\| 0, capUsd: status\.capUsd \}, safeShown\);/);

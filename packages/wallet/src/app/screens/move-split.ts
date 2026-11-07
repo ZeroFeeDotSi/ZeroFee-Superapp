@@ -470,11 +470,18 @@ export const MOVE_WORDS = {
   // J2-5 (copy review, 8 Nov): the cap is the person's own rule. It is changed on the NEAR wallet's top-up ("holds up to · Change",
   // Spending.tsx CapSheet), not in Protection, so the line names no place it isn't
   safeKeepsCap: (usd: string, cap: string) => `${usd} stays in your Safe. Your rule: wallets hold up to ${cap} in all.`,
+  // QA 16's move-44px grade (7 Nov): the Safe's row says its figure (Home's, Private in it), so its note says no second
+  // Safe figure, only why the rest stays (words provisional, for 53)
+  safeRestCap: (cap: string) => `The rest stays in your Safe. Your rule: wallets hold up to ${cap} in all.`,
+  safeRestCoin: "The rest stays in your Safe. One coin per move.",
+  // QA 16 (7 Nov): Private rose $33.86 to $46.40 with no word why: the fill's round sum leaves its extra in Private
+  privateGets: (usd: string) => `Private gets ${usd} so this move is harder to trace.`,
   short: (from: string, to: string, least: string) => `${from} → ${to} needs at least ${least}.`,
   leave: (place: string) => `Leave ${place === "Safe" ? "your Safe" : place} as it is`,
   closeOk: "It keeps going if you close this.",
   // the floor's one summary line (the UI reviewer, 6 Nov, item 4): the plan's total, to the places by name
-  moves: (usd: string, to: string) => `Moves ${usd} to ${to}.`,
+  /** the floor's and the start face's line under the figure (the audit's M6, 7 Nov): the place only, the figure said once above */
+  moves: (to: string) => `Moves it to ${to}.`,
   // a source the plan moved by itself (row 8 b): said once, with the plan's own figure
   also: (parts: string) => `Also moves ${parts}.`,
   done: "Done",
@@ -543,12 +550,12 @@ export function placesWords(to: readonly Place[]): string {
   return u.includes("safe") ? (w ? `your Safe and ${w}` : "your Safe") : w;
 }
 
-/** The floor's one summary line (the UI reviewer, 6 Nov): what the plan moves in all (its "Leaves" row's own figure) and
- *  where, by name. None for an empty plan or one that can't go. */
+/** The floor's one summary line (the UI reviewer, 6 Nov): where the plan moves it, by name; its figure is the "Leaves"
+ *  row's (the start face's hero), said once (the audit's way-home audit M6, 7 Nov). None for an empty plan or one that can't go. */
 export function moveSummary(legs: readonly Leg[], blocked: boolean): string | null {
   if (blocked || !legs.length) return null;
   const to = placesWords(legs.map((l) => l.to));
-  return to ? MOVE_WORDS.moves(money2(costFacts(legs).leaves), to) : null;
+  return to ? MOVE_WORDS.moves(to) : null;
 }
 
 /** What each place gives in the plan as the ledger pays it (fillLegs): the Safe its whole fill (what stays in Private is
@@ -724,8 +731,16 @@ export function safeKeeps(now: readonly PlaceNow[], o: { coinUsd: number; roomUs
   const p = now.find((x) => x.place === "safe");
   if (!p || !(p.lo >= 0.01)) return null;
   const cap = o.roomUsd < o.coinUsd - 0.004;
-  if (shownUsd !== undefined) return cap ? MOVE_WORDS.safeKeepsCap(usdShort(shownUsd), usdShort(Number(o.capUsd) || 0)) : MOVE_WORDS.safeStaysCoin(usdShort(shownUsd));
+  // QA 16's move-44px grade (7 Nov): the row already says the Safe's figure, so the note says why only (one figure per name)
+  if (shownUsd !== undefined) return cap ? MOVE_WORDS.safeRestCap(usdShort(Number(o.capUsd) || 0)) : MOVE_WORDS.safeRestCoin;
   return cap ? MOVE_WORDS.safeKeepsCap(usdShort(p.lo), usdShort(Number(o.capUsd) || 0)) : MOVE_WORDS.safeKeepsCoin(usdShort(p.lo));
+}
+
+/** Private's rise on this Move (QA 16, 7 Nov: $33.86 → $46.40, unsaid), in one line under its row; null when it doesn't
+ *  rise by a cent. `was`: Private today; `after`: what the ledger leaves it (the row's figure). */
+export function privateGetsLine(was: number, after: number): string | null {
+  const up = Math.round((after - was) * 100);
+  return up >= 1 ? MOVE_WORDS.privateGets(usdShort(up / 100)) : null;
 }
 
 /** The calls the legs make, in the order they go: the Safe's Approve first (a no stops everything), then each wallet →

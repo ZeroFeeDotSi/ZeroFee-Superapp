@@ -30,6 +30,9 @@ export async function keptHeld(o: { rec: TradeRecord; engineOf: (chain: "near") 
  * fill never books on its own; none of them shows the help step. Can't tell (no figure proven): undefined, nothing booked,
  * the cards stay and read Rhea again.
  */
+/** How a claim ended (the audit's T8): the rise booked (`got`), sent with no read (`sent`), or the person said no (`declined`). */
+export type ClaimEnd = { got: string } | { sent: true } | { declined: true };
+
 export async function claimKept(o: {
   rec: TradeRecord; records: () => TradeRecord[]; engineOf: (chain: "near") => Promise<{ e: ChainEngine }>;
   bookInOrder: (rec: TradeRecord, q: Quote, f: Fill) => Promise<void>; save: () => Promise<void>;
@@ -37,14 +40,18 @@ export async function claimKept(o: {
   covered: (hash: string, ids: string[]) => void;
   /** A covered trade closed as claimed: done, "about" its quote, its id applied (service.ts closeClaimed). */
   close: (x: TradeRecord, hash: string) => void;
-}): Promise<{ got: string } | undefined> {
+}): Promise<ClaimEnd | undefined> {
   const { rec } = o;
   const k = rec.kept;
   if (rec.problem?.code !== KEPT || !k || !rec.quote || !rec.fill) return undefined;
   const { e } = await o.engineOf("near");
   const r = await e.claimKept?.(k.token);
   if (!r) return undefined;
+  if ("declined" in r) return { declined: true };
   const all = o.records().filter((x) => x.problem?.code === KEPT && x.kept?.wallet === k.wallet && x.kept.token === k.token && x.quote && x.fill);
+  // the audit's T8: sent, its end unread: each trade it covers remembers it, so its card never sends the person to Rhea's team
+  // when the lost and found reads empty (the claim most likely took it)
+  if ("sent" in r) { for (const x of all) x.kept!.claimSent = r.sent; await o.save(); return { sent: true }; }
   const spent = all.reduce((n, x) => n + BigInt(x.fill!.spent), 0n);
   o.covered(r.hash, all.map((x) => x.id));
   // one booking for the claim: the rise against what the trades it covers spent, in the first trade's wallet and coin

@@ -200,7 +200,7 @@ export class Unnamed {
     return `${k ? `amount ${k + 1}` : "an amount"} of ${this.name(i)}`;
   }
   /**
-   * A before → after row of the sheet for a coin it can't name (round 3, 2 Nov: a Solana coin's row read "coin 8JVZ…GYZ
+   * A before → after row of the sheet for a coin it can't name (round 3, 2 Nov: a Solana coin's row read "coin 9xQe…Fin
    * 4906542056 → 0"): the row says "A coin ZeroFee can't name" and "an amount → less (amount 2)", each figure the same
    * label the lines use for it, its exact smallest-unit amount in the disclosure. Zero is said as 0 (exact in any unit).
    * The after-figure always says which way it went, "less" or "more", from the exact figures (security review, round 3,

@@ -89,7 +89,8 @@ export function pocketTrader(d: PocketDeps) {
       tx = step.tx;
     } catch (e) {
       // Trade's own refusal, in Trade's own words ("BONK's maker can freeze it and stop you selling. We don't offer it.").
-      if (e instanceof TradeError) return { kind: "refused", line: `${problemOf(e, { symbol: name, chain: "Solana" }).whatHappened} Nothing was sent.` };
+      // T7: a trap coin's words already say nothing was spent: said once
+      if (e instanceof TradeError) { const said = problemOf(e, { symbol: name, chain: "Solana" }).whatHappened; return { kind: "refused", line: /Nothing was spent\.$/.test(said) ? said : `${said} Nothing was sent.` }; }
       return { kind: "refused", line: `AgentZero didn't trade ${name}: ${built(e)} Nothing was sent.` };
     }
     const r = await d.bridge.call<{ signedTx: string }>("account.agent.pocketSign", { tx, ...(ticket ? { ticket } : {}) });

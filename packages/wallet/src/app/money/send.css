@@ -250,3 +250,6 @@
 .wl-send2 .zf-keypad button, .wl-send2:has(.wl-send2__nets) .zf-keypad button { height: 56px; min-height: 56px; }
 /* the chosen chip scrolled into view stops clear of the right-edge fade (its 24 px), never under it */
 .wl-send2__nets .wl-chips { scroll-padding-inline: 24px; }
+/* J3-2 (the copy review's walk): the keypad is on the floor now; the form's last line scrolls clear of the floor's 20 px fade, and the
+   dollars scrolled into sight (SendForm amountBox) stop above it, never under it */
+.wl-send2__scroll { padding-bottom: 20px; scroll-padding-bottom: 20px; }

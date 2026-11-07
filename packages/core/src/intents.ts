@@ -21,7 +21,7 @@ import { readable, type Warning } from "./signer.ts";
 import type { DecodedAction, DecodedTx } from "./tx-decode.ts";
 import { readJson } from "./net.ts";
 import { NEAR_STORAGE_MAX_YOCTO, STORAGE_DEPOSIT_MAX_YOCTO, WNEAR } from "./near-gate.ts";
-import { LEG_WORDS, SEND_LEG_WORDS, fillRows, moveAllLine, moveAllTitle, planOthers, quoted } from "./private-route.ts";
+import { LEG_WORDS, SEND_LEG_WORDS, fillRows, moveAllLine, moveAllTitle, planOthers, quoted, theyGet } from "./private-route.ts";
 
 export const INTENTS = {
   account: "intents.near",
@@ -667,7 +667,7 @@ function intoOwnWords(own: string, quote: QuoteFacts, send: string, warnings: Wa
     // the payout is 1Click's quote: one "about" per line, on the figure read as money (copy review, 7 Nov): the dollars when shown,
     // "They get · 1.2345 SOL (about $247.50)"; else the coin figure itself
     const coinGets = fourPlacesText(money(sent.destinationAsset, sent.amountOut, facts));
-    const theyGet = `${SEND_LEG_WORDS.gets} · ${sent.gets ? `${coinGets} (${quoted(sent.gets)})` : quoted(coinGets)}`;
+    const gets = theyGet(coinGets, sent.gets);
     return {
       title: sent.title,
       titleFor: null,
@@ -676,8 +676,8 @@ function intoOwnWords(own: string, quote: QuoteFacts, send: string, warnings: Wa
       // a public payee (the copy review's ruling, 6 Nov): headline, To, They get, the split with its one line, the fees, and one public
       // line ("Public on NEAR: anyone can see the Safe's part."), nothing else; Private is explained where it is first met
       lines: sent.open
-        ? [sent.to, sent.seen, theyGet, ...sent.lines]
-        : [sent.to, sent.seen, PRIVATE_SAID, theyGet, ...sent.lines, LEG_WORDS.seen, `If it can't, the money comes back to ${PRIVATE_POCKET}`, ...(sent.lines.includes(SEND_LEG_WORDS.kept) ? [] : [PRIVATE_RECEIPT])],
+        ? [sent.to, sent.seen, gets, ...sent.lines]
+        : [sent.to, sent.seen, PRIVATE_SAID, gets, ...sent.lines, LEG_WORDS.seen, `If it can't, the money comes back to ${PRIVATE_POCKET}`, ...(sent.lines.includes(SEND_LEG_WORDS.kept) ? [] : [PRIVATE_RECEIPT])],
       warnings: [...warnings, promise],
       effects,
       // QA's ledger re-walk (6 Nov, b/12: the amount three times): "Your Safe sends · $30.00" is the bytes' amountIn, so

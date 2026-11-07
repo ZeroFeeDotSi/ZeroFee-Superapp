@@ -39,6 +39,13 @@ export const nearProblems = {
     money: inTrading,
     next: { kind: "nothing", label: "Go back" },
   }),
+  /** the audit's T8: Ref's contract turned the lost-and-found claim down: nothing came back, the coin is still with Rhea. */
+  claimRefused: (): Problem => ({
+    code: "trade.near.claim-refused",
+    whatHappened: "Rhea said no to getting it back.",
+    money: { state: "safe", where: "with Rhea" },
+    next: { kind: "retry", label: "Get it back" },
+  }),
   nearNothingMoved: (symbol: string): Problem => ({
     code: "trade.near.nothing-moved",
     whatHappened: `Your ${symbol} trade didn't go, so nothing moved.`,

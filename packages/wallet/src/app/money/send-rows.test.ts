@@ -147,7 +147,8 @@ test("privacy audit (4 Nov, review): Max says exactly what goes to them and that
   assert.equal(maxSendLine({ max: "5", symbol: "USDC", pocket: "5" }, "5", 6), null, "all of it already private: nothing rounded, nothing said");
   assert.equal(maxSendLine(sol, "1.42", undefined), "Some of it stays in Private.");
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
-  assert.match(form, /under\.max \? <p className="zf-small wl-send2__coins" data-testid="send-max-line">\{under\.max\}<\/p>/, "the sheet shows it, in the one slot (copy review, 6 Nov)");
+  // QA 16's Send Max shots (7 Nov): the rest is said once, under From (max-one-figure.test.ts); the slot no longer says it
+  assert.doesNotMatch(form, /send-max-line/);
 });
 
 test("QA's condition on D70's default: someone who expected their SOL wallet sees it's the Safe before any approval (control: a wallet preset still says its wallet)", async () => {
@@ -176,7 +177,7 @@ test("Send every coin as itself (product decision, 5 Nov; the chat-pay builder's
   const { sendSources } = await import("./send-sources.ts");
   const [safeUsdc] = sendSources([], [], [usdc("20", "private")], false);
   assert.deepEqual(nearLandsAs(safeUsdc), { tokenId: "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", coin: "USDC" });
-  assert.deepEqual(routeLines("near", nearLandsAs(safeUsdc).coin), ["Public on NEAR.", "Lands as USDC on NEAR."], "the coin that lands, after who sees it");
+  assert.deepEqual(routeLines("near", nearLandsAs(safeUsdc).coin), ["Public on NEAR, as USDC."], "the coin that lands, in the one public line (QA 16: NEAR said once)");
   // the copy review's pair walk (send-add-must 602b4c9af): 1Click delivers native NEAR to a NEAR account, so the line says NEAR
   const wrapped = { tokenId: LANDS_AS.near.tokenId, coin: "NEAR" };
   assert.deepEqual(nearLandsAs({ row: null, chain: "near", tokenId: "nep141:wrap.near", symbol: "wNEAR" }), wrapped, "control: the Safe's NEAR is NEAR");

@@ -19,11 +19,18 @@ const startHome = () => {
   // (browser-sites crawl F1, MUST): its landed first leg goes on home with no tap (reads only; the core sends it, once)
   let stopBacks: (() => void) | undefined, gone = false;
   void import("@zerofee/browser/social/take-out-resume.ts").then((m) => { if (!gone) stopBacks = m.resumeTakeOuts(appBridge("social")); }).catch(() => undefined);
+  // QA 16's MUST on T12 (8 Nov): a trade still checking after a reload is followed from Home's start, and its Jobs row
+  // kept to it, whether or not Trade is ever opened (Trade's runtime alone, with its own bridge; never its screens)
+  let stopTrades: (() => void) | undefined;
+  void import("@zerofee/trade/app/trade-follow.ts").then((m) => { if (!gone) stopTrades = m.followTrades(appBridge("trade")); }).catch(() => undefined);
+  // T13 phase 2: the person's own servers (Settings → Status), read from the sealed store into the doors before a trade
+  // (no check, no network: the status service's own.get only reads the store)
+  void shellBridge.call("status.own.get").catch(() => undefined);
   // the account's own parts and Settings, fetched now Home is up, so their first tap is as quick as before (headroom)
   void Promise.all([SecurityRows.preload(), SettingsPanel.preload()]).catch(() => undefined);
   // set-up's and recovery's screens (new words, Was this you?, Check my words), so they draw at once from Home too
   void setupScreens();
-  return () => { gone = true; stopBacks?.(); stop(); };
+  return () => { gone = true; stopBacks?.(); stopTrades?.(); stop(); };
 };
 import { APPS } from "./apps.ts";
 import { appsFor, mvpOn, publicApps } from "./shown-apps.ts";

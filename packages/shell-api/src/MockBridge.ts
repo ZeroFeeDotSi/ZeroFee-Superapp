@@ -8,6 +8,8 @@
 // show one outside a screen marked "Sample data".
 import { hiddenCoin } from "@zerofee/core/hidden-coins";
 import type { Bridge, BridgeResult } from "@zerofee/core/bridge";
+import type { StatusReport, StatusRow } from "@zerofee/core/status-probe";
+import { isOwnChain, ownAddressOf, ownHostOf, type OwnChain } from "@zerofee/core/own-servers";
 import { APP_STORE_NAME } from "@zerofee/core/app-store";
 import { isPairingCode } from "@zerofee/core/pairing-code";
 import type { Problem } from "@zerofee/core/problem";
@@ -26,7 +28,8 @@ import { endsTitle } from "@zerofee/core/onward-ends";
 import { ProblemError } from "@zerofee/core/problem";
 import { SAFE_FILL_OPEN } from "@zerofee/core/safe-fill-open";
 import { SAFE_SEND_FILL_OPEN } from "@zerofee/core/safe-send-fill-open";
-import { LEG_WORDS, SEND_LEG_WORDS, fillStepUsd, privateRows, privateShort, quoted, sendTitle } from "@zerofee/core/private-route";
+import { LEG_WORDS, SEND_LEG_WORDS, fillStepUsd, privateRows, privateShort, quoted, sendTitle, theyGet } from "@zerofee/core/private-route";
+import { maxSend } from "@zerofee/core/inflow-grid";
 import { moveSheet, moveSplitUsd, othersForSheet, sheetOthers } from "@zerofee/core/move-plan";
 import { NETWORK_FEE_USD } from "@zerofee/core/float-floors";
 import { FEES_KEPT } from "@zerofee/core/zero-fee";
@@ -252,7 +255,32 @@ export function sampleAddAddress(chain: string, key: string): string {
   return `0x${hex.join("")}`;
 }
 
+/** The Sim's own servers (Settings → Status, phase 2): it fetches nothing, so a host ending ".invalid" (a name that never
+ *  exists) is the one that doesn't answer, and any other https address does. */
+export const simOwnAnswers = (address: string): boolean => !/\.invalid(?::\d+)?$/i.test(ownHostOf(address) ?? "");
+
 /** "1 day", "8 days", "2 minutes": a wait in words. */
+/** The Sim's Status answer (Settings → Status): every service the real app checks, Working, through ZeroFee's server. */
+export function simStatusReport(at: number, own: Partial<Record<OwnChain, string | null>> = {}): StatusReport {
+  // a chain given the person's own server (phase 2) is checked there; a Sim host ending ".invalid" never answers
+  const chain = (id: "near" | "solana" | "hood" | "price"): StatusRow => {
+    const o = id === "price" ? null : own[id];
+    if (!o) return { id, state: "working", via: "relay", ms: 120 };
+    return simOwnAnswers(o) ? { id, state: "working", via: "own", ms: 180 } : { id, state: "working", via: "relay", ms: 120, ownMissed: true };
+  };
+  return {
+    at,
+    relay: true,
+    rows: [
+      { id: "relay", state: "working", via: "direct", ms: 140, doors: { data: "working", chains: "working" } },
+      chain("near"), chain("solana"), chain("hood"), chain("price"),
+      { id: "oneclick", state: "working", via: "direct", ms: 600 },
+      { id: "jupiter", state: "working", via: "direct", ms: 150 },
+      { id: "agentzero", state: "working", via: "relay", ms: 300 },
+    ],
+  };
+}
+
 export function waitWords(seconds: number): string {
   const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
   if (seconds >= 86400) return unit(Math.round(seconds / 86400), "day");
@@ -614,6 +642,10 @@ const notFound = (id: string): Problem => ({
 
 export function createMockBridge(options: MockOptions = {}): MockBridge {
   const latency = options.latencyMs ?? 250;
+  /** When the Sim's Status look last ended (Settings → Status, its 30 s keep). */
+  let simStatusAt = -Infinity;
+  /** The Sim's own servers (Settings → Status, phase 2): kept in memory only, like the rest of its sample. */
+  const simOwn: Record<OwnChain, string | null> = { near: null, solana: null, hood: null };
   const settle = options.settleMs ?? 2500;
   /** ZeroFee Chat's sample seed: this demo's own, random; kept with the rest of the demo (?demo keeps it over a reload),
    *  so after a reload the person is still the same person in a place and their own posts still read "You" (J3 C2). */
@@ -1187,6 +1219,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       }
       // Home's Send from the Safe: the part already in the private balance, straight out (the core's Send sheet)
       case "ledger.sendFromSafe": {
+        p = maxedSend(p);
         const id = p.tokenId === "near" ? "nep141:wrap.near" : String(p.tokenId ?? "");
         const priced = amountOf(id, String(p.amount ?? ""));
         const payee = p.to as { kind?: string; chain?: string; address?: string; accountId?: string } | undefined;
@@ -1575,7 +1608,8 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     const tokenId = typeof p.toTokenId === "string" && p.toTokenId ? p.toTokenId : key === "near" ? "nep141:wrap.near" : LANDS_ID[key] ?? "";
     const symbol = typeof p.toTokenId === "string" && p.toTokenId ? coinOf(p.toTokenId) : SEND_LANDS[key]?.coin ?? coinOf(tokenId);
     const px = tokenId ? tokenPrice(tokenId) : 0;
-    return symbol && px > 0 ? `${(Math.floor((usd / px) * 1e4) / 1e4).toString()} ${symbol}` : null;
+    // with its commas (QA 16's Send Max shots: "1228.1 USDC")
+    return symbol && px > 0 ? `${(Math.floor((usd / px) * 1e4) / 1e4).toLocaleString("en-US", { maximumFractionDigits: 4 })} ${symbol}` : null;
   };
   const fillSheet = (p: Record<string, unknown>, id: string, payee: { chain?: string; address?: string; accountId?: string } | undefined, lands: { coin: string; network: string }, more: Record<string, unknown>) => {
     const c = fillCase(p);
@@ -1590,17 +1624,23 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     // what they get (QA's Sim walk): the coin figure first (4 places, down), then what it is worth to them in brackets
     // (the quote's amountOutUsd, 1 % under the Send here), and the network fees the payout pays, named (T less that);
     // a coin it can't name or price never gets here (refused before the sheet, sendCoinUnknown)
-    const outUsd = Number(cents(askedUsd * SIM_PAYOUT_KEEPS)) / 100;
+    // builder 3 (7 Nov): ONE cent figure, the title's (a Max Send's cents down, as the form says it; else rounded), and
+    // every row worked from it, so From your Safe - Private keeps the rest = the title = They get + Fees (the title
+    // floored maxSend's $1,165.0485 while the rest and the fee took $1,165.05: $1,200.00 - $34.95 over "Send $1,165.04")
+    const titleC = p.maxed === true ? BigInt(Math.floor(askedUsd * 100 + 1e-6)) : cents(askedUsd);
+    const keepsC = cents((Number(titleC) / 100) * SIM_PAYOUT_KEEPS), outC = keepsC < titleC ? keepsC : titleC;
+    const outUsd = Number(outC) / 100;
     const gets = fillGets(p, outUsd) ?? "";
-    const feesUsd = Number(cents(askedUsd) - cents(outUsd)) / 100;
+    const feesUsd = Number(titleC - outC) / 100;
     // any coin (train 36): the split in dollars at the coin's price, rounded to the cent once
-    const sendsUsd = Number(cents(fill * coinPx)) / 100, staysUsd = Number(cents(fill * coinPx) - cents(askedUsd)) / 100;
+    const sendsUsd = Number(cents(fill * coinPx)) / 100, staysUsd = Number(cents(fill * coinPx) - titleC) / 100;
     // as the real core's fill sheet (send-fill.ts) and every outside sheet (the audit's D37 condition): the FULL address first,
     // unfolded, then where it lands in the copy review's words, then the split and what they get
     // J2-2 (copy review, 8 Nov), as the core's send-fill.ts: "Send $25.00 to alice.near"; From your Safe = they get + Fees + what
     // Private keeps (privateRows, its net change), the Fees row on every sheet, no why sentence
     const $b = (c: bigint) => usd$(Number(c) / 100);
-    return { title: sendTitle(usd$(askedUsd), to), lines: [`To ${to}`, SEND_LEG_WORDS.seen(lands.network), `${SEND_LEG_WORDS.gets} · ${gets} (${quoted(usd$(outUsd))})`, `${SEND_LEG_WORDS.sends} · ${usd$(sendsUsd)}`, ...privateRows(cents(staysUsd), $b, { about: true }), SEND_LEG_WORDS.fees(usd$(feesUsd)), SEND_LEG_WORDS.kept], warnings: [], effect: [], ...more,
+    // a Max Send says the form's one figure, to the cent, down (QA 16, 7 Nov: maxSend's 1165.048543 is $1,165.04)
+    return { title: sendTitle(usd$(Number(titleC) / 100), to), lines: [`To ${to}`, SEND_LEG_WORDS.seen(lands.network), theyGet(gets, usd$(outUsd)), `${SEND_LEG_WORDS.sends} · ${usd$(sendsUsd)}`, ...privateRows(cents(staysUsd), $b, { about: true }), SEND_LEG_WORDS.fees(usd$(feesUsd)), SEND_LEG_WORDS.kept], warnings: [], effect: [], ...more,
       // as the real core (intents.ts, the Send's fill): the Amount is what the Safe's bytes move (the fill), said by "Your
       // Safe sends", so no "Amount:" line over it (QA's ledger re-walk, 6 Nov, b/12: "Amount: about $25.00" said the Send)
       ...amountOf(c.id, fill.toFixed(9)), amountSaid: true as const };
@@ -1615,6 +1655,20 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
   /** Whether a Send from the Safe takes the fill, as the real ledger's safe-send.ts decides it for ANY coin (QA walk,
    *  MUST 1: the Sim filled only USDC): `fill` asked, the fill open, Private short of it, and the coin priced. `raw`: the
    *  Safe's own id ("near": NEAR on the account), `id`: Private's id for it. */
+  /** QA 16's Send Max shots (7 Nov, (d)): a Max Send (`upTo`, all its place can send, asked whole) pays as the core's Max
+   *  path does (wallet safe-send.ts: a Send's fill pays core maxSend over upTo, none of Private's share), never the raw
+   *  max; `maxed` marks it, for its title's cents. Anything else as asked. */
+  const maxedSend = (p: Record<string, unknown>): Record<string, unknown> => {
+    if (p.upTo === undefined || p.fill !== true || !(Number(p.amount) >= Number(p.upTo))) return p;
+    const id = p.tokenId === "near" ? "nep141:wrap.near" : String(p.tokenId ?? "");
+    const dec = DEFAULT_TOKENS.find((t) => t.assetId === id)?.decimals;
+    const m = /^(\d+)(?:\.(\d+))?$/.exec(String(p.upTo));
+    if (dec === undefined || !m) return p;
+    const most = maxSend(BigInt(m[1]! + (m[2] ?? "").padEnd(dec, "0").slice(0, dec)), 0n);
+    if (!most) return p;
+    const { upTo: _upTo, ...rest } = p;
+    return { ...rest, amount: unitsText(most.pays, dec), maxed: true };
+  };
   const fillCase = (p: Record<string, unknown>): { raw: string; id: string; asked: number } | null => {
     const raw = String(p.tokenId ?? ""), id = raw === "near" ? "nep141:wrap.near" : raw;
     const asked = Number(p.amount), held = Number(pocket.rows.find((r) => r.tokenId === id)?.amount ?? 0);
@@ -2614,6 +2668,23 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       // B28 R6: every service is up in the demo (faults.ts injects one for the fault-injection suite and a dev build)
       case "ledger.services": return {};
       case "ledger.status": return [];
+      // Settings → Status (rule 9b): the Sim asks no service (sim-no-network), so it says what its sample money uses: every
+      // row Working through ZeroFee's server, checked now (core status-probe.ts's shape)
+      case "status.probe": return simStatusReport(Date.now(), simOwn);
+      case "status.own.get": return { near: simOwn.near && ownHostOf(simOwn.near), solana: simOwn.solana && ownHostOf(simOwn.solana), hood: simOwn.hood && ownHostOf(simOwn.hood) };
+      case "status.own.test": {
+        const url = ownAddressOf(p.address);
+        if (!isOwnChain(p.chain) || !url) return { result: "bad" };
+        return simOwnAnswers(url) ? { result: "working", ms: 180 } : { result: "down", ms: null };
+      }
+      case "status.own.set": {
+        if (!isOwnChain(p.chain)) throw new ProblemError({ code: "status.unknown", whatHappened: "Status couldn't check this one.", money: { state: "not-involved" }, next: { kind: "nothing", label: "Close" } } as Problem);
+        const url = p.address === null ? null : ownAddressOf(p.address);
+        if (p.address !== null && !url) throw new ProblemError({ code: "status.own.bad", whatHappened: "That isn't a server address. It starts with https://", money: { state: "not-involved" }, next: { kind: "nothing", label: "Close" } } as Problem);
+        simOwn[p.chain] = url;
+        simStatusAt = -Infinity;
+        return { host: url ? ownHostOf(url) : null };
+      }
       case "ledger.quotePay": {
         const amountOut = String(p.amountOut ?? "0");
         const sameCoin = p.fromTokenId === p.toTokenId;
@@ -2897,6 +2968,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       // flow (D125). Answers Movement[], one per part, as the real ledger does.
       case "ledger.sendFromSafe": {
         if (p.app !== undefined && p.app !== "wallet") throw securityProblems.requestNotAllowed("Only your own Send sends from your Safe this way.");
+        p = maxedSend(p);
         const id = p.tokenId === "near" ? "nep141:wrap.near" : String(p.tokenId ?? "");
         const row = pocket.rows.find((r) => r.tokenId === id);
         const held = Number(row?.amount ?? 0), asked = Number(p.amount);
@@ -3248,6 +3320,9 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         // sent, says job.signed, and the shell makes the job then ("Job created.")
         if (words.amount && words.tap !== true) signedSaid();
       }
+      // Settings → Status: the real look takes about a second (status-probe.ts), so the Sim's row says "Checking…" that long too
+      // (kept 30 s as the real checks are: Settings' row asks first, so the sheet then opens on the answer)
+      if (method === "status.probe" && options.latencyMs !== 0 && Date.now() - simStatusAt >= 30_000) { await new Promise((r) => setTimeout(r, 900)); simStatusAt = Date.now(); }
       try {
         return { ok: answer(method, params) as T };
       } catch (e) {

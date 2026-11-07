@@ -42,12 +42,7 @@ export const EXTENSION_BUILD: boolean = import.meta.env?.VITE_ZEROFEE_TARGET ===
  * with a strict CSP (laptopCsp, hosting.ts). Its WebAuthn RP ID is the host, "laptop.zerofee.si" (no rp.id is sent).
  * laptop-words.ts names it on mainnet (LAPTOP_SITE) only once check-laptop-site.sh passes.
  */
-/** A self-hosted build names its own laptop page's host with VITE_SECOND_DEVICE_SITE (a bare host name); else ours. */
-export const secondDeviceSite = (raw: string | undefined): string => {
-  const v = raw?.trim().toLowerCase() ?? "";
-  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(v) ? v : "laptop.zerofee.si";
-};
-export const SECOND_DEVICE_SITE = secondDeviceSite(import.meta.env?.VITE_SECOND_DEVICE_SITE);
+export const SECOND_DEVICE_SITE = "laptop.zerofee.si";
 /** The laptop page's path in the real app's build (D54). */
 export const LAPTOP_PATH = "/laptop";
 const isLaptopPath = (path: string) => path.replace(/\/+$/, "") === LAPTOP_PATH;

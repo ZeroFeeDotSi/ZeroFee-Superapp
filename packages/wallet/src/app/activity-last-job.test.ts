@@ -131,7 +131,7 @@ test("item 8: money coming home says the wallet it left from, never the NEAR wal
 
 test("item 7: a Send keeps its job's name and figure when it ends (never \"Paid · 5.6433 NEAR\")", () => {
   const r = sendRowOf(send(), "$25.00");
-  assert.deepEqual(r, { title: "Send $25.00 to bob.near", usd: "$25.00" });
+  assert.deepEqual(r, { title: "Send $25.00 to bob.near", usd: "$25.00", line: "From Private" }, "J3-4: the line where it left from only");
   assert.equal(sendRowOf(send({ status: "moving" }), "$25.00")?.title, "Send $25.00 to bob.near", "the same name while it goes");
   // control: a payment this phone didn't make (no carried figure): the ledger's own words
   assert.equal(sendRowOf(send(), undefined), null);

@@ -18,7 +18,10 @@ for (const s of Object.values(SAMPLE_UNSELLABLE)) {
     assert.ok(rows.some((r) => r.chain === s.chain && r.address.toLowerCase() === s.address), JSON.stringify(rows.map((r) => [r.chain, r.symbol])));
     const d = await m.coin(s.chain, s.address);
     assert.equal(d.symbol, "NOSELL");
-    assert.equal(d.name, "Honeypot coin", "named on screen as what it is: a coin nobody can sell back");
+    // QA 16 (7 Nov): the list row's line is the coin's name like every other row's; "Not for sale" (where Buy was) is the
+    // one place that says what it is, so the name never says it again ("Honeypot coin" did)
+    assert.equal(d.name, "Lucky Frog");
+    assert.doesNotMatch(d.name, /honey|pot|sale|sell|trap|stuck|scam/i);
     // every coin has a logo: this one is bundled, so no host the CSP refuses, with the relay on or off
     assert.equal(d.logoUrl, HONEYPOT_LOGO);
     const viaRelay = createMarket({ fetch: createRecordedFetch(withSamples(RECORDED), () => T) as typeof fetch, logoRelay: "https://quotes-seven-gamma.vercel.app", now: () => T, storage: null, budget: { calls: 1e9, perMs: 60_000 }, burst: { calls: 1e9, perMs: 10_000 }, screenWaitMs: 0 });

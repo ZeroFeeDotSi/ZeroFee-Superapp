@@ -4,6 +4,7 @@
 // call goes through the quote server. Loaded with the first private quote, never in Home's first load (speed budget,
 // 3 Nov): the ledger hands over what it needs. The rules are the ledger's own, moved here unchanged.
 import { ProblemError, type Problem } from "@zerofee/core/problem";
+import { refusalFace } from "@zerofee/shell-api/refusal-face.ts";
 import { payeeAsk } from "./payee-ask.ts";
 import type { AccountInfo } from "@zerofee/core/signer";
 import { fromUnits, toUnits } from "./amount.ts";
@@ -137,7 +138,7 @@ export function createPrivatePay(x: PrivatePayDeps) {
  * fill) stays private. Without it, all of each coin, as before. Only the amount the core is asked for changes.
  */
 export async function fromPrivate<M extends { id: string; status: string }>(p: Record<string, unknown>, caller: Caller, x: {
-  rows: { tokenId: string; amount: string }[];
+  rows: { tokenId: string; amount: string; symbol?: string; name?: string; usd?: string | null }[];
   home: (tokenId: string, key: string, amount: string) => Promise<{ ok: M } | { problem: Problem }>;
   /** The coin's decimals, as the rows were worked out with (needed only with `upTo`). */
   decimals?: (tokenId: string) => number;
@@ -166,7 +167,12 @@ export async function fromPrivate<M extends { id: string; status: string }>(p: R
     }
     const key = `wallet-home-${row.tokenId.replace(/[^A-Za-z0-9]/g, "").slice(-24)}-${Date.now().toString(36)}`;
     const moved = await x.home(row.tokenId, key, amount);
-    if ("problem" in moved) throw new ProblemError(moved.problem);
+    if ("problem" in moved) {
+      // the audit's way-home audit P2 (7 Nov): a coin refused after another went was "Nothing moved." on the job; now it says what
+      // went and where the rest is (the coins that went are in Activity, each its own row)
+      if (out.length) { x.emit("ledger.balancesChanged", {}); throw new ProblemError(homePartWent(moved.problem, out.map((m) => went(coinsOut.find((r) => r.tokenId === m.to), m.amount)), coinsOut.filter((r) => !out.some((m) => m.to === r.tokenId) && (upTo === undefined || (upTo as Record<string, string>)[r.tokenId] !== undefined)).map((r) => coinName(r)))); }
+      throw new ProblemError(moved.problem);
+    }
     const at = x.iso();
     const m: Movement = { id: `home:${moved.ok.id}`, kind: "private", status: x.status(moved.ok), from: PRIVATE_KIND, to: row.tokenId, amount: said, startedAtIso: at, updatedAtIso: at, explorerUrls: [], caller };
     await x.remember(m);
@@ -174,4 +180,36 @@ export async function fromPrivate<M extends { id: string; status: string }>(p: R
   }
   x.emit("ledger.balancesChanged", {});
   return out;
+}
+
+/** A coin by name, always (QA 16's SHOULD on P2): its symbol; a coin the catalogue doesn't know (its row's symbol "?",
+ *  ledger privatePocket) by its row's name, "an unnamed coin"; never "it" or "?". */
+const coinName = (r: { symbol?: string; name?: string } | undefined): string =>
+  r?.symbol && r.symbol !== "?" ? r.symbol : r?.name ? r.name.replace(/^An /, "an ") : "an unnamed coin";
+/** "$25.00 of USDC" (the row's dollars, in proportion when only part of it went), else "25 USDC". */
+function went(r: { amount: string; symbol?: string; name?: string; usd?: string | null } | undefined, amount: string): string {
+  const sym = coinName(r);
+  const usd = r && r.usd != null && Number(r.amount) > 0 ? (Number(r.usd) * Number(amount)) / Number(r.amount) : NaN;
+  return Number.isFinite(usd) ? `$${usd.toFixed(2)} of ${sym}` : `${amount} ${sym}`;
+}
+const and = (xs: readonly string[]): string => (xs.length < 2 ? xs[0] ?? "" : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+
+/**
+ * P2 (the audit's way-home audit, 7 Nov): the way home stopped on a coin after others went. Never "Nothing moved.": what went is
+ * on its way to the Safe, the coin refused (and any after it) is still in Private, by name, with the refusal's own why;
+ * its money unsure (the refusal's own state not "safe"): "Check Activity for where this is." Pure.
+ */
+export function homePartWent(p: Problem, gone: readonly string[], left: readonly string[]): Problem {
+  // the core's own refusal (security.subwallet.refused) says what failed in its reason's first sentence (the audit's M9: never
+  // its generic "This wallet can't approve this, so ZeroFee said no.")
+  const face = refusalFace(p);
+  const why = (face ? face.head : p.whatHappened).replace(/\s*Nothing (moved|was sent)\.?\s*$/i, "").trim();
+  const sure = p.money.state === "safe";
+  const rest = left.length ? `${sure ? `${and(left)} ${left.length > 1 ? "are" : "is"} still in Private.` : "Check Activity for where this is."}` : "";
+  return {
+    code: "ledger.private.home.part-went",
+    whatHappened: [`${and(gone)} ${gone.length > 1 ? "are" : "is"} on its way to your Safe.`, rest, why].filter(Boolean).join(" "),
+    money: { state: "on-the-way", where: sure ? "part on its way to your Safe, the rest in Private" : "part on its way to your Safe" },
+    next: { kind: "open", label: "Open Activity", screen: "wallet/activity" },
+  };
 }

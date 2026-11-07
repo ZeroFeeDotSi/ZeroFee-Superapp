@@ -155,7 +155,7 @@ test("P5: Trade's own coin check refuses in Trade's words, before anything is si
     }),
   });
   const out = await t.buy(MINT, 5, "BONK");
-  assert.deepEqual(out, { kind: "refused", line: "BONK's maker can freeze it and stop you selling. Trade doesn't offer it. Nothing was sent." });
+  assert.deepEqual(out, { kind: "refused", line: "ZeroFee won't buy BONK. Its maker can freeze it. Nothing was spent." }, "changed pin (T7): Trade's words, said once");
   assert.ok(!signs.includes("account.agent.pocketSign"));
 });
 

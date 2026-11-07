@@ -19,12 +19,6 @@ export const TOP_NOTE_LAPTOP_URL = "https://laptop.zerofee.si";
  *  address as Settings → Open source (open-source.ts CODE_FALLBACK, pinned equal in top-note.test.ts). */
 export const TOP_NOTE_SELFHOST_FALLBACK = "https://zerofee.si/docs/self-host";
 
-/** The laptop link: a self-hosted build's VITE_SECOND_DEVICE_SITE (a bare host, as mode.ts reads it), else ours. */
-export function laptopHref(site: string | undefined): string {
-  const v = (site ?? "").trim().toLowerCase();
-  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(v) ? `https://${v}` : TOP_NOTE_LAPTOP_URL;
-}
-
 /** The code link: the build's VITE_CODE_URL when it is an https address, else the fallback (never empty or dead). */
 export function selfHostHref(codeUrl: string | undefined): string {
   const url = (codeUrl ?? "").trim();

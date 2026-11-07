@@ -80,10 +80,10 @@ export function inplaceFigures(side: "buy" | "sell", q: InplaceQuote): { payUsd:
   return { payUsd, getUsd, feeUsd: Math.max(0, Math.round((payUsd - getUsd) * 100) / 100) };
 }
 
-/** "You get about 3.2 NEAR, at least 3.1 NEAR. About 10 s." (a buy), "You get about $9.94, at least $9.84." (a sale into USDC): the
+/** "You get about 3.2 NEAR, at least 3.1 NEAR. In 10 s." (a buy; one "about" a line, the audit's M6), "You get about $9.94, at least $9.84." (a sale into USDC): the
  *  quote's own figure, the least the tap signs (`atLeast`, its minAmountOut: item 9, it was never shown), and the quoter's own time. */
 export function inplaceArrives(side: "buy" | "sell", q: InplaceQuote, symbol: string): string {
-  const time = q.etaSeconds ? ` About ${q.etaSeconds} s.` : "";
+  const time = q.etaSeconds ? ` In ${q.etaSeconds} s.` : "";
   if (side === "sell") return `You get about $${(Number(q.amountOut) / 1e6).toFixed(2)}, at least $${(Math.floor(Number(q.minAmountOut) / 1e4) / 100).toFixed(2)}.${time}`;
   const sym = q.symbol || symbol;
   return `You get about ${coinShown(Number(q.amountOut) / 10 ** q.decimals)} ${sym}, at least ${coinShown(Number(q.minAmountOut) / 10 ** q.decimals)} ${sym}.${time}`;

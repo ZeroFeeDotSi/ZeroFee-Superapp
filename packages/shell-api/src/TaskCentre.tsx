@@ -11,7 +11,7 @@ import { ActSwap, AppAgent, AppBrowser, AppChat, AppHome, AppTrade } from "@zero
 import { useShell } from "./AppFrame.tsx";
 import { cardStep, timeLeft } from "./job-steps.ts";
 import { TASK_APP_HOME, taskStore, type Task, type TaskApp } from "./tasks.ts";
-import { useAppHistories, useHistory } from "./history-slot.ts";
+import { appRecorded, useAppHistories, useHistory } from "./history-slot.ts";
 import { earlierOf } from "./task-earlier.ts";
 import { siteMoneyRow } from "./site-money-rows.ts";
 import { TxProofLine } from "./TxProofLine.tsx";
@@ -69,7 +69,7 @@ export function TaskCentre({ onClose, onBack, only, onAll }: { onClose: () => vo
   // Home's finished tasks live in its history (the Money list), never twice. Home's history is drawn on the whole centre
   // and on Home alone (`only` home), so the rule holds on both.
   const homeHistory = !!history && (!only || only === "home");
-  const earlier = newestFirst(earlierOf(all, homeHistory, new Set(others.map(([a]) => a))));
+  const earlier = newestFirst(earlierOf(all, homeHistory, new Set(others.map(([a]) => a)), appRecorded()));
   // the words of what is still going ("12 s", "4 min"): every second under a minute, then every 15 s
   const [at, setAt] = useState(() => Date.now());
   const youngest = now.length ? Math.min(...now.map((t) => at - t.startedAt)) : Infinity;

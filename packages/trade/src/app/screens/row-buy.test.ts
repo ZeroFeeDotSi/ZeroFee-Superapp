@@ -29,7 +29,7 @@ test("the service's answer: done = landed; unconfirmed = checking (never refused
 });
 
 test("money rules in the source: the sheet's service with origin chip:<address>, the preset, the ready check before any ask, the core's refusal said on the row", () => {
-  assert.match(src, /svc\.trade\(p, `chip:\$\{r\.address\}`\)/);
+  assert.match(src, /svc\.trade\(p, `chip:\$\{r\.address\}`, \{ task: taskId, tapAt: epochOf\(at\) \}\)/, "changed pin (T12, then 83\'s T4): with its task and its press");
   assert.match(src, /svc\.quote\("buy", r\.chain, r\.address, \{ usd: quick \}\)/);
   assert.equal(QUICK_BUY_DEFAULT, 25);
   assert.match(src, /if \(ready !== undefined && ready < quick\) \{[\s\S]*?onState\(\{ phase: "refused", at, why: `Only \$/);

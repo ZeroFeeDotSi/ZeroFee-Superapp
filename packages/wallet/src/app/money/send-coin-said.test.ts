@@ -37,7 +37,8 @@ test("control: display only; the amount sent is the exact unrounded figure, neve
   assert.equal(form.split("\n").filter((l) => /coinSaid\(/.test(l) && !/^\s*import /.test(l)).length, 0);
   const cap = readFileSync(new URL("./send-cap.ts", import.meta.url), "utf8");
   const under = cap.slice(cap.indexOf("export function underAmount"), cap.indexOf("export function underAmount") + 900);
-  assert.match(under, /coins: Number\(o\.amount\) > 0 \? `\$\{coinSaid\(o\.amount, o\.symbol\)\} from \$\{o\.place\}`/, "only the line under the keypad reads it");
+  // changed pin (builder 3, 7 Nov): a dollar coin's line is gone under its dollar hero (max-cents.test.ts)
+  assert.match(under, /coins: Number\(o\.amount\) > 0 && o\.stable !== true \? `\$\{coinSaid\(o\.amount, o\.symbol\)\} from \$\{o\.place\}`/, "only the line under the keypad reads it");
   const amount = "1.128653627";
   const source = { id: "safe:near", row: null, tokenId: "near", label: "", place: "your Safe", symbol: "NEAR", chain: "near", amount: "10", usd: "44.3", max: "10" };
   assert.equal(safeAmount({ source: source as never, amountIn: amount, usd: 5 }), amount, "amountIn reaching the quote is the unrounded figure");

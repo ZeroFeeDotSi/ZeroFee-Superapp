@@ -13,6 +13,7 @@ import { copyReason } from "./market/spam.ts";
 import { approvalNeeded, rawToUsd, usdToRaw } from "./slippage.ts";
 import { ageOf, BACKOFF_AFTER_MS, checkableShape, liveCheckable, LIVE_MAX_MS } from "./live-check.ts";
 import { problemOf, tradeProblems } from "./trade-problems.ts";
+import { pressAt } from "./tap-time.ts";
 import type { Amount, ChainEngine, ChainId, CoinMeta, FinalAgain, Fill, Prepared, Quote, Side, TxStatus, TxStep } from "./types.ts";
 
 /**
@@ -104,10 +105,13 @@ export interface TradeRecord {
   bookFails?: number;
   /** Ref kept its coin out and nothing proved where (the audit's MUST, 7 Nov; trade.near.rhea-kept): what the card's way back
    *  needs, the wallet that traded, the trade's hash and the coin out's contract. */
-  kept?: { wallet: string; hash: string; token: string };
+  kept?: { wallet: string; hash: string; token: string; /** the audit's T8: a claim of it went out, its end unread (the claim's hash) */ claimSent?: string };
   /** Its coin came back by this claim's tx (the audit's MUST, 7 Nov): one claim covers every kept trade of the wallet and coin,
    *  booked once under claim:<hash>; this trade's own fill is "about" its quote and never books on its own. */
   claimed?: string;
+  /** Its Jobs row's id (the audit's T12, 8 Nov): Trade's runtime keeps that row to this record (app/trade-tasks.ts), whatever
+   *  screen made it, after a reload too. */
+  task?: string;
 }
 
 /** A fill the positions can book: every figure the booking reads is one BigInt takes (the audit's SHOULD, 7 Nov: a corrupt kept
@@ -817,16 +821,18 @@ export function createTradeService(d: TradeServiceDeps) {
 
   /** Trades in flight by coin, side, amount and wallet (trade()): the one-tap lock, held here, never in a screen's state. */
   const inFlight = new Map<string, Promise<TradeRecord>>();
-  async function tradeOnce(p: Prepared): Promise<TradeRecord> {
+  async function tradeOnce(p: Prepared, task?: string, pressed?: number): Promise<TradeRecord> {
+    // the audit's T4: the clock starts at the person's press (the screen's, handed in), so Activity's time is the row's and Jobs'
+    const started = now();
     await ensureLoaded();
-    const tapAt = now(), q = p.quote;
+    const tapAt = pressAt(pressed, started), q = p.quote;
     if (q.expiresAt < now()) {
       // an old quote is prepared again; it goes ahead only if its own floor (what gets signed) is still at least the minimum shown
       const fresh = await quote(q.side, q.chain, q.coin, { raw: q.payRaw });
       if (BigInt(fresh.quote.getMinRaw) < BigInt(q.getMinRaw)) throw new ProblemError(tradeProblems.priceMoved(q.symbol));
       p = fresh;
     }
-    const rec: TradeRecord = { id: newId(), kind: q.side, chain: q.chain, coin: q.coin, symbol: q.symbol, status: "signing", amountUsd: q.side === "buy" ? q.payUsd : q.getUsd, route: q.route, quote: p.quote, hashes: [], startedAt: tapAt };
+    const rec: TradeRecord = { id: newId(), kind: q.side, chain: q.chain, coin: q.coin, symbol: q.symbol, status: "signing", amountUsd: q.side === "buy" ? q.payUsd : q.getUsd, route: q.route, quote: p.quote, ...(task ? { task } : {}), hashes: [], startedAt: tapAt };
     records!.unshift(rec);
     changed();
     // its place in this coin's bookings, at the tap (review M1); a trade done on one node's word gives it up when its
@@ -947,7 +953,7 @@ export function createTradeService(d: TradeServiceDeps) {
   /** A NEAR coin's trade 1Click was still finishing, looked at by the core's move id (resume's look, and the live one):
    *  in near/book.ts, loaded the first time one is looked at (Home's first load, its JS budget). */
   /** A kept trade's claim, one per trade at a time (the audit's MUST (3), 7 Nov): a second tap waits on the first, one tx. */
-  const claiming = new Map<string, Promise<{ got: string } | undefined>>();
+  const claiming = new Map<string, Promise<import("./near/kept.ts").ClaimEnd | undefined>>();
   const followNear = async (rec: TradeRecord) => (await import("./near/book.ts")).followNear({ rec, checking, engineOf, bookOrDefer, save, now, takeSlot, settleSlot, reverted: tradeProblems.reverted });
 
   return {
@@ -985,12 +991,14 @@ export function createTradeService(d: TradeServiceDeps) {
      *  taken before any await, so nothing is signed or sent twice. Once it ends, the next tap is a new trade. `origin` says
      *  who asked (none: the person's tap; "order:<id>", "standing:<id>", "chip:<row>"): only repeats from the same one fold, so a price order that fires
      *  while the person's own identical tap is on its way is its own trade, never the tap's record (QA's SHOULD). */
-    trade(p: Prepared, origin?: string): Promise<TradeRecord> {
+    trade(p: Prepared, origin?: string, o: { task?: string; tapAt?: number } = {}): Promise<TradeRecord> {
       // the wallet is the chain's for a buy and the coin's holder for a sale (walletFor): chain, coin and side name it
       const q = p.quote, key = [origin, q.chain, q.coin, q.side, q.payRaw].join("|");
       let once = inFlight.get(key);
       // the key is held until this trade ends (its finally runs before any caller hears the end), so none newer is lost
-      if (!once) inFlight.set(key, (once = tradeOnce(p).finally(() => inFlight.delete(key))));
+      // `task`: the tap's Jobs row (T12), kept on the record; a folded repeat keeps the first's
+      // `tapAt` (the audit's T4): the press, epoch ms by the service's clock; from it the record's time is counted
+      if (!once) inFlight.set(key, (once = tradeOnce(p, o.task, o.tapAt).finally(() => inFlight.delete(key))));
       return once;
     },
 
@@ -1092,7 +1100,7 @@ export function createTradeService(d: TradeServiceDeps) {
     /** A kept trade's coin claimed back: Ref sends the coin's WHOLE lost and found, so every kept trade of the wallet and
      *  coin is done by it, the measured rise booked once (near/kept.ts): the rise, raw; undefined can't tell. A second tap
      *  while one runs, on any of them, gets the same answer (one tx). */
-    async claimKept(id: string): Promise<{ got: string } | undefined> {
+    async claimKept(id: string): Promise<import("./near/kept.ts").ClaimEnd | undefined> {
       await ensureLoaded();
       const rec = records!.find((r) => r.id === id);
       if (!rec?.kept) return undefined;

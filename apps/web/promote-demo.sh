@@ -9,7 +9,7 @@
 # Reads and prints no secret. Nothing here touches zerofee.si itself or any other project.
 set -uo pipefail
 PROJECT=zerofee-app
-DOMAIN=${DOMAIN:-superapp.zerofee.si}
+DOMAIN=superapp.zerofee.si
 URL="${1:-}"
 repo="$(cd "$(dirname "$0")/../.." && pwd)"
 want_csp="$(node "$repo/apps/web/src/hosting.ts" --csp)" || { echo "STOP: hosting.ts could not make the CSP" >&2; exit 1; }

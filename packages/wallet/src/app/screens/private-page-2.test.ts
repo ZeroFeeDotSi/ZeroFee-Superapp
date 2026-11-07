@@ -47,7 +47,7 @@ function page(held: Balance[], ready = true): string {
 
 test("A2-2: Private's Move opens its own one-slider sheet, \"Move money from Private to your Safe\", never the all-wallets Move [before: shell.openMoney({kind: move, source: private})]", () => {
   // the page's Move opens the sheet in place (with the slider); the app no longer hands it to the all-wallets Move
-  assert.match(src, /data-testid="private-move" onClick=\{\(\) => openSheet\(true\)\}>Move<\/button>/);
+  assert.match(src, /data-testid="private-move" disabled=\{moving !== "no"\} onClick=\{\(\) => openSheet\(true\)\}>Move<\/button>/);
   assert.doesNotMatch(app, /<PrivateScreen [^\n]*source: "private"/, "fails before: Move opened MoveSheet (\"All your wallets\")");
   assert.ok(P.PRIVATE_MOVE_WORDS, "fails before: no one-slider sheet");
   const html = renderToStaticMarkup(createElement(P.MoveAllSheet, { usd: "$20.00", stays: "$13.86", slide: { value: 20, max: 33.86, onChange: () => {} }, onApprove: () => {}, onClose: () => {} }));
@@ -57,17 +57,18 @@ test("A2-2: Private's Move opens its own one-slider sheet, \"Move money from Pri
   assert.equal((html.match(/type="range"/g) ?? []).length, 1, "one slider");
   assert.match(html, /aria-label="How much to move"/);
   assert.doesNotMatch(html, /All your wallets/);
-  assert.match(html, /<span>Your Safe gets<\/span><span>\$20\.00<\/span>/);
-  assert.match(html, /<span>Private keeps the rest<\/span><span>about \$13\.86<\/span>/);
+  assert.match(html, /<span>From Private<\/span><span>\$20\.00<\/span>/, "P5: the source row the slider form lacked");
+  assert.match(html, /<span>Your Safe gets<\/span><span>about \$20\.00, at least \$19\.60<\/span>/);
+  assert.match(html, /<span>Private keeps the rest<\/span><span>\$13\.86<\/span>/);
   // the copy review: the privacy line right under the rows, then Approve; no void (the floor no longer pushed down)
-  assert.match(html, /about \$13\.86<\/span><\/div><p class="zf-small wl-moveall__seen" data-testid="private-home-seen">Anyone can see what reaches your Safe\.<\/p><div class="wl-moveall__foot">/);
+  assert.match(html, /\$13\.86<\/span><\/div><p class="zf-small wl-moveall__seen" data-testid="private-home-seen">Anyone can see what reaches your Safe\.<\/p><div class="wl-moveall__foot">/);
   const css = readFileSync(new URL("../wallet.css", import.meta.url), "utf8");
   assert.match(css, /\.wl-moveall__foot \{ padding-top: 24px;/);
   assert.doesNotMatch(css, /\.wl-moveall__foot \{[^}]*margin-top: auto/, "fails before: the foot sat on the floor under a void");
   // control: move-all's sheet is still Check this with its own head and no slider
   const all = renderToStaticMarkup(createElement(P.MoveAllSheet, { usd: "$33.86", stays: "$0.00", onApprove: () => {}, onClose: () => {} }));
   assert.match(all, />Check this<\/div>/);
-  assert.match(all, />Move \$33\.86 from Private to your Safe<\/h2>/);
+  assert.match(all, />Move money from Private to your Safe<\/h2>/, "P5: the figure once, on its rows");
   assert.doesNotMatch(all, /type="range"|keeps the rest/);
 });
 
@@ -115,10 +116,17 @@ test("QA QA's SHOULD: after Approve the page says \"$33.86 on its way to your Sa
   await P.homeFromPrivate({ tasks: store.forApp("wallet"), caps: { usdc: "25", near: "2" }, usd: "$33.86", bridge: { call: async () => ({ ok: [{ id: "home:mv-1", kind: "private", status: "moving" }] }) as never }, set: (s) => { step = s; }, onProblem: () => {}, refresh: () => {}, onMade: (o) => said.push(o) });
   assert.equal(step, "sent");
   assert.deepEqual(said, [{ usd: "$33.86", ids: null }, { usd: "$33.86", ids: ["home:mv-1"] }]);
-  // control: refused after the job was made: no line (its job's row says it)
-  const no: unknown[] = [];
-  await P.homeFromPrivate({ tasks: createTaskStore().forApp("wallet"), caps: {}, usd: "$33.86", bridge: { call: async () => ({ problem: { code: "x.refused", whatHappened: "No.", money: { state: "safe", where: "" }, next: { kind: "nothing" } } }) as never }, set: () => {}, onProblem: () => {}, refresh: () => {}, onMade: (o) => no.push(o) });
+  // refused after the job was made: no on-its-way line; P1 (the audit's way-home audit, 7 Nov): the page says the refusal, its
+  // trigger back, "Job created." cleared [before: none of it, "Job created." ticking on]
+  const no: unknown[] = [], heard: unknown[] = [], steps: string[] = [];
+  const refusal = { code: "x.refused", whatHappened: "NEAR Intents gave no address to pay. Nothing moved.", money: { state: "safe", where: "" }, next: { kind: "nothing" } };
+  const jobs = createTaskStore();
+  await P.homeFromPrivate({ tasks: jobs.forApp("wallet"), caps: {}, usd: "$33.86", bridge: { call: async () => ({ problem: refusal }) as never }, set: (s) => void steps.push(s), onProblem: (p) => void heard.push(p), refresh: () => {}, onMade: (o) => no.push(o) });
   assert.deepEqual(no, [{ usd: "$33.86", ids: null }, null]);
+  assert.deepEqual(heard, [refusal], "the page says the refusal");
+  assert.equal(steps.at(-1), "no", "the trigger is back");
+  assert.equal(jobs.list()[0]?.state, "failed", "control: the job's row ends with its own words");
+  assert.match(src, /if \(!o\) setMadeAt\(null\); \};/, "\"Job created.\" cleared with the job's figure");
   // "Job created." its own block, 16 px above and below (copy review)
   const css = readFileSync(new URL("../wallet.css", import.meta.url), "utf8");
   assert.match(css, /\.wl-explain\.wl-private-made \{ margin: 16px 0; \}/);

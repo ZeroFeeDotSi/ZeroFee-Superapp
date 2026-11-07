@@ -15,7 +15,8 @@ async function asked(status: Status, depositAddress: unknown, tag: unknown): Pro
 /** `w`, with privatePay and hiddenFromRow given the honest page's payee whenever a test leaves it out. */
 export function honestPage<T extends SubWallets>(w: T, status: Status): T {
   const pay = w.privatePay.bind(w), row = w.hiddenFromRow.bind(w);
-  w.privatePay = async (id, dep, intent, why, tag, inDep, send, payee) => pay(id, dep, intent, why, tag, inDep, send, payee ?? (await asked(status, dep, tag)));
+  // a Send's own key (the audit's M9) passes through; the pair and plan arguments stay off, as before
+  w.privatePay = async (id, dep, intent, why, tag, inDep, send, payee, _pair, _job, sendJob) => pay(id, dep, intent, why, tag, inDep, send, payee ?? (await asked(status, dep, tag)), undefined, undefined, sendJob);
   w.hiddenFromRow = async (chain, inDep, outDep, intent, tag, why, payee, coin) => row(chain, inDep, outDep, intent, tag, why, payee ?? (await asked(status, outDep, tag)), coin);
   return w;
 }

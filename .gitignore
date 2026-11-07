@@ -42,6 +42,3 @@ apps/extension/build-check/
 .npmrc
 *.map
 ExportOptions.plist
-
-# The self-host settings template is committed; your filled .env never is.
-!.env.example

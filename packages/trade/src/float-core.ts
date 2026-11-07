@@ -92,7 +92,9 @@ export function moveAnswer(a: FloatMoveWire | { declined: true }): MoveAnswer {
   const reason = typeof a.reason === "string" && a.reason ? a.reason.slice(0, 240) : undefined;
   // S21: a move home 1Click says is done that the Safe's read hasn't shown yet: on its way, with its line
   const unshown = a.kind === "home" && a.status === "pending" && a.unshown === true && !!reason;
-  return { id: a.id, status: a.status, ...(arrived !== undefined ? { arrivedUsd: arrived } : {}), ...(expected !== undefined ? { expectedUsd: expected } : {}), ...(reason ? { reason } : {}), ...(unshown ? { unshown: true as const } : {}), ...(a.proof && typeof a.proof === "object" ? { proof: a.proof } : {}) };
+  // what landed, in the landed coin's own smallest units (the audit's Send audit M5): 1Click's settled figure, done only
+  const units = a.status === "done" && typeof a.settled?.amountOut === "string" && /^\d{1,40}$/.test(a.settled.amountOut) && BigInt(a.settled.amountOut) > 0n ? a.settled.amountOut : undefined;
+  return { id: a.id, status: a.status, ...(arrived !== undefined ? { arrivedUsd: arrived } : {}), ...(units !== undefined ? { arrivedUnits: units } : {}), ...(expected !== undefined ? { expectedUsd: expected } : {}), ...(reason ? { reason } : {}), ...(unshown ? { unshown: true as const } : {}), ...(a.proof && typeof a.proof === "object" ? { proof: a.proof } : {}) };
 }
 
 /** The ledger's movement for an Add (ledger.toTrading) once it ended other than done, as far as its row needs it. */
@@ -847,7 +849,7 @@ export function createCoreFloat(d: CoreFloatDeps): FloatView & { fromPrivate: bo
       ...(j.why ? { why: j.why } : j.asked ? { why: "asked" as const } : {}), ...(j.note ? { note: j.note } : {}), ...(j.unshown && j.state === "moving" ? { unshown: true as const } : {}), ...(j.why === "ready" && j.wallet ? { wallet: j.wallet } : {}),
       // a leg of the person's one move (a Move's leg on to a chain; a take-out's move back from one): one Activity row
       // a site's Add and its move on to the site's wallet (r.ready.job) are one move too (QA, 5 Nov: two rows)
-      ...(j.of ? { of: j.of } : j.kind === "in" && j.for && j.asked ? { of: j.for } : readyOf(j) ? { of: readyOf(j) } : {}), ...(j.to ? { to: j.to } : {}), ...(j.proof ? { proof: j.proof } : {}) };
+      ...(j.of ? { of: j.of } : j.kind === "in" && j.for && j.asked ? { of: j.for } : readyOf(j) ? { of: readyOf(j) } : {}), ...(j.to ? { to: j.to } : {}), ...(j.proof ? { proof: j.proof } : {}), ...(j.state === "done" && j.got ? { got: j.got } : {}) };
   }
 
   return {

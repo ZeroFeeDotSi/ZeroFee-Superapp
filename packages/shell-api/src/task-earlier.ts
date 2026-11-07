@@ -18,5 +18,9 @@ export const SAFE_SWAP = /^native-(buy|sell)-/;
 /** `drawn`: the other apps whose own history the centre draws (Trade's trades): their done tasks are those records, so
  *  they leave Earlier (lap FAIL 4, QA 5 Nov: each trade was listed twice, a task row and a trade row). One that
  *  didn't finish stays: it has no record there. */
-export const earlierOf = (tasks: readonly Task[], homeHistory: boolean, drawn: ReadonlySet<string> = new Set()): Task[] =>
-  tasks.filter((t) => t.state !== "pending" && !(homeHistory && ((t.app === "home" && !OWN_RECORD.test(t.id)) || (t.app === "trade" && t.state === "done" && SAFE_SWAP.test(t.id)))) && !(t.state === "done" && t.app !== "home" && drawn.has(t.app)));
+/** `recorded` (the audit's Trade audit T11, 8 Nov): the tasks each drawn app's history has a record for (history-slot.ts
+ *  setAppRecorded). One of those that failed or stopped is that record's row too ("Didn't buy DOPE"), so it leaves Earlier
+ *  as a done one does: a reverted buy was "Buy $5 of DOPE · DOPE didn't buy…" here and "Didn't buy DOPE" under Trade.
+ *  One with no record (said no before a record, the app closed first) stays: it is its only row. */
+export const earlierOf = (tasks: readonly Task[], homeHistory: boolean, drawn: ReadonlySet<string> = new Set(), recorded: ReadonlyMap<string, ReadonlySet<string>> = new Map()): Task[] =>
+  tasks.filter((t) => t.state !== "pending" && !(homeHistory && ((t.app === "home" && !OWN_RECORD.test(t.id)) || (t.app === "trade" && t.state === "done" && SAFE_SWAP.test(t.id)))) && !(t.app !== "home" && drawn.has(t.app) && (t.state === "done" || !!recorded.get(t.app)?.has(t.id))));

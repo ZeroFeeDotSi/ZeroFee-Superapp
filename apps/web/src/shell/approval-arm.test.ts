@@ -1,12 +1,12 @@
 // the audit's ruling (c), 8 Nov, with R4 (audit, 6 Nov): the Move's Getting-ready sheet starts Approve's 700 ms arm at the tap, and
 // the core's sheet with the same headline keeps it (so Approve may be on at once). A sheet whose signed quote broke the
-// plan's bound heads with "Costs more than the plan said.": it RE-ARMS, Approve off, the same 700 ms arm from when it
+// plan's bound heads with its costs-more card (NEAR Intents' figure against the plan's, the audit's M8): it RE-ARMS, Approve off, the same 700 ms arm from when it
 // came. Fails on ae8e3f472 and 1e2123004: the sheet kept the tap's arm whatever its words (no approval-arm.ts).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { moveSheet } from "@zerofee/core/move-plan";
-import { ARM_MS, COSTS_MORE_HEAD, keptArm } from "./approval-arm.ts";
+import { ARM_MS, costsMoreHead, keptArm } from "./approval-arm.ts";
 
 const sheet = readFileSync(new URL("./ApprovalSheet.tsx", import.meta.url), "utf8");
 const view = readFileSync(new URL("./ApprovalSheetView.tsx", import.meta.url), "utf8");
@@ -19,7 +19,7 @@ test("the audit's ruling (c): a quote past the plan's bound gives the head and a
   const came = 1_000 + 2_500; // the core's sheet, 2.5 s after the tap: the tap's arm long done
   // the core's sheet from leg 2's signed quote: $45.00 at least for $51.00 (the plan said at least $49.01)
   const past = moveSheet([{ wallet: "your SOL wallet", priv: 0n, pay: 5100n, got: 5000n, least: 4500n }], 6000n, $c);
-  assert.equal(past.lines[0], COSTS_MORE_HEAD, past.lines.join(" | "));
+  assert.equal(costsMoreHead(past.lines), 3, past.lines.join(" | "));
   assert.equal(past.title, getting.headline, "the same headline as the tap's sheet");
   const kept = keptArm(getting, past);
   assert.equal(kept, null, "the head re-arms: no kept arm");
@@ -27,7 +27,7 @@ test("the audit's ruling (c): a quote past the plan's bound gives the head and a
   assert.equal(ARM_MS, 700);
   // control: within the plan, the same headline keeps the tap's arm, so Approve is on as the sheet comes
   const within = moveSheet([{ wallet: "your SOL wallet", priv: 0n, pay: 5100n, got: 5050n, least: 4999n }], 6000n, $c);
-  assert.ok(!within.lines.includes(COSTS_MORE_HEAD), within.lines.join(" | "));
+  assert.equal(costsMoreHead(within.lines), 0, within.lines.join(" | "));
   assert.equal(keptArm(getting, within), getting);
   assert.equal(left(keptArm(getting, within)?.at, came), 0);
   // control: another headline re-arms as before (R4)
@@ -37,5 +37,6 @@ test("the audit's ruling (c): a quote past the plan's bound gives the head and a
   assert.match(sheet, /key=\{same \? `getting-\$\{same\.at\}` : showing\.id\}[^\n]*\{\.\.\.\(same \? \{ armAt: same\.at \} : \{\}\)\}/);
   assert.match(view, /const left = Math\.max\(0, \(armAt \?\? Date\.now\(\)\) \+ ARM_MS - Date\.now\(\)\);/);
   // the head is said first, in ink
-  assert.match(view, /if \(line === COSTS_MORE_HEAD\) return <p key=\{i\} className="approval__line approval__lead" role="alert">/);
+  assert.match(view, /\{costsMoreHead\(words\.lines\) > 0 && \(\n\s+<div className="approval__costs" role="alert"/);
+  assert.match(view, /\{words\.lines\.slice\(costsMoreHead\(words\.lines\)\)\.map\(\(line, i\) => \{/, "the rows after the card, never the head twice");
 });

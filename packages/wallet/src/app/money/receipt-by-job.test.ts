@@ -26,9 +26,9 @@ test("two jobs within the slack, one going (a hot wallet's Send) and one stopped
   assert.ok(Math.abs(rows[0]!.startedAt - rows[1]!.startedAt) < LANDED_SLACK_MS, "both inside the slack");
   const aState = receiptStateOf(rows, T, jobRows(a.id)), bState = receiptStateOf(rows, T, jobRows(b.id));
   assert.deepEqual(aState, { state: "going" }, "A: its own row is going");
-  assert.equal(receiptSaid(sendWords("$25.00 to bob.near"), aState), "Sending $25.00 to bob.near.", "A keeps the present, no stop words");
+  assert.equal(receiptSaid(sendWords("bob.near"), aState), "Sending it to bob.near.", "A keeps the present, no stop words");
   assert.deepEqual(bState, { state: "stopped", words: STOP }, "B: its own stop words");
-  assert.equal(receiptSaid(sendWords("$30.00 to carol.near"), bState), `Sending $30.00 to carol.near. ${STOP}`);
+  assert.equal(receiptSaid(sendWords("carol.near"), bState), `Sending it to carol.near. ${STOP}`);
   assert.deepEqual(receiptStateOf(rows, T), { state: "stopped", words: STOP }, "control: with no job id (the fallback), the window takes B's stop words");
 });
 
@@ -45,12 +45,12 @@ test("a landed row of job B never makes job A's receipt past tense: A not yet an
   a.made(["send:a-1"]);
   const going: Row[] = [{ id: "send:a-1", state: "pending", startedAt: T + 400 }, bDone];
   assert.deepEqual(receiptStateOf(going, T, jobRows(a.id)), { state: "going" });
-  assert.equal(receiptSaid(sendWords("$25.00 to bob.near"), receiptStateOf(going, T, jobRows(a.id))), "Sending $25.00 to bob.near.");
+  assert.equal(receiptSaid(sendWords("bob.near"), receiptStateOf(going, T, jobRows(a.id))), "Sending it to bob.near.");
   assert.deepEqual(receiptStateOf(going, T, jobRows(b.id)), { state: "landed", at: T + 700 }, "B's own receipt: landed");
   // control: A's own row done, A landed (and says Sent)
   const both: Row[] = [{ id: "send:a-1", state: "done", startedAt: T + 400, endedAt: T + 1_200 }, bDone];
   assert.deepEqual(receiptStateOf(both, T, jobRows(a.id)), { state: "landed", at: T + 1_200 });
-  assert.equal(receiptSaid(sendWords("$25.00 to bob.near"), receiptStateOf(both, T, jobRows(a.id))), "Sent $25.00 to bob.near.");
+  assert.equal(receiptSaid(sendWords("bob.near"), receiptStateOf(both, T, jobRows(a.id))), "Sent to bob.near.");
 });
 
 test("a job's rows are its own whenever they started, and only its own: its starting row's refusal, a Safe Move's own row id, a job with two rows", () => {

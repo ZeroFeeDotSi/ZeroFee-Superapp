@@ -23,8 +23,7 @@ test("only the mainnet flows tool and the release-4 sandbox rehearsal set privat
   const setters = [...sources(join(repo, "apps")), ...sources(join(repo, "packages")), ...sources(join(repo, "tools"))]
     .filter((f) => /privateQuotesLoopback\s*:/.test(readFileSync(f, "utf8")))
     .map((f) => f.slice(repo.length));
-  const allowed = new Set(["tools/mainnet/flows.ts", "tools/mainnet/v4-sandbox.ts"]);
-  assert.deepEqual(setters.filter((f) => !allowed.has(f)), [], "no other file sets it (the mainnet tools may be absent from a public copy)");
+  assert.deepEqual(setters, ["tools/mainnet/flows.ts", "tools/mainnet/v4-sandbox.ts"]);
   const core = readFileSync(join(repo, "packages/core/src/demo-core.ts"), "utf8");
   assert.match(core, /const local = loopback && \/\^http:\\\/\\\/\(127\\\.0\\\.0\\\.1\|localhost\):\\d\{2,5\}\$\/\.test\(base\);/, "loopback only, a port, nothing after it");
 });

@@ -93,14 +93,21 @@ export interface Paid { to: string; chain?: string }
 /** The lines under the amount (the copy review's re-walk, 5 Nov): first who sees it land, the core sheet's own line (core send-words.ts
  *  OUTSIDE_WORDS.seen: "Public on Solana."); then, only where it says more, the coin that lands, one idea per line. */
 // R3 (the design review §4.5): never the machine's route ("Goes through NEAR"). No wait of ours to name (D137).
-// `nearCoin`: on NEAR, the coin nearLandsAs (send-to.ts) gives, when it is the Safe's own NEAR coin ("Lands as USDC on NEAR.")
+// `nearCoin`: on NEAR, the coin nearLandsAs (send-to.ts) gives, when it is the Safe's own NEAR coin ("Public on NEAR, as USDC.")
 // the copy review's pair walk: true to the route used. A NEAR account with a NEAR Intents balance is paid there (INTENTS): wNEAR in it
+// when NEAR is what lands; the Safe's own NEAR coin lands as itself (the audit's Send audit M2, 7 Nov: Safe USDC to such an
+// account said "Lands as wNEAR" while SendSheet's toTokenId, nearLandsAs, was USDC)
 export const routeLines = (net: SendToChain, nearCoin?: string, intoIntents = false): string[] => {
   const seen = OUTSIDE_WORDS.seen(LANDS_AS[net].network);
+  const own = !!nearCoin && nearCoin !== LANDS_AS.near.named;
+  // QA 16 (7 Nov, Send Max shots): "Public on NEAR." over "Lands as USDC on NEAR." said NEAR twice; the coin folds into
+  // the one public line (a NEAR Intents balance's wNEAR keeps its own line: it says what wNEAR is)
+  if (net === "near" && own) return [nearAs(nearCoin)];
   if (net === "near" && intoIntents) return [seen, INTENTS_LINE];
-  if (net === "near" && nearCoin && nearCoin !== LANDS_AS.near.named) return [seen, `Lands as ${nearCoin} on NEAR.`];
   return [seen];
 };
+/** The one public line for a coin other than NEAR landing on NEAR: "Public on NEAR, as USDC." */
+export const nearAs = (coin: string) => `Public on NEAR, as ${coin}.`;
 export const INTENTS_LINE = "Lands as wNEAR, the NEAR Intents form of NEAR.";
 
 /**

@@ -32,13 +32,15 @@ function Obj({ state, icon }: { state: MarkState; icon: ReactNode }) {
   );
 }
 
-export function Receipt({ state, side, coin, coinAmount, where, usd, landedMs, feeTaken, feeUsd, icon, extra, say }: {
+export function Receipt({ state, side, coin, coinAmount, where, usd, landedMs, feeTaken, feeUsd, about, icon, extra, say }: {
   state: ReceiptState; side: "buy" | "sell"; coin: string; coinAmount: string; where: string;
   /** "$25.00": the figure from the signed quote (min received), never a higher estimate. `state` "refused" only when nothing
    *  was broadcast or the chain confirmed a fail/expire; a lost answer after broadcast is "checking". */
   usd: string; landedMs?: number;
   /** A refusal the chain made after landing: its network fee left the wallet (receipt.ts). */
   feeTaken?: boolean; feeUsd?: string;
+  /** Landed, its coins still the quote's (not the chain's read): "About 7,505 DOPE" (receipt.ts). */
+  about?: boolean;
   /** The coin's logo (a CoinIcon at 64), drawn inside the object. */
   icon: ReactNode;
   /** On the chain line, after its words: a clock while it is on its way ("· 0.36 s"). */
@@ -47,7 +49,7 @@ export function Receipt({ state, side, coin, coinAmount, where, usd, landedMs, f
    *  "your wallet"; a refusal's own reason). Only the lines given change; the state, the object and the marks don't. */
   say?: { head?: string; line?: string; chain?: string };
 }) {
-  const w0 = receiptWords({ state, side, coin, coinAmount, where, ...(landedMs !== undefined ? { landedMs } : {}), ...(feeTaken ? { feeTaken } : {}), ...(feeUsd ? { feeUsd } : {}) });
+  const w0 = receiptWords({ state, side, coin, coinAmount, where, ...(landedMs !== undefined ? { landedMs } : {}), ...(feeTaken ? { feeTaken } : {}), ...(feeUsd ? { feeUsd } : {}), ...(about ? { about } : {}) });
   const w = { ...w0, ...say };
   useEffect(() => { mark(state); }, [state]);   // a crawl's clock: away, checking, landed, refused
   return (

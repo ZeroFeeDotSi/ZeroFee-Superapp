@@ -62,6 +62,25 @@ const KEEP_MS = 7 * 86_400_000;
 /** 1Click's fee and the 1 % slippage fit well inside this (float-floors.ts: Move's sheet says the least from it). */
 const AT_LEAST_PERCENT = POCKET_HOME_LEAST_PERCENT;
 const refused = (why: string) => new ProblemError(securityProblems.subwalletRefused(why));
+/**
+ * the audit's way-home audit M9 (7 Nov): a way home's refusal in plain words (rule 8): what failed, by name, as the first
+ * sentence (the refusal's head, shell-api refusal-face); where the money is and the next tap after it. The service's own
+ * text ("fetch failed", a relay's message) is never on screen: it rides on the error's `cause`, for the log.
+ */
+export const HOME_REFUSED = {
+  said: "NEAR Intents said no.",
+  silent: "NEAR Intents didn't answer.",
+  noAddress: "NEAR Intents gave no address to pay.",
+  nothingToSign: "NEAR Intents sent nothing to approve.",
+  checked: "ZeroFee stopped it: NEAR Intents' price wasn't the one it asked for.",
+  still: "Your money is still in Private. Try again in a minute.",
+  notTaken: "NEAR Intents didn't take it. Check Activity for where your money is.",
+} as const;
+/** The refusal's every field in the same words: never the generic "This wallet can't approve this" or "in that wallet". */
+const homeRefused = (head: string, cause?: unknown) =>
+  Object.assign(new ProblemError({ ...securityProblems.subwalletRefused(`${head} ${HOME_REFUSED.still}`), whatHappened: head, money: { state: "safe", where: "in Private" } }), cause === undefined ? {} : { cause });
+const notTaken = (cause: unknown) =>
+  Object.assign(new ProblemError({ ...securityProblems.subwalletRefused(HOME_REFUSED.notTaken), whatHappened: "NEAR Intents didn't take it.", money: { state: "unsure", where: "in Private, or on its way to your Safe", check: "Activity" } }), { cause });
 const invalid = (why: string) => new ProblemError(securityProblems.requestInvalid(why));
 
 export class PocketMoves {
@@ -119,26 +138,26 @@ export class PocketMoves {
         recipient: main, recipientType: this.d.recipientType ?? "INTENTS", deadline: quoteDeadline(this.now(), QUOTE_MINUTES * 60_000), confidentiality: "basic",
       });
       const depositAddress = raw?.quote?.depositAddress;
-      if (typeof depositAddress !== "string" || !/^[0-9a-f]{64}$/.test(depositAddress)) throw refused("NEAR Intents gave no address to pay. Nothing moved.");
+      if (typeof depositAddress !== "string" || !/^[0-9a-f]{64}$/.test(depositAddress)) throw homeRefused(HOME_REFUSED.noAddress);
       k.depositAddress = depositAddress;
       if (typeof raw?.zerofeeStatusTag === "string" && /^[A-Za-z0-9_-]{16,128}$/.test(raw.zerofeeStatusTag)) k.tag = raw.zerofeeStatusTag;
       await this.keep(k);
       const gen = await relay.generateIntent(pocket.address, depositAddress);
       const p = gen?.intent?.payload;
       const payload: Nep413Payload | null = gen?.intent?.standard === "nep413" && typeof p?.message === "string" && typeof p?.nonce === "string" && typeof p?.recipient === "string" ? { message: p.message, nonce: p.nonce, recipient: p.recipient, ...(p.callbackUrl !== undefined ? { callbackUrl: p.callbackUrl } : {}) } : null;
-      if (!payload) throw refused("NEAR Intents sent nothing to approve. Nothing moved.");
+      if (!payload) throw homeRefused(HOME_REFUSED.nothingToSign);
       // The quote by its deposit address, as 1Click signed it (the relay only passes it on): never the app's word.
       const quote = parseQuote(await relay.status(depositAddress, k.tag), depositAddress, this.d.quoteKey);
       // pocketIntentRefusal also holds the refund to the pocket itself.
       const why = pocketIntentRefusal(payload, quote, depositAddress, pocket.address, this.now()) ?? notAsked(quote!, tokenId, units, atLeast, main, this.d.recipientType ?? "INTENTS");
-      if (why) throw refused(why);
+      if (why) throw homeRefused(HOME_REFUSED.checked, why);
       k.move.sent = { tokenId, amount: quote!.amountIn };
       k.signed = signNep413(payload, await pocket.secret());
       await this.keep(k);
     } catch (e) {
       // Nothing was signed: the money never left the pocket.
       if (k.depositAddress) (k.move.status = "failed"), await this.keep(k);
-      throw e instanceof ProblemError ? e : refused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+      throw e instanceof ProblemError ? e : homeRefused((e as { refused?: boolean } | null)?.refused ? HOME_REFUSED.said : HOME_REFUSED.silent, e);
     }
     // Signed: from here the money may move, so a move 1Click may have is answered, never thrown. Only 1Click's own "no"
     // ends it here; with no answer at all it stays pending, and subwallet.private.move sends it again.
@@ -151,7 +170,7 @@ export class PocketMoves {
         delete k.signed;
         k.move.status = "failed";
         await this.keep(k);
-        throw refused(`NEAR Intents didn't take it. See Activity for where your money is. ${String((e as Error).message).slice(0, 120)}`);
+        throw notTaken(e);
       }
     }
     await this.keep(k);

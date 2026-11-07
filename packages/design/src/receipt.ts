@@ -23,11 +23,13 @@ export interface ReceiptWords {
 /** `feeTaken`: the chain landed the trade and failed it, so its network fee (and any priority fee) left the wallet (QA,
  *  5 Nov: "Nothing left your wallet" is false there); `feeUsd` names it when the fill was read. Without `feeTaken` a refusal
  *  is one the core made before signing, or an expired send that never landed: nothing left. */
-export function receiptWords(a: { state: ReceiptState; side: "buy" | "sell"; coin: string; coinAmount: string; where: string; landedMs?: number; feeTaken?: boolean; feeUsd?: string }): ReceiptWords {
+/** `about` (the audit's Trade audit T1, 8 Nov): landed on one node's word, the coins are the quote's until the chain's read, so
+ *  the line says "About 7,505 DOPE", never the quote as fact. */
+export function receiptWords(a: { state: ReceiptState; side: "buy" | "sell"; coin: string; coinAmount: string; where: string; landedMs?: number; feeTaken?: boolean; feeUsd?: string; about?: boolean }): ReceiptWords {
   const did = a.side === "buy" ? "Bought" : "Sold";
   if (a.state === "landed") {
     const ms = a.landedMs ?? 0;
-    return { head: did, line: `${a.coinAmount} ${a.coin} · ${a.side === "buy" ? "in" : "from"} ${a.where}`, chain: `Landed in ${(ms / 1000).toFixed(2)} s`, verb: "Done" };
+    return { head: did, line: `${a.about ? "About " : ""}${a.coinAmount} ${a.coin} · ${a.side === "buy" ? "in" : "from"} ${a.where}`, chain: `Landed in ${(ms / 1000).toFixed(2)} s`, verb: "Done" };
   }
   if (a.state === "refused") {
     const line = a.feeTaken ? `Only the network fee${a.feeUsd ? ` (${a.feeUsd})` : ""} left your wallet.` : "Nothing left your wallet.";

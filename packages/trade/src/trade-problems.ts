@@ -142,28 +142,30 @@ export const tradeProblems = {
     next: { kind: "nothing", label: "Go back" },
     more: "Recent buyers couldn't sell it, so your money could get stuck. Nothing was spent.",
   }),
+  // the audit's Trade audit T7 (8 Nov): the six trap refusals name who said no (ZeroFee, never "Trade"), the one reason, and
+  // where the money is ("Nothing was spent.": refused before anything is signed, so it is all still in the wallet)
   coinFreezable: (symbol: string): Problem => ({
     code: "trade.coin.freezable",
-    whatHappened: `${symbol}'s maker can freeze it and stop you selling. Trade doesn't offer it.`,
+    whatHappened: `ZeroFee won't buy ${symbol}. Its maker can freeze it. Nothing was spent.`,
     money: inTradingWallet,
     next: { kind: "open", label: "Find another coin", screen: "search" },
   }),
   // a Token-2022 power that lets the issuer take or stop what a buyer holds (sol/codec.ts issuerHold)
   coinDelegated: (symbol: string): Problem => ({
     code: "trade.coin.delegated",
-    whatHappened: `${symbol}'s maker can take it from any wallet, at any time. Trade doesn't offer it.`,
+    whatHappened: `ZeroFee won't buy ${symbol}. Its maker can take it from any wallet. Nothing was spent.`,
     money: inTradingWallet,
     next: { kind: "open", label: "Find another coin", screen: "search" },
   }),
   coinPausable: (symbol: string): Problem => ({
     code: "trade.coin.pausable",
-    whatHappened: `${symbol}'s maker can pause it and stop you selling. Trade doesn't offer it.`,
+    whatHappened: `ZeroFee won't buy ${symbol}. Its maker can pause it. Nothing was spent.`,
     money: inTradingWallet,
     next: { kind: "open", label: "Find another coin", screen: "search" },
   }),
   coinHooked: (symbol: string): Problem => ({
     code: "trade.coin.hooked",
-    whatHappened: `${symbol}'s maker could stop you selling. Trade doesn't offer it.`,
+    whatHappened: `ZeroFee won't buy ${symbol}. Its maker could stop you selling. Nothing was spent.`,
     money: inTradingWallet,
     next: { kind: "open", label: "Find another coin", screen: "search" },
     more: "Its maker runs its own code on every transfer.",
@@ -176,13 +178,13 @@ export const tradeProblems = {
   }),
   coinFeeRaisable: (symbol: string): Problem => ({
     code: "trade.coin.fee-raisable",
-    whatHappened: `${symbol}'s maker can raise its fee and take most of a sale. Trade doesn't offer it.`,
+    whatHappened: `ZeroFee won't buy ${symbol}. Its maker can raise its fee and take most of a sale. Nothing was spent.`,
     money: inTradingWallet,
     next: { kind: "open", label: "Find another coin", screen: "search" },
   }),
   coinFeeHigh: (symbol: string): Problem => ({
     code: "trade.coin.fee-high",
-    whatHappened: `${symbol} takes over 1% of every transfer. Trade doesn't offer it.`,
+    whatHappened: `ZeroFee won't buy ${symbol}. It takes over 1% of every transfer. Nothing was spent.`,
     money: inTradingWallet,
     next: { kind: "open", label: "Find another coin", screen: "search" },
     more: "It takes it again when you sell.",

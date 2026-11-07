@@ -3,8 +3,7 @@
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 
-// Sample words only, checksum-invalid on purpose: no wallet opens them, so never fund them (words.test.ts proves it).
-export const WORDS = "orbit velvet canyon pulse harbor lemon quick tiger ribbon sketch nature amount glove civil drift onion phrase metal brave crisp slogan window empty lunar".split(" "); // zerofee-allow-secret-shape: checksum-invalid sample
+export const WORDS = "orbit velvet canyon pulse harbor lemon quick tiger ribbon sketch nature amount glove civil drift onion phrase metal brave crisp slogan window empty lunar".split(" ");
 
 /**
  * The Sim's backup words after `round` sets of new words (QA sd-security (a): Get new words showed the same 24). Round 0

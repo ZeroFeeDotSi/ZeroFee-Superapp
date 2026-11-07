@@ -15,7 +15,7 @@ const NOW = Date.parse("2026-11-03T08:00:00Z");
 const ago = (min: number) => new Date(NOW - min * 60_000).toISOString();
 const mv = (o: Partial<Movement> & Pick<Movement, "id" | "kind" | "status">): Movement => ({ amount: "5", startedAtIso: ago(3), updatedAtIso: ago(2), explorerUrls: [], ...o } as Movement);
 const LEDGER: Movement[] = [
-  mv({ id: "send", kind: "transfer", status: "moving", from: "nep141:usdc", to: "8JVZpqUZfQMEc8kMduTS9SkVxP9v8rgunJNcV4qNYGYZ on Solana", startedAtIso: ago(2) }),
+  mv({ id: "send", kind: "transfer", status: "moving", from: "nep141:usdc", to: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin on Solana", startedAtIso: ago(2) }),
   mv({ id: "in", kind: "deposit", status: "done", from: "sol", to: "nep141:usdc", amount: "25.01", updatedAtIso: ago(60) }),
   mv({ id: "old", kind: "transfer", status: "done", from: "nep141:usdc", to: "kim.near", updatedAtIso: ago(60 * 30) }),
   mv({ id: "acct", kind: "account", status: "done", amount: "0", label: "Added a key" }),

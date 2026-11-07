@@ -21,8 +21,8 @@ test("the copy review's ruling: Send from Private, the coin's row carries Privat
   assert.equal(privateRow("NEAR", "$8.86"), s!.line);
   for (const w of [s!.line, s!.part ?? "", s!.cant ?? ""]) assert.doesNotMatch(w, /can't|can go right now/, "never a standing can't line");
   // the From row and each list row show `line` (held = s.line ?? heldWords(s))
-  assert.match(form, /const held = \(s: SendSource\) => s\.line \?\? heldWords\(s\);/);
-  assert.match(form, /\{restStays\(source\) && !source\.privateOnly && /, "no standing \"rest stays\" line either");
+  assert.match(form, /const heldNow = \(s: SendSource\) => s\.line \?\? heldWords\(\{ \.\.\.s, max: sendable\(s, decOf\(s\)\) \}\);/);
+  assert.match(form, /const restNow = source\.privateOnly \? null : restStaysLine\(\{ \.\.\.source, max: can, rest: withKept\(source\.rest, readyUsd\(max, perCoin\), readyNow\) \}\);/, "no standing \"rest stays\" line either (changed pin, QA 20 8 Nov: the line names its figure, send-rest.test.ts)");
   const [open] = sendSources([], [near("100", "443.00", "ledger")], [near("2", "8.86", "private")], true);
   assert.deepEqual([open!.privateOnly, open!.line, open!.part], [undefined, undefined, undefined], "control: route open, all of it can go: no Private figure, no line");
   assert.equal(SEND_PART(false, "$443.00"), "Up to $443.00 can go in one send.", "control: the route-open part line is unchanged");

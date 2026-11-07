@@ -4,26 +4,29 @@
 // own (problems.ts NEAR_RELAY_SWITCHED, the design review's words: never "relay", never the vague "may").
 import { useEffect, useState } from "react";
 import { NEAR_RELAY_SWITCHED } from "./problems.ts";
+import { OWN_SWITCHED } from "@zerofee/core/own-servers";
 
 export const SWITCHED_LINE = NEAR_RELAY_SWITCHED;
 
-let on = false;
-const ears = new Set<(on: boolean) => void>();
+// The person's own server missing (doors.ts own, Settings → Status) says its own line, OWN_SWITCHED, the same way.
 
-/** doors.ts onSwitch: any line = switched, null = a paid door answered again. */
+let said: string | null = null;
+const ears = new Set<(line: string | null) => void>();
+
+/** doors.ts onSwitch: the line it says (NEAR's public servers, or the person's own server missed), null = gone. */
 export function saySwitched(line: string | null): void {
-  const next = line !== null;
-  if (next === on) return;
-  on = next;
-  for (const e of ears) e(on);
+  const next = line === null ? null : line === NEAR_RELAY_SWITCHED ? SWITCHED_LINE : line === OWN_SWITCHED ? OWN_SWITCHED : SWITCHED_LINE;
+  if (next === said) return;
+  said = next;
+  for (const e of ears) e(said);
 }
 
 /** The line while it lasts, else null. */
 export function useSwitchedLine(): string | null {
-  const [is, setIs] = useState(isSwitched);
-  useEffect(() => { setIs(on); ears.add(setIs); return () => { ears.delete(setIs); }; }, []);
-  return is ? SWITCHED_LINE : null;
+  const [line, setLine] = useState<string | null>(said);
+  useEffect(() => { setLine(said); ears.add(setLine); return () => { ears.delete(setLine); }; }, []);
+  return line;
 }
 
-/** Whether the line is on now (tests, and a sheet that opens mid-outage reads it at once). */
-export const isSwitched = (): boolean => on;
+/** Whether NEAR's trades are on NEAR's public servers now (tests, the Status check, and a sheet that opens mid-outage). */
+export const isSwitched = (): boolean => said === SWITCHED_LINE;

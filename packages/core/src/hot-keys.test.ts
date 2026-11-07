@@ -91,7 +91,7 @@ test("end to end, the standard paths give the addresses other wallets show for B
   const { evmAddress } = await import("./evm.ts");
   const { ed25519 } = await import("@noble/curves/ed25519.js");
   const { base58 } = await import("./sol/bytes.ts");
-  const seed = mnemonicToSeedSync("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"); // zerofee-allow-secret-shape: BIP-39's public test vector
+  const seed = mnemonicToSeedSync("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about");
   assert.equal(evmAddress(bip32Secp256k1(seed, steps("m/44H/60H/0H/0/0"))), "0x9858effd232b4033e47d90003d41ec34ecaeda94");
   assert.equal(base58(ed25519.getPublicKey(slip10Ed25519(seed, [44, 501, 0, 0]))), "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
 });

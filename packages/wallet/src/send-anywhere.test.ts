@@ -15,6 +15,7 @@ import { CONVERT_ROUTES } from "./convert.ts";
 import { QUOTE_ADDRESS, fakeCore, fakeNear, replayFetch } from "./testing/replay.ts";
 import type { Movement } from "./types.ts";
 import { pairs } from "@zerofee/core/testing/explorer-pairs";
+import { sendable } from "./app/money/send-sources.ts";
 
 const ME = "kid.near";
 const POCKET = "a1".repeat(32);
@@ -495,7 +496,7 @@ test("security review H1: the pocket's share whose submit errors is 'It may have
   const r = await s.ledger.call<Movement[]>("ledger.sendFromSafe", { ...safeAsk, amount: "10" });
   assert.ok("ok" in r, "problem" in r ? `${r.problem.code} ${r.problem.whatHappened}` : "the old code threw 'didn't answer… Try again' here");
   const m = await wait(s.ledger, r.ok[0]!.id, (x) => !!x.problem);
-  assert.deepEqual([m.status, m.problem?.whatHappened, m.problem?.next.kind], ["moving", "It may have gone. Activity will say.", "wait"]);
+  assert.deepEqual([m.status, m.problem?.whatHappened, m.problem?.next.kind], ["moving", "It's on its way to the person you paid, or back in Private. Check Activity for where this is.", "wait"]);
   assert.equal(JSON.parse(s.core.store.get("send-jobs")!)[m.id].handed, true, "marked handed over before the submit");
   out = "SUCCESS";
   assert.equal((await wait(s.ledger, m.id)).status, "done", "1Click's own status of the payment ends it: paid");
@@ -694,4 +695,23 @@ test("QA's add (5 Nov): Private's payment signed before a fill that failed is th
   assert.ok("ok" in o);
   assert.equal((await wait(ok.ledger, o.ok[0]!.id)).status, "done");
   assert.equal(ok.submitted.length, 1);
+});
+
+test("builder 3 (7 Nov): a Max Send through the fill pays what the form says it pays, Private holding some of the coin: the fill leaves Private's share where it is, so the form never counts it (before: the form said maxSend over the Safe's part less Private's, $1,067.96, while the core paid $1,165.05)", async () => {
+  // the Safe holds $1,210 of USDC in one place, Private $25: the form's source (send-sources.ts) is max 1210, pocket 25
+  const s = setup({ routeOpen: false, safeUnits: "1210000000", core: pocketCore("25000000") });
+  const r = await s.ledger.call<Movement[]>("ledger.sendFromSafe", { ...fillAsk, amount: "1210", upTo: "1210" });
+  assert.ok("ok" in r, "problem" in r ? `${r.problem.code} ${r.problem.whatHappened}` : "");
+  const paid = r.ok.reduce((n, m) => n + Number(m.amount), 0);
+  assert.equal(String(paid), sendable({ max: "1210", pocket: "25" }, 6), "one figure: the core's");
+  assert.equal(sendable({ max: "1210", pocket: "25" }, 6), "1165.048543");
+  // controls: no Private share, the same figure; a Private-only coin (no fill) says what Private holds
+  assert.equal(sendable({ max: "1210" }, 6), "1165.048543");
+  assert.equal(sendable({ max: "25", pocket: "25", privateOnly: true }, 6), "25");
+  // control: Private holds more than the Safe's place ($600 and $500: the form's max is Private's $600): Private pays it all
+  const p = setup({ routeOpen: false, core: pocketCore("600000000") });
+  const q = await p.ledger.call<Movement[]>("ledger.sendFromSafe", { ...fillAsk, amount: "600", upTo: "600" });
+  assert.ok("ok" in q, "problem" in q ? `${q.problem.code} ${q.problem.whatHappened}` : "");
+  assert.equal(String(q.ok.reduce((n, m) => n + Number(m.amount), 0)), sendable({ max: "600", pocket: "600" }, 6));
+  assert.equal(sendable({ max: "600", pocket: "600" }, 6), "600");
 });

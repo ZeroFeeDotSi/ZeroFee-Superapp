@@ -20,3 +20,6 @@ export function refusalFace(p: Problem): { head: string; body: string } | null {
 
 /** The sheets' one line: the head, then the body. */
 export const refusalText = (f: { head: string; body: string }): string => `${f.head} ${f.body}`.trim();
+/** A Jobs row's stop words for a Problem (the audit's way-home audit M9, 7 Nov): a wallet's refusal by its own reason, head then
+ *  body (the words the Problem screen shows), never its generic "This wallet can't approve this"; any other its own. */
+export const refusalWords = (p: Problem): string => { const f = refusalFace(p); return f ? refusalText(f) : p.whatHappened; };

@@ -92,9 +92,9 @@ test("T2-4: one net figure per holding: the receipt's holding line and the Sell 
   assert.equal(heldNetUsd("7505000000", { ...q, getUsd: Number.NaN }), undefined);
   const tsx = src("./screens/TradeSheet.tsx");
   assert.match(tsx, /const saleFigure = q \? saleNetUsd\(q\) : 0;/, "the Sell sheet reads saleNetUsd");
-  assert.match(tsx, /heldNetQuote\(svc\.quote, coin\.chain, coin\.address, heldRaw\)/, "the receipt asks one sale quote for all it holds (held-net.ts: heldNetUsd of it, a figure only)");
+  assert.match(tsx, /heldNetOf\(svc\.quote, coin\.chain, coin\.address, heldRaw\)/, "the receipt asks one sale quote for all it holds (held-net.ts: heldNetUsd of it, a figure only)");
   assert.match(src("./held-net.ts"), /const p = await quote\("sell", chain, coin, \{ fraction: 1 \}\);\n\s*return heldNetUsd\(raw, p\.quote\);/);
-  assert.match(tsx, /heldNet\?\.raw === pos\.value\.raw \? \{ usd: usd\(heldNet\.usd\) \} : \{\}/, "and shows it only for those very coins");
+  assert.match(tsx, /heldNet\?\.raw === moment\.held\.raw \? \{ usd: usd\(heldNet\.usd\) \} : \{\}/, "and shows it only for those very coins");
   assert.doesNotMatch(tsx, /usd: usd\(pos\.value\.valueUsd\)/, "never the market mark (service.ts pricedPositions) on the receipt");
   // the fee said once on the Sell sheet, in the copy review's form
   const { saleLine } = await import("./paid.ts");

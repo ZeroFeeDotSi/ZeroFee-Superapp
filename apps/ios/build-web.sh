@@ -7,9 +7,7 @@ repo="$(cd "$here/../.." && pwd)"
 cd "$repo"
 # The market/quote relay (apps/quotes) the phone build talks to: its public URL in apps/ios/relay-url.txt (one line,
 # empty until the relay is deployed). The web dev build leaves it unset (public APIs). Keys never travel; the relay holds them.
-# Self-host: ZEROFEE_RELAY_URL in the environment wins over the file (set it empty for no relay).
-if [ -n "${ZEROFEE_RELAY_URL+set}" ]; then RELAY="$(printf %s "$ZEROFEE_RELAY_URL" | tr -d '[:space:]')"; else
-RELAY="$(tr -d '[:space:]' < "$here/relay-url.txt" 2>/dev/null || true)"; fi
+RELAY="$(tr -d '[:space:]' < "$here/relay-url.txt" 2>/dev/null || true)"
 case "$RELAY" in ""|https://*) ;; *) echo "apps/ios/relay-url.txt must be empty or an https:// URL" >&2; exit 1;; esac
 # D130: the Browser's Private browsing needs tor in the app. A phone build never ships without it: if it isn't built
 # here yet, it is built now from its signed, pinned sources (tools/ios/build-tor.sh, about 4 minutes the first time).

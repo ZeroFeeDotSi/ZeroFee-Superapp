@@ -48,7 +48,7 @@ test("QA's condition 2: the fee line is never what a refusal replaces: the fee b
   const fee = sheet.indexOf('<div className="zf-fee">'), line = sheet.indexOf('data-testid="swap-line"'), go = sheet.indexOf('data-testid="swap-go"');
   assert.ok(line < fee && fee < go, "line 1, the fee block, the button");
   assert.match(sheet, /\{route && \(\n\s*<div className="zf-fee">/, "gated on the route alone: no refusal hides it");
-  assert.match(sheet, /price\.waiting \? <p className="zf-small" role="status" data-testid="swap-price-wait">[^\n]*: price\.figure && <p className="zf-small" data-testid="swap-fee">\{price\.figure\}<\/p>\}/);
+  assert.match(sheet, /price\.waiting \? <p className="zf-small" role="status" data-testid="swap-price-wait">[^\n]*: price\.figure && <p className=\{feeCls\} data-testid="swap-fee">\{price\.figure\}<\/p>\}/);
   assert.match(sheet, /<p className="zf-small" data-testid="swap-paid">\{price\.paid\}<\/p>/);
   assert.doesNotMatch(sheet, /const price = useSwapPrice\([^\n]*stopped/, "a refusal never stops the price: the figure stays and comes back with the amount");
   assert.match(sheet, /const price = useSwapPrice\(bridge, pay\?\.place \?\? null, get, amount, !route \|\| !!block\);/);

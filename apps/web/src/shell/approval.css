@@ -102,4 +102,9 @@
 .approval__lands { color: var(--mute); }
 /* a Send fill sheet's first leg, what they get (the UI lead's ruling, 5 Nov): ink; the Safe's and Private's legs quiet */
 .approval__line.approval__lead { color: var(--ink); }
+/* a signed quote past the plan's bound (the audit's M8): its head as one card, the warning's tint, first; the phone's the same */
+.approval__costs { margin: 8px 0 12px; padding: 12px 16px; border-radius: var(--r-sm, 12px); background: color-mix(in srgb, var(--alert) 9%, transparent); }
+.approval__costs .approval__line { color: var(--ink); margin: 0; }
+.approval__costs .approval__line + .approval__line { margin-top: 4px; }
+.approval__costs .approval__lead { font-weight: 600; }
 .approval__kv span.approval__checking { color: var(--mute); }  /* over .approval__kv span:last-child's --ink (copy review: Checking in --mute) */

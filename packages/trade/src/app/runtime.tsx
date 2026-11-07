@@ -10,6 +10,8 @@ import { keptList, listReadsNow, listRetryMs, liveReadsNow } from "./reads.ts";
 import { createTicks, tickKey, type Tick, type Ticks } from "../market/ticks.ts";
 import type { Candle, CoinDetail, CoinRow, Market, Range } from "../market/types.ts";
 import type { ChainId } from "../types.ts";
+import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
+import { keepTradeTasks } from "./trade-tasks.ts";
 export { CHAIN_NAME, LISTED, MARKET, NEAR_NOT_TRADED, OFFERED } from "../runtime.ts";
 export { tickKey } from "../market/ticks.ts";
 export type { ListKind } from "../market/paint.ts";
@@ -29,6 +31,9 @@ export function TradeProvider({ bridge, active, children }: { bridge: Bridge; ac
   // twice and keeps one, and a registered twin would answer with sample balances the app never moved
   useEffect(() => { setAppRuntime(rt); }, [rt]);
   useEffect(() => rt.svc.on(() => setTick((n) => n + 1)), [rt]);
+  // T12 (the audit's Trade audit, 8 Nov): every trade's Jobs row kept to its record from Trade's start, whatever screen made it
+  const { tasks } = useShell();
+  useEffect(() => (tasks ? keepTradeTasks(rt.svc, tasks) : undefined), [rt, tasks]);
   // the live re-check of an unconfirmed trade runs only while the app is in the foreground (service.ts foreground)
   useEffect(() => {
     if (typeof document === "undefined") return;

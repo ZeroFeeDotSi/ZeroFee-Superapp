@@ -19,6 +19,10 @@ const NOTHING_MOVES: ReadonlySet<string> = new Set([
   "ledger.depositAddress", "ledger.receiveChain", "ledger.accountKey", "ledger.daoPolicy", "ledger.nearProfile", "ledger.daosOf", "ledger.quotePay", "ledger.quoteConvert", "ledger.swapQuote", "ledger.startNetworks", "ledger.startQuote", "ledger.quoteToPrivate", "ledger.sendFee", "ledger.privateMoveStatus", "ledger.services", "ledger.status",
   // the ledger's settings
   "ledger.relabel", "ledger.privateSetup", "ledger.privateDefault",
+  // Settings → Status's read-only checks (status-probe.ts): no key, no account, no money
+  "status.probe",
+  // its own servers (phase 2): the hosts, a Test against a typed address, keeping or clearing one; no money
+  "status.own.get", "status.own.test", "status.own.set",
   // Spending's other calls that touch no money
   "spending.setCap", "spending.exportKey", "spending.swap.find", "spending.swap.held", "spending.swap.quote",
 ]);

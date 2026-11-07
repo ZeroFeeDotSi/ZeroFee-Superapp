@@ -12,7 +12,7 @@ import { buy, pocketNode, send } from "./testing/pocket-tx.ts";
 import { MemoryVault } from "./vault.ts";
 
 const STRANGER = "0x00000000000000000000000000000000000000aa";
-const SOL_STRANGER = "8JVZpqUZfQMEc8kMduTS9SkVxP9v8rgunJNcV4qNYGYZ";
+const SOL_STRANGER = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
 
 async function wallet(answer = false) {
   const shown: PlainWords[] = [];

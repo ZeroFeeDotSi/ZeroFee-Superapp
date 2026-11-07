@@ -118,7 +118,7 @@ test("Swap (Safe → SOL, Private pays it): made in the tap's turn as runJob's t
 
 test("the sheets read the rule: SwapSheet's Safe route and MoveSheet's Move ask the Safe only when it signs (control: unread coins keep the Approve first)", () => {
   const swap = src("./SwapSheet.tsx");
-  assert.match(swap, /const signs = route\.kind === "topup" \? safeSigns\(/);
+  assert.match(swap, /const signs = route\?\.kind === "topup" \? safeSigns\(/, "J3-3: computed once in the render, the card and the tap read the same value");
   assert.match(swap, /const safe = \(route\.kind === "topup" && signs !== false\) \|\| route\.kind === "safe";/);
   assert.match(swap, /balances && pocket \? \[/, "control: coins unread, safeSigns gets null (undefined: the Safe asks)");
   const move = src("../screens/MoveSheet.tsx");

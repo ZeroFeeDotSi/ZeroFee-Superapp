@@ -13,12 +13,17 @@
 // signed bytes, go to NEAR's keyless public nodes (market/near.ts createNearRpc), as core near-proxy.ts does. When a door
 // did reach NEAR and NEAR failed there, no free node is asked. Only when everything failed is a 9a line thrown, naming
 // what is really down: NEAR (NearDoorsDown, trade.near.down) or ZeroFee's relay (NearRelayDown, trade.near.relay-down).
+// A person's own NEAR server (Settings → Status, rule 9b; core own-servers.ts) goes ahead of both doors: a read asks it
+// first and the doors too when it fails or hasn't answered in OWN_HEDGE_MS; a send gives it the signed bytes first and
+// the doors the SAME bytes when it doesn't take them. While it misses, onSwitch says OWN_SWITCHED ("Your server didn't
+// answer. Using ZeroFee's server."), cleared when it answers again.
 import { sha256 } from "@noble/hashes/sha2.js";
 import { ProblemError } from "@zerofee/core/problem";
 import { createNearRpc, NEAR_RPC_HOSTS, type NearRpc } from "../market/near.ts";
 import { NEAR_RELAY_SWITCHED, nearProblems } from "./problems.ts";
 import { relayBase } from "../market/relay.ts";
 import { base58 } from "../sol/bytes.ts";
+import { OWN_SWITCHED, ownSaid } from "@zerofee/core/own-servers";
 
 /** A door's id (code only, never shown: the person's line is nearProblems.nearDown) and its two relay routes. */
 export interface NearDoor { id: "fastnear" | "near2"; read: string; send: string }
@@ -37,6 +42,8 @@ export const SEND_MS = 1_500;
 /** How long a transaction's outcome is waited for by its hash (the engine's own wait is longer: rhea.ts RHEA_LAND_MS). */
 export const OUTCOME_MS = 15_000;
 const OUTCOME_POLL_MS = 120;
+/** A person's own server gets this long alone before ZeroFee's doors are asked too (a read or the same signed bytes). */
+export const OWN_HEDGE_MS = 500;
 
 /** Every paid door failed (rule 9a): a ProblemError whose Problem is NEAR's one line (problems.ts nearDown, from
  *  services.ts serviceSays), so a trade that can't go says it by name, with where the money is. */
@@ -61,6 +68,8 @@ export interface NearDoorsDeps {
   /** Rule 9a, never silent: told NEAR_RELAY_SWITCHED (problems.ts) when a trade went on through NEAR's public servers
    *  because the relay itself failed, and null when a door answers again (the sheet's one calm line while it lasts). */
   onSwitch?(line: string | null): void;
+  /** The person's own NEAR server (core own-servers.ts ownServer), read at each call; null: none. */
+  own?(): string | null;
   /** Timers (tests drive a virtual clock). */
   sleep?(ms: number): Promise<void>;
   now?(): number;
@@ -109,15 +118,24 @@ export function createNearDoors(d: NearDoorsDeps): NearDoors {
   const free = d.free ?? createNearRpc(f, NEAR_RPC_HOSTS);
   /** Trades are going through NEAR's public servers (the relay itself failed): said once, cleared when a door answers. */
   let switched = false;
-  const doorAnswered = () => { if (switched) { switched = false; d.onSwitch?.(null); } };
+  /** The person's own server missed its last ask: OWN_SWITCHED is said until it answers again. */
+  let ownOff = false;
+  const doorAnswered = () => { if (switched) { switched = false; d.onSwitch?.(ownOff ? OWN_SWITCHED : null); } };
+  const ownAnswer = (answered: boolean) => {
+    ownSaid("near", answered);
+    if (answered === !ownOff) return;
+    ownOff = !answered;
+    if (!switched) d.onSwitch?.(ownOff ? OWN_SWITCHED : null);
+  };
 
   /** One door, one read: an answer, a node's verdict, or down and where (never a throw). */
-  async function ask(door: NearDoor, method: string, params: unknown, ms: number): Promise<Got> {
+  async function ask(door: NearDoor, method: string, params: unknown, ms: number): Promise<Got> { return askAt(`${base}${door.read}`, method, params, ms); }
+  async function askAt(url: string, method: string, params: unknown, ms: number): Promise<Got> {
     const ac = typeof AbortController === "undefined" ? undefined : new AbortController();
     const cut = sleep(ms).then((): Got => { ac?.abort(); return { ok: false, down: true, at: "slow" }; });
     const go = (async (): Promise<Got> => {
       try {
-        const r = await f(`${base}${door.read}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), ...(ac ? { signal: ac.signal } : {}) });
+        const r = await f(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), ...(ac ? { signal: ac.signal } : {}) });
         if (!r.ok) return { ok: false, down: true, at: await whereOf(r) };
         const j = await r.json() as { result?: any; error?: { cause?: { name?: string }; data?: string; message?: string } };
         if (j?.error) return { ok: false, verdict: Object.assign(new Error(`${j.error.cause?.name ?? ""} ${j.error.data ?? j.error.message ?? ""}`.trim()), { node: true }) };
@@ -173,9 +191,56 @@ export function createNearDoors(d: NearDoorsDeps): NearDoors {
     });
   }
 
+  /** The person's own server first, then `rest` (the doors) when it fails or hasn't answered in OWN_HEDGE_MS. A node's
+   *  verdict from it is an answer. No own server: `rest` alone. */
+  function ownFirst<T>(method: string, params: unknown, ms: number, rest: () => Promise<T>): Promise<T> {
+    const own = d.own?.() ?? null;
+    if (!own) return rest();
+    return new Promise<T>((resolve, reject) => {
+      let settled = false, fell = false;
+      const fall = () => {
+        if (fell) return;
+        fell = true;
+        rest().then((v) => { if (!settled) { settled = true; resolve(v); } }, (e) => { if (!settled) { settled = true; reject(e); } });
+      };
+      void askAt(own, method, params, ms).then((g) => {
+        if (g.ok || "verdict" in g) ownAnswer(true); else ownAnswer(false);
+        if (settled) return;
+        if (g.ok) { settled = true; resolve(g.value); return; }
+        if ("verdict" in g) { settled = true; reject(g.verdict); return; }
+        fall();
+      });
+      void sleep(OWN_HEDGE_MS).then(() => { if (!settled) fall(); });
+    });
+  }
+
+  /** The signed bytes to the person's own server (send_tx, not waiting): true once it took them. */
+  async function ownTook(own: string, tx: string): Promise<boolean> {
+    const g = await askAt(own, "send_tx", { signed_tx_base64: tx, wait_until: "NONE" }, SEND_MS);
+    ownAnswer(g.ok || "verdict" in g);
+    return g.ok;
+  }
+
   /** The same signed bytes to door 1, and to door 2 when door 1 fails or is slow: true once a door took them, else
-   *  where each door failed. */
+   *  where each door failed. A person's own server is given them first; the doors the same bytes when it doesn't take
+   *  them, or hasn't in OWN_HEDGE_MS. */
   async function broadcast(tx: string): Promise<true | Where[]> {
+    const own = d.own?.() ?? null;
+    if (own) {
+      const viaOwn = ownTook(own, tx);
+      const first = await Promise.race([viaOwn, sleep(OWN_HEDGE_MS).then(() => null)]);
+      if (first === true) return true;
+      // the own server may still take them while the doors are asked: either taking them is the one trade (NEAR keeps
+      // one copy), and the first to take them answers
+      const doors = doorsBroadcast(tx);
+      const never = new Promise<never>(() => {});
+      const ownLater = first === false ? never : viaOwn.then((t) => (t ? (true as const) : never));
+      const doorsDone = doors.then(async (b) => (b === true || first === false ? b : (await viaOwn) ? (true as const) : b));
+      return Promise.race([ownLater, doorsDone]);
+    }
+    return doorsBroadcast(tx);
+  }
+  async function doorsBroadcast(tx: string): Promise<true | Where[]> {
     const one = async (door: NearDoor): Promise<true | Where> => {
       const ac = typeof AbortController === "undefined" ? undefined : new AbortController();
       const cut = sleep(SEND_MS).then((): Where => { ac?.abort(); return "slow"; });
@@ -221,7 +286,7 @@ export function createNearDoors(d: NearDoorsDeps): NearDoors {
     const until = now() + OUTCOME_MS;
     for (;;) {
       try {
-        return await read(order, "tx", { tx_hash: id.hash, sender_account_id: id.signer, wait_until: wait });
+        return await readAny(order, "tx", { tx_hash: id.hash, sender_account_id: id.signer, wait_until: wait });
       } catch (e) {
         if (!/UNKNOWN_TRANSACTION|doesn't exist|does not exist/i.test(String((e as Error)?.message)) || now() >= until) throw e;
         await sleep(OUTCOME_POLL_MS);
@@ -229,6 +294,10 @@ export function createNearDoors(d: NearDoorsDeps): NearDoors {
     }
   }
 
-  const rpcOf = (order: readonly NearDoor[]): NearRpc => (method, params) => (method === "send_tx" ? sendTx(order, params) : read(order, method, params));
+  const readAny = (order: readonly NearDoor[], method: string, params: unknown) => {
+    const waits = method === "tx" && typeof (params as { wait_until?: unknown })?.wait_until === "string" && (params as { wait_until: string }).wait_until !== "NONE";
+    return ownFirst(method, params, waits ? OUTCOME_MS : DOOR_READ_MS, () => read(order, method, params));
+  };
+  const rpcOf = (order: readonly NearDoor[]): NearRpc => (method, params) => (method === "send_tx" ? sendTx(order, params) : readAny(order, method, params));
   return { rpc: rpcOf(NEAR_DOORS), rpc2: rpcOf([NEAR_DOORS[1]!, NEAR_DOORS[0]!]) };
 }

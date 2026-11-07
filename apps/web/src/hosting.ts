@@ -58,9 +58,8 @@ export function approvedHosts(text = readFileSync(here("../../ios/connect-hosts.
   return text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
 }
 
-/** The relay's origin from its URL (ZEROFEE_RELAY_URL in the build's environment when set, else apps/ios/relay-url.txt),
- *  or null when none is set. */
-export function relayOrigin(url = (process.env.ZEROFEE_RELAY_URL ?? readFileSync(here("../../ios/relay-url.txt"), "utf8")).trim()): string | null {
+/** The relay's origin from its URL (apps/ios/relay-url.txt), or null when none is set. */
+export function relayOrigin(url = readFileSync(here("../../ios/relay-url.txt"), "utf8").trim()): string | null {
   const m = /^(https:\/\/[a-z0-9.-]+)(\/|$)/.exec(url);
   return m ? m[1]! : null;
 }

@@ -11,6 +11,7 @@
 // The float's balance is the core's own count (float.balance): what each move signed away, and what 1Click's status
 // says settled into it (an Add's or a move in's amountOut, any refundedAmount). Nothing else can spend the float: its key
 // never leaves the core. Moves let go after a week are folded into a base kept in the same record.
+import { intentsNotTaken, intentsRefused, stopWords } from "./intents-refused.ts";
 import { moveProof, type MoveProof } from "./tx-proof.ts";
 import { FLOAT_MIN_USD, FLOAT_MOVES_PER_DAY, FLOAT_NO_SHEET_USD_PER_DAY, type FloatGuard } from "./float.ts";
 import { HOME_LEAST_PERCENT, leastIn, mostIn } from "./float-floors.ts";
@@ -363,7 +364,8 @@ const refused = (why: string) => new ProblemError(securityProblems.subwalletRefu
 const refOf = (m: FloatMove): WalletRef => (m.wallet ? { id: m.wallet } : m.slot !== undefined ? { slot: m.slot } : {});
 /** A move in that ended unpaid, in its row's words. */
 const stillThere = (chain: TradeChain) => `Didn't go · the money is still in your ${CHAIN_NAME[chain]} wallet`;
-/** An error's own words, short: a Problem's what-happened, else its message (a node's refusal, as it said it). */
+/** An error's own words, short: a Problem's what-happened, else its message (a node's refusal, as it said it). For the
+ *  kept record (payError, the log) only; a reason line says stopWords. */
 const wordsOf = (e: unknown): string => {
   const p = (e as { problem?: { whatHappened?: unknown } })?.problem?.whatHappened;
   return (typeof p === "string" ? p : String((e as Error)?.message ?? e)).replace(/\s+/g, " ").slice(0, 200);
@@ -834,7 +836,7 @@ export class FloatMoves {
     } catch (e) {
       await place.release();
       if (k.depositAddress) (k.move.status = "failed"), await this.keep(k);
-      throw e instanceof ProblemError ? e : refused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+      throw e instanceof ProblemError ? e : intentsRefused(e, `in your ${CHAIN_NAME[c.chain]} wallet`);
     }
     // From here the money may move, so the move is answered, never thrown: with no node taking the transfer it stays
     // pending on the chain, saying why, until it is provably unpaid (refresh) or its price runs out (subwallet.float.move).
@@ -856,15 +858,17 @@ export class FloatMoves {
     } catch (e) {
       // Mainnet 2 Nov: this was thrown away, so the move said "moving" for 3 days and nobody could say why.
       k.payError = wordsOf(e);
+      // the reason line in plain words (QA 16's SHOULD): payError keeps the node's own, for the log
+      const said = stopWords(e, `${CHAIN_NAME[c.chain]} didn't take it`);
       // Never signed (product decision, 5 Nov: a SOL wallet -> Safe Move said "Leaving your SOL wallet" for 20 minutes with no
       // transaction): `tried` runs after the transfer is signed and before it is sent, so with none kept no transfer exists
       // and nothing can have left the wallet. It ends now, the money in the wallet, never "on its way". Only this attempt's
       // own k: a move asked again (its record reloaded) is answered from that record by again() and never pays here, so an
       // EARLIER attempt's kept `tried` keeps its move pending: a retry after a real send can never say "still in your wallet".
       if (!k.tried) {
-        Object.assign(k.move, { status: "failed", where: "chain", reason: `Didn't go: ${k.payError} · the money is still in your ${CHAIN_NAME[c.chain]} wallet` });
+        Object.assign(k.move, { status: "failed", where: "chain", reason: `Didn't go: ${said} · the money is still in your ${CHAIN_NAME[c.chain]} wallet` });
         await place.release();
-      } else k.move.reason = `Not sent from your ${CHAIN_NAME[c.chain]} wallet: ${k.payError}`;
+      } else k.move.reason = `Not sent from your ${CHAIN_NAME[c.chain]} wallet: ${said}`;
     } finally {
       this.paying.delete(k.move.id);
     }
@@ -959,7 +963,7 @@ export class FloatMoves {
       if (k.depositAddress) (k.move.status = "failed"), await this.keep(k);
       // NEAR's own coin in from its chain, which 1Click didn't take (near-chain-refused.ts): NEAR Intents', by name
       if (!k.depositAddress && upstreamRefused(e)) throw refused(nearWalletRefused(usd));
-      throw e instanceof ProblemError ? e : refused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+      throw e instanceof ProblemError ? e : intentsRefused(e, "in your NEAR coin wallet");
     }
     // from here the money may move: answered, never thrown; 1Click's own record ends it (refresh)
     this.paying.add(k.move.id);
@@ -970,7 +974,7 @@ export class FloatMoves {
       this.hintDeposit(k);
     } catch (e) {
       k.payError = wordsOf(e);
-      k.move.reason = `Not sent from your NEAR coin wallet: ${k.payError}`;
+      k.move.reason = `Not sent from your NEAR coin wallet: ${stopWords(e, "NEAR didn't take it")}`;
     } finally {
       this.paying.delete(k.move.id);
     }
@@ -1037,7 +1041,7 @@ export class FloatMoves {
         deadline: quoteDeadline(this.now(), QUOTE_MINUTES * 60_000), confidentiality: "basic",
       })
       .catch((e: unknown) => {
-        throw e instanceof ProblemError ? e : refused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+        throw e instanceof ProblemError ? e : intentsRefused(e, "in your Safe");
       });
     const depositAddress = raw?.quote?.depositAddress;
     if (typeof depositAddress !== "string" || !/^[0-9a-f]{64}$/.test(depositAddress)) throw refused("NEAR Intents gave no address to pay. Nothing moved.");
@@ -1175,7 +1179,7 @@ export class FloatMoves {
       // Nothing was signed: the money never left the float, and the move gives its place back.
       await place.release();
       if (k.depositAddress) (k.move.status = "failed"), await this.keep(k);
-      throw e instanceof ProblemError ? e : refused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+      throw e instanceof ProblemError ? e : intentsRefused(e, "in your NEAR wallet");
     }
     // Signed: from here the money may move, so a move that 1Click may have is answered, never thrown. Only 1Click's own
     // "no" ends it here; with no answer at all it stays pending, and subwallet.float.move sends it again.
@@ -1189,7 +1193,7 @@ export class FloatMoves {
         k.move.status = "failed";
         await place.release();
         await this.keep(k);
-        throw refused(`NEAR Intents didn't take it. See Activity for where your money is. ${String((e as Error).message).slice(0, 120)}`);
+        throw intentsNotTaken(e, "in your NEAR wallet, or on its way");
       }
     }
     await this.keep(k);
@@ -1246,7 +1250,7 @@ export class FloatMoves {
       destinationAsset: to, amount, refundTo: float.address, refundType: "CONFIDENTIAL_INTENTS",
       recipient: float.address, recipientType: "CONFIDENTIAL_INTENTS", deadline: quoteDeadline(this.now(), QUOTE_MINUTES * 60_000), confidentiality: "basic",
     }).catch((e: unknown) => {
-      throw e instanceof ProblemError ? e : refused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+      throw e instanceof ProblemError ? e : intentsRefused(e, "in your NEAR wallet");
     });
     const q = raw?.quote;
     const out = digits(q?.amountOut), min = digits(q?.minAmountOut) ?? (out ? ((BigInt(out) * 99n) / 100n).toString() : undefined);
@@ -1360,7 +1364,7 @@ export class FloatMoves {
     } catch (e) {
       // nothing was signed: the money never left Spending
       if (k.depositAddress) (k.move.status = "failed"), await this.keep(k);
-      throw e instanceof ProblemError ? e : refused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+      throw e instanceof ProblemError ? e : intentsRefused(e, "in your NEAR wallet");
     }
     // signed: from here 1Click may run it, so it is answered, never thrown; only 1Click's own "no" ends it here
     try {
@@ -1375,7 +1379,7 @@ export class FloatMoves {
         k.move.status = "failed";
         k.move.reason = SWAP_NOT_TAKEN;
         await this.keep(k);
-        throw refused(`${SWAP_NOT_TAKEN} ${String((e as Error).message).slice(0, 120)}`);
+        throw intentsNotTaken(e, "in your NEAR wallet, or on its way", SWAP_NOT_TAKEN);
       }
       // no answer: it may have run, so it is never "nothing moved" here (refresh follows it)
       k.move.reason = SWAP_UNANSWERED;

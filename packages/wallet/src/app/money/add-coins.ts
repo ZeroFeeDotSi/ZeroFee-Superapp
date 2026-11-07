@@ -93,6 +93,8 @@ export const ADD_WORDS = {
   only: (symbol: string, network: string, least: string) => `Send only ${symbol} on ${network}, at least ${least} ${symbol}.`,
   // review M3: the Safe is credited on its own NEAR account, so the line promises no privacy it can't give
   until: (t: string, to: AddTo) => `${to === "safe" ? "Lands in your Safe as USDC. " : ""}Until ${t}.`,
+  /** The Safe's row's first fact line (J3-5, the copy review's words): the same words as its QR sheet's. */
+  rowLands: "Lands in your Safe as USDC.",
   asking: "Getting a new address…",
   /** The row's second line in the Sim (the copy review's row spec, 6 Nov): its made-up address, never shown as a real one. */
   sampleRow: "Sample address",
@@ -220,9 +222,12 @@ export function untilDate(iso: string): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${h}:${String(d.getMinutes()).padStart(2, "0")} ${d.getHours() < 12 ? "am" : "pm"}`;
 }
 /** What a row says about its address (the audit's MUST): its rule (the coin, chain and least) and its end. */
-export function addRule(a: Pick<AddAddress, "minAmountIn" | "decimals" | "untilIso">, row: Pick<AddRow, "symbol" | "network">): { only: string; until: string } {
+/** J3-5 (the copy review's walk, 8 Nov: the Safe's row and the SOL wallet's read the same): the Safe's row says first what it lands
+ *  as, the QR sheet's own words (ADD_WORDS.until's), true of the core's E2 forward (float-add.ts forwardMove: to "safe" is
+ *  homeOne, whose chain coin is swapped to FLOAT_USDC). A wallet's row: no such line. */
+export function addRule(a: Pick<AddAddress, "minAmountIn" | "decimals" | "untilIso">, row: Pick<AddRow, "symbol" | "network">, to?: AddTo): { lands?: string; only: string; until: string } {
   const least = leastTwoFigures(a.minAmountIn, a.decimals);
-  return { only: ADD_WORDS.rowOnly(row.symbol, row.network, least), until: ADD_WORDS.rowUntil(untilDate(a.untilIso)) };
+  return { ...(to === "safe" ? { lands: ADD_WORDS.rowLands } : {}), only: ADD_WORDS.rowOnly(row.symbol, row.network, least), until: ADD_WORDS.rowUntil(untilDate(a.untilIso)) };
 }
 
 /** A row line's phrases (the copy review's grid, 6 Nov): the line may wrap only at its commas, so "at least 0.03 SOL." and "10:37 pm."

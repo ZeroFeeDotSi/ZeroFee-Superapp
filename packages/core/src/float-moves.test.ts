@@ -189,7 +189,7 @@ test("out: with no answer from 1Click the signed move stays pending, and asking 
 
 test("out: 1Click's own no ends the move there, with its place back", async () => {
   const { w } = await setup({ submit: async () => { throw Object.assign(new Error("Not enough balance"), { refused: true }); } });
-  await assert.rejects(w.floatOut("sol", 0, "100000000", key(5)), (e: any) => e.problem.code === "security.subwallet.refused" && /Not enough balance/.test(e.problem.more));
+  await assert.rejects(w.floatOut("sol", 0, "100000000", key(5)), (e: any) => e.problem.code === "security.subwallet.refused" && e.problem.more === "NEAR Intents didn't take it. Check Activity for where your money is." && e.cause?.message === "Not enough balance", "QA 16's MUST: its own words on the cause only");
   assert.equal((await w.floatLimits()).movesLeftToday, FLOAT_MOVES_PER_DAY);
   const [m] = await w.floatMoveList();
   assert.equal(m.status, "failed");

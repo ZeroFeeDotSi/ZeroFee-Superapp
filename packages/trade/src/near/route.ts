@@ -7,6 +7,7 @@ import { createNearRpc, NEAR_RPC_HOSTS, type NearRpc } from "../market/near.ts";
 import { relayBase } from "../market/relay.ts";
 import { createNearDoors } from "./doors.ts";
 import { saySwitched } from "./switched.ts";
+import { ownServer } from "@zerofee/core/own-servers";
 import { createNearEngine, type NearEngineDeps } from "./engine.ts";
 import { createRheaEngine, type RheaEngine } from "./rhea.ts";
 
@@ -28,11 +29,14 @@ const buildRelay = (): string | undefined => import.meta.env?.VITE_ZEROFEE_RELAY
  * only as the last resort when ZeroFee's relay itself fails (doors.ts).
  * A build with no relay at all (a self-hosted copy) has no paid door, so it reads the keyless nodes as before.
  * near-fast and every other NEAR trade caller take their rpc/rpc2 from here.
+ * A person's own NEAR server (Settings → Status; core own-servers.ts) is asked first in both, read at each call (`own`,
+ * for tests): with a relay, ahead of its doors (doors.ts); without one, ahead of the keyless nodes.
  */
-export function nearTradeNodes(relay: string | undefined = buildRelay(), f?: typeof fetch, onSwitch?: (line: string | null) => void): { rpc: NearRpc; rpc2: NearRpc } {
-  if (relayBase(relay)) return createNearDoors({ relay: relay!, ...(f ? { fetch: f } : {}), ...(onSwitch ? { onSwitch } : {}) });
+export function nearTradeNodes(relay: string | undefined = buildRelay(), f?: typeof fetch, onSwitch?: (line: string | null) => void, own: () => string | null = () => ownServer("near")): { rpc: NearRpc; rpc2: NearRpc } {
+  if (relayBase(relay)) return createNearDoors({ relay: relay!, own, ...(f ? { fetch: f } : {}), ...(onSwitch ? { onSwitch } : {}) });
   const hosts = [...NEAR_RPC_HOSTS];
-  return { rpc: createNearRpc(f, hosts), rpc2: createNearRpc(f, [...hosts].reverse()) };
+  const withOwn = (list: string[]): NearRpc => (method, params) => { const o = own(); return createNearRpc(f, o ? [o, ...list.filter((h) => h !== o)] : list)(method, params); };
+  return { rpc: withOwn(hosts), rpc2: withOwn([...hosts].reverse()) };
 }
 
 export function createNearRoute(rhea: RheaEngine, oneClick: ChainEngine): ChainEngine {

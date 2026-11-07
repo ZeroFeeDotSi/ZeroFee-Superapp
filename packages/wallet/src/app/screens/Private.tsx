@@ -3,10 +3,13 @@
 // chain, which the screen and the approval sheet both say; what's done with it after doesn't.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
-import { runJob } from "@zerofee/shell-api/job-run.ts";
+import { claim, runJob } from "@zerofee/shell-api/job-run.ts";
+import { refusalWords } from "@zerofee/shell-api/refusal-face.ts";
+import { taskStore } from "@zerofee/shell-api/tasks.ts";
 import { JOB_WORDS } from "@zerofee/shell-api/job-start.ts";
 import { LEG_SEC, receiptLeft } from "@zerofee/shell-api/job-steps.ts";
-import { carryTo } from "@zerofee/shell-api/job-carry.ts";
+import { carried, carryTo } from "@zerofee/shell-api/job-carry.ts";
+import { resumeAway } from "./private-resume.ts";
 import { mark } from "@zerofee/design/tap.ts";
 import { JobReceipt, THROUGH_CONFIDENTIAL } from "../money/JobMade.tsx";
 import "../money/move-swap.css";
@@ -21,6 +24,8 @@ import type { Tasks } from "@zerofee/shell-api/tasks.ts";
 import type { Bridge } from "@zerofee/core/bridge";
 import { PRIVATE_HOW, PRIVATE_MORE, PRIVATE_SEEN, PRIVATE_WORDS, amountOf, coins, dollars, placeOf, oldWalletsLine, privateAllUsd, privateUsd } from "../format.ts";
 import { Down, PrivateMark } from "../icons.tsx";
+import { headlineUsd } from "./private-headline.ts";
+import { homeRows } from "./private-home-rows.ts";
 import { useWallet } from "../runtime.tsx";
 
 /** Under "Job created." on Private's way home (copywriter, 5 Nov). */
@@ -31,8 +36,11 @@ export const PRIVATE_JOB_WATCH = "Watch it in Activity.";
 export const MOVE_ALL_WORDS = {
   open: "Move it all to your Safe",
   bar: "Check this",
-  head: (usd: string) => `Move ${usd} from Private to your Safe`,
+  /** P5 (the audit's way-home audit): the figure once, on the rows (was "Move $33.86 from Private to your Safe") */
+  head: "Move money from Private to your Safe",
+  from: "From Private",
   gets: "Your Safe gets",
+  fee: "Fees",
   /** the copy review's rule (8 Nov): never "Stays in Private" on a Check this; the leftover, only above $0 */
   keeps: "Private keeps the rest",
   seen: "Anyone can see what reaches your Safe.",
@@ -120,11 +128,16 @@ export async function homeFromPrivate({ tasks, caps, usd, bridge, set, onProblem
     etaSec: HOME_ETA_SEC,
     call: () => bridge.call<Movement[]>("ledger.fromPrivate", { upTo: caps }),
     declined: (r) => "problem" in r && /declined$/.test(r.problem.code),
+    // the row's stop words (the audit's M9): the core's refusal by its own reason, never "This wallet can't approve this"
+    words: refusalWords,
     made: () => { mark("away"); onMade?.({ usd, ids: null }); set("sent"); },
   });
   if ("declined" in end) { onMade?.(null); return set("no"); }
   if ("refused" in end) { onMade?.(null); set("no"); return onProblem(end.refused); }
-  if ("problem" in end) { onMade?.(null); return void mark("refused"); }
+  // the audit's way-home audit P1 (7 Nov): refused after the job was made (every core refusal: the job is made at the tap), the
+  // page said "Job created." and ticked on with no end while Jobs said failed. Now the page says the refusal too, its
+  // trigger back, "Job created." gone (onMade(null) clears it); the job's row keeps its own stop words
+  if ("problem" in end) { onMade?.(null); set("no"); mark("refused"); return onProblem(end.problem); }
   onMade?.({ usd, ids: end.ok.map((m) => m.id) });
   // the audit's MUST (8 Nov): no live track was ever made for a "send:" id out of Private (live-steps sendTrack leaves them out),
   // so its row went after HANDOFF_MS and Jobs had none. Now every coin's movement is a part of this ONE job (its carry),
@@ -142,13 +155,17 @@ export async function homeFromPrivate({ tasks, caps, usd, bridge, set, onProblem
 export function MoveAllSheet({ usd, stays, slide, onApprove, onClose }: { usd: string; stays?: string; slide?: { value: number; max: number; onChange: (v: number) => void }; onApprove: () => void; onClose: () => void }) {
   const w = MOVE_ALL_WORDS;
   const p = slide && slide.max > 0 ? Math.max(0, Math.min(100, (slide.value / slide.max) * 100)) : 0;
+  const r = homeRows(Number(usd.replace(/[^0-9.]/g, "")));
   return (
     <Sheet title={slide ? PRIVATE_MOVE_WORDS.bar : w.bar} onClose={onClose}>
-      <h2 className="zf-title wl-moveall__head" data-testid="private-home-head">{slide ? PRIVATE_MOVE_WORDS.head : w.head(usd)}</h2>
+      <h2 className="zf-title wl-moveall__head" data-testid="private-home-head">{slide ? PRIVATE_MOVE_WORDS.head : w.head}</h2>
       {slide && <input type="range" className="wl-mv-range wl-moveall__range" min={0} max={slide.max} step={0.01} value={slide.value} aria-label={PRIVATE_MOVE_WORDS.slider} aria-valuetext={usd}
         style={{ ["--p" as string]: `${p}%` } as CSSProperties} data-testid="private-move-slider" onChange={(e) => slide.onChange(Number(e.target.value))} />}
-      <div className="wl-kv" data-testid="private-home-gets"><span>{w.gets}</span><span>{usd}</span></div>
-      {stays !== undefined && Number(stays.replace(/[^0-9.]/g, "")) > 0 && <div className="wl-kv" data-testid="private-home-stays"><span>{w.keeps}</span><span>about {stays}</span></div>}
+      <div className="wl-kv" data-testid="private-home-from"><span>{w.from}</span><span>{r.from}</span></div>
+      <div className="wl-kv" data-testid="private-home-gets"><span>{w.gets}</span><span>{r.gets}</span></div>
+      <div className="wl-kv" data-testid="private-home-fee"><span>{w.fee}</span><span>{r.fee}</span></div>
+      {/* the ledger's own difference, exact: no "about" (core private-route.ts rule) */}
+      {stays !== undefined && Number(stays.replace(/[^0-9.]/g, "")) > 0 && <div className="wl-kv" data-testid="private-home-stays"><span>{w.keeps}</span><span>{stays}</span></div>}
       <p className="zf-small wl-moveall__seen" data-testid="private-home-seen">{w.seen}</p>
       {/* Approve and Not now together on the floor (a pinned .wl-sheet-go's ground band would cover a link under it) */}
       <div className="wl-moveall__foot">
@@ -200,13 +217,31 @@ export function PrivateScreen({ onAdd, onSetUp, onDefault, onProblem, clock = WA
   // the rows as the sheet opened on them (the audit's SHOULD): its figure and the most the core may move, never re-read under it
   const [shown, setShown] = useState<{ rows: Balance[]; slide: boolean } | null>(null);
   const [pick, setPick] = useState(0);
-  const [away, setAway] = useState<{ usd: string; ids: string[] | null } | null>(null);
+  const [away, setAway] = useState<{ usd: string; ids: string[] | null; at?: number } | null>(null);
   // the job's tap and its landing, on the page's clock: "Job created." counts down; "Landed in your Safe." for 60 s
   const [madeAt, setMadeAt] = useState<number | null>(null);
   const [landedAt, setLandedAt] = useState<number | null>(null);
   const [, setTick] = useState(0);
-  const onMade = (o: { usd: string; ids: string[] | null } | null) => { setAway(o); if (o && o.ids === null) { setMadeAt(clock.now()); setLandedAt(null); } };
-  const onEnd = (landed: boolean) => { setAway(null); if (landed) setLandedAt(clock.now()); else set("no"); };
+  // what Private holds now, as read; `at`: that figure at the tap, kept while the job goes (headlineUsd)
+  const live = Number(pocket ? privateAllUsd(pocket) : privateUsd(rows));
+  const onMade = (o: { usd: string; ids: string[] | null } | null) => { setAway((was) => (o ? { ...o, at: was?.at ?? live } : null)); if (o && o.ids === null) { setMadeAt(clock.now()); setLandedAt(null); } if (!o) setMadeAt(null); };
+  // P3 (the audit's way-home audit): a way home a reload left going is this page's again: its figure on its way, "Job created."
+  // from its tap, the trigger off, and Private's money claimed as runJob's own was (released at its end, or as the page goes)
+  const resumed = useRef<{ release: (() => void) | null } | null>(null);
+  const letGo = () => { resumed.current?.release?.(); if (resumed.current) resumed.current.release = null; };
+  useEffect(() => {
+    const look = () => {
+      if (resumed.current || step.current !== "no") return;
+      const r = resumeAway(taskStore().list(), (id) => carried(id)?.parts);
+      if (!r) return;
+      resumed.current = { release: claim(["private"]) };
+      setAway({ usd: r.usd, ids: r.ids }); setMadeAt(r.madeAt); setLandedAt(null); set("sent");
+    };
+    look();
+    const off = taskStore().subscribe(look);
+    return () => { off(); letGo(); };
+  }, []);
+  const onEnd = (landed: boolean) => { letGo(); setAway(null); if (landed) setLandedAt(clock.now()); else set("no"); };
   useEffect(() => {
     if (moving !== "sent") return;
     if (landedAt !== null) { const h = clock.set(() => { setLandedAt(null); set("no"); }, Math.max(0, LANDED_SHOWN_MS - (clock.now() - landedAt))); return () => clock.clear(h); }
@@ -227,7 +262,7 @@ export function PrivateScreen({ onAdd, onSetUp, onDefault, onProblem, clock = WA
     <div className="wl wl-coin zf-enter">
       <div className="wl-total">
         <PrivateMark size={44} />
-        <p className="wl-display">{dollars(pocket ? privateAllUsd(pocket) : privateUsd(rows))}</p>
+        <p className="wl-display">{dollars(headlineUsd(live, away).toFixed(2))}</p>
         {/* QA 20 (8 Nov): where the money is, right under the figure ($0.00 once it left), then its landing, for 60 s */}
         {away && <OnItsWay away={away} activity={activity} onEnd={onEnd} />}
         {!away && moving === "sent" && landedShown(landedAt, clock.now()) && <p className="zf-small wl-explain" role="status" data-testid="private-landed">{PRIVATE_MOVE_WORDS.landed}</p>}
@@ -268,7 +303,7 @@ export function PrivateScreen({ onAdd, onSetUp, onDefault, onProblem, clock = WA
       <div className="zf-floor">
         {/* the copy review's A2-2: one lit button, Move while Private holds money, else Add to Private; the other quiet. Move opens
             Private's own one-slider sheet, never the all-wallets one */}
-        {ready && has && <button className="zf-btn" data-testid="private-move" onClick={() => openSheet(true)}>Move</button>}
+        {ready && has && <button className="zf-btn" data-testid="private-move" disabled={moving !== "no"} onClick={() => openSheet(true)}>Move</button>}
         <button className={ready && has ? "zf-btn zf-btn--quiet" : "zf-btn"} data-testid="private-add" onClick={ready ? onAdd : onSetUp}>{ready ? "Add to Private" : "Set up Private"}</button>
       </div>
       {moving === "check" && shown && <MoveAllSheet usd={usd} stays={stays} {...(shown.slide ? { slide: { value: pick, max: shownTotal, onChange: setPick } } : {})} onApprove={taps.approve} onClose={taps.close} />}

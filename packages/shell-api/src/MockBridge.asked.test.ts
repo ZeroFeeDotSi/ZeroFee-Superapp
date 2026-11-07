@@ -42,3 +42,26 @@ test("jobKeyOf: a request's job, a ledger call's job, well formed only", () => {
   ];
   for (const [m, p, want] of table) assert.equal(jobKeyOf(m, p), want, `${m} ${JSON.stringify(p)}`);
 });
+
+// the audit's Send audit M9 (7 Nov) in the Sim: the core says job.signed with the Send's key at a Private-only Send's signature
+// (wt/m9), so "Job created." comes at Face ID, never after 1Click's whole answer. The Sim takes the same path: its sheet
+// for ledger.sendFromSafe says approval.asked with the Send's key, then job.signed with it on the yes, before its answer.
+const SEND = "home-send-0123456789abcdef01234567";
+const USDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
+test("M9, the Sim: a Send Private pays whole says job.signed with the Send's key at its sheet's yes, before the answer, to a NEAR name and to an outside address (controls: Not now never signed; no key, none by key)", async () => {
+  for (const to of [{ kind: "ledger", accountId: "bob.near" }, { kind: "chain", chain: "sol", address: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin" }]) {
+    const s = await sim();
+    let answered = false;
+    s.b.on("job.signed", () => assert.equal(answered, false, "signed before the Send's answer"));
+    const r = await s.b.call("ledger.sendFromSafe", { tokenId: USDC, to, toTokenId: USDC, amount: "2", job: SEND });
+    answered = true;
+    ok(r);
+    assert.deepEqual(s.log, [`asked:${SEND}`, "sheet", `signed:${SEND}`], to.kind);
+  }
+  const no = await sim(false);
+  await no.b.call("ledger.sendFromSafe", { tokenId: USDC, to: { kind: "ledger", accountId: "bob.near" }, toTokenId: USDC, amount: "2", job: SEND });
+  assert.deepEqual(no.log, [`asked:${SEND}`, "sheet"], "Not now: asked, never signed");
+  const bare = await sim();
+  ok(await bare.b.call("ledger.sendFromSafe", { tokenId: USDC, to: { kind: "ledger", accountId: "bob.near" }, toTokenId: USDC, amount: "2" }));
+  assert.deepEqual(bare.log, ["sheet", "signed:"], "no key: nothing asked or signed by key");
+});

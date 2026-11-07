@@ -41,7 +41,7 @@
 //!   the 24-hour list holds at most 128 coin rows (one for each coin a request moves; a waiting request's rows count
 //!   until it runs or goes, and for 24 hours after it runs).
 //! - A request whose value the contract can't measure goes to the strictest band. Every call also counts the gas it
-//!   carries as NEAR, so no call can burn the balance outside the bands: one measured by its NEAR alone (contract review,
+//!   carries as NEAR, so no call can burn the balance outside the bands: one measured by its NEAR alone (Fable review,
 //!   FB-1), and from release 8 a coin's own call too (a 1-unit `ft_transfer_call` to a receiver that spins its gas,
 //!   re-score RS-2).
 //! - A band waits at most 31 days: the longest change's wait (a 30-day delay plus a day). Release 10 (round 2, E1): what
@@ -200,7 +200,7 @@ const MAX_CHAIN_GAS: u64 = 250_000_000_000_000;
  *  chain's gas price (no host function gives it; near-sdk's `env` has none), so the count uses a conservative upper bound
  *  instead: 1,000,000,000 yocto a gas, ten times NEAR's lowest price (100 million, the price mainnet has held). NEAR raises
  *  its price by at most 1% a block, and only while blocks are more than half full, so it reaches ten times the floor
- *  only after about 230 full blocks in a row; releases 7 and 8 counted twice the floor (contract review, FB-1). From NEAR
+ *  only after about 230 full blocks in a row; releases 7 and 8 counted twice the floor (Fable review, FB-1). From NEAR
  *  protocol 85 an allowance is charged at max(gas price, 1,000,000,000) a gas, so this equals that purchase floor: no
  *  headroom above what a key's allowance pays (accepted, I-4). */
 const GAS_PRICE_COUNTED: u128 = 1_000_000_000;
@@ -751,7 +751,7 @@ impl AccountPolicy {
         let mut by: Vec<(u64, Vec<u8>)> = load_key(APPROVERS_KEY).unwrap_or_default();
         // A yes from a device not yet of age is kept as such (re-check 1, R-I1): it lets through what needs a device, but
         // never counts as co-signed, even once the device comes of age (no key hashes to nothing). It never replaces an
-        // aged device's co-sign of the same request either (contract review, FB-2).
+        // aged device's co-sign of the same request either (Fable review, FB-2).
         // Release 10 (the 4 Nov proofing, round 2, C-L1): nor a yes from a device on the account for the fallback by one
         // that is only of age, which would take a listing (R9-AL1) back from the floor to the fallback. A yes replaces the
         // one on record only if it counts at least as much (`yes_rank`).
@@ -995,7 +995,7 @@ impl AccountPolicy {
         // Starting a recovery drops every waiting request a second device hasn't approved (audit F1): whoever holds the
         // backup words can stop what a phone alone asked for, a loosening, an upgrade or a big payment, but never what
         // the phone and a second device asked for together. New backup words too: the words beat the phone (re-audit 2,
-        // N1 (a), the product's choice): a stolen phone can't replace them, and leaked words can only freeze, never take.
+        // N1 (a), the owner's choice): a stolen phone can't replace them, and leaked words can only freeze, never take.
         self.drop_unapproved("request_stopped_by_recovery");
         // A second device not yet of age stops ageing until this recovery ends (re-audit 2, N2).
         self.restart_young_ages(u64::MAX);
@@ -2276,7 +2276,7 @@ impl AccountPolicy {
             let last = i == bands.len() - 1;
             require!(band.up_to.is_none() == last, "only the last band has no limit");
             // As long as the longest change's wait (a 30-day delay's floor, 31 days), so the wait a band gets when the last
-            // second device goes (forget_second_device) is always one the account may set again (contract review, FB-4).
+            // second device goes (forget_second_device) is always one the account may set again (Fable review, FB-4).
             require!(band.level.wait_ns() <= MAX_WAIT_NS + DAY_NS, "a wait can be at most 31 days");
             if let Some(limits) = &band.up_to {
                 require!(limits.len() <= MAX_COINS && limits.iter().all(|(c, _)| !c.is_empty() && c.len() <= MAX_COIN_NAME), "too many coins in a band");
@@ -2491,7 +2491,7 @@ fn measure(receiver: &str, steps: &[Step]) -> Option<Vec<(String, u128)>> {
         add_move(&mut out, "near", deposit);
         // Any contract a call goes to may run it to its gas limit, and the gas it burns is this account's NEAR (unused gas
         // comes back). So every call's gas counts as NEAR at twice NEAR's lowest gas price: a call measured by its NEAR
-        // alone (contract review, FB-1), and from release 8 a coin's own methods too (re-score RS-2: a 1-unit
+        // alone (Fable review, FB-1), and from release 8 a coin's own methods too (re-score RS-2: a 1-unit
         // `ft_transfer_call` to a receiver that spins its gas burnt about 0.03 NEAR a time outside the bands).
         add_move(&mut out, "near", u128::from(gas) * GAS_PRICE_COUNTED);
         let standard = matches!(method, "ft_transfer" | "ft_transfer_call" | "mt_transfer" | "mt_transfer_call" | "mt_batch_transfer" | "mt_batch_transfer_call" | "nft_transfer" | "nft_transfer_call" | "ft_withdraw");

@@ -61,7 +61,7 @@ test("Send's From shows Home's figure, Max is what it can pay, and one quiet lin
   assert.deepEqual([whole.amount, whole.max, whole.part], ["50", "50", undefined], "control: all of it can go, no line");
   const form = readFileSync(new URL("./money/SendForm.tsx", import.meta.url), "utf8");
   // the audit's filing: directly under the From row (its button), before any amount is typed
-  assert.match(form, /data-testid="send-from" disabled=\{busy\}>[\s\S]{0,700}?<\/button>\s*\{\/\*[^}]*\*\/\}\s*\{partShown\(source\.part, held\(source\)\) && <p className="zf-small wl-send2__part" data-testid="send-part">\{source\.part\}<\/p>\}/);
+  assert.match(form, /data-testid="send-from" disabled=\{busy\}>[\s\S]{0,700}?<\/button>\s*\{\/\*[^}]*\*\/\}\s*\{partShown\(part, heldNow\(source\)\) && <p className="zf-small wl-send2__part" data-testid="send-part">\{part\}<\/p>\}/);
   assert.doesNotMatch(form, /!maxLine && source\.part/, "control: never only after an amount, never hidden by Max's line");
 });
 

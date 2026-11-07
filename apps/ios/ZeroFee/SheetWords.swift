@@ -49,6 +49,16 @@ struct SheetWords: Equatable {
     line == "Private." || (line.hasPrefix("Public on ") && line.hasSuffix(".") && !line.dropFirst(10).dropLast().contains("."))
   }
 
+  /** How many of a sheet's first lines are the costs-more head (core float-floors COSTS_MORE, the audit's M8): 3 or 0. The lead
+   *  names NEAR Intents and both figures, then where the money still is, then the next tap. Drawn as one card, first. */
+  static func costsMoreHead(_ lines: [String]) -> Int {
+    guard lines.count >= 3 else { return 0 }
+    let lead = lines[0]
+    let byFee = lead.hasPrefix("NEAR Intents takes $") && lead.contains(" in fees now. This Move said at most $")
+    let byLeast = lead.hasPrefix("NEAR Intents moves at least $") && lead.contains(" now. This Move said at least $")
+    return (byFee || byLeast) && lead.hasSuffix(".") && lines[1].hasPrefix("Nothing moved yet. It's still in ") && lines[2] == "Tap Approve to go on, or Not now to stop." ? 3 : 0
+  }
+
   let title: String
   let lines: [String]
   let details: [Details]

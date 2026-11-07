@@ -17,23 +17,24 @@ const T = 1_800_000_000_000;
 
 test("item 1: the line under \"Job created.\" is what happened, the copy review's words (control: an unpriced swap never makes a figure up)", () => {
   assert.equal(JOB_WORDS.created, "Job created.", "the owner's word stands (QA's relay, 7 Nov)");
-  assert.equal(sentLine("$25.00 to bob.near"), "Sent $25.00 to bob.near.");
-  assert.equal(swappedLine("$25.00", "0.2419 SOL", "your SOL wallet"), "$25.00 swapped: about 0.2419 SOL is in your SOL wallet.");
+  // changed pins (the audit's M8): the figure is the hero, said once
+  assert.equal(sentLine("bob.near"), "Sent to bob.near.");
+  assert.equal(swappedLine("0.2419 SOL", "your SOL wallet"), "About 0.2419 SOL is in your SOL wallet.");
   assert.equal(addedLine("$10.00", "pump.fun"), "Added $10.00 to your pump.fun wallet.");
   assert.equal(addedLine("$10.00", "GMGN", "Solana"), "Added $10.00 to your GMGN Solana wallet.");
-  assert.equal(swappedLine("$25.00", undefined, "your SOL wallet"), "$25.00 swapped. It goes to your SOL wallet.", "control: no figure");
-  for (const l of [sentLine("$25.00 to bob.near"), swappedLine("$25.00", "0.2419 SOL", "your SOL wallet"), addedLine("$10.00", "pump.fun"), agentFundLine("$25.00", true), agentFundLine("$25.00", false)]) {
+  assert.equal(swappedLine(undefined, "your SOL wallet"), "It's in your SOL wallet.", "control: no figure");
+  for (const l of [sentLine("bob.near"), swappedLine("0.2419 SOL", "your SOL wallet"), addedLine("$10.00", "pump.fun"), agentFundLine("$25.00", true), agentFundLine("$25.00", false)]) {
     assert.doesNotMatch(l, /NEAR Confidential|Solana lands|Job created|Landed/, l);
   }
 });
 
-test("item 1: each receipt's line is the job's own figures: Send's title, Swap's priced figure and wallet, the site's name (control: the head is still JOB_WORDS)", () => {
+test("item 1: each receipt's line is the job's own words: Send's payee, Swap's priced figure and wallet, the site's name (control: the head is still JOB_WORDS)", () => {
   const send = src("./SendSheet.tsx");
-  assert.match(send, /setSentSaid\(sendWords\(said\)\); setFlying\(shown\);/, "Send: its job's own \"$25.00 to bob.near\"");
+  assert.match(send, /setSentSaid\(sendWords\(toWho\)\); setFlying\(shown\);/, "Send: whom, as its job says it (the figure is the hero's alone, the audit's M8)");
   assert.match(send, /title: `Send \$\{said\}`/, "control: the same figures as the job's title");
   assert.match(send, /<JobReceipt amount=\{flying\} icon=\{<ActSend \/>\} testid="send-sent" etaSec=\{etaSec\} said=\{sentSaid\?\.going\} landedSaid=\{sentSaid\?\.landed\} job=\{flyingJob\} onDone=\{madeDone\} \/>/);
-  assert.match(src("./SwapSheet.tsx"), /setMadeSaid\(\{ going: swappingLine\(said, SWAP_COIN\[pay\.place\]\.label, SWAP_COIN\[get\]\.label\), landed: swappedLine\(said, lands, SWAP_COIN\[get\]\.where\) \}\)/, "Swap: going, then the figure the sheet priced and where it lands");
-  assert.match(src("../screens/MoveSheet.tsx"), /\{movingLine\(dollars\(made\.toFixed\(2\)\), madeTo\(legs\.map\(\(l\) => l\.to\)\), job\.state === "landed"\)\}/, "Move: J5's line");
+  assert.match(src("./SwapSheet.tsx"), /setMadeSaid\(\{ going: swappingLine\(SWAP_COIN\[pay\.place\]\.label, SWAP_COIN\[get\]\.label\), landed: swappedLine\(lands, SWAP_COIN\[get\]\.where\) \}\)/, "Swap: going, then the figure the sheet priced and where it lands");
+  assert.match(src("../screens/MoveSheet.tsx"), /\{movingLine\(madeTo\(legs\.map\(\(l\) => l\.to\)\), job\.state === "landed"\)\}/, "Move: J5's line");
   assert.match(src("./SiteMoney.tsx"), /<SaidLine testid="site-add-said" \{\.\.\.addWords\(made, name, network\)\} job=\{madeJob\} \/>/);
   assert.match(src("./JobMade.tsx"), /<p className="zf-receipt__head">\{JOB_WORDS\.created\}<\/p>/);
 });
@@ -92,14 +93,14 @@ test("item 5: the funding page: the amounts first, three plain lines, the rest o
 });
 
 test("the copy review's J5: Swap says it is swapping while it goes, swapped once landed; Move names where it goes (controls: one place, the Safe, Private)", () => {
-  assert.equal(swappingLine("$10.00", "USDC", "SOL"), "Swapping $10.00 of USDC for SOL.");
-  assert.equal(movingLine("$135.00", moveWhere(["SOL", "ETH (RH)"]), false), "Moving $135.00 to your SOL and ETH (RH) wallets.");
-  assert.equal(movingLine("$135.00", moveWhere(["SOL", "ETH (RH)", "NEAR"]), false), "Moving $135.00 to your SOL, ETH (RH) and NEAR wallets.");
+  assert.equal(swappingLine("USDC", "SOL"), "Swapping USDC for SOL.");
+  assert.equal(movingLine(moveWhere(["SOL", "ETH (RH)"]), false), "Moving it to your SOL and ETH (RH) wallets.");
+  assert.equal(movingLine(moveWhere(["SOL", "ETH (RH)", "NEAR"]), false), "Moving it to your SOL, ETH (RH) and NEAR wallets.");
   assert.equal(moveWhere(["SOL", "SOL"]), "your SOL wallet", "control: one wallet");
   assert.equal(moveWhere(["Safe"]), "your Safe", "control: the Safe");
   assert.equal(moveWhere(["Private"]), "Private", "control: never \"your Private wallet\"");
   assert.equal(moveWhere([]), "your wallets", "control: none known");
-  assert.equal(movingLine("$5.00", "your Safe", true), "Moved $5.00 to your Safe.");
+  assert.equal(movingLine("your Safe", true), "Moved to your Safe.");
 });
 
 test("the copy review (7 Nov): where the Safe pays, the details say so, never \"never spends from your Safe\" (control: a real account's NEAR wallet fill keeps the wallet's own rule)", () => {
@@ -130,20 +131,20 @@ test("the audit's SHOULD: the fund receipt reads again until its estimate plus t
 });
 
 test("QA's MUST: the line's tense follows the job's chain read: going, the present; landed, the past; stopped or unsure, the present and its own stop words, never the past", () => {
-  const send = sendWords("$25.00 to bob.near"), add = addWords("$10.00", "pump.fun");
-  const swap = { going: swappingLine("$25.00", "USDC", "SOL"), landed: swappedLine("$25.00", "0.2419 SOL", "your SOL wallet") };
+  const send = sendWords("bob.near"), add = addWords("$10.00", "pump.fun");
+  const swap = { going: swappingLine("USDC", "SOL"), landed: swappedLine("0.2419 SOL", "your SOL wallet") };
   const table: [typeof send, Parameters<typeof receiptSaid>[1], string][] = [
-    [send, { state: "going" }, "Sending $25.00 to bob.near."],
-    [send, { state: "landed" }, "Sent $25.00 to bob.near."],
-    [send, { state: "stopped", words: "NEAR said no. Your money is in your Safe." }, "Sending $25.00 to bob.near. NEAR said no. Your money is in your Safe."],
-    [send, { state: "unsure", words: "Your money is either in Private or still with NEAR Intents." }, "Sending $25.00 to bob.near. Your money is either in Private or still with NEAR Intents."],
-    [send, { state: "stopped" }, "Sending $25.00 to bob.near."],
+    [send, { state: "going" }, "Sending it to bob.near."],
+    [send, { state: "landed" }, "Sent to bob.near."],
+    [send, { state: "stopped", words: "NEAR said no. Your money is in your Safe." }, "Sending it to bob.near. NEAR said no. Your money is in your Safe."],
+    [send, { state: "unsure", words: "Your money is either in Private or still with NEAR Intents." }, "Sending it to bob.near. Your money is either in Private or still with NEAR Intents."],
+    [send, { state: "stopped" }, "Sending it to bob.near."],
     [add, { state: "going" }, "Adding $10.00 to your pump.fun wallet."],
     [add, { state: "landed" }, "Added $10.00 to your pump.fun wallet."],
     [add, { state: "stopped", words: "Solana said no." }, "Adding $10.00 to your pump.fun wallet. Solana said no."],
-    [swap, { state: "going" }, "Swapping $25.00 of USDC for SOL."],
-    [swap, { state: "landed" }, "$25.00 swapped: about 0.2419 SOL is in your SOL wallet."],
-    [swap, { state: "unsure", words: "x" }, "Swapping $25.00 of USDC for SOL. x"],
+    [swap, { state: "going" }, "Swapping USDC for SOL."],
+    [swap, { state: "landed" }, "About 0.2419 SOL is in your SOL wallet."],
+    [swap, { state: "unsure", words: "x" }, "Swapping USDC for SOL. x"],
   ];
   for (const [w, s, want] of table) assert.equal(receiptSaid(w, s), want, `${s.state}`);
   for (const [w, s] of table) if (s.state !== "landed") assert.doesNotMatch(receiptSaid(w, s), /^(Sent|Added)|swapped:/, "control: never the past before landed");

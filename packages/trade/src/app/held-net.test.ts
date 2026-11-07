@@ -71,7 +71,9 @@ test("the audit's MUST: the receipt's sale quote makes no signing call, no core 
   assert.equal(atob(sale.p.steps[0]!.tx), `unsigned-${x.made.length}`, "its bytes stay unsigned");
   assert.equal((heldNetQuote.toString().match(/\bready\b|\btrade\(/g) ?? []).length, 0, "the receipt's path names no ready() and no trade()");
   const sheet = readFileSync(new URL("./screens/TradeSheet.tsx", import.meta.url), "utf8");
-  assert.match(sheet, /void heldNetQuote\(svc\.quote, coin\.chain, coin\.address, heldRaw\)\.then\(\(net\) => \{/, "the receipt uses exactly this path");
+  // the audit's T6 (8 Nov): through the one cached figure (heldNetOf), which asks exactly this path
+  assert.match(sheet, /void heldNetOf\(svc\.quote, coin\.chain, coin\.address, heldRaw\)\.then\(\(net\) => \{/, "the receipt uses exactly this path");
+  assert.match(readFileSync(new URL("./held-net.ts", import.meta.url), "utf8"), /\.then\(\(\) => heldNetQuote\(quote, chain, coin, raw\)\)/, "heldNetOf asks heldNetQuote");
   assert.doesNotMatch(sheet, /svc\.quote\("sell", coin\.chain, coin\.address, \{ fraction: 1 \}\)/, "never its own quote call");
 
   // control: a sale quote readied and traded does sign and send, so the counters above would have seen it

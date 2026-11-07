@@ -219,8 +219,8 @@ test("QA's proof lap: a Move's wallet as Trade names it (\"trade-sol-…\") is f
 });
 
 test("a site's top-up (pump.fun, GMGN): the site's own SOL wallet, as Trade sees it (kind site), is found and paid at its address; control: a site wallet id that isn't listed is refused", async () => {
-  const PUMP = "site-pump.fun-sol-EyyZf9", GMGN = "site-gmgn.ai-sol-4Rf8kL";
-  const A = "8JVZpqUZfQMEc8kMduTS9SkVxP9v8rgunJNcV4qNYGYZ", B = "4Rf8kLqQ2WmHG1oHk5jBu7m1Y5Cz6ZfjE6vY3oXbUJmN";
+  const PUMP = "site-pump.fun-sol-9xQeWv", GMGN = "site-gmgn.ai-sol-4Rf8kL";
+  const A = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin", B = "4Rf8kLqQ2WmHG1oHk5jBu7m1Y5Cz6ZfjE6vY3oXbUJmN";
   const wallets = [{ kind: "private", id: "sw-private", chain: "near", address: POCKET }, { kind: "site", id: PUMP, chain: "sol", address: A }, { kind: "site", id: GMGN, chain: "sol", address: B }];
   for (const [id, addr] of [[PUMP, A], [GMGN, B]] as const) {
     const s = setup({ core: fakeCore({ accountId: ME, pocket: [{ tokenId: USDC, amount: "10000000" }], subwallets: wallets as never }) });

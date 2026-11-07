@@ -191,12 +191,12 @@ test("Robinhood Chain: an estimate past 100,000 gas for a plain transfer is refu
 
 // ---- 2. A transfer no node took says why (it was thrown away).
 
-test("a payment no node takes keeps the nodes' own words on the move, for Activity and the logs", async () => {
+test("a payment no node takes says so plainly on the move (QA 16's SHOULD: the nodes' own words stay on the kept record, for the logs, never in its reason line)", async () => {
   const { w } = await core({ evm: { send: async () => { throw new Error("neither node took it: gas required exceeds allowance (21000)"); } } });
   const m = await w.floatIn("hood", 0, "5000000000000000", key(10));
   assert.ok(!("declined" in m));
   assert.deepEqual([m.status, m.where], ["pending", "chain"]);
-  assert.equal(m.reason, "Not sent from your Robinhood Chain wallet: neither node took it: gas required exceeds allowance (21000)");
+  assert.equal(m.reason, "Not sent from your Robinhood Chain wallet: neither node took it");
   assert.equal((await w.floatMove(m.id)).reason, m.reason, "kept");
 });
 
@@ -271,7 +271,7 @@ test("Solana: unpaid, its blockhash expired on both nodes and the deposit addres
   const { w } = await core({ sol: { ...solProof({}), send: async () => { throw new Error("neither node took it: Blockhash not found"); } } });
   const m = await w.floatIn("sol", 0, "all", key(30));
   assert.ok(!("declined" in m));
-  assert.equal(m.reason, "Not sent from your Solana wallet: neither node took it: Blockhash not found");
+  assert.equal(m.reason, "Not sent from your Solana wallet: neither node took it");
   // signed with a kept blockhash: open until 2 minutes on (product decision, 5 Nov: 20 minutes of "Leaving your SOL wallet"),
   // then ended on the chain's word alone (the blockhash expired on both nodes, the deposit address untouched)
   assert.equal((await later(1 * MIN, () => w.floatMove(m.id))).status, "pending");

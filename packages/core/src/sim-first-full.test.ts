@@ -10,7 +10,7 @@ import { SubWallets } from "./subwallets.ts";
 import { POCKET_COIN, buy, pocketNode, sell } from "./testing/pocket-tx.ts";
 import { MemoryVault } from "./vault.ts";
 
-const WALLET = "8JVZpqUZfQMEc8kMduTS9SkVxP9v8rgunJNcV4qNYGYZ";
+const WALLET = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
 
 /** Node a answers at once; node b only when `release()` is called. */
 function nodes() {

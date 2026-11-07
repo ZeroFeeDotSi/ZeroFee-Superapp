@@ -33,7 +33,7 @@ test("what it pays: dollars of cash; a share of the coin held; Max is all of it"
 
 test("the one fee form, with the quote's own figure; 1Click's own time where the amount shows; no time when it gives none", () => {
   assert.equal(inplaceFee("buy", Q), "Fees · about $0.10");
-  assert.ok(inplaceArrives("buy", Q, "ZEC").endsWith(" About 10 s."));
+  assert.ok(inplaceArrives("buy", Q, "ZEC").endsWith(" In 10 s."));
   assert.equal(tapDetail(Q), "NEAR Intents says about 10 s");
   const { etaSeconds: _e, ...noTime } = Q;
   assert.equal(tapDetail(noTime), undefined, "never a number of ours");

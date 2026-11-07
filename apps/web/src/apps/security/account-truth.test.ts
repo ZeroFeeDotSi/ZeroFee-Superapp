@@ -22,7 +22,7 @@ test("web: no secure-chip line and no tick for this device or AgentZero, whateve
     assert.equal(r.phone!.line, undefined, `${device.kind}: never "In its secure chip" on the web`);
     assert.deepEqual([r.phone!.value, r.phone!.tick], ["On iPhone", false], device.kind);
     assert.deepEqual([r.agent!.value, r.agent!.tick], ["On iPhone", false], device.kind);
-    assert.deepEqual([r.laptop!.value, r.laptop!.tick], ["Not yet", false]);
+    assert.equal(r.laptop, undefined, "the audit's T15: no laptop key on the account, no row");
   }
 });
 
@@ -36,9 +36,9 @@ test("web: the backup words read \"Written down\", ticked only when checked; no 
 test("control, the phone: its real chip key keeps \"In its secure chip\" and every on-account ML-DSA key its tick", () => {
   const r = shown([CHIP, WORDS, AGENT], false, false);
   assert.equal(r.phone!.line, "In its secure chip");
-  assert.deepEqual([r.phone!.tick, r.words!.tick, r.agent!.tick, r.laptop!.tick], [true, true, true, false]);
+  assert.deepEqual([r.phone!.tick, r.words!.tick, r.agent!.tick], [true, true, true]);
   assert.equal(r.phone!.value, null);
-  assert.equal(r.laptop!.value, "Not yet");
+  assert.equal(r.laptop, undefined, "the audit's T15: no laptop key, no \"Not yet\" row");
   assert.equal(shown([DEV, WORDS], false).phone!.line, undefined, "control: a development key on the phone claims no chip");
 });
 
@@ -69,6 +69,7 @@ test("Your account's right sides: never \"On\" on the web (the copy review's S3,
 
 test("Recovery's backup-words row says \"Written down\" with its tick once checked, never \"On\" (the copy review's #7; control: due, \"Check them\")", () => {
   const src = readFileSync(new URL("./SecurityApp.tsx", import.meta.url), "utf8");
-  assert.match(src, /<span>Backup words<\/span><span className="v">\{checkDue \? "Check them" : <>\{QUANTUM_WORDS\.wordsDown\} <span className="zf-tick on/);
+  // the audit's T14: the words come from backupWordsShown (words-tick.test.ts: "Written down" ticked only on the core's answer)
+  assert.match(src, /<span>Backup words<\/span><span className="v">\{\(\(\) => \{ const w = backupWordsShown\(checkDue\); return w\.tick \? <>\{w\.value\} <span className="zf-tick on/);
   assert.doesNotMatch(src, /"Check them" : <>On </, "fails before: \"On\" with a tick");
 });

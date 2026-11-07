@@ -13,15 +13,16 @@ export function receiptSaid(w: SaidWords, s: Pick<ReceiptState, "state"> & { wor
   return w.going;
 }
 
-/** Send: "Sending $25.00 to bob.near." then "Sent $25.00 to bob.near." `what`: the job's own "$25.00 to bob.near". */
-export const sentLine = (what: string): string => `Sent ${what}.`;
-export const sendWords = (what: string): SaidWords => ({ going: `Sending ${what}.`, landed: sentLine(what) });
+/** Send: "Sending it to bob.near." then "Sent to bob.near." `to`: whom, as the job says it. The figure is the receipt's
+ *  hero, said once (the audit's Send audit M8, 7 Nov: "$5.00" over "Sending $5.00 to bob.near."). */
+export const sentLine = (to: string): string => `Sent to ${to}.`;
+export const sendWords = (to: string): SaidWords => ({ going: `Sending it to ${to}.`, landed: sentLine(to) });
 
-/** Swap: "$25.00 swapped: about 0.2419 SOL is in your SOL wallet." `gets`: the figure the sheet priced at the tap ("0.2419
- *  SOL"), `where` the wallet it lands in ("your SOL wallet"). Unpriced: "$25.00 swapped. It goes to your SOL wallet."
- *  (provisional), never a made-up figure. */
-export const swappedLine = (usd: string, gets: string | undefined, where: string): string =>
-  gets ? `${usd} swapped: about ${gets} is in ${where}.` : `${usd} swapped. It goes to ${where}.`;
+/** Swap, landed: "About 0.2419 SOL is in your SOL wallet." `gets`: the figure the sheet priced at the tap ("0.2419 SOL"),
+ *  `where` the wallet it lands in ("your SOL wallet"). Unpriced: "It's in your SOL wallet.", never a made-up figure. The
+ *  dollars are the receipt's hero, said once (the audit's M8). */
+export const swappedLine = (gets: string | undefined, where: string): string =>
+  gets ? `About ${gets} is in ${where}.` : `It's in ${where}.`;
 
 /** A site wallet's Add: "Added $10.00 to your pump.fun wallet." (`network`: a site with more than one, "Solana"). */
 export const addedLine = (usd: string, site: string, network?: string): string => `Added ${usd} to your ${site}${network ? ` ${network}` : ""} wallet.`;
@@ -33,8 +34,9 @@ export const addWords = (usd: string, site: string, network?: string): SaidWords
 export const agentFundLine = (usd: string, shown: boolean): string =>
   receiptSaid({ going: `Adding ${usd} to AgentZero's wallet.`, landed: `${usd} is in AgentZero's wallet.` }, { state: shown ? "landed" : "going" });
 
-/** Swap while it goes (the copy review's J5, 7 Nov): "Swapping $10.00 of USDC for SOL."; swappedLine once its job landed. */
-export const swappingLine = (usd: string, pay: string, get: string): string => `Swapping ${usd} of ${pay} for ${get}.`;
+/** Swap while it goes (the copy review's J5, 7 Nov): "Swapping USDC for SOL." (the dollars are the hero, the audit's M8); swappedLine once
+ *  its job landed. */
+export const swappingLine = (pay: string, get: string): string => `Swapping ${pay} for ${get}.`;
 
 /** Where a Move goes, by name (the copy review's J5: "your SOL and ETH (RH) wallets"). `names`: "Safe", "Private" or a wallet's name
  *  ("SOL", "ETH (RH)"). The Safe or Private beside wallets (provisional): "your Safe and your SOL wallet". */
@@ -45,5 +47,6 @@ export function moveWhere(names: readonly string[]): string {
   const parts = [...(u.includes("Safe") ? ["your Safe"] : []), ...(u.includes("Private") ? ["Private"] : []), ...(wallets.length ? [`your ${list(wallets)} wallet${wallets.length > 1 ? "s" : ""}`] : [])];
   return parts.length ? parts.join(" and ") : "your wallets";
 }
-/** Move's first line (the copy review's J5): "Moving $135.00 to your SOL and ETH (RH) wallets."; once its legs landed, "Moved …" (provisional). */
-export const movingLine = (usd: string, where: string, landed: boolean): string => `${landed ? "Moved" : "Moving"} ${usd} to ${where}.`;
+/** Move's first line (the copy review's J5): "Moving it to your SOL and ETH (RH) wallets."; once its legs landed, "Moved to …"
+ *  (provisional). The figure is the receipt's hero, said once (the audit's way-home audit M6, 7 Nov; Send's M8). */
+export const movingLine = (where: string, landed: boolean): string => (landed ? `Moved to ${where}.` : `Moving it to ${where}.`);

@@ -117,6 +117,10 @@ export interface SpendingActivity {
   goesTo?: SpendingNetwork[];
   /** Its proof (product decision, 3 Nov; tx-proof.ts): the transaction that set it off and the one that landed it. */
   proof?: MoveProof;
+  /** What landed, in the coin it landed as (the audit's Send audit M5, 7 Nov): 1Click's settled amountOut as a decimal ("0.0644")
+   *  and that coin ("SOL"; "USDC" into the Safe or Trading). A Swap's landed line says this, never the tap's estimate.
+   *  Done rows only; a row of legs carries its one landing leg's. */
+  amountOut?: { amount: string; symbol: string };
   /** A site's Add: the site's name ("pump.fun"), for where it goes ("your pump.fun wallet"). */
   siteName?: string;
   /** Finding 61: a site's Add that stopped in the NEAR wallet (its move on to the site's wallet didn't go, F1): ended. */
@@ -473,6 +477,23 @@ export const spendingProblems = {
   }),
 };
 
+/** Each chain wallet's own coin, as a leg on lands it (an out leg's 1Click amountOut is in its smallest units). */
+const LANDED_COIN: Readonly<Record<SpendingNetwork, { symbol: string; decimals: number }>> = { sol: { symbol: "SOL", decimals: 9 }, hood: { symbol: "ETH", decimals: 18 }, bsc: { symbol: "BNB", decimals: 18 } };
+/** Smallest units as a decimal, exact, with no trailing zeros: "64400000", 9 -> "0.0644". */
+export function unitsText(units: string, decimals: number): string {
+  const v = BigInt(units), base = 10n ** BigInt(decimals);
+  const frac = (v % base).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return `${v / base}${frac ? `.${frac}` : ""}`;
+}
+/** the audit's Send audit M5 (7 Nov): what a done move landed, in the coin it landed as, from the engine's own record of
+ *  1Click's settled amountOut (EngineMove.got): an out leg its chain's own coin, in and home USDC. Nothing for an Add (its
+ *  legs land it), a move not done, or no figure. Pure. */
+export function landedOut(m: Pick<EngineMove, "kind" | "chain" | "status" | "got">): { amount: string; symbol: string } | undefined {
+  if (m.status !== "done" || typeof m.got !== "string" || !/^\d{1,40}$/.test(m.got) || BigInt(m.got) === 0n) return undefined;
+  if (m.kind === "out") { const c = m.chain ? LANDED_COIN[m.chain] : undefined; return c ? { amount: unitsText(m.got, c.decimals), symbol: c.symbol } : undefined; }
+  return m.kind === "in" || m.kind === "home" ? { amount: unitsText(m.got, 6), symbol: "USDC" } : undefined;
+}
+
 // ---- the engine behind it (Trade's planner, extended; implemented by packages/trade float-core.ts createCoreFloat) ----
 
 /** A network's wallet as the engine reads it (D55): `current`, the one Trade, Apps and Chat use; else an older one. */
@@ -512,6 +533,9 @@ export interface EngineMove {
   to?: SpendingNetwork | "near";
   /** Its proof (tx-proof.ts), as the trade engine got it from the core. */
   proof?: MoveProof;
+  /** Done: what landed, 1Click's settled amountOut in the smallest units of the coin it lands as (an out leg: its chain's
+   *  own coin; in or home: USDC, 6 decimals). */
+  got?: string;
   /** Move's legs (an Add from the Safe that goes on to the wallets the person chose), as the trade engine keeps them. */
   legs?: { chain: SpendingNetwork | "near"; usd: number; sent?: true; failed?: string }[];
   /** E7: an Add that is a swap inside the Safe (it goes home once in Trading); `paidWith`, the Safe's coin that paid. */
@@ -773,6 +797,7 @@ export function createSpendingService(d: SpendingDeps): Bridge & { capUsd(): num
     const asked = lg > 0 && !m.ready ? lg : kind === "put-away" && m.askedUsd !== undefined && m.askedUsd > 0 ? m.askedUsd : undefined;
     return { id: m.id, kind, usd: usdText(m.usd), status, ...(lg > 0 && lg < m.usd - 0.004 && !m.ready ? { legsUsd: usdText(lg) } : {}), ...(asked !== undefined && Math.abs(asked - m.usd) >= 0.005 ? { askedUsd: usdText(asked) } : {}), ...(kind === "top-up" && m.ready ? { siteName: m.ready.name } : {}), shown: shownInActivity(kind, status), atIso: new Date(m.at).toISOString(), words, ...(m.chain ? { network: m.chain } : {}), ...(m.to ? { to: m.to } : {}), ...(m.held ? { held: m.held } : {}), ...(note ? { note } : {}),
       ...(etaOk(m.etaSec) && status === "on-its-way" && !m.held && !m.paused && !m.unshown ? { etaSeconds: m.etaSec } : {}), ...(m.unshown && status === "on-its-way" ? { unshown: true as const } : {}), ...(forSite ? { site: forSite } : {}), ...(m.by === "agentzero" ? { by: m.by } : {}), ...(m.of ? { of: m.of } : {}), ...(goesTo.length ? { goesTo } : {}), ...(kind === "top-up" && (m.ready?.failed || m.legs?.some((l) => l.failed)) ? { stoppedShort: true as const } : {}),
+      ...(landedOut(m) ? { amountOut: landedOut(m)! } : {}),
       ...(parked !== undefined ? { parkedUsd: parked } : {}), ...(m.signing ? { signing: m.signing.orphan ? "checking" as const : "asked" as const } : {}), ...(typeof m.mv === "string" && m.mv !== m.id ? { ledgerId: m.mv } : {}), ...(m.priv ? { via: "private" as const, ...(m.priv.fill ? { fill: m.priv.fill } : {}), ...(paidIds(m.priv).length ? { paid: paidIds(m.priv) } : {}), ...(privLanded(m).length ? { landed: privLanded(m) } : {}), ...(privMissed(m).length ? { missed: privMissed(m), missedUsd: privMissedUsd(m)! } : {}), ...(privUnsure(m) ? { unsure: true as const } : {}), ...(privOnWay(m) ? { onWay: true as const } : {}), ...(privPaid(m.priv) ? { paidDone: true as const } : {}) } : {}), ...(m.proof ? { proof: m.proof } : {}) };
   }
 

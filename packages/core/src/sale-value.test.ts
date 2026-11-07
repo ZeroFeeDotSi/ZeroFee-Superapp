@@ -56,7 +56,7 @@ test("re-review B1 (ship fix): a sale paid into the wallet's OWN wrapped-SOL acc
   };
   const own = await run((wallet) => ownTokenAccount(wallet, SOL.wsol));
   assert.deepEqual([own.out, own.shown.length], ["signed", 0], "its own wSOL account: SOL back, no sheet");
-  const other = await run(() => ownTokenAccount("8JVZpqUZfQMEc8kMduTS9SkVxP9v8rgunJNcV4qNYGYZ", SOL.wsol));
+  const other = await run(() => ownTokenAccount("9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin", SOL.wsol));
   assert.equal(other.out, "It doesn't show what the sale brings back. Nothing was signed.", "another owner's wSOL account counts for nothing: refused by name");
   assert.equal(other.shown.length, 0);
 });

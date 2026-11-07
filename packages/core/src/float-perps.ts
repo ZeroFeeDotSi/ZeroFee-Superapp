@@ -1,6 +1,7 @@
 // D119 landing 3: Trading ↔ the person's own Perps account on Hyperliquid, through 1Click, with FloatMoves' own steps
 // (fromFloat for a move out, the same checks as a move in for a move back). Loaded on first use (float-moves.ts toPerps /
 // fromPerps import it), so none of it is in Home's first load.
+import { intentsRefused, stopWords } from "./intents-refused.ts";
 import { FLOAT_USDC, type FloatMove, type Kept, type PerpsKit } from "./float-moves.ts";
 import { leastIn as least } from "./float-floors.ts";
 import { parseQuote } from "./intents.ts";
@@ -86,7 +87,7 @@ export async function fromPerps(f: PerpsKit, amount: unknown, key: unknown, pay:
   } catch (e) {
     await place.release();
     if (k.depositAddress) (k.move.status = "failed"), await f.keep(k);
-    throw e instanceof ProblemError ? e : refused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+    throw e instanceof ProblemError ? e : intentsRefused(e, "in Perps");
   }
   f.paying.add(k.move.id);
   try {
@@ -97,8 +98,9 @@ export async function fromPerps(f: PerpsKit, amount: unknown, key: unknown, pay:
     k.payError = wordsOf(e);
     // Only a spotSend Hyperliquid didn't answer may have gone (the perps service marks it maybeSent): open until 1Click
     // says. Anything else (Hyperliquid's no, a refusal before the send) left nothing out of the Perps account.
-    if ((e as { maybeSent?: boolean })?.maybeSent) k.move.reason = `Not confirmed by Hyperliquid yet: ${k.payError}`;
-    else Object.assign(k.move, { status: "failed", where: "chain", reason: `Not sent from Perps: ${k.payError}` });
+    // the reason line in plain words (QA 16's SHOULD): payError keeps Hyperliquid's own, for the log
+    if ((e as { maybeSent?: boolean })?.maybeSent) k.move.reason = `Not confirmed by Hyperliquid yet: ${stopWords(e, "Hyperliquid didn't answer")}`;
+    else Object.assign(k.move, { status: "failed", where: "chain", reason: `Not sent from Perps: ${stopWords(e, "Hyperliquid didn't take it")}` });
   } finally {
     f.paying.delete(k.move.id);
   }

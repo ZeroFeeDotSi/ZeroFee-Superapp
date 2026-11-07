@@ -46,7 +46,7 @@ export const HOME_LEG_MIN_USD = Math.ceil(((2 * MAX_OVER + FEE_ROOM_USD) / 0.99)
  * The plan's bound for a leg from the Safe or Private to a wallet, before any quote (the Move page's "Arrives at least",
  * move-split.ts leastOf): the Add brings at least 99 % of it, a leg on to a chain's wallet keeps 3 % for its fee, and
  * each leg pays its chain's fixed network fee (NETWORK_FEE_USD; the audit's MUST, 8 Nov: the bound, not the noise). The Check-this sheet holds leg 2's signed quote to it (the audit's
- * ruling (c), 8 Nov): a quote that promises less, or costs more than the plan's "at most", heads COSTS_MORE_HEAD.
+ * ruling (c), 8 Nov): a quote that promises less, or costs more than the plan's "at most", heads COSTS_MORE.
  */
 export const planLeastUsd = (usd: number, chain: WalletChain): number => Math.max(0, (chain === "near" ? usd * 0.99 : (usd * 0.99) / MAX_OVER) - NETWORK_FEE_USD[chain]);
 /** A wallet's chain, as the plan and the sheets name them. */
@@ -67,6 +67,21 @@ export const walletChainOf = (wallet: string): WalletChain | null => CHAIN_OF_NA
  */
 export const walletLegLeastUsd = (usd: number, fromChain: boolean, toChain: boolean): number =>
   fromChain && toChain ? leastIn(usd * 0.99) / MAX_OVER : fromChain ? leastIn(usd * 0.99) : usd * 0.99;
-/** The head of a Check-this whose signed quote breaks the plan's bound (the audit's ruling (c); provisional words, to 53). The
- *  approval sheet re-arms Approve on it (apps/web approval-arm.ts). */
-export const COSTS_MORE_HEAD = "Costs more than the plan said.";
+/**
+ * The head of a Check-this whose signed quote breaks the plan's bound (the audit's ruling (c); the audit's way-home audit M8, 7 Nov:
+ * rule 8, by name, the figure against the plan's, where the money is, the next tap). Three lines, drawn as one card
+ * first on the web sheet and the phone's own (apps/ios SheetWords.costsMoreHead reads the same three); the approval sheet
+ * re-arms Approve on it (apps/web approval-arm.ts). `fee`: its fees past the plan's "at most"; `least`: it promises less
+ * than the plan's "at least". `places`: where the money is now, by Home's names.
+ */
+export const COSTS_MORE = {
+  lead: (by: "fee" | "least", now: string, plan: string) =>
+    by === "fee" ? `NEAR Intents takes ${now} in fees now. This Move said at most ${plan}.` : `NEAR Intents moves at least ${now} now. This Move said at least ${plan}.`,
+  still: (places: readonly string[]) => `Nothing moved yet. It's still in ${places.length > 1 ? `${places.slice(0, -1).join(", ")} and ${places.at(-1)}` : places[0] ?? "your Safe"}.`,
+  next: "Tap Approve to go on, or Not now to stop.",
+} as const;
+const COSTS_LEAD = /^NEAR Intents (takes \$[\d,]+\.\d{2} in fees now\. This Move said at most|moves at least \$[\d,]+\.\d{2} now\. This Move said at least) \$[\d,]+\.\d{2}\.$/;
+/** How many of a sheet's first lines are the costs-more head: 3 or 0. */
+export function costsMoreHead(lines: readonly string[]): number {
+  return lines.length >= 3 && COSTS_LEAD.test(lines[0]!) && lines[1]!.startsWith("Nothing moved yet. It's still in ") && lines[2] === COSTS_MORE.next ? 3 : 0;
+}

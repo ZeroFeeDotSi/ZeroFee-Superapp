@@ -41,7 +41,7 @@ test("D140 (the grade of 3 Nov: the total fell by the $310 on its way): from the
   assert.match(sheet, /setBusy\(true\); setLine\(null\);\s*setFrozen\(now\);/);
   // nothing moved (refused before the job, or a no on the Safe's Approve): it reads live again; a job made keeps them
   assert.match(sheet, /const back = \(\) => \{ setMade\(null\); setBusy\(false\); setFrozen\(null\); \};/);
-  assert.match(sheet, /refused: \(pr\) => \{ back\(\); if \(sendEndsHere\(pr\)\) return void endHere\(shell, pr, onClose\); const said = refusedLine\(pr\); if \(said !== null\) \{ setLine\(said\); setStep\(refusedStep\(pr\)\); \} else void problem\(pr, \(\) => undefined\); \},\s*declined: back,/);
+  assert.match(sheet, /refused: \(pr\) => \{ back\(\); if \(sendEndsHere\(pr\)\) return void endHere\(shell, pr, onClose\); const said = refusedLine\(pr\); if \(said !== null\) \{ setLine\(said\); setStep\(refusedStep\(pr\)\); \} else void problem\(pr, \(\) => undefined\); \},\s*declined: \(\) => \{ back\(\); setStep\(null\); setLine\(MOVE_SAID_NO\); \},/);
   assert.match(sheet, /const total = totalOf\(now\);/, "the total from the held places");
 });
 
@@ -68,7 +68,7 @@ test("the copy review's Move walk (5 Nov): one note under the rows at a time, th
 
 test("the copy review's Move walk (5 Nov), A2-2 (8 Nov): Private's screen has a Move, only once Private holds money, that opens Private's own one-slider sheet (private-page-2.test.ts), never the all-wallets Move; Home's own Move keeps its tab's focus", () => {
   const priv = readFileSync(new URL("./Private.tsx", import.meta.url), "utf8");
-  assert.match(priv, /\{ready && has && <button className="zf-btn" data-testid="private-move" onClick=\{\(\) => openSheet\(true\)\}>Move<\/button>\}/);
+  assert.match(priv, /\{ready && has && <button className="zf-btn" data-testid="private-move" disabled=\{moving !== "no"\} onClick=\{\(\) => openSheet\(true\)\}>Move<\/button>\}/);
   const app = readFileSync(new URL("../WalletApp.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(app, /<PrivateScreen [^\n]*?onMove=/);
   const host = readFileSync(new URL("../money/MoneyHost.tsx", import.meta.url), "utf8");

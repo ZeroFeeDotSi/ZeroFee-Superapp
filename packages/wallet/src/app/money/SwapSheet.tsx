@@ -15,15 +15,16 @@ import { MoneyAmount, MoneySheet, QUOTE_WAIT_MS, SheetLine, quoteWaitLine, useEl
 import { serviceOf } from "@zerofee/core/services";
 import type { BridgeResult } from "@zerofee/core/bridge";
 import { keepPrice, keptPrice } from "./price-kept.ts";
+import { keepFresh, priceFresh } from "./swap-fresh.ts";
 import { Keypad } from "@zerofee/design/Keypad.tsx";
 import { padBase } from "@zerofee/design/keypad.ts";
 import { sayWent, type HomeWallet } from "@zerofee/shell-api/money.ts";
 import { HOME_PROOF } from "@zerofee/core/home-proof";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { runJob } from "@zerofee/shell-api/job-run.ts";
-import { receiptPaidLine } from "./paid-from.ts";
+import { receiptPaidLine, swapPayer } from "./paid-from.ts";
 import { mark } from "@zerofee/design/tap.ts";
-import { followSwap } from "./swap-follow.ts";
+import { LANDED_READ_FOR_MS, LANDED_READ_MS, followSwap, landedFigure } from "./swap-follow.ts";
 import { nameSwap } from "@zerofee/shell-api/job-carry.ts";
 import { JobReceipt } from "./JobMade.tsx";
 import { swappedLine, swappingLine } from "./receipt-said.ts";
@@ -32,7 +33,7 @@ import type { Balance, Token } from "../../types.ts";
 import { typedUsd } from "../hub.ts";
 import { useWallet } from "../runtime.tsx";
 import { useMoveProblem } from "../screens/Spending.tsx";
-import { dollars } from "../format.ts";
+import { dollars, privateFigure } from "../format.ts";
 import { SHEET_NEEDS, useServices } from "../services.ts";
 import { SWAP_COIN, coinFigure, routeSec, feeHigh, floorOf, SWAP_MIN_USD, SWAP_WORDS, arrivesWith, backLine, coinName, feesLine, paidLine, type SwapPrice, privateLine, getsFor, mostOn, payFor, paysHere, routeOf, saidOnSheet, swapBlock, swapFloor, swapKey, swapSub, type PayHere, type SwapPlace, type SwapRoute, swapStays, swapMoney, SWAP_PLACES } from "./swap-corridor.ts";
 import { MOVE_WORDS, safeSigns } from "../screens/move-split.ts";
@@ -131,6 +132,10 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   // with no cover is said before the tap in the sub-line slot, the button off, never refused after it
   const cover = route?.kind === "topup" && !block ? swapCover({ coin: route.coin, usd: amount, safe: balances as readonly SafeCoin[] | null, pocket: pocket ? (pocket.available ? pocket.rows as readonly SafeCoin[] : []) : null, fillOpen: SAFE_FILL_OPEN }) : null;
   const short = coverLine(cover);
+  // J3-3: who pays, by the fill rule the money path itself runs (move-split safeSigns): the same `signs` the tap's job
+  // (fromPrivate), its Safe sheet and the receipt's W1 read, so the "You pay" card never names a place the money won't
+  // leave. Coins not read, or a fill: the Safe's Approve comes, as before
+  const signs = route?.kind === "topup" ? safeSigns([{ from: "safe", to: route.to, usd: amount }], balances && pocket ? [...balances, ...(pocket.available && pocket.ready ? pocket.rows : [])] : null, SAFE_FILL_OPEN, route.coin) : undefined;
   // the route's least, said once while the amount is picked; nothing under it is offered (QA, 5 Nov)
   const floor = floorOf(route);
   // a press with no amount yet says "Pick an amount." (until the dollars change)
@@ -176,15 +181,34 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   const [madeJob, setMadeJob] = useState<string | null>(null);
   /** The receipt's first line (copy review, 7 Nov): "$25.00 swapped: about 0.2419 SOL is in your SOL wallet.", the tap's own figures. */
   const [madeSaid, setMadeSaid] = useState<{ going: string; landed: string } | null>(null);
+  // the audit's Send audit M5 (7 Nov): once its movement is done, the receipt's landed line says what the movement itself landed
+  // (1Click's settled amountOut, the core's record), never the tap's estimate; read while the receipt shows
+  const [landing, setLanding] = useState<{ id: string; where: string } | null>(null);
+  useEffect(() => {
+    if (!landing) return;
+    let live = true;
+    const read = async () => {
+      const r = await bridge.call<SpendingActivity[]>("spending.activity", {}).catch(() => null);
+      if (!live || !r || !("ok" in r) || !Array.isArray(r.ok)) return;
+      const fig = landedFigure(r.ok, landing.id, (n) => coinFigure(n, "down"));
+      if (fig) { live = false; setMadeSaid((m) => (m ? { ...m, landed: swappedLine(fig, landing.where) } : m)); }
+    };
+    void read();
+    const t = setInterval(() => void read(), LANDED_READ_MS);
+    const end = setTimeout(() => { live = false; }, LANDED_READ_FOR_MS);
+    return () => { live = false; clearInterval(t); clearTimeout(end); };
+  }, [landing]);
   const go = async () => {
     if (!pay || !get || !route || busy || block || short) return;           // one hold, one swap
+    // M5 (the audit's audit): a price this old is asked again first, so the tap's figure (the receipt's) is never a stale one
+    if (price.cost && !priceFresh(price.at, Date.now())) return price.again();
     mark("tap");
     setBusy(true); setLine(null); setStopped(null);
     const words = swapWords(String(amount), SWAP_COIN[pay.place].label, SWAP_COIN[get].label);
     // a Swap from the Safe to a wallet that Private pays whole (the ledger's fill rule, move-split safeSigns): no Safe sheet
     // comes, so the job is made at the tap like a wallet's (rule 2; QA's Sim lap: 1.8 s to "Job created." while
     // it waited for a sheet that never came). Coins not read, or a fill: the Safe's Approve first, as before
-    const signs = route.kind === "topup" ? safeSigns([{ from: "safe", to: route.to, usd: amount }], balances && pocket ? [...balances, ...(pocket.available && pocket.ready ? pocket.rows : [])] : null, SAFE_FILL_OPEN, route.coin) : undefined;
+    // `signs`: the render's own (J3-3), the value the "You pay" card said
     const safe = (route.kind === "topup" && signs !== false) || route.kind === "safe";
     const said = `$${amount.toFixed(2)}`;
     // what comes in, as the sheet priced it at the tap ("0.0644 SOL"): the job's end says it (copywriter, 5 Nov)
@@ -200,7 +224,7 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
       tasks: jobTasks, title: words, usd: said, etaSec: routeSec(route), safe, ...(signs === false ? { fromPrivate: true } : {}), money: swapMoney(safe, signs, pay.place),
       call: () => bridge.call<SpendingActivity | { declined: true }>(a.method, a.params),
       declined: (r) => "ok" in r && "declined" in r.ok,
-      made: (j) => { sayWent(""); setMadeJob(j.id); setMadeSaid({ going: swappingLine(said, SWAP_COIN[pay.place].label, SWAP_COIN[get].label), landed: swappedLine(said, lands, SWAP_COIN[get].where) }); setMade(said); setBusy(false); },
+      made: (j) => { sayWent(""); setMadeJob(j.id); setMadeSaid({ going: swappingLine(SWAP_COIN[pay.place].label, SWAP_COIN[get].label), landed: swappedLine(lands, SWAP_COIN[get].where) }); setMade(said); setBusy(false); },
       // the audit's (B): the Safe asked after all, so the receipt never says "From Private, so no Face ID."
       safeAsked: () => setPaidLine(null),
       // its key (the call's), which the core names with approval.asked when the Safe's sheet comes for it (the audit's MUST)
@@ -220,6 +244,7 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
     setPaidLine(receiptPaidLine(route.kind === "topup", signs, ok));
     // the row is this Swap's from its first read (QA's Sim crawl, 5 Nov: it read "Move" until Done)
     nameSwap(ok.id, words, lands);
+    setLanding({ id: ok.id, where: SWAP_COIN[get].where });
     end.job.made([`move:${ok.id}`]);
     if (ok.held) { onHeld(ok.held); return onDone(""); }
     // the wallets are read again until the swap shows (swap-follow.ts): the host does it with Done (the app that asked
@@ -264,8 +289,12 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   const said = line ?? services.line ?? slowLine ?? null;
   const refused = stopped && !busy && !block ? stoppedLine(stopped) : null;
   const on = swapFloor({ again: refused ? stopped!.next.label : null, block, tried, said: !!said, priceDown: price.late || !!price.said });
-  const stays = !block ? swapStays(route, amount, sends, undefined, cover) : null;
+  // J3-3: Private paying it whole, the card names Private, so no "leaves Private" line under it
+  const payer = pay ? swapPayer({ safeRoute: route?.kind === "topup", signs, where: SWAP_COIN[pay.place].where, usd: pay.usd, privateUsd: privateFigure(pocket) }) : null;
+  const stays = !block && !payer?.private ? swapStays(route, amount, sends, undefined, cover) : null;
   const nothing = !!route && most < 0.01;
+  // M5 (the audit's audit): a price past its life with nothing newer is greyed, its arrives line and its fee
+  const feeCls = `zf-small${price.stale ? " wl-swap2--stale" : ""}`;
   const sub = swapSub({ short, back, arrives: route && !block ? arrivesWith(route, get!, amount, priceOf(get!, status, tokens), price.cost) : null, part: nothing ? SWAP_WORDS.none : pay?.part ?? null });
   const list = (which: "pay" | "get") => (
     <CoinPicker bridge={bridge} title={which === "pay" ? SWAP_WORDS.pay : SWAP_WORDS.get} start={(which === "pay" ? payPick : getPick ?? payPick)?.chain ?? (PLACE_CHAIN[pay?.place ?? "near"] ?? "near")}
@@ -307,11 +336,11 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
           <div className="wl-swap2">
             <div className="wl-swap2__scroll">
               <div className="wl-swap2__card">
-                <button className="wl-swap-pick" onClick={() => setPicking("pay")} aria-label={`${SWAP_WORDS.pay}: ${name(pay.place)}`}>
+                <button className="wl-swap-pick" onClick={() => setPicking("pay")} aria-label={`${SWAP_WORDS.pay}: ${SWAP_COIN[pay.place].label} · ${payer?.where ?? SWAP_COIN[pay.place].where}`} data-testid="swap-payer">
                   <span className="zf-small">{SWAP_WORDS.pay}</span><CoinIcon symbol={SWAP_COIN[pay.place].symbol} icon={SWAP_COIN[pay.place].icon} size={28} />
                   {/* R3 (the design review §4.4): the coin over where it sits, two lines, never wrapped mid-phrase */}
-                  <span className="zf-body wl-sw-name">{SWAP_COIN[pay.place].label}<span className="zf-small wl-sw-where">{SWAP_COIN[pay.place].where}</span></span>
-                  <span className="zf-small">{dollars(pay.usd.toFixed(2))}</span><svg className="wl-sw-chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
+                  <span className="zf-body wl-sw-name">{SWAP_COIN[pay.place].label}<span className="zf-small wl-sw-where">{payer?.where ?? SWAP_COIN[pay.place].where}</span></span>
+                  {payer?.usd !== null && <span className="zf-small">{dollars((payer?.usd ?? pay.usd).toFixed(2))}</span>}<svg className="wl-sw-chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
                 </button>
                 <button className="wl-swap-pick" onClick={() => setPicking("get")} aria-label={`${SWAP_WORDS.get}: ${get ? name(get) : SWAP_WORDS.pick}`}>
                   <span className="zf-small">{SWAP_WORDS.get}</span>
@@ -328,7 +357,7 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
                 <button type="button" className="zf-chip wl-swap-all" onClick={() => { setPreset(true); onUsd(most.toFixed(2)); }} disabled={most < floor.usd} aria-label={`Max, $${most.toFixed(2)}`}>{SWAP_WORDS.max}</button>
               </div>
               {/* the one sub-line slot: its height is kept, so a line coming or going moves nothing */}
-              <div className="wl-swap2__sub" data-testid="swap-sub">{sub && <p className="zf-small" data-testid={sub.id}>{sub.text}{sub.id === "swap-short" && <> <button type="button" className="zf-link" onClick={() => { onClose(); shell.openApp("wallet", "private/add"); }} data-testid="swap-top-up">{TOP_UP_PRIVATE}</button></>}</p>}</div>
+              <div className="wl-swap2__sub" data-testid="swap-sub">{sub && <p className={`zf-small${price.stale && sub.id === "swap-arrives" ? " wl-swap2--stale" : ""}`} data-testid={sub.id}>{sub.text}{sub.id === "swap-short" && <> <button type="button" className="zf-link" onClick={() => { onClose(); shell.openApp("wallet", "private/add"); }} data-testid="swap-top-up">{TOP_UP_PRIVATE}</button></>}</p>}</div>
               <Keypad value={padBase(usd || "0", preset)} decimals={2} onChange={(v) => { setPreset(false); onUsd(v === "0" ? "" : v); }} />
             </div>
             <div className="wl-swap2__floor">
@@ -343,7 +372,7 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
               {/* line 2, the fee block, right above the button (the copy review, 6 Nov); a refusal never takes its place */}
               {route && (
                 <div className="zf-fee">
-                  {price.waiting ? <p className="zf-small" role="status" data-testid="swap-price-wait">{quoteWaitLine(price.waitedMs)}</p> : price.figure && <p className="zf-small" data-testid="swap-fee">{price.figure}</p>}
+                  {price.waiting ? <p className="zf-small" role="status" data-testid="swap-price-wait">{quoteWaitLine(price.waitedMs)}</p> : price.figure && <p className={feeCls} data-testid="swap-fee">{price.figure}</p>}
                   <p className="zf-small" data-testid="swap-paid">{price.paid}</p>
                 </div>
               )}
@@ -371,15 +400,18 @@ export const SWAP_PRICE_LATE = "NEAR Intents didn't answer.";
  * answer or QUOTE_WAIT_MS passed; `said` when it came back refused at once (its own words, never "didn't answer"). The
  * same price asked again within PRICE_KEPT_MS is the one kept.
  */
-function useSwapPrice(bridge: Bridge, from: SwapPlace | null, to: SwapPlace | null, usd: number, off: boolean): { cost: SwapPrice | null; figure: string | null; paid: string; late: boolean; said: string | null; waiting: boolean; waitedMs: number; again: () => void } {
+function useSwapPrice(bridge: Bridge, from: SwapPlace | null, to: SwapPlace | null, usd: number, off: boolean): { cost: SwapPrice | null; at: number; stale: boolean; figure: string | null; paid: string; late: boolean; said: string | null; waiting: boolean; waitedMs: number; again: () => void } {
   const [cost, setCost] = useState<SwapPrice | null>(null);
+  // M5 (the audit's audit): when the price shown came, and whether it is past its life with nothing newer (greyed)
+  const [at, setAt] = useState(0);
+  const [stale, setStale] = useState(false);
   const [late, setLate] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
   const [tries, setTries] = useState(0);
   const waitedMs = useElapsed(waiting);
   useEffect(() => {
-    setCost(null); setLate(false); setSaid(null); setWaiting(false);
+    setCost(null); setLate(false); setSaid(null); setWaiting(false); setStale(false);
     if (off || !from || !to || !(usd >= SWAP_MIN_USD)) return;
     let live = true;
     const call = (u: number): Promise<BridgeResult<SwapPrice>> => {
@@ -393,6 +425,13 @@ function useSwapPrice(bridge: Bridge, from: SwapPlace | null, to: SwapPlace | nu
     };
     const good = (r: BridgeResult<SwapPrice> | null): SwapPrice | null => (r && "ok" in r && Number.isFinite(r.ok.feeUsd) && Number.isFinite(r.ok.arrivesUsd) ? r.ok : null);
     let slow: ReturnType<typeof setTimeout> | undefined;
+    let fresh = () => {};
+    // asked again while the sheet sits (never the kept copy: that one is the price going stale)
+    const ask = (): Promise<SwapPrice | null> => bridge.call<SwapPrice>("subwallet.float.swapCost", { from, to, usd: usd.toFixed(2) }).then((r) => {
+      const c = good(r);
+      if (c) keepPrice(bridge, JSON.stringify(["swap", from, to, usd.toFixed(2)]), c);
+      return c;
+    });
     const t = setTimeout(() => {
       setWaiting(true);
       slow = setTimeout(() => { if (live) { setWaiting(false); setLate(true); } }, QUOTE_WAIT_MS);
@@ -402,13 +441,14 @@ function useSwapPrice(bridge: Bridge, from: SwapPlace | null, to: SwapPlace | nu
         setWaiting(false);
         const c = good(r);
         setCost(c);
+        if (c) { setAt(Date.now()); fresh = keepFresh({ ask, got: (n) => { setCost(n); setAt(Date.now()); setStale(false); }, stale: () => setStale(true) }); }
         // no price: the relay's own "didn't answer" (a service named) is late; anything else came back at once, refused
         const p = r && "problem" in r ? r.problem : null;
         setLate(!c && (!p || !!serviceOf(p)));
         setSaid(!c && p && !serviceOf(p) ? (p.more && p.more.length <= 140 ? p.more : p.whatHappened) : null);
       });
     }, 300);
-    return () => { live = false; clearTimeout(t); clearTimeout(slow); };
+    return () => { live = false; clearTimeout(t); clearTimeout(slow); fresh(); };
   }, [bridge, from, to, usd, off, tries]);
-  return { cost, figure: feesLine(cost), paid: paidLine(cost), late, said, waiting, waitedMs, again: () => setTries((n) => n + 1) };
+  return { cost, at, stale, figure: feesLine(cost), paid: paidLine(cost), late, said, waiting, waitedMs, again: () => setTries((n) => n + 1) };
 }

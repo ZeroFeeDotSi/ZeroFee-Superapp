@@ -22,7 +22,7 @@ import { sheetFoot } from "@zerofee/shell-api/key-place.ts";
 import { simPage } from "@zerofee/shell-api/release.ts";
 import { markTap, personTapped } from "../unlock/activation.ts";
 import { APPROVAL_PASSWORD_WORDS } from "./approval-password.ts";
-import { ARM_MS, COSTS_MORE_HEAD } from "./approval-arm.ts";
+import { ARM_MS, costsMoreHead } from "./approval-arm.ts";
 import { groupAddress, isLandsLine, isLeadLine, toAddress, ungroup } from "./sheet-address.ts";
 import "./approval.css";
 
@@ -158,14 +158,19 @@ export function ApprovalSheetView({ id, words, onAnswer: answer, password, pendi
           )}
           {/* The payment in dollars, the coin amount after it (grade 02g, G11), before every other line. */}
           {amountLine(words) && <p className="approval__amount">Amount: {amountLine(words)}</p>}
-          {words.lines.map((line, i) => {
+          {/* a signed quote past the plan's bound (the audit's ruling (c), M8): its three head lines, one card, said first; the
+              phone's own sheet draws the same card (NativeSheet.swift) */}
+          {costsMoreHead(words.lines) > 0 && (
+            <div className="approval__costs" role="alert" data-testid="approval-costs">
+              {words.lines.slice(0, costsMoreHead(words.lines)).map((line, i) => <p key={i} className={i === 0 ? "approval__line approval__lead" : "approval__line"}>{line}</p>)}
+            </div>
+          )}
+          {words.lines.slice(costsMoreHead(words.lines)).map((line, i) => {
             // every outside sheet's full address (the copy review's rules, 5 Nov): "To" a caption, the address in groups of 4 under
             // it; the line saying where it lands, quiet
             const to = toAddress(line);
             if (to) return <div key={i} className="approval__to"><span className="approval__to-cap">To</span><FullAddress label="The address" address={to} /></div>;
             if (isLandsLine(line)) return <p key={i} className="approval__line approval__lands">{line}</p>;
-            // a signed quote past the plan's bound (the audit's ruling (c)): its head, in ink, said first
-            if (line === COSTS_MORE_HEAD) return <p key={i} className="approval__line approval__lead" role="alert">{line}</p>;
             if (isLeadLine(line)) return <p key={i} className="approval__line approval__lead">{line}</p>;
             // an open detail (a payee's full address) sits right under its line, never folded
             const full = words.details?.find((d) => d.open?.after === line);

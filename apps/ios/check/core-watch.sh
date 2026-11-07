@@ -14,7 +14,7 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 cd "$repo"
 node "$repo/apps/ios/core/build.mjs"
-relay="$(printf %s "${ZEROFEE_RELAY_URL-$(cat "$repo/apps/ios/relay-url.txt")}" | tr -d '[:space:]')"
+relay="$(tr -d '[:space:]' < "$repo/apps/ios/relay-url.txt")"
 key="$(node --input-type=module -e '
   import { RpcChain } from "./packages/core/src/chain.ts";
   import { handleOf } from "./packages/core/src/dev-signer.ts";

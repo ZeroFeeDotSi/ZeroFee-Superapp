@@ -30,6 +30,7 @@ const REFUSAL_WORDS: Record<PageRefusal, (symbol: string) => { whatHappened: str
 import { agoText } from "../chart-math.ts";
 import { amount, coinHeadline, compactUsd, dexName, listPrice, pct, usd } from "../format.ts";
 import { coinPageSince } from "../your-coins.ts";
+import { heldNetOf, IF_SOLD } from "../held-net.ts";
 import { CoinOrders } from "./Orders.tsx";
 import { CoinStanding } from "./Standing.tsx";
 import { CoinExitPlan } from "./ExitPlan.tsx";
@@ -206,7 +207,6 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
   // range, green over a red hour)
   const moved = headerMove(range, shown ?? [], dayMove);
   const logo = d?.logoUrl ?? seed.logoUrl;
-  const heldUnits = holds && d ? Number(BigInt(held.value!)) / 10 ** (d.decimals ?? 6) : 0;
   const explorer = EXPLORER[seed.chain]?.(seed.address);
   // the market cap at the price on screen (the market data's, moved with the live price); the tapped row's numbers until the page's own come (coin-stats.ts)
   const fig = statFigures(d, seed, px), mcap = fig.mcap;
@@ -215,7 +215,9 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
   const trap = sellTrap(safety.card);
   const stale = Date.now() - heardAt > STALE_MS;
   const copy = () => { void navigator.clipboard?.writeText(seed.address).then(() => setCopied(true), () => undefined); };
-  const sinceWords = coinPageSince(position, px, MARKET.includes(seed.chain));
+  // the audit's T6: the holding's one figure, what selling it now gets (held-net.ts), as Your coins and the receipt say it
+  const net = useLive(() => (holds ? heldNetOf(svc.quote, seed.chain, seed.address, held.value!) : Promise.resolve(undefined)), [seed.chain, seed.address, held.value]);
+  const sinceWords = coinPageSince(position, px, MARKET.includes(seed.chain), net.value);
   // the network in words, never the venue ("On Solana", not "SOL · PumpSwap": the copy review's final words, 7 Nov, T1)
   const where = `On ${CHAIN_NAME[seed.chain]}`;
   const canTrade = !no && MARKET.includes(seed.chain) && !(!d && detail.error);
@@ -270,7 +272,7 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
           <CoinIcon symbol={symbol} src={d.logoUrl ?? seed.logoUrl} size={36} />
           <span className="cp-hold-t"><span>You hold {amount(held.value!, d.decimals ?? 6)} {symbol}</span>
             {sinceWords && <span className="zf-small" data-testid="coin-since">{"note" in sinceWords ? sinceWords.note : sinceWords.text}</span>}</span>
-          <span className="cp-hold-v">{px !== undefined ? usd(heldUnits * px) : ""}</span>
+          <span className="cp-hold-v">{net.value !== undefined ? <>{usd(net.value)} <span className="zf-small tr-mute">{IF_SOLD}</span></> : ""}</span>
         </div>
       )}
       {/* product decision, 4 Nov ("coin checks are not needed ... pull only data from GeckoTerminal and show it better"): the coin's

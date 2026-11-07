@@ -8,7 +8,7 @@
 // out of Hot and New); the change is coloured text; a price that moved gets a glint, never a box, and its digits never
 // roll; at most two rows glow in their coin's own light. The list paints from the device in the first frame
 // (runtime.tsx useMarketList) and reads again by itself; a press warms the coin's page before the tap lands.
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
 import { LiveRow } from "@zerofee/design/LiveRow.tsx";
 import { ReceiptMark } from "@zerofee/design/Receipt.tsx";
@@ -18,9 +18,13 @@ import { ProblemError } from "@zerofee/core/problem";
 import { CHAINS, type TradeRecord } from "../../service.ts";
 import { amount as fmtAmount } from "../format.ts";
 import { createFeedback } from "../feedback.ts";
+import { followTurn, turnTask } from "../trade-turn.ts";
+import { rowSaid, whenBooked } from "../fill-words.ts";
+import { epochOf, tradeMs } from "../../tap-time.ts";
 import { followRecord, recordOf, UNCONFIRMED } from "../unconfirmed-follow.ts";
 import { landedDetail, whenCosted } from "../landed-detail.ts";
-import { ROW_RECEIPT_MS, rowBuyEnd, rowBuyLanded, rowBuyLine, type RowBuy as RowBuyState } from "./row-buy.ts";
+import { ROW_RECEIPT_MS, createChipQuotes, rowBuyEnd, rowBuyLanded, rowBuyLine, type RowBuy as RowBuyState } from "./row-buy.ts";
+import type { Prepared } from "../../types.ts";
 import { useQuickBuy } from "./quick-buy.ts";
 import type { CoinRow } from "../../market/types.ts";
 import { tickKey } from "../../market/ticks.ts";
@@ -166,7 +170,7 @@ const Row = memo(function Row({ r, rise, win, showChain, refused, lit, needsLogo
       // 53, 6 Nov, item 9: the worth beside the symbol, the name on its own line below, whole (2 lines at most)
       title={<span className="dc-sym">{r.symbol}{words.cap && <span className="dc-cap">{words.cap}</span>}{fresh && !buy && <span className="dc-age"><span className="zf-live" />{ageText(age!)}</span>}</span>}
       // the chain is the logo's badge, spoken as "on ETH (RH)" (webd-money2 crawl, 4 Nov: CASHCAT's row didn't say ETH (RH))
-      line={buy ? <span className="dc-sub--buy" role="status">{buy.phase === "away" && <span className="zf-live" aria-hidden="true" />}<span className="dc-sub__words">{rowBuyLine(buy, r.symbol)}</span></span>
+      line={buy ? <span className="dc-sub--buy" role="status">{buy.phase === "away" && <span className="zf-live" aria-hidden="true" />}<span className="dc-sub__words">{rowBuyLine(buy, r.symbol, noSale)}</span></span>
         // product decision, 5 Nov (via a proxy): the line is the coin's name and worth ("Doge Pepe · $3.27M"); on All the chain is
         // the badge on the logo and the row's spoken label, never words that pushed the name to "SOL ·…" beside the chip
         : <span className="dc-sub dc-sub--name"><span className="dc-name dc-name--whole">{words.name}</span></span>}
@@ -182,7 +186,10 @@ const Row = memo(function Row({ r, rise, win, showChain, refused, lit, needsLogo
  *  `chip:<address>` in the one-tap lock's key (a double tap is one trade; a chip beside an open sheet is another trade).
  *  It lights only under the finger. The checks are the sheet's: a chain with less than the preset ready refuses on the
  *  row before anything is asked; the core's refusal is said on the row in its own words; never a silent fail. */
-function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: (b: RowBuyState) => void; follow: MutableRefObject<(() => void) | null> }) {
+/** Every chip's quote, got from the touch (the audit's T3): one store for the list, so a row that re-mounts keeps its warm quote. */
+const chipQuotes = createChipQuotes<Prepared>();
+
+function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: Dispatch<SetStateAction<RowBuyState | null>>; follow: MutableRefObject<(() => void) | null> }) {
   // the crawl's clock (QA): the row's state leaves the Receipt's marks (tap.ts), as the sheet's does
   const onState = (b: RowBuyState) => { mark(b.phase); tell(b); };
   const { svc } = useTrade();
@@ -192,6 +199,13 @@ function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: (b: RowBuyS
   // Settings' Quick buy amount (quick-buy.ts): $25 unless the person picked another
   const quick = useQuickBuy(bridge);
   const busy = useRef(false);
+  // T3 (the audit's Trade audit, 8 Nov): the quote of the Quick buy amount, got and checked (ready(): built, the core's check of
+  // its bytes) from the touch, so the tap only signs
+  const key = `${r.chain}:${r.address}:${quick}`;
+  const quoteNow = async () => { const p = await svc.quote("buy", r.chain, r.address, { usd: quick }); await p.ready(); return p; };
+  const warm = () => { void chipQuotes.warm(key, quoteNow).catch(() => undefined); };
+  // a touch that turned into a scroll: its quote is forgotten (one in flight per coin at most; never the next tap's)
+  const cancel = () => chipQuotes.drop(key);
   const press = async (el: HTMLElement) => {
     if (busy.current) return;
     busy.current = true;
@@ -210,14 +224,25 @@ function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: (b: RowBuyS
     }
     const taskId = `trade-${Date.now()}`, taskAt = Date.now();
     const route = `coin:${r.chain}:${r.address}:${r.symbol}`;
+    // T3: the job at the tap, before any network answer (its title is the ask)
+    tasks?.publish({ id: taskId, title: `Buy $${quick} of ${r.symbol}`, open: { route },
+      steps: [{ label: "Sent", state: "doing", at: taskAt }, { label: "Landed", state: "waiting" }, { label: `In your ${CHAINS[r.chain].symbol} wallet`, state: "waiting" }] });
     const secs = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
     let got = "";
     const landed = (rec: TradeRecord) => {
-      const now = Date.now(), ms = performance.now() - at;
+      const now = Date.now(), ms = tradeMs(rec, at);   // the audit's T4: the record's time, from the press
       rowBuyLanded(tasks, taskId, { taskAt, now, wallet: `In your ${CHAINS[r.chain].symbol} wallet`, detail: landedDetail(secs(ms), rec, CHAINS[r.chain].name), proof: (rec.hashes ?? []).map((hash) => ({ chain: r.chain, hash })) });
       whenCosted(svc.on, rec, () => void tasks?.update(taskId, { detail: landedDetail(secs(ms), rec, CHAINS[r.chain].name) }));
+      // T2 (the audit's Trade audit, 8 Nov): done on one node's word can still turn; followed by its id until its check clears, a
+      // turn rewrites the ended task and the row says it (trade-turn.ts)
+      const walletStep = `In your ${CHAINS[r.chain].symbol} wallet`;
+      followTurn(svc, rec.id, (_r, t) => { turnTask(tasks, taskId, t, { taskAt, wallet: walletStep }); onState({ phase: t.row.phase, at, got, ...(t.row.why ? { why: t.row.why } : {}) }); });
       void feel.filled();
-      onState({ phase: "landed", at, got, ms });   // the Row keeps the state: this chip is gone the moment the row is the receipt
+      // the audit's T1: the coins are "about" the quote's until the chain's read books it; then the row says the read figure
+      const s = rowSaid(rec);
+      got = s.got;
+      whenBooked(svc, rec.id, (b) => tell((x) => (x && x.phase === "landed" && x.at === at ? { ...x, ...rowSaid(b) } : x)));
+      onState({ phase: "landed", at, got, ...(s.about ? { about: true } : {}), ms });   // the Row keeps the state: this chip is gone the moment the row is the receipt
     };
     const refused = (rec: TradeRecord, why?: string) => {
       tasks?.end(taskId, rec.status === "declined" ? "stopped" : "failed", why);
@@ -238,14 +263,11 @@ function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: (b: RowBuyS
       });
     };
     try {
-      const p = await svc.quote("buy", r.chain, r.address, { usd: quick });
-      await p.ready();
+      const p = await chipQuotes.take(key, quoteNow);
       const q = p.quote;
       got = `${fmtAmount(q.getRaw, q.decimals)} ${r.symbol}`;
       onState({ phase: "away", at, got });
-      tasks?.publish({ id: taskId, title: `Buy $${quick} of ${r.symbol}`, open: { route },
-        steps: [{ label: "Sent", state: "doing", at: taskAt }, { label: "Landed", state: "waiting" }, { label: `In your ${CHAINS[r.chain].symbol} wallet`, state: "waiting" }] });
-      const rec = await svc.trade(p, `chip:${r.address}`);
+      const rec = await svc.trade(p, `chip:${r.address}`, { task: taskId, tapAt: epochOf(at) });
       const end = rowBuyEnd(rec);
       if (end.phase === "landed") { landed(rec); return; }
       if (end.phase === "refused") { refused(rec, end.why); return; }
@@ -264,7 +286,7 @@ function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: (b: RowBuyS
     } finally { busy.current = false; }
   };
   return (
-    <button type="button" className="dc-qb" aria-label={`Buy $${quick} of ${r.symbol}`} onClick={(e) => void press(e.currentTarget)}>
+    <button type="button" className="dc-qb" aria-label={`Buy $${quick} of ${r.symbol}`} onPointerDown={warm} onFocus={warm} onPointerCancel={cancel} onClick={(e) => void press(e.currentTarget)}>
       <span className="dc-qb__pill" aria-hidden="true">Buy</span>
     </button>
   );

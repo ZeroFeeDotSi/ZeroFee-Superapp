@@ -99,13 +99,13 @@ test("landing 2: the coin page says the same as its row, from the position's own
   assert.equal(coinPageSince(null, 0.0412, false), null);
   assert.equal(coinPageSince(pos({ costUsd: 0 }), 0.0412, false), null);
   assert.equal((coinPageSince(p, 0.0412, false) as { label: string }).label, "Since you bought", "control: a real cost still shows");
-  assert.match((await import("node:fs")).readFileSync(new URL("./screens/CoinPage.tsx", import.meta.url), "utf8"), /coinPageSince\(position, px, MARKET\.includes\(seed\.chain\)\)/);
+  assert.match((await import("node:fs")).readFileSync(new URL("./screens/CoinPage.tsx", import.meta.url), "utf8"), /coinPageSince\(position, px, MARKET\.includes\(seed\.chain\), net\.value\)/);
   assert.deepEqual(coinPageSince(pos({ costUsd: 0 }), 0.0412), { note: NO_RECORD });
   for (const px of [undefined, NaN, 0, -1]) assert.equal(coinPageSince(p, px), null, `review 2 L6: price ${px}`);
   const src = readFileSync(new URL("./screens/CoinPage.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(src, /Profit or loss/, "the old line is gone");
   assert.match(src, /svc\.position\(seed\.chain, seed\.address\)\.then\(\(p\) => p \?\? null\)/);
-  assert.match(src, /coinPageSince\(position, px, MARKET\.includes\(seed\.chain\)\)/);
+  assert.match(src, /coinPageSince\(position, px, MARKET\.includes\(seed\.chain\), net\.value\)/);
 });
 
 test("review 2: a scam coin's price can't inflate the total, a near-zero cost is no record, float noise reads +$0.00, and a partial result says so (controls)", async () => {

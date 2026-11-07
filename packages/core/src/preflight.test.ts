@@ -13,7 +13,7 @@ import { fairCoins } from "./testing/sol-coins.ts";
 import { POCKET_COIN, buy, pocketNode, sell } from "./testing/pocket-tx.ts";
 import { MemoryVault } from "./vault.ts";
 
-const STRANGER = "8JVZpqUZfQMEc8kMduTS9SkVxP9v8rgunJNcV4qNYGYZ";
+const STRANGER = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
 
 /** Trade's wallet on a node that counts every read; the coin a sale sells is worth `coinUsd` (6 decimals). */
 async function setup(o: { coinUsd?: number | null; wsolTo?: (wallet: string) => string } = {}) {

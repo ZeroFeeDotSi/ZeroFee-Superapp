@@ -1,5 +1,5 @@
 // B35 on V4 Send: the amount can never send more than the coin holds (finding 64: an ask over it is said, never snapped).
-import { compare } from "@zerofee/pay/amount";
+import { compare, sub } from "@zerofee/pay/amount";
 import { isUsdStable } from "@zerofee/pay/tokens";
 import { COIN_SHOWN_DECIMALS } from "@zerofee/core/add-outside";
 import { flowCents } from "@zerofee/core/cents";
@@ -16,13 +16,15 @@ export const OVER_MAX_TAP = "Tap Max to send that.";
  *  wallet" and "0.0106 ETH goes to them"): what the slot under the amount says. Over what can go: nothing, so no coin
  *  figure is ever worked from a sum that can't leave (the "at most" line says the most, over the button). A request's
  *  exact coin: what they asked. Else the typed amount in its coin, and Max's line when it shows. */
-export function underAmount(o: { over: boolean; exact: { amount: string; symbol: string } | null; amount: string; symbol: string; place: string; maxLine: string | null }): { coins: string | null; max: string | null } {
+/** `stable`: a dollar coin (builder 3, 7 Nov): its figure is the hero's dollars, so no coin line repeats it ("1,165.0485
+ *  USDC from your Safe" under "$1,165.04"); any other coin keeps it. */
+export function underAmount(o: { over: boolean; stable?: boolean; exact: { amount: string; symbol: string } | null; amount: string; symbol: string; place: string; maxLine: string | null }): { coins: string | null; max: string | null } {
   if (o.over) return { coins: null, max: null };
   if (o.exact) return { coins: `They asked for ${o.exact.amount} ${o.exact.symbol}.`, max: null };
   // the a16 rule (copy review, 6 Nov, 21c): ONE line in the slot; Max's line (what goes to them, where the rest stays: the privacy
   // audit's, 4 Nov) takes it, the coin line leaves
   if (o.maxLine) return { coins: null, max: o.maxLine };
-  return { coins: Number(o.amount) > 0 ? `${coinSaid(o.amount, o.symbol)} from ${o.place}` : null, max: null };
+  return { coins: Number(o.amount) > 0 && o.stable !== true ? `${coinSaid(o.amount, o.symbol)} from ${o.place}` : null, max: null };
 }
 /** S3 (the copy review's Sim walk, 5 Nov): From said "314.4 NEAR · $1,392.79" while "at most $8.85" could go. One figure:
  *  what can be sent now, in dollars, down to the cent: the same figure "at most" says. `per`: the coin's dollar price
@@ -46,19 +48,35 @@ export function heldWords(s: { row: string | null; symbol: string; amount: strin
   return ready !== null ? readyWords(dollarsOf(ready), s.symbol) : `${coinShown(s.amount, "down")} ${s.symbol}${s.usd ? ` · ${dollarsOf(Number(s.usd))}` : ""}`;
 }
 /** J2-5 (audit, 8 Nov): Home's figure less what can go now, by where it really is (send-sources.ts restOf), in dollars. */
-export interface RestParts { privateUsd: number; elsewhereUsd: number; stakedUsd: number }
+export interface RestParts { privateUsd: number; elsewhereUsd: number; stakedUsd: number; keptUsd?: number }
 /** J2-5's words (provisional, for 53): "$8.86 more is in Private. $55.38 more is elsewhere in your Safe." Each part by
  *  its own place; a part under $0.01 is left out; nothing left out: null. */
 export const REST_WORDS = {
   private: (usd: string) => `${usd} more is in Private.`,
   elsewhere: (usd: string) => `${usd} more is elsewhere in your Safe.`,
   staked: (usd: string) => `${usd} more is staked with validators.`,
+  // QA 16's Send Max shots (7 Nov): one send pays a round sum's share (core maxSend), never all of its place; the gap is
+  // the person's (part stays in the Safe, part goes to Private), so it is said where the rest is, once (words for 53)
+  kept: (usd: string) => `${usd} more stays with you, so this send is harder to trace.`,
 };
+/** The rest with the gap a round sum keeps back (QA 16, 7 Nov): what the source's place can send (`maxUsd`) less what
+ *  one send pays (`canUsd`, maxSend's), so the parts add up to Home's figure less the one figure. Unchanged without one. */
+export function withKept(rest: RestParts | undefined, maxUsd: number | null, canUsd: number | null): RestParts | undefined {
+  const kept = maxUsd !== null && canUsd !== null ? Math.round((maxUsd - canUsd) * 100) / 100 : 0;
+  if (!(kept >= 0.01)) return rest;
+  return { ...(rest ?? { privateUsd: 0, elsewhereUsd: 0, stakedUsd: 0 }), keptUsd: kept };
+}
+/** "Up to $X can go in one send." with the one figure (QA 16, 7 Nov: it said the raw max, $1,240.50, over a $1,165.04
+ *  button); a line with no dollar figure as it was. */
+export const onePart = (part: string, figure: string): string => part.replace(/\$[\d,]+\.\d\d/, figure);
+/** QA 16's Send Max shots (7 Nov): the form's one figure ("1165.04") as every later line says it, "$1,165.04", with its
+ *  commas (the receipt, the Jobs rows and the Getting-ready sheet said "$1165.04"). */
+export const sendCash = (figure: string): string => dollarsOf(Number(figure));
 export function restLine(s: { row: string | null; symbol: string; amount: string; usd?: string; max: string; rest?: RestParts }): string | null {
   const ready = s.row === null ? readyUsd(s.max, perOf(s)) : null;
   if (ready === null || !s.rest) return null;
   const r = s.rest;
-  const parts = ([["private", r.privateUsd], ["elsewhere", r.elsewhereUsd], ["staked", r.stakedUsd]] as const)
+  const parts = ([["private", r.privateUsd], ["elsewhere", r.elsewhereUsd], ["staked", r.stakedUsd], ["kept", r.keptUsd ?? 0]] as const)
     .filter(([, usd]) => usd >= 0.01).map(([k, usd]) => REST_WORDS[k](dollarsOf(usd)));
   // the copy review's trim (8 Nov): the row over it already says "$1,383.92 ready": only the causes
   return parts.length ? parts.join(" ") : null;
@@ -73,10 +91,30 @@ export function partShown(part: string | null | undefined, rowLine: string): str
   const figure = /\$[\d,]+\.\d\d/.exec(part)?.[0];
   return figure && rowLine.includes(figure) ? null : part;
 }
-/** Whether From says REST_STAYS: a Safe coin holding more than it can send now (said once, never per row). */
+/** Whether From says where the rest is (restStaysLine): a Safe coin holding more than it can send now (said once, never per row). */
 export const restStays = (s: { row: string | null; amount: string; max: string }): boolean => s.row === null && Number(s.amount) > Number(s.max);
-/** Said once under From when a Safe coin can send less than it holds (the copy review's words). */
-export const REST_STAYS = "The rest stays in your Safe for now.";
+/** QA 20 (8 Nov, B+): the line under From said "The rest stays in your Safe for now.", no figure, no place. Said once
+ *  under From when a Safe coin can send less than it holds: all of it in Private, "Private keeps the rest · about $X"
+ *  (the copy review's words); spread over places, each by its own figure (restLine, J2-5's words); else the Safe's own figure, "Your Safe keeps the rest · about $X" ("about": worked
+ *  from a price; a dollar coin's is exact; no price: the coins). Null when nothing rests (words to 53). */
+export const REST_KEPT = "Your Safe keeps the rest";
+export const PRIVATE_KEEPS = "Private keeps the rest";
+export function restStaysLine(s: { row: string | null; symbol: string; amount: string; usd?: string; max: string; rest?: RestParts }): string | null {
+  if (!restStays(s)) return null;
+  // the copy review's exact words (8 Nov, QA 16): the rest all in Private reads "Private keeps the rest · about $X"; spread over more
+  // than one place, each place by its own figure (restLine, J2-5's words)
+  const r = s.rest;
+  if (r && r.privateUsd >= 0.01 && r.elsewhereUsd < 0.01 && r.stakedUsd < 0.01 && !((r.keptUsd ?? 0) >= 0.01)) return `${PRIVATE_KEEPS} · about ${dollarsOf(r.privateUsd)}`;
+  const placed = restLine(s);
+  if (placed) return placed;
+  let coins: string;
+  try { coins = sub(s.amount, s.max); } catch { return null; }
+  if (!(Number(coins) > 0)) return null;
+  const per = perOf(s);
+  const usd = per !== null ? Math.floor(Number(coins) * per * 100 + 1e-6) / 100 : 0;
+  if (usd >= 0.01) return `${REST_KEPT} · ${isUsdStable(s.symbol) ? "" : "about "}${dollarsOf(usd)}`;
+  return `${REST_KEPT} · ${coinShown(coins, "down")} ${s.symbol}`;
+}
 /** the copy review's ruling (5 Nov), Send from Private: the coin's row carries its figure ("NEAR · $8.85 in Private"). */
 export const privateRow = (symbol: string, most: string) => `${symbol} · ${most} in Private`;
 

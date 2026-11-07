@@ -51,9 +51,13 @@ async function passkeyToHome(t: TestContext, store: ReturnType<typeof memoryStor
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
   const net = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), NET_MS));
   let homeAt: number | null = null;
+  // the lock's own work (PRF → HKDF, WebCrypto) is real time, never on the mock clock: the clock moves only once the lock is
+  // open (land gate, 8 Nov: under a loaded machine the loop's 5 ms ticks ran on during the crypto, and read 375 ms)
+  let opened = false;
   const session = new UnlockSession();
   const run = (async () => {
     await openWithPasskey(dev, session, dev.record as never, async () => prf());
+    opened = true;
     assert.equal(session.unlocked, true);
     kept.open = true;
     // account.state: block (two nodes), block, access keys, a query, one after another
@@ -65,9 +69,9 @@ async function passkeyToHome(t: TestContext, store: ReturnType<typeof memoryStor
       show();
     }
   })();
-  for (let i = 0; homeAt === null && i < 1000; i++) {
+  for (let i = 0; homeAt === null && i < 100_000; i++) {
     await new Promise((r) => setImmediate(r));
-    t.mock.timers.tick(5);
+    if (opened) t.mock.timers.tick(5);
   }
   await run;
   t.mock.timers.reset();

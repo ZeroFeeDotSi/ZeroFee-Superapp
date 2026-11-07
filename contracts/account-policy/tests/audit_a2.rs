@@ -326,7 +326,7 @@ fn v_a2_every_stop_drops() {
 fn v_a3_rows_cap() {
     let mut p = account();
     as_key(PHONE, DAY);
-    // A call moving no NEAR still counts its gas (the contract review, FB-1): 128 of them fill the day, the 129th is refused.
+    // A call moving no NEAR still counts its gas (the Fable review, FB-1): 128 of them fill the day, the 129th is refused.
     for i in 0..128u64 {
         as_key(PHONE, DAY + i);
         assert!(p.execute(acct("wrap.near"), vec![call("near_deposit", "", 0)], None).done);

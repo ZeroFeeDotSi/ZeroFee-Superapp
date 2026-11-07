@@ -23,7 +23,7 @@ import { buy, pocketNode, send } from "./testing/pocket-tx.ts";
 import type { SolChain } from "./solana.ts";
 import { MemoryVault } from "./vault.ts";
 
-const STRANGER = "8JVZpqUZfQMEc8kMduTS9SkVxP9v8rgunJNcV4qNYGYZ";
+const STRANGER = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
 
 /** SubWallets whose approve sheet counts what it is shown, and answers yes (or `answer`). */
 async function hot(node: SolChain = pocketNode(), evm: EvmChain = {} as never, answer = true) {

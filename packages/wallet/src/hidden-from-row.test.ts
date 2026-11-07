@@ -157,7 +157,7 @@ test("security review H1: a restart follows the saved Send again, never 'nothing
   b.core.store.set("send-jobs", "{}");
   const later = await b.restart().call<Movement[]>("ledger.activity", { caller: "wallet" });
   const old = "ok" in later ? later.ok.find((x) => x.id === s.ok.id) : undefined;
-  assert.deepEqual([old?.status, old?.problem?.whatHappened, old?.problem?.next.kind], ["moving", "It may have gone. Activity will say.", "wait"], "control: no job, so unknown: never 'nothing was paid', never Try again");
+  assert.deepEqual([old?.status, old?.problem?.whatHappened, old?.problem?.next.kind], ["moving", "It's on its way to the person you paid, or back in Private. Check Activity for where this is.", "wait"], "control: no job, so unknown: never 'nothing was paid', never Try again");
 });
 
 test("security review H1: the payment's submit errors after 1Click took it: never 'nothing was paid'; the payment's own status says how it ended", async () => {
@@ -171,7 +171,7 @@ test("security review H1: the payment's submit errors after 1Click took it: neve
   const r = await y.ledger.call<Movement>("ledger.hiddenFromRow", ask);
   assert.ok("ok" in r);
   const m = await wait(y.ledger, r.ok.id);
-  assert.deepEqual([m.status, m.problem?.whatHappened, m.problem?.next.kind], ["moving", "It may have gone. Activity will say.", "wait"]);
+  assert.deepEqual([m.status, m.problem?.whatHappened, m.problem?.next.kind], ["moving", "It's on its way to the person you paid, or back in Private. Check Activity for where this is.", "wait"]);
   assert.equal(JSON.parse(y.core.store.get("send-jobs")!)[r.ok.id]?.handed, true, "marked handed over on the device before the submit");
   assert.equal(taken.length, 1, "handed over once");
   // the payment's own status ends it: SUCCESS is paid

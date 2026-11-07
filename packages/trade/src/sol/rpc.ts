@@ -8,6 +8,7 @@
 import { TradeError } from "../errors.ts";
 import { onCopy } from "@zerofee/core/fork";
 import { SOL_PROXY, solProxyFor, solProxySaid } from "@zerofee/core/sol-proxy";
+import { ownSaid, ownServer } from "@zerofee/core/own-servers";
 
 /** Checked from a browser origin (CORS preflight, POST, a burst of reads). Order = preference. */
 export const SOL_NODES = onCopy("sol", [
@@ -100,15 +101,19 @@ export function createSolRpc(o: { nodes?: string[]; fetch?: typeof fetch; timeou
   /** node|method -> until when that node refuses that method */
   const refuses = new Map<string, number>();
   const refusing = (n: string, method?: string) => method !== undefined && (refuses.get(`${n}|${method}`) ?? 0) > now();
-  /** ZeroFee's relay first for a read it passes on (finding 3; the real nodes only, never a test's own), unless it rests;
-   *  then healthy nodes in preference order, resting ones soonest back first, and a node refusing this method last. */
+  /** A person's own Solana server first (Settings → Status, core own-servers.ts; any method, a send's same bytes too)
+   *  unless it rests; then ZeroFee's relay for a read it passes on (finding 3; the real nodes only, never a test's own),
+   *  unless it rests; then healthy nodes in preference order, resting ones soonest back first, and a node refusing this
+   *  method last. A node that fails moves the call to the next, as before. */
   const order = (method?: string, params?: readonly unknown[]) => {
     const t = now();
     const willing = nodes.filter((n) => !refusing(n, method));
     const up = willing.filter((n) => stateOf(n).restUntil <= t);
     const resting = willing.filter((n) => stateOf(n).restUntil > t).sort((a, b) => stateOf(a).restUntil - stateOf(b).restUntil);
     const proxy = method !== undefined && o.nodes === undefined ? solProxyFor(method, t, params) : null;
-    return [...(proxy && stateOf(proxy).restUntil <= t && !refusing(proxy, method) ? [proxy] : []), ...up, ...resting, ...nodes.filter((n) => refusing(n, method))];
+    const own = o.nodes === undefined ? ownServer("solana") : null;
+    const first = [own, proxy].filter((u): u is string => !!u && stateOf(u).restUntil <= t && !refusing(u, method));
+    return [...first, ...up.filter((n) => !first.includes(n)), ...resting, ...nodes.filter((n) => refusing(n, method))];
   };
   const strike = (n: string) => { const h = stateOf(n); h.strikes++; h.restUntil = now() + Math.min(MAX_REST_MS, REST_MS * 2 ** (h.strikes - 1)); };
   let id = 0;
@@ -118,8 +123,9 @@ export function createSolRpc(o: { nodes?: string[]; fetch?: typeof fetch; timeou
     try {
       let res: Response;
       try { res = await f(node, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }), signal: ctl.signal }); }
-      catch (e) { throw new NodeDown(ctl.signal.aborted ? "timed out" : (e as Error)?.message ?? String(e)); }
+      catch (e) { if (node === ownServer("solana")) ownSaid("solana", false); throw new NodeDown(ctl.signal.aborted ? "timed out" : (e as Error)?.message ?? String(e)); }
       if (node === SOL_PROXY.url) solProxySaid(res.status, now());
+      if (node === ownServer("solana")) ownSaid("solana", res.ok);
       if (res.status === 403 || res.status === 400) {
         // a refusal of this method (not of the node): read its words; a refusal of the method rests the node for it alone
         const text = await res.text().catch(() => "");

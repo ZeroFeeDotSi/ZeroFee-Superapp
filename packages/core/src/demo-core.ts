@@ -1571,7 +1571,7 @@ export class DemoCore implements Bridge {
         if (p.app !== undefined && p.app !== "wallet") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Only your own Send pays from Private.")));
         return this.ready().then(() => this.subwallets.hiddenFromRow(p.chain, p.inDeposit, p.outDeposit, p.intent, p.outTag, p.why, p.payee, p.coin));
       case "subwallet.privatePay":
-        return this.ready().then(() => this.ownKind(p)).then(async () => this.subwallets.privatePay(p.id, p.depositAddress, p.intent, p.why, p.statusTag, p.inDeposit, p.send === true, p.payee, (await import("./send-words.ts")).pairAsked(p), p.job));
+        return this.ready().then(() => this.ownKind(p)).then(async () => this.subwallets.privatePay(p.id, p.depositAddress, p.intent, p.why, p.statusTag, p.inDeposit, p.send === true, p.payee, (await import("./send-words.ts")).pairAsked(p), p.job, p.sendJob));
       // a Move's plan (the audit's ruling, 7 Nov: one fill for the whole Move), worked out and kept by this core. Wallet's own only
       case "subwallet.movePlan":
         if (p.app !== undefined && p.app !== "wallet") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Another app asked Private to pay, so ZeroFee stopped this. Nothing moved.")));

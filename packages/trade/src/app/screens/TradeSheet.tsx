@@ -26,12 +26,15 @@ import { CHAINS, type TradeRecord } from "../../service.ts";
 import type { Amount, Prepared, Side } from "../../types.ts";
 import { amount as fmtAmount, change, keptLine, usd } from "../format.ts";
 import { saleNetUsd, tradeUsd } from "../../trade-usd.ts";
-import { heldNetQuote, marketGapLine } from "../held-net.ts";
+import { heldAfter, heldNetOf, marketGapLine } from "../held-net.ts";
 import { buyCostLine } from "../receipt-words.ts";
 import { markIfUnsellable } from "../not-for-sale.ts";
 import { buyPresets, canTap, intentOf, queuedGoes } from "../intent.ts";
 import { createFeedback } from "../feedback.ts";
 import { followRecord, recordOf, UNCONFIRMED } from "../unconfirmed-follow.ts";
+import { followTurn, turnTask, type Turn } from "../trade-turn.ts";
+import { landedSaid, whenBooked } from "../fill-words.ts";
+import { epochOf, tradeMs } from "../../tap-time.ts";
 import { useOnline } from "../online.ts";
 import { useFloat, useLive, useTrade } from "../runtime.tsx";
 import { addWords, ShortChain, shortWay } from "./ShortChain.tsx";
@@ -172,17 +175,19 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
   // the moment (Moment.tsx): the page becomes the trade from the tap (D143: the core asks nothing, no Face ID), and the
   // real time from the tap to the chain is measured here, where the person's finger was
   // `got`: the coins ("7,505"); `usd`: the dollars from the signed quote, the chain's own figure once read (Receipt.tsx)
-  const [moment, setMoment] = useState<{ phase: MomentPhase; at: number; ms?: number; got: string; usd?: string; feeTaken?: boolean; feeUsd?: string; tx?: { chain: string; hash: string }; cost?: string | null } | null>(null);
+  const [moment, setMoment] = useState<{ phase: MomentPhase; at: number; ms?: number; got: string; usd?: string; feeTaken?: boolean; feeUsd?: string; tx?: { chain: string; hash: string }; cost?: string | null; about?: boolean;
+    /** the audit's T5: what is held after it, read once the trade has booked (undefined until then: no "You now hold"; null: nothing) */
+    held?: { raw: string; decimals: number } | null } | null>(null);
   // T2-4 (the copy review's walk): the receipt's holding figure is what selling all of it gets now, by the Sell sheet's own function
   // (trade-usd.ts heldNetUsd), from one sale quote for exactly the coins held. Until it answers, or if it can't, the line
   // shows the coins only: the market price times the coins (pos.valueUsd) is not what a sale gets, so it is never shown here
   const [heldNet, setHeldNet] = useState<{ raw: string; usd: number } | null>(null);
-  const done = moment?.phase === "done", heldRaw = pos.value?.raw;
+  const done = moment?.phase === "done", heldRaw = moment?.held?.raw;
   useEffect(() => {
     if (!done || !heldRaw || BigInt(heldRaw) <= 0n) return;
     let live = true;
     // the audit's MUST: a figure only (held-net.ts): the prepared sale is never readied, signed, sent or booked, and is dropped there
-    void heldNetQuote(svc.quote, coin.chain, coin.address, heldRaw).then((net) => {
+    void heldNetOf(svc.quote, coin.chain, coin.address, heldRaw).then((net) => {
       if (live && net !== undefined) setHeldNet({ raw: heldRaw, usd: net });
     }, () => undefined);
     return () => { live = false; };
@@ -194,6 +199,19 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
   // the receipt's figures, read from the quote at the moment it lands (set below, where the quote is read)
   let heroOf = (): string => "";
   let coinsOf = (_fill?: TradeRecord["fill"]): string => "";
+  // the audit's T1: the landed receipt's figures, "about" the quote's until the chain's read books the trade, then redrawn
+  // with the read figures (fill-words.ts), only while this page is up and still that trade's receipt
+  // the audit's T5: what is held is read only now, from the booked book (a sale of all holds nothing); the page's own read too
+  const booked = (at: number, said: { hero: string; sold: string }, soldAll: boolean) => (r: TradeRecord) => {
+    if (!alive.current) return;
+    const same = (m: typeof moment) => !!m && m.phase === "done" && m.at === at;
+    setMoment((m) => (same(m) ? { ...m!, ...landedSaid(r, said) } : m));
+    pos.reload();
+    void svc.positions().then((ps) => {
+      const p = ps.find((x) => x.chain === coin.chain && x.coin === coin.address);
+      if (alive.current) setMoment((m) => (same(m) ? { ...m!, held: heldAfter(soldAll, p) } : m));
+    }, () => undefined);
+  };
   // the asked trade is "on its way" until the page goes: through the landed moment too, so a newer ask can't end it
   // as not gone in the 1.6 s between landing and onDone (re-review M1)
   useEffect(() => { onBusy?.(busy || moment?.phase === "done" || moment?.phase === "checking"); }, [busy, moment?.phase]);
@@ -205,6 +223,9 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
   // a trade still not confirmed when its card closed: its task is followed until it ends, or this page goes
   const following = useRef<(() => void) | null>(null);
   useEffect(() => () => { following.current?.(); following.current = null; }, []);
+  // T2 (the audit's Trade audit): a turn after "done" redraws the receipt only while this page is up (the task's follow outlives it)
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   // one tap, one trade: taken before any await, never React state (a second click lands before the next render)
   const oneTap = useRef(createOneTap()).current;
   const tap = async () => {
@@ -212,6 +233,7 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
     setBusy(true);
     const at = tapAt.current || performance.now();
     const got = coinsOf();
+    const soldAll = side === "sell" && Number(value) >= 100;   // amt's own rule: 100 % is all of it
     setMoment({ phase: "sending", at, got });
     // D144: the trade in the Activity centre, with its live steps (tap → landed → in the wallet), from the tap
     const taskId = `trade-${Date.now()}`;
@@ -219,23 +241,38 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
     tasks?.publish({ id: taskId, title: label2, open: { route: `coin:${coin.chain}:${coin.address}:${symbol}` },
       steps: [{ label: "Sent", state: "doing", at: taskAt }, { label: "Landed", state: "waiting" }, { label: side === "buy" ? `In ${walletName}` : `Back in ${walletName}`, state: "waiting" }] });
     const taskEnd = (state: "failed" | "stopped", detail?: string) => tasks?.end(taskId, state, detail);
+    const walletStep = side === "buy" ? `In ${walletName}` : `Back in ${walletName}`;
+    // T2 (the audit's Trade audit, 8 Nov): a trade done on one node's word can still turn (two nodes say failed or expired, Ref
+    // kept the coin, its final amount unproven): the open receipt says the turn (trade-turn.ts), the task is rewritten
+    const turnedTo = (r: TradeRecord, t: Turn) => {
+      if (!alive.current) return;
+      if (t.moment === "refused") setMoment({ phase: "refused", at, got, feeTaken: t.feeTaken, ...(t.feeTaken && r.costs?.feeUsd !== undefined ? { feeUsd: usd(r.costs.feeUsd) } : {}) });
+      else if (t.moment === "checking") setMoment({ phase: "checking", at, got });
+      else { setMoment(null); if (r.problem) void onProblem(r.problem); }
+      feel.failed();
+    };
+    let turned = false;
     try {
-      const rec = await svc.trade(quote.p);
+      const rec = await svc.trade(quote.p, undefined, { task: taskId, tapAt: epochOf(at) });
       if (rec.status === "done") {
-        const landed = Date.now(), ms = performance.now() - at;
+        const landed = Date.now(), ms = tradeMs(rec, at);   // the audit's T4: the record's time, from the press
         tasks?.update(taskId, {
           detail: landedDetail(secsText(ms), rec, c.name),
           proof: (rec.hashes ?? []).map((hash) => ({ chain: coin.chain, hash })), steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "done", at: landed }, { label: side === "buy" ? `In ${walletName}` : `Back in ${walletName}`, state: "doing", at: landed }] });
         // the title stays the ask; the chain's figure joins the detail once the second node's check books it (the crawl, 4 Nov)
         whenCosted(svc.on, rec, () => void tasks?.update(taskId, { detail: landedDetail(secsText(ms), rec, c.name) }));
+        // T2: followed by its id until its check clears; a turn rewrites the task's end and the open receipt
+        followTurn(svc, rec.id, (r, t) => { turned = true; turnTask(tasks, taskId, t, { taskAt, wallet: walletStep }); turnedTo(r, t); });
         // the second node's check books it a moment later; the task ends once the page has read the wallet again
-        setTimeout(() => { tasks?.update(taskId, { steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "done", at: landed }, { label: side === "buy" ? `In ${walletName}` : `Back in ${walletName}`, state: "done", at: Date.now() }] }); tasks?.end(taskId, "done"); }, LANDED_MS);
+        setTimeout(() => { if (turned) return; tasks?.update(taskId, { steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "done", at: landed }, { label: side === "buy" ? `In ${walletName}` : `Back in ${walletName}`, state: "done", at: Date.now() }] }); tasks?.end(taskId, "done"); }, LANDED_MS);
         void feel.filled(side);
         // the time from the tap to the chain (D143: nothing asks in between)
         // the receipt's figure is the chain's once it is read (a buy's every cent out, a sale's every cent in)
         // its proof on the receipt: the short tx id, Copy and View (webd-money2 crawl, 4 Nov: no tx id on Bought / Sold)
         const last = rec.hashes?.[rec.hashes.length - 1];
-        setMoment({ phase: "done", at, got: coinsOf(rec.fill), usd: rec.costs ? usd(side === "sell" ? tradeUsd(rec) : rec.amountUsd) : heroOf(), ms: performance.now() - at, ...(last ? { tx: { chain: coin.chain, hash: last } } : {}), cost: costOf(rec) });
+        const said = { hero: heroOf(), sold: coinsOf() };
+        setMoment({ phase: "done", at, ...landedSaid(rec, said), ms, ...(last ? { tx: { chain: coin.chain, hash: last } } : {}), cost: costOf(rec) });
+        whenBooked(svc, rec.id, booked(at, said, soldAll));
         // told at once (the record, the ask, the next open's amount); the page stays as the receipt (review 12)
         onDone(rec, value);
         pos.reload();
@@ -261,7 +298,7 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
         tasks?.update(taskId, { detail: "Not confirmed yet", steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "doing" }, { label: wallet, state: "waiting" }] });
         let ended: TradeRecord | undefined, now: Problem = p;
         const taskOf = (r: TradeRecord) => {
-          if (r.status === "done") { const t = Date.now(); tasks?.update(taskId, { detail: "Landed", steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "done", at: t }, { label: wallet, state: "done", at: t }] }); tasks?.end(taskId, "done"); }
+          if (r.status === "done") { const t = Date.now(); tasks?.update(taskId, { detail: "Landed", steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "done", at: t }, { label: wallet, state: "done", at: t }] }); tasks?.end(taskId, "done"); followTurn(svc, r.id, (r2, tt) => { turnTask(tasks, taskId, tt, { taskAt, wallet }); turnedTo(r2, tt); }); }
           else taskEnd("failed", r.problem?.whatHappened);
         };
         // its words changed (the live look stopped after an hour): the card is shown again with them
@@ -274,7 +311,9 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
         const r = ended as TradeRecord;
         if (r.status === "done") {
           void feel.filled(side);
-          setMoment({ phase: "done", at, got: coinsOf(r.fill), usd: r.costs ? usd(side === "sell" ? tradeUsd(r) : r.amountUsd) : heroOf(), ...(r.hashes.at(-1) ? { tx: { chain: coin.chain, hash: r.hashes.at(-1)! } } : {}), cost: costOf(r) });
+          const said = { hero: heroOf(), sold: coinsOf() };
+          setMoment({ phase: "done", at, ...landedSaid(r, said), ...(r.hashes.at(-1) ? { tx: { chain: coin.chain, hash: r.hashes.at(-1)! } } : {}), cost: costOf(r) });
+          whenBooked(svc, r.id, booked(at, said, soldAll));
           onDone(r, value);
           pos.reload();
           return;
@@ -408,12 +447,13 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
         {/* not behind the receipt: its one object is the coin itself, mid-page (the 5 Nov Black walk: a brown smear above it) */}
         {!moment && <div className="tp-glow" aria-hidden="true">{coin.logoUrl && <img src={coin.logoUrl} alt="" />}</div>}
         {moment ? (
-          <TradeMoment phase={moment.phase} side={side} symbol={symbol} logo={coin.logoUrl} coinAmount={moment.got} where={walletName} usd={moment.phase !== "done" && side === "sell" ? `About ${heroOf()}` : moment.usd ?? heroOf()} tapAt={moment.at}
+          <TradeMoment phase={moment.phase} side={side} symbol={symbol} logo={coin.logoUrl} coinAmount={moment.got} {...(moment.phase === "done" && moment.about ? { about: true } : {})} where={walletName} usd={moment.phase !== "done" && side === "sell" ? `About ${heroOf()}` : moment.usd ?? heroOf()} tapAt={moment.at}
             {...(moment.phase === "done" && moment.tx ? { tx: moment.tx } : {})} {...(moment.feeTaken ? { feeTaken: true } : {})} {...(moment.feeUsd ? { feeUsd: moment.feeUsd } : {})} {...(moment.ms !== undefined ? { landedMs: moment.ms } : {})}
             {...(moment.phase === "done" ? {
-              held: pos.value && BigInt(pos.value.raw) > 0n ? { coins: `${fmtAmount(pos.value.raw, pos.value.decimals)} ${symbol}`, ...(heldNet?.raw === pos.value.raw ? { usd: usd(heldNet.usd) } : {}) } : undefined,
+              held: moment.held ? { coins: `${fmtAmount(moment.held.raw, moment.held.decimals)} ${symbol}`, ...(heldNet?.raw === moment.held.raw ? { usd: usd(heldNet.usd) } : {}) } : undefined,
               ...(moment.cost ? { cost: moment.cost } : {}),
-              ...(side === "buy" ? { onSell: () => onSwitch?.("sell"), onMore: () => { setMoment(null); feel.key(); } } : {}),
+              // the audit's T5: Sell only once the buy has booked (before, its Sell page would read the book without these coins)
+              ...(side === "buy" ? { ...(moment.held !== undefined ? { onSell: () => onSwitch?.("sell") } : {}), onMore: () => { setMoment(null); feel.key(); } } : {}),
             } : moment.phase === "refused" ? { onMore: () => { setMoment(null); feel.key(); } } : {})}
             onDone={onClose} />
         ) : empty ? (<>

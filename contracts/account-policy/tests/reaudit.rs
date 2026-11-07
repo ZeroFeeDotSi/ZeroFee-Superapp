@@ -131,7 +131,7 @@ fn r1_stolen_phone_without_second_device_drains_the_face_id_band_and_cancels_eve
 
 // ══ R2 (High, new) — leaked words + no second device: the owner can never change the words ════════════════════════════
 
-/// FIXED (R2) in release 6, then REOPENED by re-audit 2's N1 (a), the product's choice: the words beat the phone. The R2
+/// FIXED (R2) in release 6, then REOPENED by re-audit 2's N1 (a), the owner's choice: the words beat the phone. The R2
 /// fix let a stolen phone replace the words (N1). Now new words asked by the phone wait the floor and the leaked words'
 /// start drops them, so without a second device the owner can't replace leaked words; but leaked words take nothing:
 /// spending stays frozen and the phone stops each move (reaudit2.rs, n1a_cost_…). The app asks for a second device

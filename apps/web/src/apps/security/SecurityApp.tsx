@@ -27,7 +27,7 @@ import { setupWindowLine } from "./setup-window.ts";
 import { countsFullyLine } from "../../vault-gate.ts";
 import { askDeviceNext, devicesLine, fallbackSeconds, lostName, refillName, removableDevices, type SecondDevice } from "./devices.ts";
 import { ruleChangeWaitWords, waitPlain } from "./rules.ts";
-import { accountRowWords } from "./account-rows.ts";
+import { accountRowWords, backupWordsShown, wordsCheckedOf } from "./account-rows.ts";
 import { PAIR_STEP_TWO, pairStepTwo } from "./pair-steps.ts";
 import { laptopWords } from "./laptop-words.ts";
 import { LaptopWindow } from "../../shell/LaptopWindow.tsx";
@@ -80,8 +80,8 @@ const shortHandle = (handle: string) => {
 };
 
 /** The account's facts the rows and the places read, kept for the page (painted from the last known, never blank). */
-type Facts = { devices: SecondDevice[] | null; mainUsd: number; checkDue: boolean; setupUntil?: string; fresh: AccountInfo | null; guardWaiting: number };
-let lastFacts: Facts = { devices: null, mainUsd: 0, checkDue: false, fresh: null, guardWaiting: 0 };
+type Facts = { devices: SecondDevice[] | null; mainUsd: number; /** null until the core says (the audit's T14) */ checkDue: boolean | null; setupUntil?: string; fresh: AccountInfo | null; guardWaiting: number };
+let lastFacts: Facts = { devices: null, mainUsd: 0, checkDue: null, fresh: null, guardWaiting: 0 };
 
 /** Reads the account's facts (second devices, the Safe in dollars, the words check, the set-up window), again whenever
  *  `seq` changes; starts from what was last read, so nothing waits on the network. */
@@ -158,7 +158,7 @@ export function SecurityRows({ account: given, bridge, open }: { account: Accoun
  * words and AgentZero, ticked only when that key is on the account and is ML-DSA-65, else "Not yet"; an old classical
  * key, with its Remove (the same remove-key path as Devices). Never a word about connections.
  */
-function QuantumSheet({ account, wordsChecked, waitWords, onClose, onRemove, onNewWords, onPairAgain }: { account: AccountInfo; wordsChecked: boolean; waitWords: string | null; onClose: () => void; onRemove: (handle: string) => void; onNewWords: () => void; onPairAgain: () => void }) {
+function QuantumSheet({ account, wordsChecked, waitWords, onClose, onRemove, onNewWords, onPairAgain }: { account: AccountInfo; wordsChecked: boolean | null; waitWords: string | null; onClose: () => void; onRemove: (handle: string) => void; onNewWords: () => void; onPairAgain: () => void }) {
   const phone = onPhone();
   const q = quantumOf(account.keys, phone ? "This phone" : "This device", account.rules === true);
   // the audit's MUST, the copy review's S1 (7 Nov): what each row SAYS; on the web never the phone's chip or a tick for a phone-only key.
@@ -311,7 +311,7 @@ export function SecurityPlace({ account: given, actions, place, step, onBack }: 
   if (flow === "laptop-limit" || flow === "guardian-limit") return <LaptopFlow kind={flow === "laptop-limit" ? "laptop" : "guardian"} start="amount" actions={actions} onDone={() => { setFlow(null); actions.onChanged(); }} onHeld={flowBack} />;
   if (flow === "lost") return <LostDevice devices={removableDevices(devices)} delaySeconds={account.recovery?.delaySeconds ?? 0} onBack={flowBack} onRemove={(d) => { setFlow(null); actions.onRemoveKey(d.handle, "second device"); }} />;
   if (flow === "guard") return <GuardianSide bridge={actions.bridge} mainnet={account.network === "mainnet"} onBack={flowBack} onProblem={actions.onProblem} />;
-  if (place === "quantum") return <QuantumSheet account={account} wordsChecked={account.keys.some((k) => k.role === "recovery") && !facts.checkDue} waitWords={release === null ? null : ruleChangeWaitWords(shared.strictestWait ?? 0, changeFloor === 0 ? 0 : account.recovery?.delaySeconds ?? 0)} onClose={onBack} onRemove={(h) => { onBack(); actions.onRemoveKey(h); }} onNewWords={() => actions.onNewWords?.({ id: "security", tab: "recovery" })} onPairAgain={() => setFlow(noLaptopPage ? "phone" : "laptop")} />;
+  if (place === "quantum") return <QuantumSheet account={account} wordsChecked={wordsCheckedOf(account.keys.some((k) => k.role === "recovery"), facts.checkDue)} waitWords={release === null ? null : ruleChangeWaitWords(shared.strictestWait ?? 0, changeFloor === 0 ? 0 : account.recovery?.delaySeconds ?? 0)} onClose={onBack} onRemove={(h) => { onBack(); actions.onRemoveKey(h); }} onNewWords={() => actions.onNewWords?.({ id: "security", tab: "recovery" })} onPairAgain={() => setFlow(noLaptopPage ? "phone" : "laptop")} />;
   if (place === "protection") return <Protection bridge={actions.bridge} network={account.network} accountId={account.accountId} hasSecondDevice={account.keys.some((k) => k.role === "second-device")} recoveryDelaySeconds={release !== null && release < 5 ? 0 : account.recovery?.delaySeconds ?? 0} onBack={onBack} onProblem={actions.onProblem} onPairDevice={() => setFlow(noLaptopPage ? "phone" : "laptop")} onWaiting={(h) => actions.onWaiting(h, "protection")} {...(actions.onSafeUpdate ? { onSafeUpdate: actions.onSafeUpdate } : {})} />;
   if (place === "recovery") {
     return (
@@ -447,7 +447,7 @@ const deviceForRecovery = (devices: readonly SecondDevice[] | null): "none" | "y
     : devices.some((d) => !d.needsReAdd && !d.countsFullyFromIso && !d.waitsForMove) ? "ready"
       : devices.some((d) => d.needsReAdd) ? "re-add" : "young";
 
-function RecoveryTab({ account, actions, checkDue = false, devices, bandWait, changeFloor }: { account: AccountInfo; actions: SecurityActions; checkDue?: boolean; devices: SecondDevice[] | null; bandWait: number | null; changeFloor?: number }) {
+function RecoveryTab({ account, actions, checkDue = null, devices, bandWait, changeFloor }: { account: AccountInfo; actions: SecurityActions; checkDue?: boolean | null; devices: SecondDevice[] | null; bandWait: number | null; changeFloor?: number }) {
   const [emailOn, setEmailOn] = useState(false);
   useEffect(() => {
     if (actions.noEmail) return;
@@ -479,7 +479,7 @@ function RecoveryTab({ account, actions, checkDue = false, devices, bandWait, ch
       <h1 className="zf-title sec-dev__head">Your 24 words bring your money back</h1>
       <p className="zf-body sec-dev__line">{device === "ready" ? `Lose this phone? Type your words on a new one. Your ${named} says yes, then it takes ${wait}.` : `Lose this phone? Type your words on a new one. It takes ${wait}.`}</p>
       <div className="sec-dev__rows">
-        <div className="sec-fact-row"><span>Backup words</span><span className="v">{checkDue ? "Check them" : <>{QUANTUM_WORDS.wordsDown} <span className="zf-tick on sec-key-row__tick" aria-hidden="true"><Check /></span></>}</span></div>
+        <div className="sec-fact-row"><span>Backup words</span><span className="v">{(() => { const w = backupWordsShown(checkDue); return w.tick ? <>{w.value} <span className="zf-tick on sec-key-row__tick" aria-hidden="true"><Check /></span></> : w.value; })()}</span></div>
         <button className="sec-fact-row sec-fact-row--btn" onClick={() => setSheet("wait")}><span>The wait</span><span className="v">{wait} ›</span></button>
         {/* One pill per screen, on the floor: while a new phone is waiting, Stop it is the one and checking the words is a
             row. R2 (§4.9; the test list: no grey pills): the other actions are rows in this one card, never stacked text

@@ -64,7 +64,8 @@ async function setup(o: { leg1Usd?: string; refuse?: string; said?: string; appr
     fees: async () => ({ tip: 1_000_000n, maxFee: 5_000_000n }), estimateGas: async () => 23_300n, send: async (_c: string, signed: string) => (sent.push(signed), true), receipt: async () => ["ok", "ok"],
     read: async (_c: string, method: string) => (method === "eth_getBalance" ? `0x${(10n ** 21n).toString(16)}` : `0x${"0".repeat(64)}`),
   } as unknown as EvmChain;
-  const w = honestPage(new SubWallets({ vault: new MemoryVault(), sol, evm, approve: async (words) => (shown.push(words), o.approve !== false), emit: () => {}, quoteKey: TEST_QUOTE_KEY, floatRelay: relay, privateStatus, pocketUsd: async () => 0, confirm: { everyMs: 1, forMs: 5 } }), privateStatus);
+  const said: [string, unknown][] = [];
+  const w = honestPage(new SubWallets({ vault: new MemoryVault(), sol, evm, approve: async (words) => (shown.push(words), o.approve !== false), emit: (e: string, p: unknown) => void said.push([e, p]), quoteKey: TEST_QUOTE_KEY, floatRelay: relay, privateStatus, pocketUsd: async () => 0, confirm: { everyMs: 1, forMs: 5 } }), privateStatus);
   const p = await w.create("private", "near");
   pocket = p.address;
   await w.create("trade", "sol");
@@ -79,7 +80,7 @@ async function setup(o: { leg1Usd?: string; refuse?: string; said?: string; appr
     leg2 = { amountIn: leg1.minAmountOut, minOut: "1000", usd: "5.00", ...l };
     return { payload: payload(leg2.coin, leg2.amountIn) };
   };
-  return { w, shown, sent, pay, pocket: p, seen };
+  return { w, shown, sent, pay, pocket: p, seen, said };
 }
 
 test("E3: one wallet sends to any chain 1Click pays: SOL wallet → BNB Chain, SOL wallet → a NEAR account, ETH (RH) wallet → Solana, → Base; each to an outside payee asks Face ID once (QA, 5 Nov)", async () => {
@@ -276,4 +277,28 @@ test("QA's MUST 1 (5 Nov, a Send's fill): the payout is bound to its move in whe
   const b1 = await bad.w.privateQuoteIn(USDC, "20000000", false, true);
   await assert.rejects(bad.w.privatePay(bad.pocket.id, OUT, bad.pay({ coin: USDC, dest: SOL_IN, recipient: SOL_PAYEE, amountIn: (BigInt(b1.minAmountOut) + 1n).toString() }, b1), "Send", "tag-for-this-quote-0001", b1.depositAddress));
   assert.equal(bad.w.sendPayout(b1.depositAddress), null, "a refused join binds nothing");
+});
+
+test("the audit's Send audit M9 (7 Nov): a Send Private pays whole says job.signed with its own key once its Face ID signed, before 1Click's answer; a no, no key, a bad key, a Move's leg, or no send: never [before: no job.signed]", async () => {
+  const KEY = "home-send-0123456789abcdef01234567";
+  const s = await setup();
+  const ask = s.pay({ coin: USDC, dest: "nep141:eth.omft.near", recipient: EVM_PAYEE, amountIn: "5000000", usd: "5.00", minOut: "1000" }, { minAmountOut: "5000000" });
+  const r = (await s.w.privatePay(s.pocket.id, OUT, ask, "Send", "tag-for-this-quote-0001", undefined, true, undefined, undefined, undefined, KEY)) as any;
+  assert.ok(r.signedData?.signature);
+  assert.equal(s.shown.length, 1, "its Face ID first (an outside payee)");
+  assert.deepEqual(s.said.filter(([e]) => e === "job.signed"), [["job.signed", { jobKey: KEY }]], "once, with its own key, after the yes");
+  const no = await setup({ approve: false });
+  const noAsk = no.pay({ coin: USDC, dest: "nep141:eth.omft.near", recipient: EVM_PAYEE, amountIn: "5000000", usd: "5.00", minOut: "1000" }, { minAmountOut: "5000000" });
+  await assert.rejects(no.w.privatePay(no.pocket.id, OUT, noAsk, "Send", "tag-for-this-quote-0001", undefined, true, undefined, undefined, undefined, KEY));
+  assert.equal(no.said.filter(([e]) => e === "job.signed").length, 0, "control: a no signs nothing, says nothing");
+  for (const key of [undefined, "short", "has spaces in it, sixteen+"]) {
+    const c = await setup();
+    const a = c.pay({ coin: USDC, dest: "nep141:eth.omft.near", recipient: EVM_PAYEE, amountIn: "5000000", usd: "5.00", minOut: "1000" }, { minAmountOut: "5000000" });
+    await c.w.privatePay(c.pocket.id, OUT, a, "Send", "tag-for-this-quote-0001", undefined, true, undefined, undefined, undefined, key);
+    assert.equal(c.said.filter(([e]) => e === "job.signed").length, 0, `control: key ${String(key)}`);
+  }
+  const plain = await setup();
+  const pa = plain.pay({ coin: USDC, dest: "nep141:eth.omft.near", recipient: EVM_PAYEE, amountIn: "5000000", usd: "5.00", minOut: "1000" }, { minAmountOut: "5000000" });
+  await plain.w.privatePay(plain.pocket.id, OUT, pa, "Send", "tag-for-this-quote-0001", undefined, undefined, undefined, undefined, undefined, KEY).catch(() => undefined);
+  assert.equal(plain.said.filter(([e]) => e === "job.signed").length, 0, "control: not a Send's own share (no send)");
 });

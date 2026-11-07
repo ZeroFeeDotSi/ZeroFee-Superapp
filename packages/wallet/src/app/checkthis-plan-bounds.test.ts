@@ -15,7 +15,9 @@ import { costRows, type Leg } from "./screens/move-split.ts";
 
 const USDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", SOL = "nep141:sol.omft.near";
 const SOLW = "So1aWa11et1111111111111111111111111111111111", FLOAT = "f1oat.near";
-const HEAD = "Costs more than the plan said.";
+// the audit's M8 (7 Nov): the head is three lines now, by name and figure; a sheet with none has no "NEAR Intents takes/moves at least" lead
+const HEAD = /^NEAR Intents (takes|moves at least) \$/;
+const headed = (lines: readonly string[]) => lines.some((l) => HEAD.test(l));
 const $c = (v: bigint) => `$${(Number(v) / 100).toFixed(2)}`;
 const c = (x: string) => Math.round(Number(x.replace(/,/g, "")) * 100);
 const u6 = (usd: number) => String(Math.round(usd * 100) * 10_000);
@@ -65,14 +67,14 @@ test("the audit's ruling (c), core: from the signed quotes, a one-wallet and a t
   const p1 = planOf([{ from: "safe", to: "sol", usd: 51 }]), s1 = sheetOf(one.lines);
   assert.ok(s1.fee <= p1.most, `fee ${s1.fee} ≤ the plan's at most ${p1.most}`);
   assert.ok(s1.least >= p1.least, `at least ${s1.least} ≥ the plan's ${p1.least}`);
-  assert.ok(!one.lines.includes(HEAD), "within the plan: no head");
+  assert.ok(!headed(one.lines), "within the plan: no head");
   // two wallets: $101.48 to the SOL wallet, $8.39 to the NEAR wallet, a $150 step
   const two = coreSheet([{ to: SOLW, usd: 101.48, q: quote(100.9) }, { to: FLOAT, usd: 8.39, q: quote(8.36, 0.005) }], 150);
   const p2 = planOf([{ from: "safe", to: "sol", usd: 101.48 }, { from: "safe", to: "near", usd: 8.39 }]), s2 = sheetOf(two.lines);
   assert.equal(s2.wallets, 2, two.lines.join(" | "));
   assert.equal(two.title, "Move $109.87 to your SOL and NEAR wallets");
   assert.ok(s2.fee <= p2.most && s2.least >= p2.least, `${JSON.stringify(s2)} within ${JSON.stringify(p2)}`);
-  assert.ok(!two.lines.includes(HEAD));
+  assert.ok(!headed(two.lines));
 });
 
 test("the audit's ruling (c), Sim: the same Moves from the Sim's own quote (simSwapCost) hold to the plan's bounds, one wallet and two (fails on ae8e3f472 and 1e2123004: no at-least, the typed figure)", async () => {
@@ -88,17 +90,17 @@ test("the audit's ruling (c), Sim: the same Moves from the Sim's own quote (simS
     assert.equal(s.wallets, parts.length, w.lines.join(" | "));
     assert.ok(s.fee <= p.most, `fee ${s.fee} ≤ ${p.most}: ${w.lines.join(" | ")}`);
     assert.ok(s.least >= p.least, `at least ${s.least} ≥ ${p.least}: ${w.lines.join(" | ")}`);
-    assert.ok(!w.lines.includes(HEAD), w.lines.join(" | "));
+    assert.ok(!headed(w.lines), w.lines.join(" | "));
   }
   // the walk's one wallet: $51.00 to the SOL wallet, Private empty
   assert.deepEqual((await simSheet([{ wallet: "sw-trade-sol", usd: 51 }])).lines.slice(0, 4), ["Your SOL wallet gets · about $50.50, at least $49.99", "From your Safe · $60.00", "Private keeps the rest · about $9.00", "Fee · about $0.50"]);
 });
 
-test("the audit's ruling (c): a signed quote past the plan's bound (it promises less than \"at least\", or keeps more than \"at most\") heads the sheet with \"Costs more than the plan said.\", then the real figures; core and Sim (fails on ae8e3f472 and 1e2123004: no head, the plan's figure)", async () => {
+test("the audit's ruling (c): a signed quote past the plan's bound (it promises less than \"at least\", or keeps more than \"at most\") heads the sheet with NEAR Intents' figure against the plan's, where the money is and the next tap (the audit's M8), then the real figures; core and Sim (fails on ae8e3f472 and 1e2123004: no head, the plan's figure)", async () => {
   // the core: leg 2 promises at least $45.00 for $51.00 (the plan: at least $48.71)
   const low = coreSheet([{ to: SOLW, usd: 51, q: quote(50, 0.1) }], 60);
-  assert.equal(low.lines[0], HEAD, low.lines.join(" | "));
-  assert.deepEqual(low.lines.slice(1, 5), ["Your SOL wallet gets · about $50.00, at least $45.00", "From your Safe · $60.00", "Private keeps the rest · about $9.00", "Fee · about $1.00"]);
+  assert.deepEqual(low.lines.slice(0, 3), ["NEAR Intents moves at least $45.00 now. This Move said at least $48.71.", "Nothing moved yet. It's still in your Safe.", "Tap Approve to go on, or Not now to stop."], low.lines.join(" | "));
+  assert.deepEqual(low.lines.slice(3, 7), ["Your SOL wallet gets · about $50.00, at least $45.00", "From your Safe · $60.00", "Private keeps the rest · about $9.00", "Fee · about $1.00"]);
   // the fee past "at most" alone (its at-least within): leg 1 keeps $1.00 of the $60 step, leg 2 gives $49.40 (at least
   // $48.90, over the plan's $48.71): $2.60 of fees, the plan said at most $2.29 (the audit's MUST: 99 % / 1.03 less the SOL leg's
   // $0.30 network fee, float-floors NETWORK_FEE_USD)
@@ -107,30 +109,32 @@ test("the audit's ruling (c): a signed quote past the plan's bound (it promises 
   const dear = coreSheet([{ to: SOLW, usd: 51, q: quote(49.4) }], 60, 59);
   const d = sheetOf(dear.lines);
   assert.ok(d.least >= p.least && d.fee > p.most, JSON.stringify(d));
-  assert.deepEqual(dear.lines.slice(0, 5), [HEAD, "Your SOL wallet gets · about $49.40, at least $48.90", "From your Safe · $60.00", "Private keeps the rest · about $8.00", "Fee · about $2.60"]);
+  assert.deepEqual(dear.lines.slice(0, 7), ["NEAR Intents takes $2.60 in fees now. This Move said at most $2.29.", "Nothing moved yet. It's still in your Safe.", "Tap Approve to go on, or Not now to stop.", "Your SOL wallet gets · about $49.40, at least $48.90", "From your Safe · $60.00", "Private keeps the rest · about $8.00", "Fee · about $2.60"]);
   // control: a quote right at the bound has no head
   const atBound = coreSheet([{ to: SOLW, usd: 51, q: { amountOut: "1000000000", minAmountOut: "1000000000", amountOutUsd: (p.least / 100).toFixed(2) } }], 60);
-  assert.notEqual(atBound.lines[0], HEAD, atBound.lines.join(" | "));
+  assert.ok(!headed(atBound.lines), atBound.lines.join(" | "));
   // the audit's MUST (8 Nov), the bound fixed, not the noise: a $5 Sim Move to the SOL wallet keeps $0.32 (0.4 % and the SOL
   // leg's $0.30, the same table), inside the plan's "at most $0.50": no head (was the head under the old bound)
   const sim = await simSheet([{ wallet: "sw-trade-sol", usd: 5 }]);
   const ps = planOf([{ from: "safe", to: "sol", usd: 5 }]), ss = sheetOf(sim.lines);
   assert.deepEqual(ps, { least: 450, most: 50 });
   assert.ok(ss.fee <= ps.most && ss.least >= ps.least, JSON.stringify(ss));
-  assert.ok(!sim.lines.includes(HEAD), sim.lines.join(" | "));
+  assert.ok(!headed(sim.lines), sim.lines.join(" | "));
   assert.deepEqual(sim.lines.slice(0, 4), ["Your SOL wallet gets · about $4.68, at least $4.63", "From your Safe · $10.00", "Private keeps the rest · about $5.00", "Fee · about $0.32"]);
 });
 
-test("the audit's SHOULD (8 Nov): a wallet-to-wallet part has no signed quote yet, so its least is the plan's own floor, said as the plan's: \"at least about $Y\" (a wallet with a quoted part and one from another wallet; a wallet with only the other's); the rows still close", () => {
+test("the audit's SHOULD (8 Nov): a wallet-to-wallet part has no signed quote yet, so its least is the plan's own floor; QA 20: one \"about\" per line, \"about $X, at least $Y\" (a wallet with a quoted part and one from another wallet; a wallet with only the other's); the rows still close", () => {
   const cents = (usd: number) => BigInt(Math.floor(usd * 100 + 1e-6));
   // the walk's Move: $46.00 from the Safe to the SOL wallet (quote $45.53, at least $45.07), $3.64 from the ETH (RH) wallet to
   // it, and $5.00 from the ETH (RH) wallet to the NEAR wallet
   const s = moveSheet([{ wallet: "your SOL wallet", priv: 0n, pay: 4600n, got: 4553n, least: 4507n }], 5000n, $c, { others: [{ from: "your ETH (RH) wallet", to: "your SOL wallet", v: 364n }, { from: "your ETH (RH) wallet", to: "your NEAR wallet", v: 500n }] });
   const sol = 4507n + cents(walletLegLeastUsd(3.64, true, true)), near = cents(walletLegLeastUsd(5, true, false));
-  assert.deepEqual(s.lines.slice(0, 2), [`Your SOL wallet gets · about $49.17, at least about ${$c(sol)}`, `Your NEAR wallet gets · about $5.00, at least about ${$c(near)}`]);
+  assert.deepEqual(s.lines.slice(0, 2), [`Your SOL wallet gets · about $49.17, at least ${$c(sol)}`, `Your NEAR wallet gets · about $5.00, at least ${$c(near)}`]);
   assert.deepEqual([sol, near], [4799n, 432n], "the plan's floors: leastIn(99 %) / 1.03 on to a chain, leastIn(99 %) into the NEAR wallet");
   const fig = (re: RegExp) => s.lines.filter((l) => re.test(l)).reduce((n, l) => n + c(/\$([\d,.]+)/.exec(l)![1]!), 0);
   assert.equal(fig(/^From /), fig(/ gets · /) + fig(/^Fee · /) + fig(/^Private keeps the rest · /), s.lines.join(" | "));
+  // QA 20 (8 Nov): no line of the two-wallet sheet says "about" twice
+  for (const l of s.lines) assert.ok((l.match(/\babout\b/g) ?? []).length <= 1, `one "about" per line: ${l}`);
   // control: a quoted part alone is its quote's own at-least, never "about"
   assert.equal(moveSheet([{ wallet: "your SOL wallet", priv: 0n, pay: 4600n, got: 4553n, least: 4507n }], 5000n, $c).lines[0], "Your SOL wallet gets · about $45.53, at least $45.07");
 });

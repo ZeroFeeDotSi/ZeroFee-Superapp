@@ -111,7 +111,7 @@ extension Host {
 
   /** Debug only: the native backup words screen with sample words that belong to no account. */
   func probeWords() async {
-    let sample = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual" // zerofee-allow-secret-shape: sample words, checksum-invalid, no account
+    let sample = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual"
     let picked = await coreWords(sample.split(separator: " ").map(String.init), kid: false, renew: false)
     NSLog("[zf-probe] wordsSheet = %@", picked == nil ? "closed (Later)" : "checked \(picked!.0)")
   }

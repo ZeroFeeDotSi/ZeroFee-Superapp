@@ -116,55 +116,6 @@ A Chrome extension is in the source and is not ready.
    it in `apps/ios/relay-url.txt` and run `node apps/web/src/hosting.ts` (the web page only talks to servers its
    `vercel.json` names). Commit, and Vercel deploys again.
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
-[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
-
-<!-- DEMO GIF: a 30-second GIF goes here (for example docs/images/demo.gif): Create my account, then Trade. -->
-<p align="center"><em>[30-second demo GIF: to be added]</em></p>
-
-## For developers: quickstart (about 2 minutes, sample money)
-
-Needs git and Node 24 or later (`.nvmrc`). No keys, Rust or account.
-
-```sh
-git clone <this repository's URL> zerofee && cd zerofee
-make dev            # or: npm ci --ignore-scripts && npm run dev
-```
-
-Open `http://localhost:5180/?demo`. You see a **SIM** badge and **Create my account**; nothing touches a chain. Then
-follow [Do X, see Y](#do-x-see-y-sample-money-about-3-minutes).
-
-**Run your own relay and point the app at it** (one step; ZeroFee's relay answers only ZeroFee's own sites):
-
-```sh
-cp apps/quotes/.env.example apps/quotes/.env && PORT=5181 node tools/selfhost/serve.mjs &   # apps/quotes, your keys
-VITE_ZEROFEE_RELAY=http://localhost:5181 npm run dev                                       # the app, using it
-```
-
-**Self-host it** (the built app and its quote relay on one port, your own keys optional):
-
-```sh
-cp .env.example .env   # optional: every key is optional and explained in the file
-make selfhost          # or: bash tools/selfhost/run.sh  ->  http://localhost:5180/
-```
-
-**Check everything** the way CI does, on a fresh clone: `make verify` (install, typecheck, tests with no network, build).
-
-```mermaid
-flowchart LR
-  subgraph Device["The person's device"]
-    UI["Web app / iPhone app<br/>apps/web, apps/ios"] --> Core["Signing core<br/>packages/core (keys never leave)"]
-  end
-  Core -- "signed transactions" --> NEAR["NEAR account contract<br/>contracts/account-policy<br/>(limits, waits, second device, recovery)"]
-  UI -- "quotes, market data" --> Relay["Quote relay<br/>apps/quotes (holds no user keys or money)"]
-  Relay --> Intents["NEAR Intents 1Click"]
-  Relay --> Market["CoinGecko / GeckoTerminal"]
-```
-
-Security model in one line: keys stay on the device, the account's own contract enforces the rules, and the relay only
-passes quotes on. Report vulnerabilities privately: [SECURITY.md](SECURITY.md). Contributing:
-[CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Changes: [CHANGELOG.md](CHANGELOG.md).
-
 ## Release, 3 Nov 2026
 
 ### In it today
@@ -575,40 +526,6 @@ cd apps/web
 npm run build                  # writes apps/web/dist/; Rolldown's dynamic-import notes are expected
 npm run preview                # serves the build at http://127.0.0.1:5181/?demo
 ```
-
-**5. Run the relay** (optional; it holds your keys, never the app's users' keys or money):
-
-```sh
-cp apps/quotes/.env.example apps/quotes/.env   # every line is optional; put in your own keys
-PORT=5181 node tools/selfhost/serve.mjs        # the relay alone: http://localhost:5181/v0/health
-VITE_ZEROFEE_RELAY=http://localhost:5181 npm run dev   # in a second terminal: the app, talking to your relay
-```
-
-`make selfhost` builds the app and serves it with the relay on one port instead.
-
-**6. Build the iPhone app** (a Mac with Xcode 26): `npm ci`, then `ZEROFEE_RELAY_URL=<your relay or empty> apps/ios/build-web.sh`,
-then open `apps/ios/ZeroFee.xcodeproj`, pick your own team under Signing, and change the bundle id `si.zerofee.app` to one
-of yours. No team is set in the repo. Steps: [apps/ios/README.md](apps/ios/README.md).
-
-## Point it at your own servers
-
-ZeroFee's own hosts are only the defaults. Set these to use yours:
-
-| Setting | Where | What it points at | Default |
-|---|---|---|---|
-| `VITE_ZEROFEE_RELAY` | web build env (`npm run dev` / `build`) | the relay (`apps/quotes`) | none: public APIs, sample money |
-| `ZEROFEE_RELAY_URL` | env for `apps/ios/build-web.sh`, the extension build, `hosting.ts`'s CSP | the relay, for the iPhone, extension and CSP | `apps/ios/relay-url.txt` |
-| `apps/ios/relay-url.txt` | a file (one https line, or empty) | the same relay, kept in git | ZeroFee's relay |
-| `VITE_PHONE_APP_URL` | web build env | the "get the phone app" link | `https://zerofee.si` |
-| `VITE_SECOND_DEVICE_SITE` | web build env | the laptop page's host (the second device), and the web note's laptop link | `laptop.zerofee.si` |
-| `VITE_CODE_URL` | web build env | the web note's and Settings → Open source's "Get the code" link (your code's https address) | `https://zerofee.si/docs/self-host` |
-| `ALLOWED_ORIGINS` | relay env | your site's origin, so the relay answers it | localhost only |
-| `BASE` | env for `apps/quotes/deploy.sh` | your deployed relay, for its checks | ZeroFee's relay |
-| `DOMAIN` | env for `apps/web/promote-demo.sh` | your demo's domain | ZeroFee's demo |
-| `--domain` | `apps/mail/server.ts` flag | your mail domain | `zerofee.si` |
-
-`apps/web/vercel.json` and `apps/ios/connect-hosts.txt` list the hosts the page may reach; add your relay's origin there
-when you deploy your own. The relay's settings, one line each: [apps/quotes/.env.example](apps/quotes/.env.example).
 
 ## Build and test the contract (needs Rust)
 

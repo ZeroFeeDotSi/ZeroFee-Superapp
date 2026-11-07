@@ -23,7 +23,7 @@ test("controls: no history, Home's done card still shows; a Trade done still sho
 
 test("the centre uses it, with or without `only`", () => {
   const src = readFileSync(new URL("./TaskCentre.tsx", import.meta.url), "utf8");
-  assert.match(src, /const homeHistory = !!history && \(!only \|\| only === "home"\);\n  const earlier = newestFirst\(earlierOf\(all, homeHistory, new Set\(others\.map\(\(\[a\]\) => a\)\)\)\);/);
+  assert.match(src, /const homeHistory = !!history && \(!only \|\| only === "home"\);\n  const earlier = newestFirst\(earlierOf\(all, homeHistory, new Set\(others\.map\(\(\[a\]\) => a\)\), appRecorded\(\)\)\);/, "changed pin (T11): the rows Trade's records stand for");
   assert.match(src, /\{homeHistory && <section className="tc-part tc-history" aria-label="History">/, "the history is drawn exactly when the rule hides Home's cards");
   assert.match(src, /const now = newestFirst\(all\.filter\(\(t\) => t\.state === "pending"\)\);/, "Now keeps every live task");
 });

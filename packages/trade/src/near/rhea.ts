@@ -94,7 +94,7 @@ export interface RheaEngine extends ChainEngine {
   keptHeld(token: string): Promise<bigint | null>;
   /** A kept trade's coin claimed back from Ref's lost and found (claim_lostfound, signed by the core): the wallet's rise
    *  in the coin on both nodes at a final block past the claim (the chain's figure); undefined: can't tell. */
-  claimKept(token: string): Promise<{ got: bigint; hash: string } | undefined>;
+  claimKept(token: string): Promise<{ got: bigint; hash: string } | { sent: string } | { declined: true } | undefined>;
 }
 
 export function createRheaEngine(d: RheaDeps): RheaEngine {
@@ -597,12 +597,14 @@ export function createRheaEngine(d: RheaDeps): RheaEngine {
           await register(token, token === WNEAR ? undefined : (await poolOf(token))?.id);
           return sign();
         });
-        if ("declined" in r) return undefined;
-        const out = await d.rpc("send_tx", { signed_tx_base64: r.signedTx, wait_until: "EXECUTED_OPTIMISTIC" });
-        if (!out?.status || "Failure" in out.status) throw new ProblemError(nearProblems.nearNothingMoved(token));
+        if ("declined" in r) return { declined: true as const };
+        // the audit's T8: from here the claim may have gone out: an answer lost, or no read after it, is unsure, never "nothing"
+        const out = await d.rpc("send_tx", { signed_tx_base64: r.signedTx, wait_until: "EXECUTED_OPTIMISTIC" }).catch(() => undefined);
+        if (!out?.status) return { sent: r.hash };
+        if ("Failure" in out.status) throw new ProblemError(nearProblems.claimRefused());
         const f = await d.rpc2("tx", { tx_hash: r.hash, sender_account_id: r.signerId, wait_until: "FINAL" }).catch(() => undefined);
         const b = f ? await byFinalBalance(token, r.signerId, before, "1", f) : null;
-        return b && "got" in b ? { got: b.got, hash: r.hash } : undefined;
+        return b && "got" in b ? { got: b.got, hash: r.hash } : { sent: r.hash };
       });
     },
 

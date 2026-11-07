@@ -5,12 +5,14 @@
 // waiting rows open by themselves. A held Add's row leads to the shell's Waiting screen, where its hold can run or be
 // cancelled (D17).
 import { useEffect, useState } from "react";
+import { CLAIM_PREFIX } from "../trade-tasks.ts";
 import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
 import { Check } from "@zerofee/design/icons.tsx";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { about } from "../boards.ts";
 import { clockTime as clock, usd, whenWords } from "../format.ts";
-import { KEPT_CLAIM_SEC, keptDone, keptRunning, keptWay, openByDefault, type Card, type KeptFacts, type KeptView } from "../job-cards.ts";
+import { ProblemError } from "@zerofee/core/problem";
+import { KEPT_CLAIM_SEC, claimEnd, keptDone, keptRunning, keptTaskTitle, keptWay, openByDefault, type Card, type KeptFacts, type KeptView } from "../job-cards.ts";
 import { useCoinDetail, useLogo, useTrade } from "../runtime.tsx";
 
 
@@ -45,7 +47,7 @@ function useKeptHeld(k: KeptFacts | undefined, n: number): string | null | undef
  * core signs claim_lostfound; one tx however often it is tapped, on this card or another kept one of the coin; then the
  * trades are done and booked once); none: who to ask, the facts behind Show details, each with Copy (keptWay).
  */
-function KeptWay({ k, view, onClaim, running }: { k: KeptFacts; view: KeptView; onClaim: () => void; running: boolean }) {
+function KeptWay({ k, view, onClaim, running, said }: { k: KeptFacts; view: KeptView; onClaim: () => void; running: boolean; said?: string }) {
   const [details, setDetails] = useState(false);
   const copy = (v: string) => { void navigator.clipboard?.writeText(v).catch(() => undefined); };
   return (
@@ -53,7 +55,7 @@ function KeptWay({ k, view, onClaim, running }: { k: KeptFacts; view: KeptView; 
       {view.body && <p className="zf-small">{view.body}</p>}
       {view.claim && (running
         ? <p className="zf-small">{keptRunning(k.symbol, KEPT_CLAIM_SEC)}</p>
-        : <button className="zf-btn tr-kept-go" onClick={onClaim}>{view.claim.label}</button>)}
+        : <>{said && <p className="zf-small" role="alert" data-testid="kept-said">{said}</p>}<button className="zf-btn tr-kept-go" onClick={onClaim}>{view.claim.label}</button></>)}
       {view.details && (details
         ? <div className="tr-kept-details"><p className="zf-small">{view.details.head}</p>
             {view.details.rows.map((r) => (
@@ -66,7 +68,7 @@ function KeptWay({ k, view, onClaim, running }: { k: KeptFacts; view: KeptView; 
 }
 
 export function JobCard({ card }: { card: Card }) {
-  const { showWaiting } = useShell();
+  const { showWaiting, tasks } = useShell();
   const { svc } = useTrade();
   const live = openByDefault(card);
   const [open, setOpen] = useState(live);
@@ -74,6 +76,8 @@ export function JobCard({ card }: { card: Card }) {
   // a kept trade (the audit's MUST, 7 Nov): Rhea's lost and found read, its head in the row; a claim's receipt stays once done
   const [n, setN] = useState(0);
   const [claim, setClaim] = useState<{ at: number; done?: [string, string] }>();
+  // the audit's T8: a claim that didn't come back says why, under its button (never silence)
+  const [said, setSaid] = useState<string>();
   const held = useKeptHeld(card.kept, n);
   const kv = card.kept ? keptWay(card.kept, held) : undefined;
   const k = card.kept;
@@ -81,9 +85,16 @@ export function JobCard({ card }: { card: Card }) {
     if (!k || claim) return;
     const at = Date.now();
     setClaim({ at });
-    void svc.claimKept(k.id).catch(() => undefined).then((r) => {
-      if (r) setClaim({ at, done: keptDone(k, r.got, Date.now() - at) });   // the service's save redraws the card done
-      else { setClaim(undefined); setN((x) => x + 1); }
+    setSaid(undefined);
+    // the audit's T8: its Jobs row, made at the tap ("Job created." said so, and none was made)
+    const task = `${CLAIM_PREFIX}${k.id}-${at}`;   // the keeper ends it if the app closes mid-claim (trade-tasks.ts)
+    tasks?.publish({ id: task, title: keptTaskTitle(k.symbol), endsAt: at + KEPT_CLAIM_SEC * 1000, steps: [{ label: "Asked Rhea", state: "doing", at }, { label: "In your NEAR wallet", state: "waiting" }] });
+    void svc.claimKept(k.id).then((r) => ({ r }), (e: unknown) => ({ r: undefined, p: e instanceof ProblemError ? e.problem : undefined })).then(({ r, p }: { r?: Awaited<ReturnType<typeof svc.claimKept>>; p?: { code: string; whatHappened: string } }) => {
+      const end = claimEnd(k, r, p);
+      if (end.task === "done") tasks?.update(task, { steps: [{ label: "Asked Rhea", state: "done", at }, { label: "In your NEAR wallet", state: "done", at: Date.now() }] });
+      tasks?.end(task, end.task, end.detail);
+      if (r && "got" in r) setClaim({ at, done: keptDone(k, r.got, Date.now() - at) });   // the service's save redraws the card done
+      else { setClaim(undefined); setSaid(end.line); setN((x) => x + 1); }
     });
   };
   // what moved and when, or, for one that didn't go, why (its result says where the money is). T2-6 (the copy review's walk, 8 Nov):
@@ -103,7 +114,7 @@ export function JobCard({ card }: { card: Card }) {
         <CardLogo card={card} />
         <span className="ac-mid"><span className="t">{card.title}</span><span className="d">{sub}</span></span>
         <span className="ac-right">
-          {card.usd !== undefined && <span className="ac-usd">{usd(card.usd)}</span>}
+          {card.usd !== undefined && <span className="ac-usd">{card.usdAbout ? `About ${usd(card.usd)}` : usd(card.usd)}</span>}
           {card.status && <span className="ac-status">{card.status}</span>}
         </span>
       </button>
@@ -118,7 +129,7 @@ export function JobCard({ card }: { card: Card }) {
           ))}
         </ol>
       )}
-      {open && k && kv && <KeptWay k={k} view={kv} onClaim={onClaim} running={!!claim} />}
+      {open && k && kv && <KeptWay k={k} view={kv} onClaim={onClaim} running={!!claim} {...(said ? { said } : {})} />}
       {claim?.done && <div className="tr-kept" data-testid="kept-done"><p className="zf-small">{claim.done[0]}</p><p className="zf-small">{claim.done[1]}</p></div>}
       {open && card.held && <button className="zf-link tr-card-held" onClick={() => showWaiting(card.held!)}>See it in Waiting</button>}
     </article>

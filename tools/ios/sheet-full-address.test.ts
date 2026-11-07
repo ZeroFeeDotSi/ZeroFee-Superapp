@@ -18,7 +18,7 @@ function openUnderItsLine(words: string, sheet: string): string[] {
   // read only when its line is on the sheet; anything else fails the whole sheet (nothing shown, nothing signed)
   if (!/if let o = item\["open"\], !\(o is NSNull\) \{\s*guard let o = o as\? \[String: Any\], let after = text\(o\["after"\]\), readLines\.contains\(after\) else \{ return nil \}\s*openAfter = after/.test(words)) p.push("open isn't read strictly");
   // drawn inside the lines' loop, right under the line it names
-  const lines = sheet.indexOf("ForEach(Array(words.lines.enumerated())");
+  const lines = sheet.indexOf("ForEach(Array(words.lines.dropFirst(head).enumerated())");
   const folds = sheet.indexOf("DisclosureGroup");
   const open = sheet.indexOf("words.details.filter { $0.openAfter == line }");
   if (lines < 0 || open < lines || (folds >= 0 && open > folds)) p.push("the full address isn't drawn under its line, before any fold");
@@ -64,7 +64,7 @@ function outsideRules(words: string, sheet: string): string[] {
   if (!/groups\.joined\(separator: "\\u\{2009\}"\)/.test(words)) p.push("not thin spaces");
   if (!/static func toAddress\(_ line: String\) -> String\?/.test(words) || !/a\.contains\("…"\) \? nil/.test(words)) p.push("no strict To <address> read");
   if (!/static func isLands\(_ line: String\) -> Bool/.test(words)) p.push("no lands line");
-  const loop = sheet.slice(sheet.indexOf("ForEach(Array(words.lines.enumerated())"), sheet.indexOf("DisclosureGroup"));
+  const loop = sheet.slice(sheet.indexOf("ForEach(Array(words.lines.dropFirst(head).enumerated())"), sheet.indexOf("DisclosureGroup"));
   if (!/if let to = SheetWords\.toAddress\(line\) \{\s*VStack\(alignment: \.leading, spacing: 2\) \{\s*Text\("To"\)\.font\(\.system\(size: 12\)\)\.foregroundStyle\(\.secondary\)\s*FullAddress\(address: to\)/.test(loop)) p.push("no To caption over the address");
   if (!/else if SheetWords\.isLands\(line\) \{\s*Text\(line\)\.font\(\.system\(size: 15\)\)\.foregroundStyle\(\.secondary\)/.test(loop)) p.push("the lands line isn't quiet");
   const view = sheet.slice(sheet.indexOf("struct FullAddress: View"));

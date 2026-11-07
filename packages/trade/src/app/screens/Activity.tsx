@@ -2,13 +2,15 @@
 // (D52: the engine's own background moves are behind the scenes unless one failed, boards.ts shownMove)
 // (job-cards.ts, JobCard.tsx). A trade that didn't happen says so and what moved; an Add the account's protection holds
 // waits on its first step until the hold ends (D17), never done.
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { Mark } from "@zerofee/design/Mark.tsx";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { EarlierHistory } from "@zerofee/shell-api/EarlierHistory.tsx";
+import { taskStore } from "@zerofee/shell-api/tasks.ts";
 import { shownMove, siteMove } from "../boards.ts";
 import { moveCard, tradeCard } from "../job-cards.ts";
 import { useFloat, useLive, useTrade } from "../runtime.tsx";
+import { goingIds } from "../trade-tasks.ts";
 import { JobCard } from "./JobCard.tsx";
 import "../activity.css";
 
@@ -20,6 +22,10 @@ export function Activity({ tradesOnly = false }: { tradesOnly?: boolean } = {}) 
   const { bridge } = useShell();
   const { snap } = useFloat();
   const rows = useLive(() => svc.activity(), []);
+  // T11 (the audit's Trade audit, 8 Nov): in the centre, a trade whose Jobs row is still going is that row in Now, never a
+  // second card here ("Buy not confirmed" under Trade beside "Buy $5 of DOPE · Not confirmed yet"); it comes here as it ends
+  const store = taskStore();
+  const goingKey = useSyncExternalStore(store.subscribe, () => goingIds(store.list()), () => "");
   // a "not confirmed yet" card on screen (Trade's tab, or the Activity centre over any app): the service looks at it
   // again every RECHECK_MS (QA and the audit's MUST); none left, or this goes: it stops
   const open = !!rows.value?.some((r) => r.status === "unconfirmed") && (tradesOnly || active);
@@ -37,7 +43,10 @@ export function Activity({ tradesOnly = false }: { tradesOnly?: boolean } = {}) 
     const more = legs(m.id).map((l) => moveCard(l, name(l.chain)).title);
     return more.length ? { ...c, result: [c.result, ...more].filter(Boolean).join(" · ") } : c;
   });
-  const cards = [...rows.value.map((r) => tradeCard(r)), ...(tradesOnly ? [] : moves)].sort((a, b) => b.at - a.at);
-  if (cards.length === 0) return <><p className="zf-small tr-none">Nothing yet. Your trades will show here.</p><EarlierHistory bridge={bridge} /></>;
+  const going = new Set(goingKey.split("\n"));
+  const listed = tradesOnly ? rows.value.filter((r) => !(r.task && going.has(r.task))) : rows.value;
+  const cards = [...listed.map((r) => tradeCard(r)), ...(tradesOnly ? [] : moves)].sort((a, b) => b.at - a.at);
+  // every trade still going is in Now above: never "Nothing yet" under it
+  if (cards.length === 0) return <>{listed.length < rows.value.length ? null : <p className="zf-small tr-none">Nothing yet. Your trades will show here.</p>}<EarlierHistory bridge={bridge} /></>;
   return <div className="zf-enter tr-cards">{cards.map((c) => <JobCard key={c.id} card={c} />)}<EarlierHistory bridge={bridge} /></div>;
 }

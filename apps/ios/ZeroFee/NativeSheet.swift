@@ -62,7 +62,24 @@ struct NativeSheetView: View {
             .overlay(alignment: .bottom) { hair.frame(height: 1) }
             .padding(.bottom, 8)
           }
-          ForEach(Array(words.lines.enumerated()), id: \.offset) { _, line in
+          // a signed quote past the plan's bound (the audit's ruling (c), M8): its three head lines as one card, first, the web
+          // sheet's approval__costs (the warning's tint, the lead in ink, semibold), never a plain grey row
+          let head = SheetWords.costsMoreHead(words.lines)
+          if head > 0 {
+            VStack(alignment: .leading, spacing: 4) {
+              ForEach(Array(words.lines.prefix(head).enumerated()), id: \.offset) { i, line in
+                Text(line).font(.system(size: 15, weight: i == 0 ? .semibold : .regular)).foregroundStyle(Color.primary)
+              }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background(Color.red.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+            .accessibilityElement(children: .combine)
+          }
+          ForEach(Array(words.lines.dropFirst(head).enumerated()), id: \.offset) { _, line in
             // every outside sheet's full address (the copy review's rules, 5 Nov): "To" a 12 pt caption, the address under it in groups
             // of 4; the line saying where it lands, quiet
             if let to = SheetWords.toAddress(line) {

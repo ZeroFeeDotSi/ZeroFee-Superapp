@@ -100,14 +100,15 @@ test("(d) Check this's words are exact: the head with Private's dollars, the Saf
   const html = renderToStaticMarkup(createElement(P.MoveAllSheet, { usd: "$33.86", stays: "$0.00", onApprove: () => {}, onClose: () => {} }));
   assert.match(html, /<div class="zf-label zf-sheet__title">Check this<\/div>/);
   assert.match(html, /aria-label="Close"/, "Close in the bar (D135)");
-  assert.match(html, /<h2 class="zf-title wl-moveall__head" data-testid="private-home-head">Move \$33\.86 from Private to your Safe<\/h2>/);
-  assert.match(html, /<div class="wl-kv" data-testid="private-home-gets"><span>Your Safe gets<\/span><span>\$33\.86<\/span><\/div>/);
+  // P5 (the audit's way-home audit): the figure once, on the rows; the rows add up (From = at least + at most)
+  assert.match(html, /<h2 class="zf-title wl-moveall__head" data-testid="private-home-head">Move money from Private to your Safe<\/h2>/);
+  assert.match(html, /<div class="wl-kv" data-testid="private-home-from"><span>From Private<\/span><span>\$33\.86<\/span><\/div><div class="wl-kv" data-testid="private-home-gets"><span>Your Safe gets<\/span><span>about \$33\.86, at least \$33\.18<\/span><\/div><div class="wl-kv" data-testid="private-home-fee"><span>Fees<\/span><span>at most \$0\.68<\/span><\/div>/);
   assert.match(html, /data-testid="private-home-seen">Anyone can see what reaches your Safe\.<\/p>/);
   assert.match(html, /<div class="wl-moveall__foot"><button class="zf-btn" data-testid="private-home-approve">Approve<\/button>/, "Approve: the lit 56 px .zf-btn, no Face ID glyph");
   assert.match(html, /<button class="zf-link" data-testid="private-home-notnow">Not now<\/button><\/div>/, "Not now: the 44 px link");
   assert.doesNotMatch(html, /Stays in Private|keeps the rest/, "$0 kept: no row");
   // control: above $0 the row shows, in the copy review's words (never "Stays in Private" on a Check this)
-  assert.match(renderToStaticMarkup(createElement(P.MoveAllSheet, { usd: "$33.86", stays: "$1.20", onApprove: () => {}, onClose: () => {} })), /<span>Private keeps the rest<\/span><span>about \$1\.20<\/span>/);
+  assert.match(renderToStaticMarkup(createElement(P.MoveAllSheet, { usd: "$33.86", stays: "$1.20", onApprove: () => {}, onClose: () => {} })), /<span>Private keeps the rest<\/span><span>\$1\.20<\/span>/, "exact: no about (P5)");
   // the head's dollars are the plan's, from the rows as the sheet opened on them
   assert.match(src, /const usd = dollars\(plan\.usd\.toFixed\(2\)\);/);
 });

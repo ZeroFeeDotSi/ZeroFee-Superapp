@@ -19,6 +19,8 @@ import { ADD_OPEN } from "@zerofee/core/add-outside";
 import { SERVICE_NAMES, serviceOf } from "@zerofee/core/services";
 import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
 import { usdOf } from "../../amount.ts";
+import { carried } from "@zerofee/shell-api/job-carry.ts";
+import { homing, homingUsd } from "./home-homing.ts";
 import { amountOf, balanceTotal, chainName, coins, dollars, plusUsd, safeLines, titleOf, type Line } from "../format.ts";
 import { awayUsd as awayOf, sumUsd, type HeldCoin } from "../trading.ts";
 import { NEAR_CHAIN_COINS, nearOwnCoins, type NearOwnCoin } from "../near-coins.ts";
@@ -102,6 +104,8 @@ export const HOME_WORDS = {
   /** A Safe swap in flight (sandbox hunt B5): its money still counts, on this row, until it lands. */
   swapping: "Swapping",
   swappingWhere: "in your Safe",
+  /** P4: a way home's coin in flight (provisional, to 53) */
+  homing: "Coming into your Safe",
   safeLine: "Your NEAR account keeps these rules.",
   reading: "Reading your money from NEAR…",
   /** The web wallet's: its money is in its three wallets, read from each chain. */
@@ -420,7 +424,9 @@ export function Home(a: HomeActions) {
   // D140: an Add's money in neither the NEAR wallet's count nor the wallet yet (the core's onWayUsd) counts from "Received"
   // B5 (sandbox hunt): a Safe swap in flight left the Safe and hasn't come back yet: counted at its price until it ends
   const swapping = (activity ?? []).filter((m) => m.kind === "swap" && m.status === "moving" && m.source === "safe");
-  const addsUsd = (onWayOf ? onWayOf(adds) : 0) + swapping.reduce((t, m) => t + (Number(usdOf(m.amount, tokens.get(m.from ?? "")?.priceUsd)) || 0), 0);
+  // P4 (the audit's way-home audit, D140): a way home out of Private in flight is in neither count: counted at its price until it ends
+  const homes = homing(activity);
+  const addsUsd = (onWayOf ? onWayOf(adds) : 0) + swapping.reduce((t, m) => t + (Number(usdOf(m.amount, tokens.get(m.from ?? "")?.priceUsd)) || 0), 0) + homingUsd(homes, (id) => tokens.get(id)?.priceUsd);
   const counted = web ? (webBig ? webBig.usd : read && rows?.some((r) => r.unpriced) ? null : lastTotal) : read ? balanceTotal(balances!, chains, earning, pocket, trading) : lastTotal;
   const total = counted && addsUsd > 0 ? plusUsd(counted, addsUsd.toFixed(2)) : counted;
   const shown = read && (web || complete || !grace);
@@ -483,6 +489,18 @@ export function Home(a: HomeActions) {
         </>
       );
       return m.held ? <button className="wl-row wl-pick wl-rise" key={m.id} onClick={() => a.onHeld(m.held!)}>{inside}</button> : <div className="wl-row wl-rise" key={m.id}>{inside}</div>;
+    }),
+    // P4: each coin of a way home its own On its way row, unless its job's card already stands for it (live-steps homeTracks)
+    ...homes.filter((m) => !covered.has(carried(`send:${m.id}`)?.job ?? "")).map((m) => {
+      const token = tokens.get(m.to ?? "");
+      const usd = token ? usdOf(m.amount, token.priceUsd) : undefined;
+      return (
+        <div className="wl-row wl-rise" key={m.id} role="status" data-testid="home-homing">
+          <span className="zf-tick off" aria-hidden="true" />
+          <div><div className="t">On its way</div><div className="d">{HOME_WORDS.homing}</div></div>
+          <div className="r"><div className="v">{usd ? $(usd) : hide ? HIDDEN_AMOUNT : `${m.amount} ${token?.symbol ?? ""}`}</div></div>
+        </div>
+      );
     }),
     ...swapping.map((m) => {
       const token = tokens.get(m.from ?? "");

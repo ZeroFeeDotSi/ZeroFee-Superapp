@@ -195,7 +195,8 @@ export function createSafeSend(x: SafeSendDeps) {
     const named = x.label(p.label);
     const why = named ?? `Send ${max ? fromUnits(pocketPart + rest, coin.decimals) : amount} ${symbol} to ${x.payeeText(to)}`;
     const out: Movement[] = [];
-    if (pocketPart > 0n) out.push(await payFromPocket(pocket, pocketCoin, pocketPart, coin, to, toTokenId, why, named, caller, route.ownWallet === true));
+    // M9 (the audit's audit): Private pays the whole Send (no Safe part follows): its signature is the last, so it carries the Send's key
+    if (pocketPart > 0n) out.push(await payFromPocket(pocket, pocketCoin, pocketPart, coin, to, toTokenId, why, named, caller, route.ownWallet === true, undefined, !plan && route.ownWallet !== true ? jobKey : undefined));
     if (plan) {
       // the Move's fill (QA, 5 Nov): its one Safe sheet says Private's leg and the Safe's to this wallet, and
       // their sum, from the core's own figures (the bytes; its record of the pocket's share above): a marker, no figures
@@ -227,7 +228,7 @@ export function createSafeSend(x: SafeSendDeps) {
   }
 
   /** The pocket's own share, straight out: EXACT_INPUT of exactly that, the core's Send sheet (no pot cap), submitted. */
-  async function payFromPocket(pocket: { id: string; address: string }, pocketCoin: string, units: bigint, coin: Coin, to: Payee, toTokenId: string, why: string, named: string | undefined, caller: Caller, ownWallet = false, moveJob?: string): Promise<Movement> {
+  async function payFromPocket(pocket: { id: string; address: string }, pocketCoin: string, units: bigint, coin: Coin, to: Payee, toTokenId: string, why: string, named: string | undefined, caller: Caller, ownWallet = false, moveJob?: string, sendJob?: string): Promise<Movement> {
     const req = x.privatePayRequest({ fromTokenId: pocketCoin, toTokenId, to, inUnits: units, pocket: pocket.address, dry: false });
     const real = await x.askPrivate(req);
     const depositAddress = real.quote.depositAddress;
@@ -236,7 +237,7 @@ export function createSafeSend(x: SafeSendDeps) {
     // (c) NEAR (wrapped) as before
     if (!ownWallet && pocketCoin === toTokenId && toTokenId !== LANDS_AS.near.tokenId && BigInt(real.quote.amountOut) !== units) throw new ProblemError(walletProblems.sameCoinShort(coin.symbol));
     const intent = await generate(pocket.address, depositAddress);
-    const signed = await x.core<{ signedData?: unknown; declined?: true }>("subwallet.privatePay", { id: pocket.id, depositAddress, intent: { payload: intent.payload }, why, ...(real.zerofeeStatusTag ? { statusTag: real.zerofeeStatusTag } : {}), send: true, payee: payeeAsk(req), ...(moveJob ? { job: moveJob } : {}) });
+    const signed = await x.core<{ signedData?: unknown; declined?: true }>("subwallet.privatePay", { id: pocket.id, depositAddress, intent: { payload: intent.payload }, why, ...(real.zerofeeStatusTag ? { statusTag: real.zerofeeStatusTag } : {}), send: true, payee: payeeAsk(req), ...(moveJob ? { job: moveJob } : {}), ...(sendJob ? { sendJob } : {}) });
     if (signed.declined || !signed.signedData) throw new ProblemError(walletProblems.declined());
     const at = iso();
     const movement: Movement = {

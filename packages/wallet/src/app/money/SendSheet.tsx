@@ -42,7 +42,7 @@ import { buzz } from "./hold.ts";
 import { SEND_PROOF_OFF, homeProof } from "./home-proof.ts";
 import { SHEET_NEEDS, sheetLineOf, useServices } from "../services.ts";
 import { useWallet } from "../runtime.tsx";
-import { sendHeadline } from "./send-cap.ts";
+import { sendCash, sendHeadline } from "./send-cap.ts";
 import "@zerofee/pay/app/pay.css";
 // The guard (packages/agent's judge, unitGuard, obfuscated) loads as the sheet opens, never in Home's first load; Hold
 // stays off until it is here, so no send can go before the guard (QA 3 Nov).
@@ -289,7 +289,12 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
       setBusy(false);
       return void setLine("This coin has no price right now. Pick another to send from.");
     }
-    const said = `${a.exactOut ? `${a.exactOut.amount} ${a.exactOut.symbol}` : a.usd !== null ? `$${a.usd.toFixed(2)}` : `${a.amountIn} ${a.source.symbol}`} to ${payee.kind === "ledger" ? payee.accountId : shortAddress(payee.address)}`;
+    // M1 (the audit's audit): the form's own figure, never re-rounded here (it said $9.99 while this said $10.00)
+    const figure = a.figure !== undefined ? Number(a.figure).toFixed(2) : a.usd !== null ? a.usd.toFixed(2) : null;
+    // QA 16's Send Max shots (7 Nov): with its commas on every later line ("$1165.04" on the receipt and the Jobs rows)
+    const cash = figure !== null ? sendCash(figure) : null;
+    const toWho = payee.kind === "ledger" ? payee.accountId : shortAddress(payee.address);
+    const said = `${a.exactOut ? `${a.exactOut.amount} ${a.exactOut.symbol}` : cash !== null ? cash : `${a.amountIn} ${a.source.symbol}`} to ${toWho}`;
     paying.current = a.contactId ?? null;
     // the job (bug report, 5 Nov; QA's crawl: Send had no receipt): from a wallet it is made at the tap (a
     // sheet past its cap steps the receipt aside until answered); from the Safe once the core answers, after every
@@ -298,13 +303,13 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
     setAsking(fromSafe);
     if (fromSafe) sayWent("Getting it ready…", "busy");
     mark("tap");
-    const shown = a.usd !== null ? `$${a.usd.toFixed(2)}` : a.exactOut ? `${a.exactOut.amount} ${a.exactOut.symbol}` : `${a.amountIn} ${a.source.symbol}`;
+    const shown = cash !== null ? cash : a.exactOut ? `${a.exactOut.amount} ${a.exactOut.symbol}` : `${a.amountIn} ${a.source.symbol}`;
     // its own key (the audit's MUST, 7 Nov): the Safe's sheet for it says approval.asked and job.signed with this key, never another's
     const key = `home-send-${Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("")}`;
     const eta = sendSec({ row: a.source.row, toNear: payee.kind === "ledger" || a.network === "near" });
     setEtaSec(eta);
     const end = await runJob<Movement | Movement[]>({
-      key, tasks: shell.tasks, title: `Send ${said}`, ...(a.usd !== null ? { usd: `$${a.usd.toFixed(2)}` } : {}), safe: fromSafe, onAnswer: true, etaSec: eta,
+      key, tasks: shell.tasks, title: `Send ${said}`, ...(cash !== null ? { usd: cash } : {}), safe: fromSafe, onAnswer: true, etaSec: eta,
       // the Getting-ready sheet says the typed figure alone; the bound one only adds "from your Safe" (copy review, 6 Nov)
       ...(fromSafe ? { headline: sendHeadline(shown) } : {}),
       // QA's MUST (Sim test): a wallet's Send to someone else asks every time (QA's ruling), on
@@ -315,7 +320,7 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
         ? shell.bridge.call<Movement>("ledger.hiddenFromRow", { chain: a.source.row, ...(a.source.coin ? { coin: a.source.coin } : {}), to: payee, toTokenId, ...amount, ...upTo, ...(a.note ? { label: a.note } : {}) })
         : shell.bridge.call<Movement[]>("ledger.sendFromSafe", { tokenId: a.source.tokenId, to: payee, toTokenId, ...amount, ...upTo, ...(a.source.privateOnly ? {} : { fill: true }), ...(a.note ? { label: a.note } : {}), job: key })).catch(() => ({ problem: payProblems.quoteFailed() })),
       declined: (r) => "problem" in r && /declined$/.test(r.problem.code),
-      made: (j) => { sayWent(""); setAsking(false); setBusy(false); buzz(shell.bridge, "success"); setSentSaid(sendWords(said)); setFlying(shown); setFlyingJob(j.id); },
+      made: (j) => { sayWent(""); setAsking(false); setBusy(false); buzz(shell.bridge, "success"); setSentSaid(sendWords(toWho)); setFlying(shown); setFlyingJob(j.id); },
       asking: setAsking,
     });
     setBusy(false);
@@ -379,7 +384,7 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
       onClose(true);
       return shell.showWaiting(held.held);
     }
-    const done = () => went(`${said}: on its way. Activity shows it.`, moved[0]?.id, a.usd !== null ? a.usd.toFixed(2) : undefined, moved[0]?.amount, false);
+    const done = () => went(`${said}: on its way. Activity shows it.`, moved[0]?.id, figure ?? undefined, moved[0]?.amount, false);
     // Done already tapped (a wallet's job, made at the tap): the sheet is gone, the contact is marked paid now
     if (sent.current === "closed") {
       sent.current = null;

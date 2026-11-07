@@ -70,7 +70,7 @@ test("rule 8: Send's first payment names who, the wallet it comes from, and the 
 
 test("S2 (the build's trace): a refused swap clears \"Job created.\" and says the refusal; train 10's runJob decides the row (control: a No on the sheet makes nothing)", async () => {
   const sheet = src("./SwapSheet.tsx");
-  assert.match(sheet, /made: \(j\) => \{ sayWent\(""\); setMadeJob\(j\.id\); setMadeSaid\(\{ going: swappingLine\(said, SWAP_COIN\[pay\.place\]\.label, SWAP_COIN\[get\]\.label\), landed: swappedLine\(said, lands, SWAP_COIN\[get\]\.where\) \}\); setMade\(said\); setBusy\(false\); \},/);
+  assert.match(sheet, /made: \(j\) => \{ sayWent\(""\); setMadeJob\(j\.id\); setMadeSaid\(\{ going: swappingLine\(SWAP_COIN\[pay\.place\]\.label, SWAP_COIN\[get\]\.label\), landed: swappedLine\(lands, SWAP_COIN\[get\]\.where\) \}\); setMade\(said\); setBusy\(false\); \},/);
   assert.match(sheet, /if \("refused" in end\) \{ mark\("refused"\); setMade\(null\); return void \(sendEndsHere\(end\.refused\) \? endHere\(shell, end\.refused, onClose\) : saidOnSheet\(end\.refused\) \? setStopped\(end\.refused\) : problem\(swapRefusal\(end\.refused\), onUsd\)\); \}/);
   assert.match(sheet, /if \("problem" in end\) \{ mark\("refused"\); setMade\(null\); return void \(sendEndsHere\(end\.problem\) \? endHere\(shell, end\.problem, onClose\) : saidOnSheet\(end\.problem\) \? setStopped\(end\.problem\) : problem\(swapRefusal\(end\.problem\), onUsd\)\); \}/, "refused after the job existed: the row says why (runJob), and the sheet too");
   assert.match(sheet, /if \("declined" in end\) return setMade\(null\);/, "control: a No makes nothing");

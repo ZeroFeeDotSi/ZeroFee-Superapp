@@ -156,7 +156,11 @@
 .wl-mv-outside .wl-mv-outside__usd { font: 500 17px/22px var(--font); font-variant-numeric: tabular-nums; color: var(--ink); text-align: right; }
 .wl-mv-outside { padding-bottom: 12px; }
 /* finding 17: the figure is a field that reads as the figure, with a hairline under it that says it can be typed */
-.wl-mv-row .wl-mv-type { width: 9ch; padding: 0 0 1px; border: 0; border-bottom: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent); border-radius: 0; background: transparent; text-align: right; -webkit-appearance: none; appearance: none; }
+/* the audit's way-home audit P7 (7 Nov): the typed figure was a 24 px tap (17/22 text, 1 px padding). Its tap is 44 px now, grown
+   upward only (20 px of padding over the text, the same 20 px given back in margin) so the figure and its hairline stay
+   where they were; a row with a field is 44 px tall, so that room is the row's own, never the row above's */
+.wl-mv-row__h:has(.wl-mv-type) { min-height: 44px; }
+.wl-mv-row .wl-mv-type { box-sizing: border-box; min-height: 44px; margin-top: -20px; width: 9ch; padding: 20px 0 1px; border: 0; border-bottom: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent); border-radius: 0; background: transparent; text-align: right; -webkit-appearance: none; appearance: none; }
 .wl-mv-row .wl-mv-type:focus { outline: none; box-shadow: none; border-bottom: 1px solid var(--ink); }  /* a-nav-5: the global inset ring is off here; the line under the figure is the cue */
 .wl-mv-row .wl-mv-type:disabled { border-bottom-color: transparent; color: var(--ink); opacity: 1; }
 .wl-mv-rows .wl-mv-range { height: 40px; }
@@ -221,6 +225,8 @@
 .wl-swap2__scroll .wl-swap-chips { margin: 0; }
 .wl-swap2__sub { min-height: 18px; text-align: center; color: var(--mute); }
 .wl-swap2__sub > p { margin: 0; font: 400 13px/18px var(--font); }
+/* the audit's M5: a price past its life with nothing newer is greyed until the next one comes (the tap asks again first) */
+.wl-swap2 .wl-swap2--stale { opacity: 0.5; }
 .wl-swap2__scroll > .zf-keypad { flex: 0 1 224px; min-height: 120px; margin: 0; grid-auto-rows: minmax(0, 1fr); overflow: clip; overflow-clip-margin: 12px; }   /* 4 rows: never under 30 pt; a key's press disc shows, but never counts as the box's scroll */
 .wl-swap2__scroll > .zf-keypad button { height: auto; min-height: 0; }
 .wl-swap2__floor { position: relative; flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 0 24px; background: var(--bg); }

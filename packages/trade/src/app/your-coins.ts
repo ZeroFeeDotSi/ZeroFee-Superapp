@@ -40,6 +40,10 @@ export function coinRowWords(p: Position): { value: string; since: string } {
   return { value: usd(p.valueUsd), since: result(p.valueUsd, p.costUsd) };
 }
 
+/** the audit's T6: a holding at its one figure, what selling it now gets (held-net.ts): `net` undefined while asked or when no
+ *  sale can be quoted, so no figure is shown, never coins x market price. */
+export const atSale = (p: Position, net: number | undefined): Position => ({ ...p, valueUsd: net });
+
 /** T-5 landing 2: the chain's total over its priced coins, and their result since bought where Trade has the buys:
  *  "Solana coins $96.40 · +$9.80 since you bought". Null when nothing held has a price. */
 export function chainTotalLine(chainName: string, held: Position[]): string | null {
@@ -60,12 +64,13 @@ export function chainTotalLine(chainName: string, held: Position[]): string | nu
  *  the price can't be read or is zero. `traded`: Trade's market buys this chain's coins. Where it doesn't (NEAR: bought in Home's
  *  swap, which keeps no cost here), no record says nothing about when it was bought, so no line (real-tap proof, 6 Nov, G05:
  *  "Bought before ZeroFee kept a record" on a coin bought seconds before). */
-export function coinPageSince(position: Position | null | undefined, px: number | undefined, traded = true): { label: string; text: string } | { note: string } | null {
-  if (position === undefined || !(typeof px === "number" && px > 0 && Number.isFinite(px))) return null;
+/** `value` (the audit's T6): the holding's sale figure "if sold now" (held-net.ts), used in place of coins x price when given. */
+export function coinPageSince(position: Position | null | undefined, px: number | undefined, traded = true, value?: number): { label: string; text: string } | { note: string } | null {
+  if (position === undefined || (value === undefined && !(typeof px === "number" && px > 0 && Number.isFinite(px)))) return null;
   if (position === null) return traded ? { note: NO_RECORD } : null;
   if (!/^\d+$/.test(position.raw) || !Number.isInteger(position.decimals)) return null;
-  const value = (Number(BigInt(position.raw)) / 10 ** position.decimals) * px;
-  if (!priced(value)) return null;
+  const v = value ?? (Number(BigInt(position.raw)) / 10 ** position.decimals) * px!;
+  if (!priced(v)) return null;
   if (!recorded(position.costUsd)) return traded ? { note: NO_RECORD } : null;
-  return { label: "Since you bought", text: result(value, position.costUsd) };
+  return { label: "Since you bought", text: result(v, position.costUsd) };
 }

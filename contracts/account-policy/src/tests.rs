@@ -306,7 +306,7 @@ fn moves_reads_the_standard_methods_and_refuses_to_guess() {
     // Release 8 (RS-2): a coin's own call counts its 30 Tgas as NEAR too, as every call does.
     assert_eq!(moves("usdt.tether-token.near", &ft), Some(vec![("near".into(), 1 + 30_000_000_000_000 * 1_000_000_000), ("nep141:usdt.tether-token.near".into(), 7)]));
     let other = intents("deposit_and_stake", "{}");
-    // An allowlisted method may be any contract's, so its 30 Tgas count as NEAR too (the contract review, FB-1).
+    // An allowlisted method may be any contract's, so its 30 Tgas count as NEAR too (the Fable review, FB-1).
     assert_eq!(moves("pool.near", &other), Some(vec![("near".into(), 1 + 30_000_000_000_000 * 1_000_000_000)]));
     assert_eq!(moves("intents.near", &intents("mt_transfer", r#"{"token_id":"x","amount":"1.5"}"#)), None, "an amount that isn't a whole number can't be measured");
     assert_eq!(moves("token.near", &intents("ft_withdraw", "{}")), None);

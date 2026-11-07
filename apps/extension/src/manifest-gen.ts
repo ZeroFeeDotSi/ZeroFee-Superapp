@@ -18,9 +18,8 @@ const read = (p: string) => readFileSync(join(REPO, p), "utf8");
 /** The trading panel's coin images (src/panel, before D157): its own, kept. */
 export const PANEL_IMG_HOSTS = ["https://coin-images.coingecko.com", "https://assets.geckoterminal.com"] as const;
 
-/** The relay's https URL (ZEROFEE_RELAY_URL in the build's environment when set, else apps/ios/relay-url.txt), or ""
- *  when unset. Anything else is refused. */
-export function relayUrl(text = process.env.ZEROFEE_RELAY_URL ?? read("apps/ios/relay-url.txt")): string {
+/** The relay's https URL (apps/ios/relay-url.txt), or "" when unset. Anything else is refused. */
+export function relayUrl(text = read("apps/ios/relay-url.txt")): string {
   const r = text.replace(/\s+/g, "");
   if (r !== "" && !/^https:\/\/[a-z0-9.-]+(\/.*)?$/i.test(r)) throw new Error("apps/ios/relay-url.txt must be empty or an https:// URL");
   return r;

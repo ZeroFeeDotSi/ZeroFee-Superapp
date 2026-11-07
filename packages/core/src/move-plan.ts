@@ -2,7 +2,7 @@
 // sheet in the copy review's layout. Its own module, off Home's first load (the speed budget, 7 Nov): the core's plan (subwallets),
 // the sheet's words (dev-signer hands moveFillBlock to intents.ts legsBlock) and the Sim load it when a Move does.
 import { FILL_WORDS, LEG_WORDS, PRIVATE_BUFFER_USD, feeRow, fillStepUsd, privateRows, quoted, type MoveLeg, type OtherPart } from "./private-route.ts";
-import { COSTS_MORE_HEAD, planLeastUsd, walletChainOf, walletLegLeastUsd } from "./float-floors.ts";
+import { COSTS_MORE, planLeastUsd, walletChainOf, walletLegLeastUsd } from "./float-floors.ts";
 
 /**
  * The Move's one fill sheet in the copy review's layout (7 Nov), with the audit's SHOULD 4 (the rows add up): the headline is the person's
@@ -21,9 +21,9 @@ export const MOVE_WORDS = {
   one: (total: string, from: "your Safe" | "Private") => `${total} from ${from}.`,
   /** a wallet's row from its legs' signed quotes (the audit's ruling (c), 8 Nov; provisional words, to 53) */
   signed: (got: string, least: string) => `${quoted(got)}, at least ${least}`,
-  /** a part with no signed quote yet in it: its least the plan's own floor, so "about" (the audit's SHOULD; provisional, to 53) */
-  planned: (got: string, least: string) => `${quoted(got)}, at least ${quoted(least)}`,
-  costsMore: COSTS_MORE_HEAD,
+  /** a part with no signed quote yet in it: its least the plan's own floor (the audit's SHOULD). One "about" per line (QA 20, 8 Nov:
+   *  "about $49.17, at least about $47.99" said it twice): the line's first word already marks every figure on it */
+  planned: (got: string, least: string) => `${quoted(got)}, at least ${least}`,
 } as const;
 /** "your SOL wallet" / "your SOL and ETH (RH) wallets" / "your SOL, ETH (RH) and NEAR wallets". */
 export function walletsWords(names: readonly string[]): string {
@@ -123,8 +123,14 @@ export function moveSheet(
   // each quote's least is rounded down on its own and the plan's once on the sum: a cent a quote of slack, never more
   const slack = BigInt(parts.reduce((n, p) => n + (p.priv > 0n ? 1 : 0) + (p.pay > 0n ? 1 : 0), 0));
   const costsMore = !!plan && o.swap !== true && (feeAll > plan.mostFee + slack || leastSum + slack < plan.least);
+  // the audit's M8 (7 Nov): by name, its figure against the plan's, where the money still is, the next tap; fees first
+  const head = !plan || !costsMore ? [] : [
+    feeAll > plan.mostFee + slack ? COSTS_MORE.lead("fee", say(feeAll), say(plan.mostFee)) : COSTS_MORE.lead("least", say(leastSum), say(plan.least)),
+    COSTS_MORE.still([...(safe > 0n ? ["your Safe"] : []), ...(fromPrivate > 0n ? ["Private"] : []), ...[...from.keys()].sort(byPlan)]),
+    COSTS_MORE.next,
+  ];
   // a wallet's part from another wallet has no signed quote yet (the audit's SHOULD, 8 Nov): its least is the plan's own floor
-  // (walletLegLeastUsd, as the Move page works it), marked as the plan's: "at least about $Y"; on a dollar sheet only
+  // (walletLegLeastUsd, as the Move page works it), the line's one "about" covers it (QA 20); on a dollar sheet only
   const chained = (name: string) => { const c = walletChainOf(name); return c !== null && c !== "near"; };
   const planLeast = (x: MoveSheetOther) => BigInt(Math.floor(walletLegLeastUsd(Number(x.v) / 100, chained(x.from), chained(x.to)) * 100 + 1e-6));
   const getsRow = (w: string): string => {
@@ -139,7 +145,7 @@ export function moveSheet(
     return `${FILL_WORDS.gets(w)} · ${g.about ? quoted(say(g.v)) : say(g.v)}`;
   };
   const lines = [
-    ...(costsMore ? [MOVE_WORDS.costsMore] : []),
+    ...head,
     ...(o.swapOut && wallets.length === 1 && !others.length ? [`You get · ${o.swapOut.words}`] : wallets.map(getsRow)),
     `${LEG_WORDS.safe} · ${say(safe)}`,
     ...[...from.keys()].sort(byPlan).map((w) => `From ${w} · ${quoted(say(from.get(w)!))}`),

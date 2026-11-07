@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { REST_STAYS, heldWords, overLine, perOf, readyUsd, restStays } from "./send-cap.ts";
+import { heldWords, overLine, perOf, readyUsd, restStays, restStaysLine } from "./send-cap.ts";
 import { shortLine, shortOf, shortUsdOf } from "./send-said.ts";
 import { walletProblems } from "../../wallet-problems.ts";
 
@@ -26,11 +26,11 @@ test("S3: From says the one figure that can go now, the same one 'at most' says;
   assert.equal(heldWords(safe), "NEAR · $8.85 ready", "changed pin (the copy review's B+, 8 Nov): two short lines, the row names its coin and what can go now");
   assert.equal(overLine("your Safe", `$${ready!.toFixed(2)}`), "You can send at most $8.85 from your Safe.", "one figure on both lines");
   assert.equal(restStays(safe), true);
-  assert.equal(REST_STAYS, "The rest stays in your Safe for now.");
+  assert.equal(restStaysLine(safe), "Your Safe keeps the rest · about $1,383.93", "changed pin (QA 20, 8 Nov): the rest line names its figure (312.4 NEAR at the row's price)");
   assert.equal(restStays({ ...safe, max: "314.4" }), false, "control: all of it can go");
   assert.equal(heldWords({ row: "sol", symbol: "SOL", amount: "1.42", usd: "201", max: "1.419" }), "1.42 SOL · $201.00", "control: a wallet as before");
   assert.equal(heldWords({ row: null, symbol: "USDC", amount: "30", usd: "30", max: "12.5" }), "USDC · $12.50 ready", "a dollar coin at $1");
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
   assert.match(form, /const most = readyNow !== null \? dollarsOf\(readyNow\)/, "'at most' reads the same function");
-  assert.equal((form.match(/\{REST_STAYS\}/g) ?? []).length, 1, "said once, never per row");
+  assert.equal((form.match(/restStaysLine\(/g) ?? []).length, 1, "said once, never per row");
 });

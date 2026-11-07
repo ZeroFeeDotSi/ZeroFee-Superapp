@@ -19,7 +19,7 @@ import { swapDetail } from "../swap-detail.ts";
 import { Bang, SmallCheck } from "../icons.tsx";
 import type { Movement } from "../../types.ts";
 import { useWallet } from "../runtime.tsx";
-import { activityRows, homeRowOf, byEnd, carriedJob, endedNow, endsOf, goingOf, jobFacts, jobRowLine, joinTracks, movementEnded, rowEnded, whenOf, nameOf, onScreen, rowEndIso, rowFace, sendJobOf, sendRowOf, stoppedWays, usdOf, type JobRow } from "../activity-rows.ts";
+import { activityRows, homeRowOf, byEnd, carriedJob, endedNow, endsOf, figureOnce, goingOf, jobFacts, jobRowLine, joinTracks, movementEnded, rowEnded, whenOf, nameOf, onScreen, rowEndIso, rowFace, sendJobOf, sendRowOf, stoppedWays, usdOf, type JobRow } from "../activity-rows.ts";
 import { inplaceDetail, inplaceJobDetail, inplaceRowOf, inplaceRows, isInplaceRow, type FloatSwapMove, type InplaceRow } from "../money/inplace-activity.ts";
 import { isHomeSwapRow, watchSwapEnds } from "../money/swap-ended.ts";
 import { SWAP_AGAIN } from "../../near-swap-words.ts";
@@ -227,7 +227,7 @@ export function Activity({ onProblem, onHeld, onStatement, statementFailed, over
             const inside = (
               <>
                 <span className={`zf-tick${face.mark === "bad" ? " wl-tick-alert" : face.mark === "on" ? " on" : " off"}`} aria-hidden="true">{face.mark === "bad" ? <Bang /> : face.mark === "on" ? <SmallCheck /> : null}</span>
-                <div><div className="t">{nameOf(s)}</div><div className="d">{face.line}</div></div>
+                <div><div className="t">{figureOnce(nameOf(s), usd)}</div><div className="d">{face.line}</div></div>
                 <div className="r">{usd && <div className="v">{usd}</div>}<div className="vd">{whenOf(rowEndIso(s, ends), rowEnded(s), now)}</div></div>
               </>
             );
@@ -250,7 +250,7 @@ export function Activity({ onProblem, onHeld, onStatement, statementFailed, over
               <span className={`zf-tick${m.status === "moving" || m.status === "waiting" ? " off" : m.problem || m.status === "problem" ? " wl-tick-alert" : " on"}`} aria-hidden="true">
                 {m.status === "done" || m.status === "refunded" ? <SmallCheck /> : m.problem || m.status === "problem" ? <Bang /> : null}
               </span>
-              <div><div className="t">{title}</div><div className="d">{send?.line ?? detail}</div></div>
+              <div><div className="t">{figureOnce(title, usd)}</div><div className="d">{send?.line ?? detail}</div></div>
               <div className="r">{usd && <div className="v">{usd}</div>}<div className="vd">{whenOf(m.updatedAtIso, movementEnded(m), now)}</div></div>
             </>
           );

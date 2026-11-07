@@ -10,6 +10,7 @@ import { whereWords } from "./boards.ts";
 import { WALLET_NAME } from "@zerofee/core/spending";
 import { amount, tookWords, usd } from "./format.ts";
 import { tradeUsd } from "../trade-usd.ts";
+import { coinsAbout, dollarsAbout } from "./fill-words.ts";
 import { liveCheckable } from "../live-check.ts";
 import { uncheckedLine } from "../trade-problems.ts";
 
@@ -21,11 +22,17 @@ export type Badge = "Done" | "Running" | "Waiting" | "Didn't go" | "Check";
  *  the dollars on the right, and a status only while it isn't done ("Sending…", "Didn't go through", "Waiting"). */
 export interface Card { id: string; title: string; result: string; badge: Badge; at: number; steps: Step[]; held?: MoveRow["held"];
   coin?: { chain: TradeRecord["chain"]; address: string; symbol: string }; usd?: number; units?: string; status?: string;
+  /** A sale's dollars are its quote's until the chain's figure books (the audit's T1): "About $4.86". */
+  usdAbout?: true;
   /** A move's row: the bundled logo of the wallet it moves to or from (its chain's; the NEAR wallet's for the Safe's). */
   moveIcon?: string;
   /** A trade whose coin Rhea kept (trade.near.rhea-kept, the audit's MUST, 7 Nov): what its way back needs (JobCard's KeptWay). */
   kept?: KeptFacts }
-export interface KeptFacts { id: string; wallet: string; hash: string; token: string; symbol: string; decimals: number }
+export interface KeptFacts { id: string; wallet: string; hash: string; token: string; symbol: string; decimals: number;
+  /** What left the wallet for it (the audit's T9): a buy's NEAR, a sale's coin. */
+  left?: string;
+  /** A claim of it went out and no read says how it ended (the audit's T8). */
+  sent?: true }
 
 /** The networks by name, where a line is about the chain itself ("Sent to Solana"); a wallet is WALLET_NAME's, always. */
 const CHAIN: Record<string, string> = { sol: "Solana", hood: "Robinhood Chain", bsc: "BNB Chain", near: "NEAR" };
@@ -48,7 +55,10 @@ export interface KeptView { head: string; body?: string; claim?: { label: string
  */
 export function keptWay(k: KeptFacts, held: string | null | undefined): KeptView {
   if (held === undefined) return { head: "Checking with Rhea…" };
-  if (held === null) return { head: "ZeroFee couldn't reach Rhea, so it stopped.", body: "Nothing moved. Open this again to check." };
+  // the audit's T9: the trade moved (its NEAR left; Ref kept the coin), so never "Nothing moved."
+  if (held === null) return { head: "Rhea's servers didn't answer.", body: `${k.left ? `Your ${k.left} left. ` : ""}Ref kept the ${k.symbol}. Open this again to check.` };
+  // the audit's T8: a claim went out and the lost and found reads empty: it most likely came back; never Rhea's team
+  if (k.sent && BigInt(held) === 0n) return { head: `Your ${k.symbol} claim was sent.`, body: "Rhea sent it back or still holds it. Check your NEAR wallet." };
   if (BigInt(held) > 0n) return { head: `Your ${k.symbol} is still with Rhea.`, body: `About ${amount(held, k.decimals)} ${k.symbol}. Nothing is lost.`, claim: { label: "Get it back", running: "Getting it back…" } };
   return {
     head: `Your ${k.symbol} didn't reach your NEAR wallet.`, body: "It's most likely with Rhea's team. Ask them to send it back.",
@@ -58,6 +68,22 @@ export function keptWay(k: KeptFacts, held: string | null | undefined): KeptView
 /** the copy review's receipt for a claim (7 Nov): while it runs, then done. */
 export const keptRunning = (symbol: string, sec: number): string => `Job created. Rhea is sending your ${symbol} back. About ${sec} seconds left.`;
 export const keptDone = (k: KeptFacts, got: string, ms: number): [string, string] => [`Done in ${Math.max(1, Math.round(ms / 1000))} seconds.`, `${amount(got, k.decimals)} ${k.symbol} · in your NEAR wallet`];
+/** the audit's T8: the claim's Jobs row, made at the tap. */
+export const keptTaskTitle = (symbol: string): string => `Get your ${symbol} back`;
+/** the audit's T8 (8 Nov): how a claim ended, in words, for the card (`line`, under its button) and its Jobs row (`task`,
+ *  `detail`). A claim that failed was silent (the button came back): now each end says what happened, where the coin is
+ *  and the next tap. `end`: the service's answer; `problem`: its refusal; neither: nothing was sent (no read before). */
+export function claimEnd(k: Pick<KeptFacts, "symbol" | "decimals">, end: { got: string } | { sent: true } | { declined: true } | undefined, problem?: { code: string; whatHappened: string }): { line?: string; task: "done" | "stopped" | "failed"; detail: string } {
+  const still = `Your ${k.symbol} is still with Rhea.`, again = "Tap Get it back to try again.";
+  if (problem) {
+    const who = problem.code.startsWith("security.") ? "ZeroFee didn't approve getting it back." : problem.code === "trade.near.claim-refused" ? problem.whatHappened : "Rhea said no to getting it back.";
+    return { line: `${who} ${still} ${again}`, task: "failed", detail: `${who} ${still}` };
+  }
+  if (!end) return { line: `Rhea's servers didn't answer, so nothing was sent. ${still} ${again}`, task: "failed", detail: `Rhea's servers didn't answer, so nothing was sent. ${still}` };
+  if ("declined" in end) return { line: `You said no. ${still}`, task: "stopped", detail: "You said no. Nothing moved." };
+  if ("sent" in end) return { task: "stopped", detail: "Rhea sent it back or still holds it. Check Activity for where this is." };
+  return { task: "done", detail: `${amount(end.got, k.decimals)} ${k.symbol} · in your NEAR wallet` };
+}
 /** A claim's usual time: the send, the claim's receipts and another node's FINAL (about 5 s on mainnet). */
 export const KEPT_CLAIM_SEC = 5;
 
@@ -94,6 +120,12 @@ export function tradeResult(r: TradeRecord, now = Date.now()): string {
   return parts.join(" · ");
 }
 
+/** A kept trade's facts for its card: what Ref kept (a sale's is NEAR), what left the wallet (the audit's T9), a claim sent. */
+function keptFacts(r: TradeRecord, kept: NonNullable<TradeRecord["kept"]>): KeptFacts {
+  const { claimSent, ...facts } = kept, wnear = kept.token === "wrap.near";
+  return { id: r.id, ...facts, symbol: wnear ? "NEAR" : r.symbol, decimals: wnear ? 24 : r.quote?.decimals ?? 0, left: r.kind === "sell" ? r.symbol : "NEAR", ...(claimSent ? { sent: true as const } : {}) };
+}
+
 /** A buy or sell: signed, sent to the network, landed. */
 export function tradeCard(r: TradeRecord, now = Date.now()): Card {
   const stopped = r.status === "declined" || r.status === "failed" || r.status === "expired";
@@ -114,7 +146,9 @@ export function tradeCard(r: TradeRecord, now = Date.now()): Card {
   const badge: Badge = r.status === "done" ? (unchecked(r) ? "Check" : "Done") : stopped ? "Didn't go" : "Running";
   // the coins that moved, in their own units: a buy's coins got (or quoted), a sale's coins sent
   const q = r.quote, raw = r.kind === "buy" ? r.fill?.got ?? q?.getRaw : r.kind === "sell" ? r.fill?.spent ?? q?.payRaw : undefined;
-  const units = raw && q && (r.kind === "buy" || r.kind === "sell") ? `${amount(raw, q.decimals)} ${r.symbol}` : undefined;
+  // the audit's T1: a buy's coins are "About" the quote's until the chain's read books it (an estimated fill, or none yet)
+  const units = raw && q && (r.kind === "buy" || r.kind === "sell") ? `${r.kind === "buy" && coinsAbout(r) ? "About " : ""}${amount(raw, q.decimals)} ${r.symbol}` : undefined;
+  const usdAbout = !stopped && dollarsAbout(r);
   // the copy review's row words (7 Nov): "Not confirmed yet" while no read places it; "Buy stopped" once it provably never landed
   const status = r.status === "unconfirmed" ? "Not confirmed yet" : r.status === "expired" ? `${r.kind === "sell" ? "Sell" : "Buy"} stopped` : STATUS[badge];
   // the trade's own dollars, as its receipt and its task say them (webd-money2 crawl, 4 Nov: "Bought $0.78" beside a $0.50
@@ -122,8 +156,8 @@ export function tradeCard(r: TradeRecord, now = Date.now()): Card {
   const own = tradeUsd(r);
   return { id: r.id, title: tradeTitle(r), result: tradeResult(r, now), badge, at: r.endedAt ?? r.startedAt, steps, usd: own,
     ...(r.coin && (r.kind === "buy" || r.kind === "sell") ? { coin: { chain: r.chain, address: r.coin, symbol: r.symbol } } : {}),
-    ...(units ? { units } : {}), ...(status ? { status } : {}),
-    ...(keptCard(r) && r.kept ? { kept: { id: r.id, ...r.kept, symbol: r.kept.token === "wrap.near" ? "NEAR" : r.symbol, decimals: r.kept.token === "wrap.near" ? 24 : q?.decimals ?? 0 } } : {}) };
+    ...(units ? { units } : {}), ...(usdAbout ? { usdAbout: true as const } : {}), ...(status ? { status } : {}),
+    ...(keptCard(r) && r.kept ? { kept: keptFacts(r, r.kept) } : {}) };
 }
 
 // ---- the one balance's moves ----

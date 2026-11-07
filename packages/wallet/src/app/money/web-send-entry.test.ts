@@ -346,8 +346,8 @@ test("W4 switch: on by default since the relay's deploy (launch A7); VITE_WEB_SE
 test("launch A7: the real quotes' sheet before the password: $5 says they get about $4.75, fees about $0.25 and the high-fee warning; $50 and $500 say theirs with no warning", async () => {
   const cases: [string, string, string, string, string, string | null][] = [
     ["5", "4.998665", "4.746213", "4.75", "0.25", "5.1% goes to fees. On a bigger send, fees are a smaller part."],
-    ["50", "49.98665", "49.734201", "49.73", "0.25", null],
-    ["500", "499.8665", "499.614051", "499.61", "0.25", null],
+    ["50", "49.98665", "49.734201", "49.73", "0.26", null], // changed pin (the audit's M7): $49.99 = $49.73 + $0.26, the rows close
+    ["500", "499.8665", "499.614051", "499.61", "0.26", null], // changed pin (the audit's M7): $499.87 = $499.61 + $0.26
   ];
   for (const [amount, inUsd, outUsd, get, fees, warn] of cases) {
     const e = await webEntry({ usd: { in: inUsd, out: outUsd }, tokens: 10n ** 9n, answer: "no" });

@@ -34,7 +34,7 @@ test("the copy review's MUST 1: Getting ready shows the labels with Checking, th
   assert.match(view, /const canApprove = !pending && armed/, "Approve present and off");
   assert.match(css, /\.approval__kv span\.approval__checking \{ color: var\(--mute\); \}/, "Checking in --mute, past the value column's --ink");
   assert.ok(css.indexOf(".approval__kv span.approval__checking") > css.lastIndexOf(".approval__kv span:last-child {"), "after it, so it wins");
-  assert.match(view, /\{words\.lines\.map\(/, "control: the bound sheet draws the core's lines");
+  assert.match(view, /\{words\.lines\.slice\(costsMoreHead\(words\.lines\)\)\.map\(/, "control: the bound sheet draws the core's lines");
 });
 
 const USDC_C = "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", SOL_C = "sol.omft.near", USDC = `nep141:${USDC_C}`, SOL = `nep141:${SOL_C}`;
@@ -55,7 +55,7 @@ test("53: Send's typed headline only gains its source when bound, the same figur
   assert.deepEqual(titles, [`${sendHeadline("$25.00")} to bob.near`], "the Sim's bound sheet (J2-2: a short name in the title)");
   const sheet = read("./SendSheet.tsx");
   assert.match(sheet, /\.\.\.\(fromSafe \? \{ headline: sendHeadline\(shown\) \} : \{\}\),/, "the Safe's Send passes it as Getting ready's headline");
-  assert.match(sheet, /const shown = a\.usd !== null \? `\$\$\{a\.usd\.toFixed\(2\)\}`/, "two decimals");
+  assert.match(sheet, /const shown = cash !== null \? cash :/, "two decimals (M1: the form's own figure), with its commas (QA 16)");
 });
 
 test("the copy review's MUST 2: Swap's headline always has two decimals (control: cents kept)", () => {

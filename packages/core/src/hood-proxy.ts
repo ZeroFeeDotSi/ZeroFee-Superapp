@@ -11,6 +11,7 @@
 import { RH_RPC_METHODS } from "../../../apps/quotes/rh-methods.mjs";
 import { httpsOrigin } from "./https-url.ts";
 import { HOOD_DOOR } from "./hood-door.ts";
+import { isOwnServer, ownSaid, ownServer } from "./own-servers.ts";
 
 export const HOOD_PROXY: { url: string | null; restUntil: number } = { url: null, restUntil: 0 };
 /** Not deployed (404) or refusing this page (403): left alone this long; resting or without its key (503): a minute. */
@@ -22,14 +23,31 @@ const METHODS = new Set<string>(RH_RPC_METHODS);
 export function setHoodProxy(url: string | null): void {
   HOOD_PROXY.url = url && httpsOrigin(url) ? url.replace(/\/+$/, "") : null;
   HOOD_PROXY.restUntil = 0;
-  HOOD_DOOR.order = HOOD_PROXY.url ? hoodNodes : null;
-  HOOD_DOOR.fetch = HOOD_PROXY.url ? doorFetch : null;
-  HOOD_DOOR.said = HOOD_PROXY.url ? (url, status) => void (url === HOOD_PROXY.url && hoodProxySaid(status)) : null;
+  setHoodOrder();
 }
+
+/** The hook's order is set while there is a door to put first: ZeroFee's, or the person's own (setOwnHood). */
+function setHoodOrder(): void {
+  const any = !!HOOD_PROXY.url || !!ownServer("hood");
+  HOOD_DOOR.order = any ? hoodNodes : null;
+  HOOD_DOOR.fetch = any ? doorFetch : null;
+  HOOD_DOOR.said = any ? (url, status) => { if (url === HOOD_PROXY.url) hoodProxySaid(status); if (isOwnServer("hood", url)) ownSaid("hood", status === 200); } : null;
+}
+/** After the person's own Robinhood Chain server is set or cleared (own-servers.ts setOwnServer): the hook again. */
+export const setOwnHood = setHoodOrder;
 
 /** fetch, and for the door: its status said (hoodProxySaid), and any answer but a 200 is no answer (the node is asked). */
 const doorFetch: typeof fetch = async (input, init) => {
-  const res = await fetch(input, init);
+  const own = isOwnServer("hood", String(input));
+  let res: Response;
+  try { res = await fetch(input, init); } catch (e) { if (own) ownSaid("hood", false); throw e; }
+  if (own) {
+    // the person's own server: any answer but a 200 is no answer, and ZeroFee's door is asked next with the same call
+    ownSaid("hood", res.status === 200);
+    if (res.status === 200) return res;
+    await res.body?.cancel().catch(() => undefined);
+    throw new Error(`HTTP ${res.status}`);
+  }
   if (String(input) !== HOOD_PROXY.url) return res;
   hoodProxySaid(res.status);
   if (res.status === 200) return res;
@@ -52,5 +70,7 @@ export function hoodProxySaid(status: number, now = Date.now()): void {
  *  then `free` as given. Prepend to this list to put a node ahead of ZeroFee's. */
 export function hoodNodes(free: readonly string[], method: string, now = Date.now()): string[] {
   const door = hoodProxyFor(method, now);
-  return door ? [door, ...free.filter((u) => u !== door)] : [...free];
+  // a person's own server first (Settings → Status, own-servers.ts): every method, a send's same signed bytes too
+  const first = [ownServer("hood"), door].filter((u): u is string => !!u);
+  return [...first, ...free.filter((u) => !first.includes(u))];
 }

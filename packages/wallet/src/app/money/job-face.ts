@@ -293,3 +293,18 @@ export function stepWord(state: LiveTrack["steps"][number]["state"], face: "goin
   if (state === "doing" && face === "going") return undefined;
   return FACE_WORDS.stepNotYet;
 }
+
+/** The From and To card's words (Home's names, no "your"): "Safe", "ETH (RH) wallet". */
+export const FACE_CARD = { from: "From", to: "To" } as const;
+const CARD_NAME: Record<string, string> = { safe: "Safe", private: "Private", sol: "SOL wallet", hood: "ETH (RH) wallet", near: "NEAR wallet", bsc: "BNB wallet" };
+const cardWords = (ws: readonly string[]) => [...new Set(ws)].map((w) => CARD_NAME[w] ?? "Wallet").join(", ");
+/** The job page's From and To card: a job's own ends (money.from / money.to, a Move's and a Swap's). A Send's page has the
+ *  same card (QA QA's SHOULD, 8 Nov; the copy review's spec: every job kind draws the same face): From the place its money left by
+ *  Home's name (sendFrom, as Activity's row says it), To whom it paid. A Send whose place no record names: no card, never
+ *  a guess (the audit's M1). Null: no card. */
+export function jobEnds(t: LiveTrack): { from: string; to: string } | null {
+  if (t.money && t.money.from.length && t.money.to.length) return { from: cardWords(t.money.from), to: cardWords(t.money.to) };
+  if (t.kind !== "send" || !t.payee) return null;
+  const from = CARD_NAME[t.wallets[0] ?? ""];
+  return from ? { from, to: t.payee } : null;
+}

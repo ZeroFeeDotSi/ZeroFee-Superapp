@@ -15,14 +15,14 @@ import { sayWent, type HomeWallet } from "@zerofee/shell-api/money.ts";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { onOwnApproval } from "@zerofee/shell-api/job-run.ts";
 import { JOB_WORDS } from "@zerofee/shell-api/job-start.ts";
-import { MOVE_LOST, refusedLine, refusedStep, runMove } from "./move-run.ts";
+import { MOVE_LOST, MOVE_SAID_NO, refusedLine, refusedStep, runMove } from "./move-run.ts";
 import { endHere, sendEndsHere } from "../money/swap-refused.ts";
 import { dollars, privateFigure } from "../format.ts";
 import { SHEET_NEEDS, useServices } from "../services.ts";
 import { useMoveProblem } from "./Spending.tsx";
 import { useWallet } from "../runtime.tsx";
 import { moveHead, oneTotal, OUTSIDE_WORDS, privateOfLine, safeRowFigure, type OutsideMove } from "../one-total.ts";
-import { aboutLegs, alsoMoved, madeState, moveFace, moveFee, moveFloor, moveSummary, safeAfter, backLines, footNote, moveUnread, costLine, costRows, everyLanded, runOf, type MoveFollow, type MoveStep, type Run, fromSlider, keptLines, least, leavePlace, leftoverLine, legLine, legsOf, legTime, MOVE_WORDS, moveBlock, nextTyped, PLACE_NAME, PLACES, planSplit, placesNow, planOf, rangeOf, fillLine, fillLegs, fillOf, safeCoinMost, safeSigns, safeSide, safeKeeps, safeMostLine, shortLeg, strandLeg, today, totalOf, typeOp, typedUsd, usdShort, WHERE, withLeg, withOp, type Leg, type Place, type PlaceNow, type SetOp, type Split } from "./move-split.ts";
+import { aboutLegs, alsoMoved, madeState, moveFace, moveFee, moveFloor, moveSummary, safeAfter, backLines, footNote, moveUnread, costLine, costRows, everyLanded, runOf, type MoveFollow, type MoveStep, type Run, fromSlider, keptLines, least, leavePlace, leftoverLine, legLine, legsOf, legTime, MOVE_WORDS, moveBlock, nextTyped, PLACE_NAME, PLACES, planSplit, placesNow, planOf, rangeOf, fillLine, fillLegs, fillOf, safeCoinMost, safeSigns, safeSide, safeKeeps, privateGetsLine, safeMostLine, shortLeg, strandLeg, today, totalOf, typeOp, typedUsd, usdShort, WHERE, withLeg, withOp, type Leg, type Place, type PlaceNow, type SetOp, type Split } from "./move-split.ts";
 import { ActMove, PrivateMark, TabSafe } from "../icons.tsx";
 import { whoLine } from "@zerofee/shell-api/job-who.ts";
 import { TimeLeft } from "../money/JobMade.tsx";
@@ -195,7 +195,7 @@ export function MoveSheet(p: { status: SpendingStatus;
       // one figure per Move (QA's MUST, test): "Job created." says what was typed, as the sheet and the job
       made: (usd, j) => { setMadeJob(j); setMade(Math.round(usd * 100) / 100); setMadeAt(Date.now()); setBusy(false); },
       refused: (pr) => { back(); if (sendEndsHere(pr)) return void endHere(shell, pr, onClose); const said = refusedLine(pr); if (said !== null) { setLine(said); setStep(refusedStep(pr)); } else void problem(pr, () => undefined); },
-      declined: back,
+      declined: () => { back(); setStep(null); setLine(MOVE_SAID_NO); },
     }).catch(() => { back(); setLine(MOVE_LOST); return null; });
     setBusy(false);
     if (!ran) return;
@@ -247,6 +247,8 @@ export function MoveSheet(p: { status: SpendingStatus;
   // Private's figure as its row says it (what the ledger leaves it while legs are set), for the Safe row's one figure
   const privShown = legs.length > 0 ? Math.round(((start.private ?? 0) + pays.privateUsd) * 100) / 100 : split.private ?? 0;
   const keeps = safeKeeps(now, { coinUsd: coinMost, roomUsd: Number(status.roomUsd) || 0, capUsd: status.capUsd }, safeShown);
+  // QA 16 (7 Nov): Private's rise said once, under its row, with why
+  const privGets = running || legs.length === 0 ? null : privateGetsLine(start.private ?? 0, privShown);
   // the plan's one summary line (item 4)
   const summary = running ? null : moveSummary(legs, !!block);
 
@@ -266,7 +268,7 @@ export function MoveSheet(p: { status: SpendingStatus;
           </div>
           <p className="zf-receipt__amount">{dollars(made.toFixed(2))}</p>
           <p className="zf-receipt__head">{JOB_WORDS.created}</p>
-          <p className="zf-receipt__line" data-testid="move-made-title">{movingLine(dollars(made.toFixed(2)), madeTo(legs.map((l) => l.to)), job.state === "landed")}</p>
+          <p className="zf-receipt__line" data-testid="move-made-title">{movingLine(madeTo(legs.map((l) => l.to)), job.state === "landed")}</p>
           <p className="zf-receipt__line" data-testid="move-made-who">{whoLine(legs.map((l) => l.to))}</p>
           {/* "You can close this. It keeps going." follows the same landing as the time line (the copy review's J2-4, 8 Nov: it stood
               under "Done in 6 seconds."): TimeLeft's own watch line, gone the moment its rows landed */}
@@ -376,6 +378,7 @@ export function MoveSheet(p: { status: SpendingStatus;
               {/* the Safe says what stays and why, once, as soon as its slider moves (QA's lap, 5 Nov: it gave at
                   most $2.29 of $10.06 with no reason; the copy review: show it then), and at its lowest (phone test, 3 Nov) */}
               {!running && !hint && x.place === "safe" && !r.still && (v <= r.floor + 0.004 || Math.abs(v - (start.safe ?? 0)) >= 0.005) && keeps && <p className="zf-small wl-mv-hint" data-testid="move-safe-keeps">{keeps}</p>}
+              {!running && !hint && x.place === "private" && privGets && <p className="zf-small wl-mv-hint" data-testid="move-private-gets">{privGets}</p>}
               {/* under $2 to spare: said plainly, never a slider that looks stuck (UI's mainnet rehearsal, 3 Nov) */}
               {!running && !hint && leftoverLine(x) && <p className="zf-small wl-mv-hint" data-testid={`move-leftover-${x.place}`}>{leftoverLine(x)}</p>}
             </div>

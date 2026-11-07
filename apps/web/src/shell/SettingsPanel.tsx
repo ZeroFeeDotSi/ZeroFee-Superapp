@@ -26,6 +26,9 @@ import { webWallet } from "@zerofee/shell-api/release.ts";
 import { ON_IPHONE, ON_IPHONE_PAGES, WEB_PASSWORDS_LINE } from "@zerofee/shell-api/web-account-words.ts";
 // the web wallet's key rows: loaded only on the web build (Home's JS budget)
 const WebWalletRows = lazy(() => import("./WebWalletRows.tsx").then((m) => ({ default: m.WebWalletRows })));
+/** Settings → Status (rule 9b): the sheet and its checks load when it opens, never in Home's first load. */
+const StatusSheet = lazy(() => import("./StatusSheet.tsx").then((m) => ({ default: m.StatusSheet })));
+import { useStatusSummary } from "./status-row.ts";
 /** The web wallet's Passwords page (On iPhone): loaded when opened. */
 const OnIphoneSheet = lazy(() => import("./OnIphoneSheet.tsx").then((m) => ({ default: m.OnIphoneSheet })));
 
@@ -65,6 +68,9 @@ export function SettingsPanel({ onClose, onBack: backTo, onStartOver, logins = l
   // Reset this iPhone (product decision, 2 Nov): deleting the app keeps the key in the chip; this is the full reset.
   const [reset, setReset] = useState<"ask" | "busy" | "not-done" | null>(null);
   const [openSource, setOpenSource] = useState(false);
+  const [status, setStatus] = useState(false);
+  // one look at every service as Settings opens (QA's hold: only while open, never from Home)
+  const statusWord = useStatusSummary(bridge);
   const browser = useMemo(() => (bridge ? forApps(bridge, "browser") : NO_SITES), [bridge]);
   // Quick buy amount, kept in Trade's own slot (quick-buy.ts), so Settings writes it as Trade
   const trade = useMemo(() => (bridge ? forApps(bridge, "trade") : null), [bridge]);
@@ -73,6 +79,7 @@ export function SettingsPanel({ onClose, onBack: backTo, onStartOver, logins = l
   const sites = useConnections(browser, !!bridge);
   if (passwords && logins) return <PasswordsScreen client={logins} onClose={() => setPasswords(false)} />;
   if (passwordsOnIphone) return <Suspense fallback={null}><OnIphoneSheet page={ON_IPHONE_PAGES.passwords} codeUrl={import.meta.env.VITE_CODE_URL} onClose={() => setPasswordsOnIphone(false)} /></Suspense>;
+  if (status && bridge) return <Suspense fallback={null}><StatusSheet bridge={bridge} onClose={() => setStatus(false)} /></Suspense>;
   if (openSource) return <Suspense fallback={null}><OpenSourceScreen onClose={() => setOpenSource(false)} codeUrl={import.meta.env.VITE_CODE_URL} onOpenUrl={bridge ? (url) => void import("./open-source.ts").then((m) => m.openInBrowserSheet(bridge, url)) : undefined} /></Suspense>;
   const pick = (t: Theme) => {
     setTheme(t);
@@ -194,6 +201,8 @@ export function SettingsPanel({ onClose, onBack: backTo, onStartOver, logins = l
         {/* Passwords and Open source: their own card, never inside Colors (a web test, 4 Nov) */}
         <section className="set__sec set__more">
           <div className="zf-group">
+            {/* rule 9b: every service the app leans on, live; the row says "Checking…" until this open's checks answered */}
+            {bridge && <button className="set__row set__row--btn set__row--val" onClick={() => setStatus(true)}><span>Status</span><span data-testid="status-summary">{statusWord}</span></button>}
             {logins ? (
               <button className="set__row set__row--btn" onClick={() => setPasswords(true)}><span>Passwords</span><span /></button>
             ) : (

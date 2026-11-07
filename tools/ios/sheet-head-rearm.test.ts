@@ -1,6 +1,6 @@
 // the audit's MUST on the phone (8 Nov, ruling (c)): the Safe's sheet there is Swift's own (NativeSheet.swift), not the web's
-// ApprovalSheet, so keptArm never runs on it. Pinned here: (a) the core's sheet lines, with "Costs more than the plan
-// said." at their head, reach the native sheet verbatim (dev-signer hands its shown words to key.sign / key.signSet,
+// ApprovalSheet, so keptArm never runs on it. Pinned here: (a) the core's sheet lines, with the costs-more head (the audit's
+// M8: three lines, NEAR Intents' figure against the plan's, drawn as one card, never a plain grey row), reach the native sheet verbatim (dev-signer hands its shown words to key.sign / key.signSet,
 // the vault passes them on, ChipKey routes them to signOnSheet / signSetOnSheet, SheetWords reads every line or nothing,
 // and the view draws each one); (b) Approve's arm runs from when those words appear: every sheet is a FRESH native view
 // (presentSheet -> presentModal -> a new SheetHost, presented; one at a time), never words swapped into an open one, and
@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { moveSheet } from "@zerofee/core/move-plan";
-import { COSTS_MORE_HEAD } from "@zerofee/core/float-floors";
+import { costsMoreHead } from "@zerofee/core/float-floors";
 
 const read = (f: string) => readFileSync(fileURLToPath(new URL(`../../${f}`, import.meta.url)), "utf8");
 const native = read("apps/ios/ZeroFee/NativeSheet.swift");
@@ -23,8 +23,8 @@ const swift = readdirSync(fileURLToPath(new URL("../../apps/ios/ZeroFee/", impor
 test("(a) the core's head line reaches the phone's native sheet verbatim, first, with the real rows", () => {
   const $c = (v: bigint) => `$${(Number(v) / 100).toFixed(2)}`;
   const past = moveSheet([{ wallet: "your SOL wallet", priv: 0n, pay: 5100n, got: 5000n, least: 4500n }], 6000n, $c);
-  assert.equal(past.lines[0], COSTS_MORE_HEAD);
-  assert.ok(![...COSTS_MORE_HEAD].some((ch) => ch.charCodeAt(0) < 0x20 || (ch.charCodeAt(0) >= 0x7f && ch.charCodeAt(0) <= 0x9f) || (ch.charCodeAt(0) >= 0x200b && ch.charCodeAt(0) <= 0x206f)), "no character SheetWords.unreadable drops");
+  assert.equal(costsMoreHead(past.lines), 3, past.lines.join(" | "));
+  assert.ok(![...past.lines.slice(0, 3).join("")].some((ch) => ch.charCodeAt(0) < 0x20 || (ch.charCodeAt(0) >= 0x7f && ch.charCodeAt(0) <= 0x9f) || (ch.charCodeAt(0) >= 0x200b && ch.charCodeAt(0) <= 0x206f)), "no character SheetWords.unreadable drops");
   // the core hands the very words it shows to the phone's own sheet (one tx and a set)
   assert.match(signer, /await onSheet\(\{ id: shown\.id, words: shown\.words, bytes: txs\[0\]!\.bytes/);
   assert.match(signer, /await onSheetSet\(\{ id: shown\.id, words: shown\.words, txs:/);
@@ -35,8 +35,15 @@ test("(a) the core's head line reaches the phone's native sheet verbatim, first,
   // Swift reads every line or shows nothing (a line it can't read is never quietly dropped) and draws each, in order
   assert.equal((native.match(/guard let words = SheetWords\(p\["words"\]\) else \{ return refused\(/g) ?? []).length, 2);
   assert.match(words, /guard readLines\.count == lines\.count, readWarnings\.count == warnings\.count, readEffects\.count == effects\.count else \{ return nil \}/);
-  assert.match(native, /ForEach\(Array\(words\.lines\.enumerated\(\)\), id: \\\.offset\) \{ _, line in/);
-  assert.match(native, /\} else \{\n\s+Text\(line\)\.font\(\.system\(size: 15\)\)/, "a plain line (the head) is drawn as itself");
+  assert.match(native, /\} else \{\n\s+Text\(line\)\.font\(\.system\(size: 15\)\)/, "a plain line is drawn as itself");
+  // the head: SheetWords reads the same three lines the core writes, and the view draws them as one card, first
+  assert.match(native, /let head = SheetWords\.costsMoreHead\(words\.lines\)\n\s+if head > 0 \{/);
+  assert.match(native, /\.background\(Color\.red\.opacity\(0\.09\), in: RoundedRectangle\(cornerRadius: 12\)\)/);
+  assert.match(native, /ForEach\(Array\(words\.lines\.dropFirst\(head\)\.enumerated\(\)\), id: \\\.offset\) \{ _, line in/, "the rows after the card, never the head twice");
+  assert.match(words, /lines\[2\] == "Tap Approve to go on, or Not now to stop\."/);
+  assert.match(words, /lead\.hasPrefix\("NEAR Intents takes \$"\) && lead\.contains\(" in fees now\. This Move said at most \$"\)/);
+  assert.match(words, /lead\.hasPrefix\("NEAR Intents moves at least \$"\) && lead\.contains\(" now\. This Move said at least \$"\)/);
+  assert.match(words, /lines\[1\]\.hasPrefix\("Nothing moved yet\. It's still in "\)/);
 });
 
 test("(b) Approve's arm runs from when the words appear: each sheet a fresh native view, never words swapped into an open one; off, then armed 700 ms after it appears", () => {

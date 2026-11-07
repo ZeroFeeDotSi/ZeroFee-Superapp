@@ -9,7 +9,7 @@ import { useSyncExternalStore, type ReactNode } from "react";
  *  `close`: the centre closes (a row that opens a screen elsewhere). */
 export type HistoryRender = (overlay: (node: ReactNode) => void, close: () => void) => ReactNode;
 
-type Slot = { render: HistoryRender | null; seq: number; fns: Set<() => void>; apps?: Map<string, HistoryRender> };
+type Slot = { render: HistoryRender | null; seq: number; fns: Set<() => void>; apps?: Map<string, HistoryRender>; recorded?: Map<string, ReadonlySet<string>> };
 const g = globalThis as { __zfHistorySlot?: Slot };
 const slot = (): Slot => (g.__zfHistorySlot ??= { render: null, seq: 0, fns: new Set() });
 
@@ -46,3 +46,21 @@ export function useAppHistories(): ReadonlyMap<string, HistoryRender> {
   return s.apps ?? EMPTY;
 }
 const EMPTY: ReadonlyMap<string, HistoryRender> = new Map();
+
+/** The tasks an app's own history stands for, by app (the audit's Trade audit T11, 8 Nov): Trade's records each carry their Jobs
+ *  row's id, so while that history is drawn a row it has is one row there, never a second card under Earlier. Set as the
+ *  records change (trade-tasks.ts); an unchanged set never draws the centre again. */
+export function setAppRecorded(app: string, ids: ReadonlySet<string> | null): void {
+  const s = slot();
+  const rec = (s.recorded ??= new Map());
+  const had = rec.get(app);
+  if (ids ? had && had.size === ids.size && [...ids].every((id) => had.has(id)) : !had) return;
+  if (ids) rec.set(app, ids);
+  else rec.delete(app);
+  s.seq += 1;
+  for (const f of [...s.fns]) f();
+}
+
+/** The centre's read of setAppRecorded (drawn again with the histories: the same signal). */
+export const appRecorded = (): ReadonlyMap<string, ReadonlySet<string>> => slot().recorded ?? NONE;
+const NONE: ReadonlyMap<string, ReadonlySet<string>> = new Map();

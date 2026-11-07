@@ -18,3 +18,11 @@ export function foldLegs(rows: readonly SpendingActivity[]): SpendingActivity[] 
 }
 /** Every row again, each leg its own (the Statement keeps every leg as its own line). */
 export const unfoldLegs = (rows: readonly SpendingActivity[]): SpendingActivity[] => rows.flatMap(({ legs, ...r }) => [r, ...(legs ?? [])]);
+/** What a move landed, in the coin it landed as (the audit's Send audit M5, 7 Nov): its own row's amountOut, else, for a row of
+ *  legs, its one leg's (a Swap from the Safe lands on its leg on); done rows only, never a guess. Pure. */
+export function landedOf(r: Pick<SpendingActivity, "status" | "amountOut" | "legs">): { amount: string; symbol: string } | undefined {
+  if (r.status !== "done") return undefined;
+  if (r.amountOut) return r.amountOut;
+  const legs = r.legs ?? [];
+  return legs.length === 1 && legs[0]!.status === "done" ? legs[0]!.amountOut : undefined;
+}

@@ -102,6 +102,9 @@ export interface MoveRow { id: string; kind: MoveKind; chain?: FloatChain; usd: 
   paidWith?: string;
   /** Its proof (product decision, 3 Nov; tx-proof.ts): the transactions that set it off and landed it, as the core gave them. */
   proof?: MoveProof;
+  /** What landed, as 1Click's settled amountOut: the smallest units of the coin it lands as (an out leg: its chain's own
+   *  coin; in or home: USDC). Only once done (the audit's Send audit M5: the landed line from the movement's own figure). */
+  got?: string;
   /** An Add saved before the Safe's signature (bug report, 5 Nov): its job's key, when it was
    *  saved, and once a page closed while it was asked (`orphan`), what the chain and 1Click said of it since. */
   signing?: { at: number; job: string; orphan?: true; checkedAt?: number; late?: true; tokenId?: string };

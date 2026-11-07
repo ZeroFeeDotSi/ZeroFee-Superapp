@@ -35,6 +35,11 @@ export const jobLine = (t: LiveTrack): string => t.end?.line ?? t.steps.find((x)
 export const nameOf = (s: SpendingActivity): string => { const t = jobOf(s); return t ? rowTitle(t) : swapLabel(s.id) ?? s.words; };
 /** A Spending row's dollars: its job's figure (what was asked, the receipt's), else the row's own. */
 export const usdOf = (s: SpendingActivity): string | undefined => carried(`move:${s.id}`)?.usd ?? (s.askedUsd ? `$${s.askedUsd}` : s.usd ? `$${s.usd}` : undefined);
+/** the audit's Trade audit T10 (8 Nov): a Home row in Activity said its figure twice, in its title ("Move $20.00 to your SOL
+ *  wallet", "Send $5.00 to bob.near", "Moved $33.86 from Private to your Safe") and in its right column. The row's
+ *  title drops its dollar figure ("about" with it) when the right column says one; the title stays whole when it doesn't. */
+export const figureOnce = (title: string, usd: string | null | undefined): string =>
+  usd ? title.replace(/ (?:about )?\$[\d,]+(?:\.\d+)?(?= |$)/, "") : title;
 /** A Spending row's second line: its job's (the same as Home's), else each leg's words and the move's state. */
 // a swap in place that came back: its name already says where the money is (copy review, 6 Nov: not twice on one row)
 export const lineOf = (s: SpendingActivity): string => { if (isInplaceRow(s) && s.status === "refunded") return "Refunded"; const t = jobOf(s); return (t && jobLine(t)) || legsLine(s); };
@@ -249,10 +254,23 @@ const goingTrack = (t: LiveTrack | null, now: number) => !!t && !t.end && Number
  *  where neither is known. A Send that came back never reads as spent (audit): its line says it came back and where it is,
  *  by the leg's own record (whereNow: paid from Private, Private; a NEAR wallet leg, the NEAR wallet; else the Safe).
  *  None: not a Send this phone made (no carry). */
+/** J3-4 (the copy review's walk, 8 Nov): a Send's ROW names the address 4+4 ("0x7D06…7e3D", never wrapping the title); its page
+ *  keeps the 6+6 (payeeWords). Built from the 6+6 form itself, so the two can never name different ends; a name as it is. */
+export const rowPayee = (full: string): string => {
+  const i = full.indexOf("…");
+  if (i < 0) return full;
+  const head = full.startsWith("0x") ? 6 : 4;
+  return `${full.slice(0, Math.min(head, i))}…${full.slice(-4)}`;
+};
+/** J3-4: a done Send's line is where it left from only ("From your Safe"): the title alone carries the address. */
+const LEFT: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 export function sendRowOf(m: Movement, usd: string | undefined = carried(`send:${m.id}`)?.usd, tokens?: ReadonlyMap<string, Token>): { title: string; usd: string; line?: string } | null {
   const t = sendJobOf(m, tokens, usd);
   if (!t) return null;
-  return { title: rowTitle(t), usd: t.figure!, ...(m.status === "refunded" ? { line: backLine(m) } : {}) };
+  const full = m.to ? payeeWords(m.to) : "";
+  const left = LEFT[sendFrom(m)];
+  const line = m.status === "refunded" ? backLine(m) : m.status === "done" && left ? `From ${left}` : undefined;
+  return { title: full ? rowTitle(t).split(full).join(rowPayee(full)) : rowTitle(t), usd: t.figure!, ...(line ? { line } : {}) };
 }
 /** J2 (the copy review's walk, 7 Nov): a Send's page is the job face (LiveTracker, job-face.ts), the same as its Now row's, never the old
  *  "Paid to" card page: its track by the same rules as Home's (live-steps sendTrack), its figure what was signed and sent
@@ -267,7 +285,8 @@ export function sendJobOf(m: Movement, tokens?: ReadonlyMap<string, Token>, usd:
  *  price (format movementDollars). Unknown (no price): undefined. Pure. */
 export function sentUsd(m: Movement, tokens: ReadonlyMap<string, Token>): string | undefined {
   const coin = tokens.get(m.from === "near" ? "nep141:wrap.near" : m.from ?? "");
-  if (coin && /^USD[CT]$/i.test(coin.symbol) && Number(m.amount) > 0) return `$${(Math.round(Number(m.amount) * 100) / 100).toFixed(2)}`;
+  // QA 16's Send Max shots (7 Nov): cents down with its commas, as the form said it (maxSend's 1165.048543 is $1,165.04)
+  if (coin && /^USD[CT]$/i.test(coin.symbol) && Number(m.amount) > 0) return dollars((Math.floor(Number(m.amount) * 100 + 1e-6) / 100).toFixed(2));
   const d = movementDollars(m, tokens as Map<string, Token>);
   return d && d.startsWith("$") ? d : undefined;
 }

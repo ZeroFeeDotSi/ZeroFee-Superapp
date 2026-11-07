@@ -155,7 +155,9 @@ export interface ChainEngine {
   /** A NEAR coin's kept trade (Ref kept its coin out, the audit's MUST, 7 Nov): what Ref's lost and found holds of the coin for
    *  the wallet (two nodes; null: can't tell), and its claim back (the wallet's measured rise; undefined: can't tell). */
   keptHeld?(token: string): Promise<bigint | null>;
-  claimKept?(token: string): Promise<{ got: bigint; hash: string } | undefined>;
+  /** the audit's T8: `got` the measured rise; `sent` the claim went out and no read says how it ended (unsure); `declined` the
+   *  person said no; undefined nothing was sent (no read before it). A refusal throws its Problem. */
+  claimKept?(token: string): Promise<{ got: bigint; hash: string } | { sent: string } | { declined: true } | undefined>;
   /** NEAR coins: look again at a move the core is still finishing (after a restart, or a trade that outran the wait). */
   followMove?(id: string, symbol: string): Promise<{ fill: Fill } | "pending" | { problem: import("@zerofee/core/problem").Problem }>;
 }

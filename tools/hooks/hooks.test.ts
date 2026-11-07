@@ -63,19 +63,3 @@ test("NF-11: the commit message is checked too", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
-test("env files: a filled .env (any folder) is refused; the committed template .env.example goes through", () => {
-  const stage = (name: string) => {
-    const dir = mkdtempSync(join(tmpdir(), "zf-hooks-"));
-    try {
-      execFileSync("git", ["init", "-q", dir]);
-      writeFileSync(join(dir, name), "PORT=5180\n");
-      execFileSync("git", ["add", "-f", name], { cwd: dir });
-      return spawnSync("sh", [hook], { cwd: dir, env, encoding: "utf8" });
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  };
-  for (const name of [".env", ".env.local", ".env.production"]) assert.notEqual(stage(name).status, 0, `${name} went through`);
-  assert.equal(stage(".env.example").status, 0, "the template is allowed");
-});

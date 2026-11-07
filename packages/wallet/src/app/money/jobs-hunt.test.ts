@@ -54,7 +54,7 @@ test("B3: the starting row's time goes on with the rows that take its place (aft
   const store = { list: () => [{ id: "send:s1" }], subscribe: () => () => undefined };
   const published: Record<string, unknown>[] = [];
   const tasks = { publish: (t: Record<string, unknown>) => (published.push(t), true), update: () => true, end: () => true, open: () => {}, drop: () => true } as never;
-  const job = startJob(tasks, { title: "Send $3.00 to 8JVZ…YGYZ", usd: "$3.00", etaSec: 60 }, { now: () => T, store });
+  const job = startJob(tasks, { title: "Send $3.00 to 9xQe…VFin", usd: "$3.00", etaSec: 60 }, { now: () => T, store });
   assert.equal(published[0]!.endsAt, T + 60_000, "the starting row counts down from the tap");
   job.made(["send:s1"]);
   assert.deepEqual([carried("send:s1")?.usd, carried("send:s1")?.endsAt], ["$3.00", T + 60_000]);

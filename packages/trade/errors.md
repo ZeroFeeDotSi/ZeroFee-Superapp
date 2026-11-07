@@ -11,13 +11,13 @@ code there is listed here. Coin and chain names in the words are examples.
 | `trade.pool.thin` | There isn't enough BONK for sale for that much. | safe: in your trading money | Try a smaller amount (fix-input → amount) |
 | `trade.coin.unavailable` | ZeroFee can't trade {symbol} right now. | safe: in your trading money | Try again (retry) |
 | `trade.coin.unsellable` | Not for sale. ZeroFee won't buy {symbol}. | safe: in your trading money | Go back (nothing) |
-| `trade.coin.freezable` | {symbol}'s maker can freeze it and stop you selling. Trade doesn't offer it. | safe: in your trading money | Find another coin (open → search) |
-| `trade.coin.delegated` | {symbol}'s maker can take it from any wallet, at any time. Trade doesn't offer it. | safe: in your trading money | Find another coin (open → search) |
-| `trade.coin.pausable` | {symbol}'s maker can pause it and stop you selling. Trade doesn't offer it. | safe: in your trading money | Find another coin (open → search) |
+| `trade.coin.freezable` | ZeroFee won't buy {symbol}. Its maker can freeze it. Nothing was spent. | safe: in your trading money | Find another coin (open → search) |
+| `trade.coin.delegated` | ZeroFee won't buy {symbol}. Its maker can take it from any wallet. Nothing was spent. | safe: in your trading money | Find another coin (open → search) |
+| `trade.coin.pausable` | ZeroFee won't buy {symbol}. Its maker can pause it. Nothing was spent. | safe: in your trading money | Find another coin (open → search) |
 | `trade.coin.unchecked` | Selling {symbol} isn't checked, so ZeroFee didn't buy it. | safe: in your trading money | Try again (retry) |
-| `trade.coin.fee-raisable` | {symbol}'s maker can raise its fee and take most of a sale. Trade doesn't offer it. | safe: in your trading money | Find another coin (open → search) |
-| `trade.coin.fee-high` | {symbol} takes over 1% of every transfer. Trade doesn't offer it. | safe: in your trading money | Find another coin (open → search) |
-| `trade.coin.hooked` | {symbol}'s maker could stop you selling. Trade doesn't offer it. | safe: in your trading money | Find another coin (open → search) |
+| `trade.coin.fee-raisable` | ZeroFee won't buy {symbol}. Its maker can raise its fee and take most of a sale. Nothing was spent. | safe: in your trading money | Find another coin (open → search) |
+| `trade.coin.fee-high` | ZeroFee won't buy {symbol}. It takes over 1% of every transfer. Nothing was spent. | safe: in your trading money | Find another coin (open → search) |
+| `trade.coin.hooked` | ZeroFee won't buy {symbol}. Its maker could stop you selling. Nothing was spent. | safe: in your trading money | Find another coin (open → search) |
 | `trade.price.moved` | {symbol}'s price moved too fast, so nothing was traded. | safe: in your trading money | Try again (retry) |
 | `trade.network.down` | {chain} didn't answer. | safe: in your trading money | Try again (retry) |
 | `trade.slippage.over` | Not traded: {symbol}'s price could move NaN%, over your NaN% limit. | safe: in your trading money | Change my limit (open: settings) |
@@ -25,6 +25,7 @@ code there is listed here. Coin and chain names in the words are examples.
 | `trade.trade.expired` | {chain} didn't confirm it in time, so nothing was traded. | safe: in {your chain's wallet} | Try again (retry) |
 | `trade.trade.unconfirmed` | {chain} hasn't confirmed this trade yet. ZeroFee keeps checking. | unsure: either in {your chain's wallet} or already traded; Check {it} first. | Open {your chain's wallet} (open: wallets) |
 | `trade.near.rhea-kept` | Your {symbol} didn't reach your NEAR wallet. | on-the-way: with Rhea | OK (nothing) |
+| `trade.near.claim-refused` | Rhea said no to getting it back. | safe: with Rhea | Get it back (retry) |
 | `trade.trade.final-unchecked` | ZeroFee couldn't confirm how much {symbol} you got. Your {chain} wallet shows what you hold. | safe: in {your chain's wallet} | Open {your chain's wallet} (open: wallets) |
 | `trade.swap.different` | This trade didn't match its price, so it wasn't sent. | safe: in your SOL wallet | Try again (retry) |
 | `trade.coin.unpriced` | The price feed has no price for {symbol}, so it wasn't traded. | safe: in your wallet | Try again (retry) |

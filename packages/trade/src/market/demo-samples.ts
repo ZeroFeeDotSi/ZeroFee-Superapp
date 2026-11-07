@@ -1,5 +1,5 @@
 // ?demo's two sample coins nobody can sell back (TRADE-JOURNEYS 21.4, so the robot walks it): one on BNB Chain, one on
-// Robinhood Chain, named on screen as what they are ("Honeypot coin"), at addresses no real coin has. Their market answers are
+// Robinhood Chain, named like any coin ("Lucky Frog"; "Not for sale" on the row says what it is), at addresses no real coin has. Their market answers are
 // added to the recordings here (recorded-data.ts stays as generated), and their checks run Trade's own evmSecurity against
 // a small sample chain that acts as a honeypot does: three recent buyers, plain wallets that still hold it, and every
 // transfer of theirs to the pool reverts. Every other coin in ?demo has no checks, as before.

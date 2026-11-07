@@ -63,6 +63,9 @@ export function moveTitle(legs: readonly Leg[]): string {
 
 /** A call that threw after the job existed (QA's crawl, 5 Nov: a refused Move stayed "1 going"): its row ends. */
 export const MOVE_LOST = "No answer came back. Home shows where your money is.";
+/** Not now on the Safe's sheet (the audit's M8, 7 Nov: the Move sheet came back with no line, its old "at least" still up): it
+ *  says so, and the sheet reads the plan live again. */
+export const MOVE_SAID_NO = "You said no. Nothing moved.";
 
 /** A refusal before anything moved, said on the Move sheet itself (QA's proof lap, 5 Nov: a refusal whose
  *  next step was a field the sheet doesn't have showed nothing at all). Only a step that opens a screen (a hold, the

@@ -125,8 +125,8 @@ const TOKENS = new Map<string, Token>([[USDC, { id: USDC, symbol: "USDC", decima
 const send = (o: Partial<Movement> = {}): Movement => ({ id: "safe-send:s1", kind: "pay", status: "done", from: USDC, to: "bob.near", amount: "24.75", startedAtIso: iso(T0), updatedAtIso: iso(T0 + 20_000), explorerUrls: ["https://nearblocks.io/txns/abc"], private: true, ...o } as Movement);
 
 test("item 2: a Send's row and title say what was signed and sent, never the typed figure where they differ (on main: $25.00); control: the same figure stays", () => {
-  assert.deepEqual(sendRowOf(send(), "$25.00", TOKENS), { title: "Send $24.75 to bob.near", usd: "$24.75" });
-  assert.deepEqual(sendRowOf(send({ amount: "25" }), "$25.00", TOKENS), { title: "Send $25.00 to bob.near", usd: "$25.00" }, "control: signed as typed");
+  assert.deepEqual(sendRowOf(send(), "$25.00", TOKENS), { title: "Send $24.75 to bob.near", usd: "$24.75", line: "From your Safe" });
+  assert.deepEqual(sendRowOf(send({ amount: "25" }), "$25.00", TOKENS), { title: "Send $25.00 to bob.near", usd: "$25.00", line: "From your Safe" }, "control: signed as typed");
   // another coin: its own amount at its price; no price known, the typed figure (never no figure)
   assert.equal(sendRowOf(send({ from: "nep141:wrap.near", amount: "5.6433" }), "$25.00", TOKENS)?.usd, "$25.00");
   assert.equal(sendRowOf(send({ from: "nep141:wrap.near", amount: "5" }), "$25.00", TOKENS)?.usd, "$22.15");
@@ -138,7 +138,7 @@ test("item 2: a Send that came back never reads as spent: its line says it came 
   assert.equal(sendRowOf(send({ status: "refunded" }), "$25.00", TOKENS)?.line, "Came back to Private.");
   assert.equal(sendRowOf(send({ status: "refunded", id: "pocket-send:s2" }), "$25.00", TOKENS)?.line, "Came back to Private.");
   assert.equal(sendRowOf(send({ status: "refunded", private: false }), "$25.00", TOKENS)?.line, "Came back to your Safe.");
-  assert.equal(sendRowOf(send(), "$25.00", TOKENS)?.line, undefined);
+  assert.equal(sendRowOf(send(), "$25.00", TOKENS)?.line, "From your Safe", "J3-4: a done Send's line is where it left from only");
 });
 
 test("item 3: a step line's pieces never leave one lone word on line 2 (\"NEAR Confidential is moving / it\"); joined, they are the line; short lines are one piece", () => {

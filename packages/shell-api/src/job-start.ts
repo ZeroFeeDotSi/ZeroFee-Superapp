@@ -185,6 +185,33 @@ export const PRIVATE_HOME_TITLE = "Move money from Private to your Safe";
 export type Reopen = (t: Partial<Task>) => "resume" | "unsure" | "closed";
 /** A move out of Private as the ledger lists it (private-pay.ts fromPrivate "home:<id>", the Sim's own). */
 const outOfPrivate = (m: { kind?: unknown; from?: unknown }) => m.kind === "private" && m.from === "private";
+/** The ledger kinds each job's own movements can have, by its title's verb (m3's SHOULD, 7 Nov). A Send pays (a payee's
+ *  payment, kind "pay"; the Safe's own NEAR, "transfer"/"withdraw"); a Swap swaps in place, converts, or moves through
+ *  Private or Trading; a Move, an Add and a Take out move between the person's own places. Money that came in
+ *  ("deposit") and a rules change ("account") are never a job's. A verb not here: any row (no proof either way). */
+const JOB_KINDS: Record<string, readonly string[]> = {
+  Send: ["pay", "transfer", "withdraw"],
+  Swap: ["swap", "convert", "trading", "private"],
+  Move: ["trading", "private", "transfer", "convert", "swap"],
+  Add: ["trading", "private", "transfer", "convert", "swap"],
+  Take: ["trading", "private", "transfer", "convert", "swap"],
+};
+/** Whether a ledger row could be this job's own (m3's SHOULD, 7 Nov: a reopened job went unsure on ANY row since its
+ *  start, money that came in or another payee's Send). Its kind by the title's verb (JOB_KINDS); a Send's payee by name,
+ *  whole and in any case, or, shown short ("0x1234…78ab", pay chains.ts shortAddress), by its head and tail. What proves
+ *  nothing matches: a row with no kind, a Send's row with no payee, a title of no known verb. */
+export function jobMatches(title: string | undefined, m: { kind?: unknown; to?: unknown }): boolean {
+  const verb = /^(\w+)/.exec(title ?? "")?.[1] ?? "";
+  const kinds = JOB_KINDS[verb];
+  if (!kinds || typeof m.kind !== "string") return true;
+  if (!kinds.includes(m.kind)) return false;
+  if (verb !== "Send" || typeof m.to !== "string" || !m.to) return true;
+  const who = / to (\S+)$/.exec(title ?? "")?.[1];
+  if (!who) return true;
+  const to = m.to.toLowerCase(), w = who.toLowerCase();
+  const short = /^(.+)…(.+)$/.exec(w);
+  return short ? to.startsWith(short[1]!) && to.endsWith(short[2]!) : to === w;
+}
 /** How far a ledger row's start may sit before the job's own (the core's clock and the page's). */
 export const REOPEN_SLACK_MS = 5_000;
 /**
@@ -193,22 +220,33 @@ export const REOPEN_SLACK_MS = 5_000;
  * answer): "closed" only when the ledger proves no move out of Private started after the job's start; any such move,
  * or a ledger that won't answer, unsure. Every other job: closed, as before. Rows by id only, never by time or amount
  * alone (the start is only ever a proof of nothing).
+ * the audit's Send audit M3 (7 Nov): the same rule for every money job's starting row. A Safe Send or Swap is made on job.signed
+ * (job-run.ts), a wallet's at the tap, and neither knows its movement ids before the core answers: reopened in that gap,
+ * it said "The page closed as it started." (failed) while its signed leg moved on in Activity. Now "closed" only when the
+ * ledger proves no movement started after the job's start (any kind: a Send's, a Swap's, a Move's); any such movement,
+ * one whose start isn't readable, or a ledger that won't answer: unsure ("Check Activity for where this is.").
  */
 export async function reopenOf(bridge: Pick<Bridge, "call">, text: string | null, parts: (job: string) => readonly string[] | undefined = (job) => jobCarry().get(job)?.parts): Promise<Reopen> {
   let kept: Partial<Task>[] = [];
   // a damaged store proves nothing (the audit's SHOULD, 8 Nov): unsure, never "closed"
   try { const raw = JSON.parse(text ?? "[]") as unknown; if (Array.isArray(raw)) kept = raw as Partial<Task>[]; } catch { return () => "unsure"; }
-  const mine = (t: Partial<Task>) => typeof t?.id === "string" && t.id.startsWith(STARTING) && t.state === "pending" && t.title === PRIVATE_HOME_TITLE;
-  if (!kept.some(mine)) return () => "closed";
-  const r = await bridge.call<{ id?: unknown; kind?: unknown; from?: unknown; startedAtIso?: unknown }[]>("ledger.activity", { limit: 50 }).catch(() => null);
+  const starting = (t: Partial<Task>) => typeof t?.id === "string" && t.id.startsWith(STARTING) && t.state === "pending";
+  const home = (t: Partial<Task>) => starting(t) && t.title === PRIVATE_HOME_TITLE;
+  if (!kept.some(starting)) return () => "closed";
+  const r = await bridge.call<{ id?: unknown; kind?: unknown; from?: unknown; to?: unknown; startedAtIso?: unknown }[]>("ledger.activity", { limit: 50 }).catch(() => null);
   const rows = r && "ok" in r && Array.isArray(r.ok) ? r.ok : null;
   return (t) => {
-    if (!mine(t)) return "closed";
+    if (!starting(t)) return "closed";
     if (!rows) return "unsure";
-    const ids = parts(t.id!);
-    if (ids?.length) return rows.some((m) => typeof m.id === "string" && ids.includes(m.id)) ? "resume" : "unsure";
     const since = (t.startedAt ?? 0) - REOPEN_SLACK_MS;
-    return rows.some((m) => outOfPrivate(m) && Date.parse(String(m.startedAtIso)) >= since) ? "unsure" : "closed";
+    if (home(t)) {
+      const ids = parts(t.id!);
+      if (ids?.length) return rows.some((m) => typeof m.id === "string" && ids.includes(m.id)) ? "resume" : "unsure";
+      return rows.some((m) => outOfPrivate(m) && Date.parse(String(m.startedAtIso)) >= since) ? "unsure" : "closed";
+    }
+    // M3: every other job; a start that won't read is no proof it came before (never "nothing moved" without proof);
+    // only a row that could be its own (jobMatches: its kind, a Send's payee), never any row since its start
+    return rows.some((m) => jobMatches(t.title, m) && !(Date.parse(String(m.startedAtIso)) < since)) ? "unsure" : "closed";
   };
 }
 /** The starting rows ("job:") still going in what a closed page kept: each ends with JOB_WORDS.closed, unless `reopen`
@@ -246,7 +284,7 @@ export async function sealJobs(bridge: Bridge, plain: Pick<Storage, "getItem" | 
   // (job-carry.ts); read before the orphans, so a reopened job finds its parts by id
   jobCarry().keep(carries ?? old(JOB_CARRY_KEY), writer(bridge, SEALED_CARRY));
   // a starting row a closed page left (its own sheet is gone, so its made() never comes): it ends now (F2), unless the
-  // ledger shows its money moved (reopenOf). A Safe Move's row has the core's own id (move:mv-…) and goes on from the
+  // ledger can't prove nothing moved (reopenOf: any money job, the audit's M3). A Safe Move's row has the core's own id (move:mv-…) and goes on from the
   // core's record; only "job:" rows are the page's alone.
   endOrphans(text, await reopenOf(bridge, text));
   try { plain?.removeItem(TASKS_KEY); plain?.removeItem(JOB_CARRY_KEY); } catch { /* nothing more to erase */ }

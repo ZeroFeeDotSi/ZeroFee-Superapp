@@ -66,7 +66,7 @@ test("(b) reopened BEFORE the core answered, a move out of Private began after t
   assert.equal(t.open?.route, "activity", "Activity is the way forward");
 });
 
-test("control: reopened before the answer with no move out of Private in the ledger: it may say it closed; another job's row: closed as before", async () => {
+test("control: reopened before the answer with no move out of Private in the ledger: it may say it closed; another job's row with no movement since its start: closed too (the audit's M3)", async () => {
   const s = sim();
   const job = startJob(tasks(), { title: PRIVATE_HOME_TITLE, usd: "$33.86", etaSec: 10 });
   const other = startJob(tasks(), { title: "Send $5.00 to alice.near", usd: "$5.00" });

@@ -44,6 +44,9 @@ export interface Job {
   moveId?: string;
   /** Its proof, as the core last gave it (tx-proof.ts): the transactions that set it off and landed it. */
   proof?: MoveProof;
+  /** What landed, as 1Click's settled amountOut: the smallest units of the coin it lands as (an out leg: its chain's own
+   *  coin; in or home: USDC). Only once done (the audit's Send audit M5: the landed line from the movement's own figure). */
+  got?: string;
   /** A move home that waits for this move in (one wallet's "Move all to your balance") and sends what that one delivered. */
   after?: string;
   /** Move's take-out (FLOW-V4 §1): the move home sends only what the person picked: this much of Spending's own cash (the
@@ -90,7 +93,7 @@ export interface Job {
 /** `expectedUsd`: what a move home (or in) delivers, known when it is sent: its row says that from the start, the figure
  *  the ledger records when it lands (review, 1 Nov: the engine said $481.06 and the ledger $355.50 for one Put away). */
 /** `reason`: the core's words for why the move is where it is (a transfer not sent, a move in that didn't go). */
-export interface MoveAnswer { id: string; status: "pending" | "done" | "failed" | "refunded"; arrivedUsd?: number; expectedUsd?: number; reason?: string; /** the core's proof of it (tx-proof.ts) */ proof?: MoveProof; /** S21: a move home 1Click says is done that the Safe's read hasn't shown yet */ unshown?: true }
+export interface MoveAnswer { id: string; status: "pending" | "done" | "failed" | "refunded"; arrivedUsd?: number; /** done: 1Click's settled amountOut, the landed coin's smallest units (Job.got) */ arrivedUnits?: string; expectedUsd?: number; reason?: string; /** the core's proof of it (tx-proof.ts) */ proof?: MoveProof; /** S21: a move home 1Click says is done that the Safe's read hasn't shown yet */ unshown?: true }
 
 export interface JobDeps {
   /** The core's float calls (subwallet.float.out / in / home / move); a Problem comes back as a thrown error. */
@@ -245,7 +248,7 @@ export function createJobRunner(d: JobDeps) {
   function settled(a: MoveAnswer): Partial<Job> {
     if (a.status === "pending") return { state: "moving", ...(a.expectedUsd !== undefined ? { usd: Math.floor(a.expectedUsd * 100 + 1e-9) / 100 } : {}), ...(a.reason ? { note: a.reason } : {}) };
     // what arrived, to the cent below (as Wallet shows a balance: never a cent that isn't there)
-    if (a.status === "done") return { state: "done", ...(a.arrivedUsd !== undefined ? { usd: Math.floor(a.arrivedUsd * 100 + 1e-9) / 100 } : {}) };
+    if (a.status === "done") return { state: "done", ...(a.arrivedUsd !== undefined ? { usd: Math.floor(a.arrivedUsd * 100 + 1e-9) / 100 } : {}), ...(a.arrivedUnits !== undefined ? { got: a.arrivedUnits } : {}) };
     if (a.status === "refunded") return { state: "refunded", note: `came back to your NEAR wallet` };
     // a move in that didn't go says where the money is: still in that wallet (mainnet 2 Nov), so the planner plans it again
     return { state: "failed", note: a.reason ?? `didn't go through · your money is still in your NEAR wallet` };

@@ -26,8 +26,8 @@ test("S1 (b/21): over what can go, the slot under the amount says no coin figure
   ];
   for (const [name, o, want] of rows) assert.deepEqual(at(o), want, name);
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
-  assert.match(form, /const under = underAmount\(\{ over, exact: exact \?\? null, amount, symbol: source\?\.symbol \?\? "", place: source\?\.place \?\? "", maxLine \}\);/, "the form's slot reads it with the same `over` that turns Send off");
-  assert.equal((form.match(/maxLine\b/g) ?? []).filter(Boolean).length, 2, "maxLine is made once and read only through underAmount");
+  assert.match(form, /const under = underAmount\(\{ over, stable, exact: exact \?\? null, amount: atMax \? can : amount, symbol: source\?\.symbol \?\? "", place: source\?\.place \?\? "", maxLine: null \}\);/, "the form's slot reads it with the same `over` that turns Send off");
+  assert.equal((form.match(/maxLine\b/g) ?? []).filter(Boolean).length, 1, "QA 16 (7 Nov): Max's line is gone from the slot; the rest is said once, under From");
 });
 
 test("S1: the at-most line names the next tap, Max, while Max can set something (control: a coin that can send nothing names no tap)", () => {

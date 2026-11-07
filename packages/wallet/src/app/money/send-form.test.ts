@@ -50,7 +50,7 @@ test("Send's coin figures have at most 4 decimals (COIN_SHOWN_DECIMALS): what le
   // changed pin (S1, 6 Nov): the line is underAmount's (send-cap.ts), as behaviour
   assert.equal(underAmount({ over: false, exact: null, amount: "1.128653627", symbol: "NEAR", place: "your Safe", maxLine: null }).coins, "1.1286 NEAR from your Safe", "the line under the amount: as the sheet says it, down");
   // S3: the From line is send-cap.ts heldWords (a Safe coin says "$8.85 ready to send"); a site's wallet its own line; a wallet's as before
-  assert.match(form, /const held = \(s: SendSource\) => s\.line \?\? heldWords\(s\);/);
+  assert.match(form, /const heldNow = \(s: SendSource\) => s\.line \?\? heldWords\(\{ \.\.\.s, max: sendable\(s, decOf\(s\)\) \}\);/);
   assert.match(readFileSync(new URL("./send-cap.ts", import.meta.url), "utf8"), /(?::|return) `\$\{coinShown\(s\.amount, "down"\)\} \$\{s\.symbol\}/, "what a wallet holds, down");
   assert.doesNotMatch(form, /maximumFractionDigits: 6|round\(amount, Math\.min\(places, 6\)/, "control: the old 6-place figures are gone");
 });
@@ -178,7 +178,7 @@ test("the amount line says where the coin is: \"0.5 SOL from your SOL wallet\", 
   assert.doesNotMatch(form, /\$\{held\(source\)\} in \$\{source\.place\}`/, "control: never the balance a second time under the chips");
   assert.equal(underAmount({ over: false, exact: null, amount: "0", symbol: "SOL", place: "your SOL wallet", maxLine: null }).coins, null, "nothing typed, no line (changed pin)");
   assert.match(form, /: under\.coins && <p className="zf-small wl-send2__coins"/);
-  assert.match(form, /<span className="zf-small">\{held\(source\)\}<\/span>/, "the From row's balance, once");
+  assert.match(form, /<span className="zf-small">\{heldNow\(source\)\}<\/span>/, "the From row's balance, once");
   assert.doesNotMatch(form, /your \$\{source\.label\}/, "control: the dropdown's words never sit inside the line");
 });
 

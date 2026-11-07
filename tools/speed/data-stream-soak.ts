@@ -16,7 +16,7 @@ import type { ChainId } from "../../packages/trade/src/types.ts";
 
 const MINUTES = Number(process.argv[2] ?? 10);
 const LABEL = process.argv[3] ?? "run";
-const RELAY = process.env.ZEROFEE_RELAY_URL || "https://quotes-seven-gamma.vercel.app";
+const RELAY = "https://quotes-seven-gamma.vercel.app";
 
 type Hit = { host: string; ms: number; status: number | "fail" | "timeout"; t: number; kind: string; edge?: string };
 const hits: Hit[] = [];

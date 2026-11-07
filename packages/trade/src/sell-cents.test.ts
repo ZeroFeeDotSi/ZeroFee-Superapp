@@ -63,7 +63,11 @@ test("test: a sale's button, receipt, Activity row, task line and one-line say o
 
 test("test: the sale's receipt takes the one figure; a buy's keeps every cent out (its extra named on the task)", () => {
   const sheet = readFileSync(new URL("./app/screens/TradeSheet.tsx", import.meta.url), "utf8");
-  assert.match(sheet, /usd: rec\.costs \? usd\(side === "sell" \? tradeUsd\(rec\) : rec\.amountUsd\) : heroOf\(\)/);
+  // the audit's T1 (8 Nov): the figures moved into fill-words.ts landedSaid, the same rule (a sale's "About" until it books)
+  assert.match(sheet, /\.\.\.landedSaid\(rec, said\)/);
+  const words = readFileSync(new URL("./app/fill-words.ts", import.meta.url), "utf8");
+  assert.match(words, /const figure = r\.costs \? usd\(tradeUsd\(r\)\) : o\.hero;/, "a sale: the one figure");
+  assert.match(words, /usd: r\.costs \? usd\(r\.amountUsd\) : o\.hero/, "a buy: every cent out");
   // control: the old receipt line read the in-all figure for both sides
   assert.doesNotMatch(sheet, /usd: rec\.costs \? usd\(rec\.amountUsd\) : heroOf\(\)/);
   assert.equal(tradeUsd({ kind: "fund", amountUsd: 5, costs: { coinUsd: 4, feeUsd: 1 } }), 5, "control: a move keeps its own figure");

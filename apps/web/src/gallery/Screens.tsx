@@ -196,7 +196,7 @@ const START_MOVE = ownAccountCall("start_recovery", { new_key: "AA==" })!;
 const START_MOVE_WORDS: PlainWords = { title: START_MOVE.title, lines: [...START_MOVE.lines, "From kim.near. Fee: at most about $0.03 (0.007 NEAR)."], ...(START_MOVE.details ? { details: START_MOVE.details } : {}), warnings: [], effect: [{ token: "NEAR", before: "7.0584", after: "7.0317" }], testNetwork: true };
 /** A site's Solana request from the Apps wallet, said by the core's own solWords and coin rows: 10 USDC and a coin
  *  ZeroFee can't name leave; the test run's rows name USDC and say the other as one (its mint and figures one tap down). */
-const SOL_SAMPLE = { wallet: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", usdc: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", odd: "8JVZpqUZfQMEc8kMduTS9SkVxP9v8rgunJNcV4qNYGYZ", to: "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1" };
+const SOL_SAMPLE = { wallet: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", usdc: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", odd: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin", to: "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1" };
 const SOL_DECODED: SolDecoded = {
   feePayer: SOL_SAMPLE.wallet, signers: 1, programs: ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"], unknownPrograms: [], swaps: [], transfers: [], closes: [], closedTo: [],
   tokenMoves: [{ kind: "transfer", account: "Fh3kRbvx4nHmW5Lq3oTtGq8yY8nDgB1rfQf3dFjH4sQe", to: SOL_SAMPLE.to, amount: "10000000", mint: SOL_SAMPLE.usdc }, { kind: "transfer", account: "3pGq2eQ6vC5kQ9yH7mN4sT8uW2xZ1aB6cD9eF3gH5jK7", to: SOL_SAMPLE.to, amount: "4906542056074766", mint: SOL_SAMPLE.odd }],

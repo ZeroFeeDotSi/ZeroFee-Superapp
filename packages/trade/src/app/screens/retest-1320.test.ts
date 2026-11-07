@@ -48,5 +48,6 @@ test("the sheet wires the gate, the limits and the fill (source)", () => {
   assert.match(sheet, /withinMs\(ASK_LIMIT_MS/);
   assert.match(sheet, /QUEUED_LIMIT_MS/);
   assert.match(sheet, /boughtRaw\(q\.getRaw, fill\)/);
-  assert.match(sheet, /got: coinsOf\(rec\.fill\)/, "the receipt's coins are the fill's (Receipt.tsx)");
+  // the audit's T1 (8 Nov): the landed figures come from fill-words.ts (the fill's once read, "About" the quote's before)
+  assert.match(sheet, /\.\.\.landedSaid\(rec, said\)/, "the receipt's coins are the fill's (fill-words.ts)");
 });

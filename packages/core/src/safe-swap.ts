@@ -11,6 +11,7 @@
 // waiting, amountIn equal to the bytes, refunds to this account). the audit's condition 2: receiver = the SIGNED quote's
 // deposit address, amountIn = units, the deadline ahead, minAmountOut at least the figure shown: refused here otherwise.
 // Loaded with its first use (subwallets.safeSwapQuote), never in Home's first load.
+import { intentsRefused } from "./intents-refused.ts";
 import { parseQuote, type QuoteFacts } from "./intents.ts";
 import { ProblemError } from "./problem.ts";
 import { QUOTE_DEADLINE_STEP_MS, quoteDeadline } from "./quote-deadline.ts";
@@ -76,7 +77,7 @@ export function createSafeSwaps(d: SafeSwapDeps) {
       refundTo: account, refundType: "INTENTS", recipient: account, recipientType: "INTENTS",
       deadline: quoteDeadline(now(), SAFE_SWAP_DEADLINE_MS), confidentiality: "basic",
     }).catch((e: unknown) => {
-      throw e instanceof ProblemError ? e : refused(`NEAR Intents said no. Nothing moved. ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+      throw e instanceof ProblemError ? e : intentsRefused(e, "in your Safe");
     });
     const depositAddress = raw?.quote?.depositAddress;
     if (typeof depositAddress !== "string" || !/^[0-9a-f]{64}$/.test(depositAddress)) throw refused("NEAR Intents gave no address to pay. Nothing moved.");

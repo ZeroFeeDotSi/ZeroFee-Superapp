@@ -62,6 +62,11 @@ export const FILL_WORDS = {
  *  what a payee gets and its dollars); a figure the person typed or the ledger holds (the Safe's bytes, a leg, Private's
  *  share) never gets it. Every sheet's quote figure goes through here: "Stays in Private · about $10.10". */
 export const quoted = (figure: string): string => `about ${figure}`;
+/** "They get" said once (QA 16's Send Max shots, 7 Nov, (b)): the coin figure, then what it is worth in brackets; a dollar
+ *  coin's figure IS its worth, so it is said alone ("They get · 1228.1 USDC (about $1,228.10)" said it twice), in its
+ *  dollars to the cent (builder 3, 7 Nov: "about 1,153.4 USDC" under a $1,165.04 title never closed with "Fees · about
+ *  $11.65"; now "about $1,153.39" + $11.65 = $1,165.04). No dollars known: its coins. */
+export const theyGet = (coin: string, usd?: string | null): string => `${SEND_LEG_WORDS.gets} · ${usd ? (/\sUSD[CT]$/.test(coin) ? quoted(usd) : `${coin} (${quoted(usd)})`) : quoted(coin)}`;
 /** the copy review's final row for Private on every Check-this (J2-1/J2-2, 8 Nov; the audit's ruling: the core folds Private's share into
  *  the fill, so Private's change is a net one): "Private keeps the rest · about $4.37", the delta that closes the sum,
  *  hidden at $0.00. "Stays in Private" is retired on Check-this (Private's balance lives on the Private page). The rows

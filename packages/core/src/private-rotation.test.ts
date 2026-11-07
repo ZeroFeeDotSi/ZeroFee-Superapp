@@ -31,7 +31,7 @@ function relay(payer: () => string, refuse?: () => string | null) {
     quote: async (req) => {
       asked.push(req);
       const no = refuse?.();
-      if (no) throw new Error(no);
+      if (no) throw Object.assign(new Error(no), { refused: true }); // the real relay marks 1Click's own no (demo-core floatRelayFrom)
       const depositAddress = (asked.length.toString(16) + "c".repeat(64)).slice(0, 64);
       quotes.set(depositAddress, { req, deadline: DEADLINE });
       return { quote: { depositAddress, amountIn: req.amount, deadline: DEADLINE }, zerofeeStatusTag: "tag-for-this-quote-0001" };

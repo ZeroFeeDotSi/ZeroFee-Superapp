@@ -68,7 +68,7 @@ test("the audit's MUST: a kept trade left unchecked says Rhea may be holding the
   assert.equal(c.result, HEAD);
   assert.ok(!c.result.includes(WALLET_SAYS) && !rec.problem!.whatHappened.includes(WALLET_SAYS));
   assert.deepEqual([c.badge, c.title], ["Check", "Bought BLACKDRAGON, amount unchecked"]);
-  assert.deepEqual((c as { kept?: unknown }).kept, { id: rec.id, wallet: "w.near", hash: "h1", token: COIN, symbol: "BLACKDRAGON", decimals: 18 });
+  assert.deepEqual((c as { kept?: unknown }).kept, { id: rec.id, wallet: "w.near", hash: "h1", token: COIN, symbol: "BLACKDRAGON", decimals: 18, left: "NEAR" }, "the audit's T9: what left, a buy's NEAR");
   assert.equal(cards.openByDefault(c), true, "the way back shows without a tap");
   // control: the same trade with nothing kept is the unchanged unchecked card
   const plain = await unchecked({ kept: false });
@@ -87,7 +87,7 @@ test("the audit's MUST (2) + (4): Get it back shows only while Ref's lost and fo
   assert.deepEqual(owner.details, { open: "Show details", head: "Give them these:", rows: [{ label: "Your wallet", value: "w.near" }, { label: "The trade", value: "h1" }, { label: "The coin", value: COIN }] });
   assert.ok(!JSON.stringify(owner).includes("Nothing is lost"));
   for (const h of [null, undefined]) assert.equal(keptWay(k, h).claim, undefined, String(h));
-  assert.deepEqual([keptWay(k, null).head, keptWay(k, null).body], ["ZeroFee couldn't reach Rhea, so it stopped.", "Nothing moved. Open this again to check."]);
+  assert.deepEqual([keptWay(k, null).head, keptWay(k, null).body], ["Rhea's servers didn't answer.", "Ref kept the BLACKDRAGON. Open this again to check."], "the audit's T9: never \"Nothing moved.\" (kept-claim-words.test.ts: with what left)");
   assert.equal(keptWay(k, undefined).head, "Checking with Rhea…");
   // the copy review: "your NEAR wallet" everywhere, never a bare "your wallet"
   for (const h of ["5", "0", null, undefined]) assert.ok(!/your wallet/.test(JSON.stringify(keptWay(k, h)).replace(/Your wallet"/g, "")), String(h));

@@ -1,5 +1,5 @@
 // The web wallet's password, asked again before the words or a key are shown, and on every approval sheet (product decision, 4 Nov
-// 13:07: like Phantom). It is the password that locks this browser (the lock's own record, Argon2id: unlock.ts), checked
+// like Phantom). It is the password that locks this browser (the lock's own record, Argon2id: unlock.ts), checked
 // the lock's way: a wrong one is counted there (the next try waits longer, as at the lock screen, and another tab's tries
 // count too), and while a wait runs nothing is tried: every try, the right password too, gets the wait (never "isn't
 // right"). The check opens a session of its own and drops it at once; the app's lock is untouched.

@@ -1970,7 +1970,7 @@ export function createLedgerService(d: LedgerDeps): Bridge {
       if (m.status === "moving" && m.kind === "swap" && m.source === "private") void inPlace().then((x) => x.resume(m), () => undefined);
     }
     // Home's Sends are saved jobs: a restart follows each again to its own end. One with no job left (an older version
-    // kept its payment in memory) is "It may have gone", never "nothing was paid" (security review H1).
+    // kept its payment in memory) is unsure (send-job sendWords.unknown), never "nothing was paid" (security review H1).
     await resumeSends().catch(() => undefined);
     // a Send's payment that ended slow, its money on its way to Private: leg 1 asked about again, so its row ends the same
     // way a Move's part does (send-job settleLates, 83, 6 Nov); send-job's code loads only when there is one

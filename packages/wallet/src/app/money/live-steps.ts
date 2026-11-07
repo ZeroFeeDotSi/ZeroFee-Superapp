@@ -74,6 +74,8 @@ export interface LiveTrack {
   got?: { figure: string; about: boolean };
   /** The job's dollars on its Jobs row (taskOf), for a track that takes over its starting row in place (homeTracks). */
   usd?: string;
+  /** A Send's payee as its page says it ("alice.near"): the To of the page's From and To card (job-face.ts jobEnds). */
+  payee?: string;
 }
 /** `unsure` (audit, 6 Nov): the ledger can't say whether it is in Private or still with NEAR Intents (a FAILED leg 1, a hold
  *  past the keep): the money line says exactly that, never "on its way". */
@@ -802,7 +804,7 @@ export function sendTrack(m: Movement, fromWallet?: string, payee = "them", usd 
   // receipt's own sum), re-counted as each step ticks on its read (QA's Sim re-check: "58 s left", then Done at once)
   const row = fromWallet && fromWallet !== "safe" && fromWallet !== "private" ? fromWallet : undefined;
   const eta = end ? {} : typeof m.etaSeconds === "number" && m.etaSeconds > 0 && Number.isFinite(startMs) ? { endsAt: startMs + m.etaSeconds * 1000 } : { legSec: legsFor(sendLegs({ row, toNear }), steps.length) };
-  return { id: `send:${m.id}`, kind: "send", title: m.label ?? (usd ? `Send ${usd} to ${payee}` : coinOf(m.from) && m.amount ? `Send ${m.amount} ${coinOf(m.from)} to ${payee}` : `Send to ${payee}`), wallets: [fromWallet ?? "safe"], startMs, steps, ...(end ? { end } : {}),
+  return { id: `send:${m.id}`, kind: "send", title: m.label ?? (usd ? `Send ${usd} to ${payee}` : coinOf(m.from) && m.amount ? `Send ${m.amount} ${coinOf(m.from)} to ${payee}` : `Send to ${payee}`), wallets: [fromWallet ?? "safe"], startMs, steps, ...(end ? { end } : {}), ...(payee && payee !== "them" ? { payee } : {}),
     ...(m.status === "refunded" ? { next: [m.private ? { label: STOP_WORDS.openPrivate, go: { kind: "private" as const } } : { label: STOP_WORDS.sendAgain, go: { kind: "send" as const, wallet: fromWallet ?? "safe" } }] } : {}), ...eta };
 }
 

@@ -53,10 +53,12 @@ function Proof({ tx }: { tx: { chain: string; hash: string } }) {
   );
 }
 
-export function TradeMoment({ phase, side, symbol, logo, coinAmount, where, usd, tapAt, landedMs, feeTaken, feeUsd, held, cost, tx, onSell, onMore, onDone }: {
+export function TradeMoment({ phase, side, symbol, logo, coinAmount, where, usd, tapAt, landedMs, feeTaken, feeUsd, about, held, cost, tx, onSell, onMore, onDone }: {
   phase: MomentPhase; side: "buy" | "sell"; symbol: string; logo?: string;
   /** the coins: "7,505" (a buy: what arrived; a sale: what went) */
   coinAmount: string;
+  /** landed, the coins still the quote's until the chain's read (the audit's T1): "About 7,505 DOPE" */
+  about?: boolean;
   /** the wallet: "your SOL wallet" */
   where: string;
   /** the dollars, from the signed quote until the chain's own figure is read: "$25.00" */
@@ -86,7 +88,7 @@ export function TradeMoment({ phase, side, symbol, logo, coinAmount, where, usd,
   const landed = phase === "done";
   return (
     <div className={`tm tm--${phase}${shown ? " is-in" : ""}`}>
-      <Receipt state={STATE[phase]} side={side} coin={symbol} coinAmount={coinAmount} where={where} usd={usd} {...(landedMs !== undefined ? { landedMs } : {})} {...(feeTaken ? { feeTaken } : {})} {...(feeUsd ? { feeUsd } : {})}
+      <Receipt state={STATE[phase]} side={side} coin={symbol} coinAmount={coinAmount} where={where} usd={usd} {...(landedMs !== undefined ? { landedMs } : {})} {...(feeTaken ? { feeTaken } : {})} {...(feeUsd ? { feeUsd } : {})} {...(about ? { about } : {})}
         {...(landed && landedMs !== undefined ? { say: { chain: doneIn(landedMs) } } : {})}
         icon={<CoinIcon symbol={symbol} src={logo} size={64} />} {...(phase === "sending" ? { extra: <Clock since={tapAt} /> } : {})} />
       {landed && cost && <p className="zf-small tm-gap" data-testid="receipt-cost">{cost}</p>}

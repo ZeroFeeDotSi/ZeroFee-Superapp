@@ -4,11 +4,26 @@ import type { Bridge } from "@zerofee/core/bridge";
 import type { SpendingActivity, SpendingStatus } from "@zerofee/core/spending";
 import { sayWent } from "@zerofee/shell-api/money.ts";
 import { carried } from "@zerofee/shell-api/job-carry.ts";
+import { landedOf } from "@zerofee/core/spending-fold";
 
 /** A Swap's name by its Spending row's id: Home's "On its way" row says "Swap $8.22 of NEAR for USDC", not the Top up it
  *  is underneath (one verb for one move). Named by its sheet (job-carry.ts nameSwap, kept with the job rows in Home's
  *  sealed store), so a reload still reads it. */
 export const swapLabel = (id: string): string | undefined => carried(`move:${id}`)?.words;
+
+/** the audit's Send audit M5 (7 Nov): what a Swap's movement landed, from its own record (core spending-fold landedOf: 1Click's
+ *  settled amountOut on the row, or its one leg's), as the receipt's figure: "0.0644 SOL". `fig`: the sheet's own coin
+ *  figure (coinFigure, rounded down). Null until its row is done with that figure. Pure. */
+export function landedFigure(rows: readonly SpendingActivity[], id: string, fig: (n: number) => string): string | null {
+  const row = rows.find((r) => r.id === id);
+  if (!row) return null;
+  const out = landedOf({ ...row, legs: rows.filter((r) => r.of === id && r.id !== id) });
+  const n = Number(out?.amount);
+  return out && n > 0 ? `${fig(n)} ${out.symbol}` : null;
+}
+/** How often the receipt reads the movement for its landed figure, and for how long. */
+export const LANDED_READ_MS = 2_000;
+export const LANDED_READ_FOR_MS = 15 * 60_000;
 
 /** How often, and for how long, the wallets are read again once a swap went (a UI re-test, 4 Nov: the SOL wallet
  *  showed the swap only after a reload, about a minute after it went on from the NEAR wallet). */

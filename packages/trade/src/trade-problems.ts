@@ -136,10 +136,11 @@ export const tradeProblems = {
   }),
   coinUnsellable: (symbol: string): Problem => ({
     code: "trade.coin.unsellable",
-    whatHappened: `A test sale of ${symbol} didn't go through, so ZeroFee won't buy it.`,
+    // the audit's note, the copy review's words (8 Nov): the refusal names it "Not for sale", says why once, and offers Go back
+    whatHappened: `Not for sale. ZeroFee won't buy ${symbol}.`,
     money: inTradingWallet,
-    next: { kind: "open", label: "Find another coin", screen: "search" },
-    more: "Before every buy, ZeroFee test-sells it without sending anything. This coin failed.",
+    next: { kind: "nothing", label: "Go back" },
+    more: "Recent buyers couldn't sell it, so your money could get stuck. Nothing was spent.",
   }),
   coinFreezable: (symbol: string): Problem => ({
     code: "trade.coin.freezable",
@@ -215,18 +216,41 @@ export const tradeProblems = {
     next: { kind: "retry", label: "Try again" },
     more: "The network still took its small fee for trying.",
   }),
-  expired: (symbol: string): Problem => ({
+  // the copy review's words (7 Nov), for a trade the chain provably never took (the audit's MUST: two full histories and a caught-up
+  // indexer without it): the reason, then the card's money line says where it is ("in your SOL wallet"), one Try again
+  expired: (_symbol: string, chain = "Solana"): Problem => ({
     code: "trade.trade.expired",
-    whatHappened: `The ${symbol} trade ran out of time, so nothing was traded.`,
-    money: inTradingWallet,
+    whatHappened: `${chain} didn't confirm it in time, so nothing was traded.`,
+    money: { state: "safe", where: `in ${walletOn(chain)}` },
     next: { kind: "retry", label: "Try again" },
   }),
-  unconfirmed: (symbol: string, chain = "Solana"): Problem => ({
+  // the copy review's words (7 Nov), for a trade sent that no read can place yet: no Try again (it may have landed: a second would pay
+  // twice), the unsure money line, and the way out is the wallet itself
+  // `live` false (the audit's SHOULD, 7 Nov): past LIVE_MAX_MS no live look runs, so it says how to look again
+  unconfirmed: (_symbol: string, chain = "Solana", live = true): Problem => ({
     code: "trade.trade.unconfirmed",
-    whatHappened: `The ${symbol} trade was sent, but ${chain} hasn't confirmed it yet.`,
-    money: { state: "on-the-way", where: `on ${chain}` },
-    next: { kind: "wait", label: "Wait" },
-    more: "It lands or expires by itself within a minute. It can't go through twice.",
+    whatHappened: `${chain} hasn't confirmed this trade yet. ${live ? "ZeroFee keeps checking." : "Open this again to check."}`,
+    money: { state: "unsure", where: `either in ${walletOn(chain)} or already traded`, check: `Check ${walletOn(chain)} first.` },
+    next: { kind: "open", label: `Open ${walletOn(chain)}`, screen: "wallets" },
+    more: "It can't go through twice.",
+  }),
+  // the audit's MUST (ii), 7 Nov, in the copy review's words (uncheckedLine): a trade done on one node's word whose final amount no look will
+  // check any more (past the live window with no FINAL answer), or whose kept fill can't be booked: nothing of it is
+  // booked into the position, and the wallet itself is the truth; no Try again (it may have traded)
+  // the audit's MUST (7 Nov), the copy review's words (final, 7 Nov): a NEAR coin's Rhea trade whose input was spent and whose coin out Ref
+  // kept on its side, never proven: never "your wallet shows what you hold" (the coin isn't there). The card reads Ref's
+  // lost and found and shows the way back (JobCard's KeptWay, job-cards.ts keptWay): Get it back, or who to ask
+  rheaKept: (symbol: string): Problem => ({
+    code: "trade.near.rhea-kept",
+    whatHappened: `Your ${symbol} didn't reach your NEAR wallet.`,
+    money: { state: "on-the-way", where: "with Rhea" },
+    next: { kind: "nothing", label: "OK" },
+  }),
+  finalUnchecked: (symbol: string, side: "buy" | "sell" = "buy", chain = "NEAR"): Problem => ({
+    code: "trade.trade.final-unchecked",
+    whatHappened: uncheckedLine(side, symbol, chain),
+    money: { state: "safe", where: `in ${walletOn(chain)}` },
+    next: { kind: "open", label: `Open ${walletOn(chain)}`, screen: "wallets" },
   }),
 
   // Market data
@@ -274,6 +298,12 @@ export const tradeProblems = {
     more: "Nothing moved.",
   }),
 };
+
+/** the copy review's line (7 Nov) for a trade whose amount nobody could confirm (trade.trade.final-unchecked): its card and its problem. */
+export function uncheckedLine(side: "buy" | "sell", symbol: string, chain = "NEAR"): string {
+  const w = walletOn(chain);
+  return `${side === "sell" ? `ZeroFee couldn't confirm how much you got for ${symbol}.` : `ZeroFee couldn't confirm how much ${symbol} you got.`} ${w[0]!.toUpperCase()}${w.slice(1)} shows what you hold.`;
+}
 
 /** The Problem for anything the engine throws while preparing a trade. */
 export function problemOf(e: unknown, o: { symbol: string; chain?: string; coin?: string }): Problem {

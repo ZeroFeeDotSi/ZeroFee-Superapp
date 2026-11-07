@@ -5,6 +5,7 @@
 import type { Bridge } from "@zerofee/core/bridge";
 import { SITE_WALLETS } from "@zerofee/core/site-wallets";
 import { HUB_SITES } from "./hub-state.ts";
+import { staleEarly } from "@zerofee/wallet/app/home-stale.ts";
 
 /** `bridge`: Social Trading's own (forApps(…, "social")): it may make a site's wallet, and nothing that moves money.
  *  ST13: every one of a site's wallets the core has (GMGN: Solana and Base), Solana first, so a sheet only
@@ -18,6 +19,9 @@ export async function prepareSites(bridge: Bridge): Promise<string[]> {
       if (r && "ok" in r) made.push(r.ok.id);
     }
   }
+  // the audit's MUST (A2-3, 8 Nov): Home's reads started before these wallets were made don't list them (Hot said $172.54
+  // without pump.fun's and GMGN's), and the real core announces nothing when one is made: Home reads afresh
+  if (made.length) staleEarly();
   return made;
 }
 

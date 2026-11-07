@@ -57,7 +57,7 @@ test("QA's condition 2: the fee line is never what a refusal replaces: the fee b
 test("button words, each state: Swap, Try again for a refusal or a price, Swap off under the least", () => {
   const under = swapBlock({ route: safeOut, usd: 1, most: 100 });
   assert.deepEqual(swapFloor({ ...idle, block: under }), { line: "why", tap: "swap", label: "Swap" }, "under the least: nothing to try again; the button stays Swap, off");
-  assert.match(sheet, /disabled=\{busy \|\| \(on\.tap === "swap" && \(nothing \|\| services\.down \|\| \(!!block && block !== SWAP_WORDS\.amount\)\)\)\}/);
+  assert.match(sheet, /disabled=\{busy \|\| \(on\.tap === "swap" && \(nothing \|\| !!short \|\| services\.down \|\| \(!!block && block !== SWAP_WORDS\.amount\)\)\)\}/);
   assert.deepEqual(swapFloor({ ...idle, block: SWAP_WORDS.amount }), { line: "stays", tap: "swap", label: "Swap" }, "nothing typed: the privacy line stays");
   assert.deepEqual(swapFloor({ ...idle, block: SWAP_WORDS.amount, tried: true }), { line: "why", tap: "swap", label: "Swap" }, "a press at $0 says Pick an amount");
   assert.deepEqual(swapFloor({ ...idle, again: "Try again", block: null, said: true, priceDown: true }).line, "stopped", "a refusal comes first");
@@ -93,7 +93,9 @@ test("the one sub-line slot: what one swap can take until an amount can go, then
 });
 
 test("line 1 is the privacy line: its figure, with Who can see this? a link at its end, opening the same words on their own sheet", () => {
-  assert.equal(swapStays(safeOut, 10), "$10.00 leaves Private. If Private is short, your Safe covers the rest.");
+  // T-F (6 Nov): the cover clause only when the Safe really covers (swap-cover.ts); else Private's line alone
+  assert.equal(swapStays(safeOut, 10, undefined, true, { kind: "cover" }), "$10.00 leaves Private. If Private is short, your Safe covers the rest.");
+  assert.equal(swapStays(safeOut, 10), "$10.00 leaves Private.");
   assert.match(sheet, /\{stays && <span data-testid="swap-stays">\{stays\} <\/span>\}\{privateLine\(route\) && <button type="button" className="zf-link wl-swap2__who" onClick=\{\(\) => setWho\(true\)\} data-testid="swap-who">\{MOVE_WORDS\.who\}<\/button>\}/);
   assert.match(sheet, /<MoneySheet title=\{MOVE_WORDS\.who\} onClose=\{\(\) => setWho\(false\)\}>/);
 });
@@ -106,10 +108,10 @@ test("the shape, Send's: the keypad gives inside the box, 30 pt rows at least; t
   assert.match(css, /\.wl-swap2__floor > \.zf-fee \{ min-height: 54px; \}/);
 });
 
-test("Move's refusal rides the floor over its fee block, never down at the long plan's end (QA's check, shot in the crawl)", () => {
-  assert.match(css, /\.zf-sheet__content:has\(> \.wl-mv-hero\) > :is\(\.wl-mv-why, \.zf-money__line\):has\(\+ \.zf-fee\) \{ position: sticky; bottom: 126px;/);
+test("Move's refusal is in the floor's line 1, over its fee block, never down at the long plan's end (the floor's own table: move-floor.test.ts)", () => {
+  assert.doesNotMatch(css, /:has\(> \.wl-mv-hero\)/);
   const move = readFileSync(new URL("../screens/MoveSheet.tsx", import.meta.url), "utf8");
-  assert.match(move, /<SheetLine text=\{line \?\? services\.line/);
+  assert.match(move, /<div className="wl-swap2__line" data-testid="move-line">/);
 });
 
 test("nothing can go in one swap: the slot says so once, never \"Up to $0.00\", and the sheet's button stays off", () => {
@@ -128,7 +130,7 @@ test("nothing can go in one swap: the slot says so once, never \"Up to $0.00\", 
 
 test("a refusal that stands when the amount can no longer go ends: never a lit Try again whose tap does nothing (audit, 6 Nov)", () => {
   assert.match(sheet, /const refused = stopped && !busy && !block \? stoppedLine\(stopped\) : null;/);
-  assert.match(sheet, /if \(!pay \|\| !get \|\| !route \|\| busy \|\| block\) return;/, "what it guards: go() stops at block");
+  assert.match(sheet, /if \(!pay \|\| !get \|\| !route \|\| busy \|\| block \|\| short\) return;/, "what it guards: go() stops at block (and at Private short with no cover, T-F)");
   assert.equal(swapFloor({ again: null, block: SWAP_WORDS.none, tried: false, said: false, priceDown: false }).tap, "swap");
   assert.equal(swapFloor({ again: null, block: "You can swap up to $5.00.", tried: false, said: false, priceDown: false }).line, "why", "the reason is said instead");
 });

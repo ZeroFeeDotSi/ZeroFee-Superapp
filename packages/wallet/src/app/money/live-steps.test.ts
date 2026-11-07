@@ -163,23 +163,24 @@ test("F4 (QA's Protection crawl, 5 Nov): a Move held by the account's rules is n
 });
 
 test("a Send: left, through NEAR privately, paid; its done time is the ledger's own; a problem says where the money is", () => {
-  const asked = sendTrack(mv({}), undefined, "kiosk.near")!;
-  assert.equal(states(asked), "doing waiting waiting", "no transaction on chain yet: nothing ticked");
+  // the Safe's Send (safe-send:): it leaves the Safe; a private record with no Safe leg leaves Private (sendFrom, the audit's MUST, 7 Nov)
+  const asked = sendTrack(mv({ id: "safe-send:s1" }), undefined, "kiosk.near")!;
+  assert.equal(states(asked), "doing waiting", "no transaction on chain yet: nothing ticked");
   assert.equal(asked.steps[0]!.label, "Leaving your Safe");
-  const going = sendTrack(mv({ explorerUrls: ["https://nearblocks.io/txns/abc"] }), undefined, "kiosk.near")!;
-  assert.equal(states(going), "done doing waiting", "control: on chain, it left");
+  const going = sendTrack(mv({ id: "safe-send:s1", explorerUrls: ["https://nearblocks.io/txns/abc"] }), undefined, "kiosk.near")!;
+  assert.equal(states(going), "done doing", "control: on chain, it left");
   assert.equal(going.steps[0]!.label, "Left your Safe");
   assert.equal(going.steps[1]!.label, "NEAR Confidential is paying kiosk.near.", "rule 11 + the copy review's ruling: who does the work while it runs, and for whom");
   assert.equal(going.title, "Send to kiosk.near");
   const paid = sendTrack(mv({ status: "done", updatedAtIso: iso(63) }), undefined, "kiosk.near")!;
-  assert.equal(paid.steps[2]!.atMs, 63_000);
+  assert.equal(paid.steps[1]!.atMs, 63_000, "J2-4: to a NEAR account, one paying step");
   assert.equal(paid.end!.line, "Paid to kiosk.near.");
   const problem = { code: "x", whatHappened: "1Click didn't pay it.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } };
   const refused = sendTrack(mv({ status: "problem", problem: problem as never }), undefined, "kiosk.near")!;
-  assert.equal(states(refused), "failed waiting waiting", "nothing on chain, the money where it was: never signed");
+  assert.equal(states(refused), "failed waiting", "nothing on chain, the money where it was: never signed");
   assert.equal(refused.end!.line, "Not signed: 1Click didn't pay it. Nothing moved.");
   const prob = sendTrack(mv({ status: "problem", explorerUrls: ["https://nearblocks.io/txns/abc"], problem: problem as never }), undefined, "kiosk.near")!;
-  assert.equal(states(prob), "done failed waiting", "control: sent, then stopped");
+  assert.equal(states(prob), "done failed", "control: sent, then stopped");
   assert.equal(prob.end!.line, "1Click didn't pay it. Your money is in your Safe.");
   assert.equal(sendTrack(mv({ private: false }))!.steps[1]!.label, "Then NEAR Intents pays them.", "a public send never says privately (NEAR Intents, not NEAR Confidential)");
   assert.equal(sendTrack(mv({ kind: "deposit" })), null, "control: a deposit isn't a Send");
@@ -373,7 +374,7 @@ test("D144: a Move not seen arriving in 15 minutes ends as taking longer, with w
   const going = topUp({ atIso: new Date(at).toISOString() }, {});
   const seen: Seen = { "move:t1": { start: at, done: { 0: 0, 1: 22_000 } } };
   const slow = await watchOnce(going, seen);
-  assert.deepEqual(slow.ended, [["move:t1", "stopped"]]);
+  assert.deepEqual(slow.ended, [], "slow is still going: never ended \"stopped\" (bug report, 6 Nov)");
   const t = slow.shown.find((x) => x.id === "move:t1")!;
   assert.equal(t.end?.line, "Slower than usual. It's on its way to your SOL wallet. This changes to Done when it lands.");
   assert.equal(taskOf(t).where, "Slower than usual. It's on its way to your SOL wallet. This changes to Done when it lands.");
@@ -441,7 +442,7 @@ test("finding 52: a slow move's card reads as on its way, never \"Move stopped\"
   assert.match(src, /p=\{t\.end && !t\.end\.ok && !stillGoing\(t\) \? undefined : progressOf/, "a slow row keeps its progress line");
   assert.match(src, /const now = useNow\(tracks\.filter\(stillGoing\)\.map\(\(t\) => t\.startMs\)\);/, "its time keeps moving");
   assert.match(src, /const now = useNow\(stillGoing\(t\) \? \[t\.startMs\] : \[\]\);/, "and the tracker's");
-  assert.match(src, /stillGoing\(t\) \? `Slower than usual · \$\{shortElapsed\(now - t\.startMs\)\}` : "Stopped"/, "the tracker says slower, never Stopped");
+  assert.doesNotMatch(src, /"Stopped"/, "the tracker never says a bare Stopped (job-face.ts says who is slow)");
 });
 
 test("a Move paid from Private (NEAR Confidential): the Safe's fill when Private was short, then the payment, each ticking on the ledger's word; one that came back says the money is in Private", () => {
@@ -477,7 +478,7 @@ test("a Send's first step names the wallet it really left (QA, 5 Nov: a SOL wall
   assert.equal(sendFrom(mv("pocket-send:abc", "nep141:sol.omft.near")), "private");
   assert.equal(sendFrom(mv("send:abc", "nep141:wrap.near")), "safe", "control: the Safe's Send stays the Safe's");
   assert.equal(sendTrack(mv("hidden-row:abc", "nep141:sol.omft.near"))!.steps[0]!.label, "Left your SOL wallet");
-  assert.equal(sendTrack(mv("pocket-send:abc", "nep141:sol.omft.near"))!.steps[0]!.label, "Left your private balance");
+  assert.equal(sendTrack(mv("pocket-send:abc", "nep141:sol.omft.near"))!.steps[0]!.label, "Left Private");
   assert.equal(sendTrack(mv("send:abc", "nep141:wrap.near"))!.steps[0]!.label, "Left your Safe");
 });
 

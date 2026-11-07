@@ -4,7 +4,8 @@
 // can't be read is "—", never $0.
 import type { Position } from "../service.ts";
 import type { ChainId } from "../types.ts";
-import { change, usd, usdChange } from "./format.ts";
+import { usd, usdChange } from "./format.ts";
+import { holdingChange } from "./coin-words.ts";
 
 export const NO_RECORD = "Bought before ZeroFee kept a record";
 export const NO_PRICE = "Its price can't be read right now";
@@ -24,10 +25,11 @@ const priced = (v: unknown): v is number => typeof v === "number" && Number.isFi
 const recorded = (c: unknown): c is number => typeof c === "number" && Number.isFinite(c) && c >= 0.01 && c < 1e9;
 /** To the cent, so float noise never reads as "+<$0.000001" (review 2, L4). */
 const cents = (n: number) => Math.round(n * 100) / 100;
-/** "+$6.10 +17.4%": the result against the cost; a percent past a million (a cost of almost nothing) is left out. */
+/** "Up $6.10 (17.4%)": the result against the cost, in words (the copy review's final words, 7 Nov, T5: "−$0.11 −0.4%" said
+ *  nothing); a percent past a million (a cost of almost nothing) is left out. */
 const result = (value: number, cost: number) => {
   const pnl = cents(value - cost), pct = (pnl / cost) * 100;
-  return change(pnl, Math.abs(pct) < 1e6 ? pct : undefined);
+  return holdingChange(pnl, Math.abs(pct) < 1e6 ? pct : undefined);
 };
 
 /** One row's words: its value now, and its result since bought (or why there is none). */
@@ -35,7 +37,7 @@ export function coinRowWords(p: Position): { value: string; since: string } {
   // a value that is no number, below zero or past any real coin's worth (a hostile price) is unpriced (review L2)
   if (!priced(p.valueUsd)) return { value: "—", since: NO_PRICE };
   if (!recorded(p.costUsd)) return { value: usd(p.valueUsd), since: NO_RECORD };
-  return { value: usd(p.valueUsd), since: `${result(p.valueUsd, p.costUsd)} since you bought` };
+  return { value: usd(p.valueUsd), since: result(p.valueUsd, p.costUsd) };
 }
 
 /** T-5 landing 2: the chain's total over its priced coins, and their result since bought where Trade has the buys:

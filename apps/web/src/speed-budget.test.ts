@@ -273,6 +273,9 @@ const NEVER_FIRST = [
   /\/packages\/wallet\/src\/app\/money\/(ScanSheet\.tsx|scan\.ts)$/,
   // the tray's locked apps (product decision, 3 Nov): their tiles and "Coming soon." sheet load after the first paint
   /\/apps\/web\/src\/shell\/locked-apps\.tsx$/,
+  // the 7 Nov trim (1,277.1 -> 1,216.2 KB): Trade's market code (its lists, spam filter, live prices, the coin's own reads)
+  // loads with the market's first pick (runtime.ts), asked for as the trade runtime is made, beside the wallet list it waits on
+  /\/packages\/trade\/src\/market\/(index|live|spot|price|onchain|feed)\.ts$/,
   /\/packages\/trade\/src\/app\//,
   /\/packages\/(agent|earn|extension-app|chat)\/src\/app\/.*\.tsx$/,
   /\/packages\/browser\/src\/(app\/BrowserApp|social\/SocialApp)\.tsx$/,

@@ -36,6 +36,11 @@
 .ob-steps li.done .ob-steps__mark { background: var(--ink); color: var(--bg); }
 /* Words: the list and its notes scroll between the title and the button (390 x 844 fits the 24 words; the notes may scroll). */
 .ob-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: none; margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter); }
+/* A2-3 (copy review, 8 Nov: the first view ended flat at "23 empty / 24 lunar"): a 24 px fade at the bottom says there is more,
+   the list scrolls with momentum and bounces inside itself (never the page), and its end clears the fade. The warning
+   over it ("24 words, in order, on paper. Never a photo.") stays pinned above the scroll. */
+.ob-scroll { -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; padding-bottom: 24px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent); }
 .ob-notes { display: grid; gap: 10px; margin: 6px 0 16px; }
 .ob-floor { padding-top: 12px; border-top: 1px solid var(--line); margin: 0 calc(-1 * var(--gutter)); padding-left: var(--gutter); padding-right: var(--gutter); }
 .ob-key { margin-top: 18px; }

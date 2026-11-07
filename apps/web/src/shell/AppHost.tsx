@@ -140,6 +140,7 @@ type Drag = { id: number; x0: number; y0: number; axis: "x" | "y" | null; lockDx
 type HostApi = {
   openApp: (id: string, tab?: string, link?: string, from?: string) => void;
   showProblem: (i: number, p: Problem) => Promise<NextStep>;
+  endProblem: (i: number, p: Problem) => boolean;
   showWaiting: (i: number, h: { id: string; readyAtIso: string; needsSecondDevice: boolean }) => void;
   openSwitcher: () => void;
   openMenu: (back?: () => void) => void;
@@ -514,6 +515,11 @@ export function AppHost({ apps: given_, onMenu, shellBridge, startWithTray = fal
       const step = overlays.current.push(apps[i].id, { kind: "problem", problem: p });
       if (i === indexRef.current) bump();
       return step;
+    },
+    endProblem: (i, p) => {
+      const gone = overlays.current.drop(apps[i].id, p, { kind: "nothing", label: "Back" });
+      if (gone && i === indexRef.current) bump();
+      return gone;
     },
     showWaiting: (i, h) => {
       void overlays.current.push(apps[i].id, { kind: "waiting", held: { id: h.id, readyAtIso: h.readyAtIso, needsSecondDevice: h.needsSecondDevice } });
@@ -897,6 +903,7 @@ const AppPage = memo(function AppPage({ app, i, count, here, active, shown, requ
     requestSeq,
     requestedLink,
     showProblem: (p) => api.current.showProblem(i, p),
+    endProblem: (p) => api.current.endProblem(i, p),
     showWaiting: (h) => api.current.showWaiting(i, h),
     openSwitcher: () => api.current.openSwitcher(),
     openMenu: (back) => api.current.openMenu(back),

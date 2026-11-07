@@ -57,8 +57,9 @@ test("(a) the ended job's page lists the same steps (From / To / Finished, no st
 
 test("(a) the tracker never draws a period then the dots (\"wallet.…\")", async () => {
   const { readFileSync } = await import("node:fs");
-  const src = readFileSync(new URL("./LiveTrack.tsx", import.meta.url), "utf8");
-  assert.match(src, /s\.state === "doing" \? `\$\{s\.label\.replace\(\/\\\.\$\/, ""\)\}…`/);
+  // the page's step labels are job-face.ts's now (the copy review's ruling, 6 Nov: each step once with its one word)
+  const src = readFileSync(new URL("./job-face.ts", import.meta.url), "utf8");
+  assert.match(src, /x\.state === "doing" && !word \? `\$\{x\.label\.replace\(\/\\\.\$\/, ""\)\}…`/);
 });
 
 const send = (o: Partial<Movement> = {}): Movement => ({ id: "pocket-send:s1", kind: "pay", status: "moving", from: "private", to: "bob.near", amount: "1.1286", startedAtIso: iso(T), updatedAtIso: iso(T), explorerUrls: [], private: true, ...o } as Movement);
@@ -75,10 +76,10 @@ test("(b) the Send's time left comes from its legs and its read: Done only on th
   const going = onLegs(sendTrack(send({ from: "private" }), "private", "bob.near")!);
   assert.equal(going.endsAt, T + LEG_SEC.privateNear * 1000, "the receipt's figure at the start");
   assert.equal(going.end, undefined);
-  assert.deepEqual(going.steps.map((s) => s.state), ["doing", "waiting", "waiting"]);
-  assert.deepEqual(going.steps.map((s) => s.label), ["Leaving your private balance", "Then NEAR Confidential pays bob.near.", "Then NEAR pays bob.near."], "53: a step not begun says Then");
+  assert.deepEqual(going.steps.map((s) => s.state), ["doing", "waiting"]);
+  assert.deepEqual(going.steps.map((s) => s.label), ["Leaving Private", "Then NEAR Confidential pays bob.near."], "53: a step not begun says Then; J2-4: one paying step, never bare NEAR");
   // its first step ticked 3 s in (stamped): the end is counted from there
-  const ticked = onLegs({ ...sendTrack(send({ explorerUrls: ["https://nearblocks.io/txns/abc"] }), "private", "bob.near")!, steps: [{ label: "Left", state: "done", atMs: 3000 }, { label: "NEAR Confidential is moving it", state: "doing" }, { label: "Paid to bob.near", state: "waiting" }] });
+  const ticked = onLegs({ ...sendTrack(send({ explorerUrls: ["https://nearblocks.io/txns/abc"] }), "private", "bob.near")!, steps: [{ label: "Left", state: "done", atMs: 3000 }, { label: "NEAR Confidential is paying bob.near.", state: "doing" }] });
   assert.equal(ticked.endsAt, T + 3000 + (LEG_SEC.privateNear - 0) * 1000);
   const paying = sendTrack(send({ explorerUrls: ["https://nearblocks.io/txns/abc"], to: "0x7D06AaAAaAaaa5aAAAaAaAaAAAAAaaaaaAaA7E3D" }), "private", "0x7D06Aa…aA7E3D")!;
   assert.equal(paying.steps[1]!.label, "NEAR Confidential is paying 0x7D06Aa…aA7E3D.", "the copy review's Send line");
@@ -127,8 +128,8 @@ test("(c) a memecoin trade is one row: Trade's history row while it is drawn, no
 test("(c) Activity draws the screen's rows, and opens a going job's page from the whole record", async () => {
   const { readFileSync } = await import("node:fs");
   const src = readFileSync(new URL("../screens/Activity.tsx", import.meta.url), "utf8");
-  assert.match(src, /const record = activityRows\(activity, all\);\n\s+const \{ ledger, spending: moves \} = onScreen\(record\);/);
-  assert.match(src, /record\.spending\.find\(\(x\) => x\.id === id\)/);
+  assert.match(src, /const record = activityRows\(activity, all, carriedJob\);\n\s+const \{ ledger, spending: moves \} = onScreen\(record, Date\.now\(\), ends, going\);/);
+  assert.match(src, /record\.spending\.find\(\(x\) => x\.id === id \|\| !!x\.parts\?\.some\(\(p\) => p\.id === id\)\)/);
 });
 
 test("the copy review's words (5 Nov): a step not begun says Then, plainly; a Send's payee is its short address or its name, never \"a Solana wallet\" (control: a name stays a name)", async () => {

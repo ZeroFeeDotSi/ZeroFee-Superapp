@@ -66,6 +66,7 @@ import { ChatKeys } from "./chat-keys.ts";
 import { SHOW_NEW_WORDS } from "./show-new-words.ts";
 import { readableWords, type AccountInfo, type Network, type PlainWords, type TxOutcome, type TxRequest } from "./signer.ts";
 import { READS } from "./read-deadline.ts";
+import { unexpectedFor } from "./money-calls.ts";
 import type { CoreAction } from "./tx-build.ts";
 import type { Vault } from "./vault.ts";
 import { readJson, readText } from "./net.ts";
@@ -728,6 +729,8 @@ const REGISTRAR: Record<string, string> = { mainnet: "near", testnet: "testnet" 
 const DEVICE_SEED = "device-seed";
 const RECOVERY_SEED = "recovery-seed";
 const RECIPIENTS = "known-recipients";
+/** The fence (the audit's C1, 7 Nov): the highest nonce this device's key may have signed, kept sealed so it outlives a restart. */
+const NONCE_MARK = "nonce-mark";
 /** The backup words' seed between the setup transaction (which put their recovery key on chain) and the moment the
  *  words are shown and checked (or "Check later"): this device's vault only, then deleted. */
 const PENDING_WORDS = "pending-words";
@@ -1046,7 +1049,7 @@ export class DemoCore implements Bridge {
       return { ok: r as T };
     } catch (e) {
       if (e instanceof ProblemError) return { problem: e.problem };
-      return { problem: securityProblems.unexpected(method, e) };
+      return { problem: unexpectedFor(method, e) };
     } finally {
       if (changes) this.stateEpoch++;
     }
@@ -1344,6 +1347,9 @@ export class DemoCore implements Bridge {
         return this.ready().then(() => this.tradeOnly(p)).then(() => this.subwallets.nearRheaSwap(p.ask));
       case "subwallet.near.rheaAdd":
         return this.ready().then(() => this.tradeOnly(p)).then(() => this.subwallets.nearRheaAdd(p.amount));
+      // a kept trade's coin back from Ref's lost and found (the audit's MUST, 7 Nov): signed here, sent by Trade. Trade's only
+      case "subwallet.near.rheaClaim":
+        return this.ready().then(() => this.tradeOnly(p)).then(() => this.subwallets.nearRheaClaim(p.coin));
       // The raw app id goes in (D55): a session covers only the app that started it, never a site's request.
       // Speed: Trade's own Solana, BNB Chain or Robinhood Chain transaction read ahead of the tap (SubWallets.preflight;
       // EVM: the coin signTx will be told, and the trade's earlier steps it runs after); signs nothing
@@ -1359,20 +1365,13 @@ export class DemoCore implements Bridge {
             const asker = p.app ? appName(String(p.app)) : undefined, app = p.app === undefined ? undefined : String(p.app);
             return p.call !== undefined ? this.subwallets.sendCall(p.id, p.call, p.why, p.site, asker, app) : this.subwallets.sendSol(p.id, p.tx, p.why, p.site, asker, app);
           });
-      // Wallet's own Send from a row (V4, the person's Hold): a plain transfer the core builds from that chain's current
-      // wallet. D143 (approval-policy.ts): a hot key never asks, so the Hold in Wallet is the act, and only Wallet's own
-      // call sends to an outside address this way: never Chat (it pays from the private balance), an app, a site or
-      // ZeroFee's own screens.
+      // A public transfer from a chain wallet: shut for every app and every build (the HARD RULE: every money move goes
+      // through NEAR Confidential; 83, 6 Nov). No screen sends it: Home's Send is ledger.hiddenFromRow and ledger.sendFromSafe.
       case "subwallet.send":
-        if (p.app !== "wallet") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Only your own Send in Home sends from your chain wallets.")));
-        // Wallet's Send offers only its rows' own coins: SOL on Solana, ETH on Robinhood Chain (review L)
-        if (p.app === "wallet" && ((p.chain !== "sol" && p.chain !== "hood") || p.token !== undefined)) return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Your Send sends only a wallet's own coin: SOL on Solana, ETH on Robinhood Chain.")));
-        // The web door refuses this call (web-wallet.ts: its only Send is subwallet.sendPrivate, the HARD RULE). Should it
-        // ever reach here on the web, decision A still holds: an outside address needs the password (passwordFirst)
-        return this.ready().then(() => this.subwallets.sendPlain(p.chain, p.to, p.amount, p.token, p.app === "chat" ? "ZeroFee Chat" : "ZeroFee", String(p.app), this.web ? () => this.web!.passwordFirst(p.password) : undefined));
+        return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("A public send from a wallet is off. Home's Send goes through NEAR Confidential.")));
       // The web wallet's private Send (QA's real path for WEB_SEND_OPEN, 5 Nov): one confidential 1Click quote from
       // the SOL or ETH (RH) wallet straight to the payee, the core's own quote and sheet (subwallets.sendPrivate). Wallet's
-      // own Send only, as subwallet.send; its status by the core's own kept tag.
+      // own Send only; its status by the core's own kept tag.
       case "subwallet.sendPrivate":
         if (p.app !== "wallet") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Only your own Send in Home sends from your chain wallets.")));
         return this.ready().then(() => this.subwallets.sendPrivate(p.chain, p.to, p.toTokenId, p.amount, String(p.app)));
@@ -1486,7 +1485,7 @@ export class DemoCore implements Bridge {
           .then(() => {
             if (p.app !== undefined && p.app !== "wallet") throw new ProblemError(securityProblems.requestNotAllowed("Only Wallet moves money into your private balance."));
           })
-          .then(() => this.subwallets.privateQuoteIn(p.tokenId, p.amount, p.outside === true, p.through === true, p.intents === true));
+          .then(() => this.subwallets.privateQuoteIn(p.tokenId, p.amount, p.outside === true, p.through === true, p.intents === true, p.job));
       case "subwallet.float.home":
         return this.ready().then(() => this.tradeOnly(p)).then(() => this.subwallets.floatHome(p.amount, p.key, p.parked));
       // Social Trading's Move back (product decision, 2 Nov): a site's own wallet → the Safe, on the core's own sheet. Only Wallet's
@@ -1560,6 +1559,11 @@ export class DemoCore implements Bridge {
       // Trade's native coins (through ledger.swap); the Safe's own sheet then checks its one mt_transfer against it
       case "subwallet.safeSwapQuote":
         return this.ready().then(() => this.tradeOnly(p, 1)).then(() => this.subwallets.safeSwapQuote(p.from, p.to, p.amount, p.atLeast));
+      // C2: a Move's wallet parts, kept by this core's own read for its one Safe sheet (Spending's, as Trade)
+      case "subwallet.moveOthers":
+        // only Spending's own engine (Trade's bridge, for Home's Move): never an app, a site, AgentZero or a call naming no one
+        if (p.app !== "trade") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Only your own Move in Home says its wallets' parts.")));
+        return this.ready().then(() => this.subwallets.moveOthers(p.job, p.others, p.end === true));
       case "subwallet.float.addStatus":
         return this.ready().then(() => this.tradeOnly(p)).then(() => this.subwallets.floatAddStatus(p.depositAddress, p.job));
       // V4 Send: Hidden from a row (SOL, ETH on Robinhood) under one Approve (subwallets.hiddenFromRow). Wallet's own Send only.
@@ -1567,7 +1571,19 @@ export class DemoCore implements Bridge {
         if (p.app !== undefined && p.app !== "wallet") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Only your own Send pays from Private.")));
         return this.ready().then(() => this.subwallets.hiddenFromRow(p.chain, p.inDeposit, p.outDeposit, p.intent, p.outTag, p.why, p.payee, p.coin));
       case "subwallet.privatePay":
-        return this.ready().then(() => this.ownKind(p)).then(() => this.subwallets.privatePay(p.id, p.depositAddress, p.intent, p.why, p.statusTag, p.inDeposit, p.send === true, p.payee));
+        return this.ready().then(() => this.ownKind(p)).then(async () => this.subwallets.privatePay(p.id, p.depositAddress, p.intent, p.why, p.statusTag, p.inDeposit, p.send === true, p.payee, (await import("./send-words.ts")).pairAsked(p), p.job));
+      // a Move's plan (the audit's ruling, 7 Nov: one fill for the whole Move), worked out and kept by this core. Wallet's own only
+      case "subwallet.movePlan":
+        if (p.app !== undefined && p.app !== "wallet") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Another app asked Private to pay, so ZeroFee stopped this. Nothing moved.")));
+        return this.ready().then(() => this.subwallets.movePlan(p.job, p.tokenId, p.parts, p.share, p.price, p.decimals, p.whole, p.safeHas));
+      // the one Face ID's leg 2 (the audit's MUST, 6 Nov): kept in this core's vault, handed to 1Click by the core itself only once
+      // leg 1 reads SUCCESS with its tag; deleted when the Send's job ends. Wallet's own Send only
+      case "subwallet.pairHand":
+        if (p.app !== undefined && p.app !== "wallet") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Only your own Send pays from Private.")));
+        return this.ready().then(() => this.subwallets.pairHand(p.inDeposit, p.outDeposit));
+      case "subwallet.pairEnd":
+        if (p.app !== undefined && p.app !== "wallet") return Promise.reject(new ProblemError(securityProblems.requestNotAllowed("Only your own Send pays from Private.")));
+        return this.ready().then(() => this.subwallets.pairEnd(p.inDeposit, p.outDeposit));
       case "subwallet.export":
         return this.ready()
           .then(() => this.ownKind(p, true))
@@ -1715,6 +1731,11 @@ export class DemoCore implements Bridge {
       approve: this.approveOnSheet,
       knownRecipients: known,
       onNewRecipient: () => void this.vault.put(RECIPIENTS, utf8(JSON.stringify([...known]))),
+      // the fence: written before every signature, read once (dev-signer nonceFloor); kept by key, so another key's is ignored
+      nonceMark: {
+        get: async () => { const raw = await this.vault.get(NONCE_MARK); return raw ? new TextDecoder().decode(raw) : null; },
+        put: (value) => this.vault.put(NONCE_MARK, utf8(value)),
+      },
       // The account's own record of sends, so one made on another device or before a restore is known too (02f).
       // NEAR and every coin it sent (activity.ts recipientsOf): the same list the first-time warning reads for all of them
       // a partial history (B33) isn't kept as the whole list of people paid before: the next sheet asks again (review L1;
@@ -1738,6 +1759,15 @@ export class DemoCore implements Bridge {
       intentOf: (depositAddress) => this.subwallets.intentOf(depositAddress),
       // a Send's payout joined to this move into Private (subwallets sendPayout): its fill sheet says it
       sendPayout: async (depositAddress) => this.subwallets.sendPayout(depositAddress),
+      // the one Face ID (audit, 6 Nov): a Send's leg 2 held for its fill's one sheet, released by its signature only, once
+      pairOf: (paid) => this.subwallets.pairOf(paid),
+      releasePair: (inDeposit, hash) => this.subwallets.releasePair(inDeposit, hash),
+      dropPair: (inDeposit) => this.subwallets.dropPair(inDeposit),
+      endPair: (inDeposit) => this.subwallets.pairEnd(inDeposit),
+      // the action's last signature is made, before anything is sent: the shell makes its job then ("Job created.")
+      onSigned: (job) => this.emit("job.signed", job ? { jobKey: job } : {}),
+      // a job's sheet is about to show (the chip's on the phone): its row waits on the Face ID (the audit's MUST, 7 Nov)
+      onAsked: (job) => this.emit("approval.asked", { jobKey: job }),
       ...(this.quoteKey ? { quoteKey: this.quoteKey } : {}),
       changeLevel: (method, band, block) => this.changeLevel(accountId, method, band, block),
       nearUsd: () => this.sheetNearUsd(),

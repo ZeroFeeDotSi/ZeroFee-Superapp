@@ -24,7 +24,7 @@ test("the sheet: a password field when asked, Approve sends it, a wrong one stay
   const view = readFileSync(new URL("./ApprovalSheetView.tsx", import.meta.url), "utf8");
   assert.match(view, /\{password && \(/);
   assert.match(view, /type="password"/);
-  assert.match(view, /const canApprove = armed && atEnd && \(!password \|\| typed\.length > 0\);/);
+  assert.match(view, /const canApprove = !pending && armed && atEnd && \(!password \|\| typed\.length > 0\);/);
   assert.match(view, /<button className="zf-link" onClick=\{\(\) => answer\(false\)\}>Not now<\/button>/);
   assert.equal(W.ask, "Type your password to approve.");
 });

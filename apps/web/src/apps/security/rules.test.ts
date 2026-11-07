@@ -5,7 +5,7 @@ import { levelWords as sheetLevelWords } from "@zerofee/core/known-contracts";
 import { PHONE_WORDS, WEB_WORDS, onPhone } from "@zerofee/shell-api/approval-words.ts";
 import { readFileSync } from "node:fs";
 import { ruleChangeWait } from "./rules.ts";
-import { recoveryRowLine, ruleChangeFoot } from "./rules-lines.ts";
+import { ruleChangeFoot } from "./rules-lines.ts";
 import { DAY, FEW_COINS_LINE, HOUR, SAVED_STATUS, SAVING_STATUS, saveLabel, strengthWords, changeRuleLine, changeRuleWords, countsFewCoins, changeWaitSeconds, changed, fromCore, keepOrder, levelWords, rangeWords, toCore, usd, waitChoices, waitLabel, waitPlain, whenWords, type Band } from "./rules.ts";
 import { openOn, rulesNow } from "./rules-now.ts";
 
@@ -216,17 +216,17 @@ test("02e, E9: the score is never 'strong for big money' while the words take th
 });
 
 test("round 3: Protection says the rule-change wait in one line; the full rule is its disclosure, never dropped", () => {
-  assert.deepEqual(changeRuleLine(SAMPLE, 2 * DAY, PHONE_WORDS), { line: "Changing these rules waits 3 days.", waits: true });
+  assert.deepEqual(changeRuleLine(SAMPLE, 2 * DAY, PHONE_WORDS), { line: "A change to these rules takes 3 days.", waits: true });
   // the "Why changes wait" disclosure left with the design review (§3: "the one line says it"); the line still reads the account's rules (`from`)
   assert.match(readFileSync(new URL("./Protection.tsx", import.meta.url), "utf8"), /rule\.waits \? ruleChangeFoot\(strictestWait\(from\), recoveryDelaySeconds\) : rule\.line/);
   // S10a (the copy review's Sim walk): three waits, each named, each the contract's (lib.rs 1408: delay + min(delay, a day))
-  assert.equal(ruleChangeFoot(DAY, 7 * DAY), "Changing these rules waits 8 days. That's the 7-day recovery wait plus 1 day.");
+  assert.equal(ruleChangeFoot(DAY, 7 * DAY), "A change to these rules takes 8 days.", "the copy review's S5: the figure, no arithmetic");
   assert.equal(ruleChangeWait(DAY, 7 * DAY), 8 * DAY, "the figure is the contract's own");
-  assert.equal(recoveryRowLine(7 * DAY), "Backup words · a new phone waits 7 days");
-  assert.equal(ruleChangeFoot(10 * DAY, 7 * DAY), "Changing these rules waits 10 days.", "control: a longer band wait is the figure, said alone");
-  assert.equal(ruleChangeFoot(0, 0), "Changing these rules waits 1 minute.", "control: no recovery wait, no 'plus'");
+  assert.equal(ruleChangeFoot(10 * DAY, 7 * DAY), "A change to these rules takes 10 days.", "control: a longer band wait is the figure");
+  assert.equal(ruleChangeFoot(0, 0), "A change to these rules takes 1 minute.", "control: no recovery wait");
   const account = readFileSync(new URL("./SecurityApp.tsx", import.meta.url), "utf8");
-  assert.match(account, /: recoveryRowLine\(delay\)\}/, "Account's Recovery row says which wait it is");
+  // the copy review's S3 (7 Nov): the Recovery row says "Backup words" and no wait (the wait lives on Recovery): account-rows.ts
+  assert.match(account, /value=\{says\.recovery\.value\}/, "Account's Recovery row takes its words from accountRowWords");
   // No wait at all: the full sentence is already one short line, and nothing goes behind a tap.
   const none = changeRuleLine([{ upToUsd: null, level: "faceid", waitSeconds: 0 }], 0, PHONE_WORDS);
   assert.equal(none.waits, false);

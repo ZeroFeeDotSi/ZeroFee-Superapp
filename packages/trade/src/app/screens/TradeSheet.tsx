@@ -19,29 +19,33 @@ import { ProblemError, type NextStep, type Problem } from "@zerofee/core/problem
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import type { CoinDetail } from "../../market/types.ts";
 import { DEFAULT_POLICY, instantUsd } from "../../float.ts";
-import { buyRoomUsd } from "../buy-room.ts";
+import { buyRoomUsd, emptyWallet } from "../buy-room.ts";
 import { gasAfterBuy } from "../gas-after.ts";
 import { landedDetail, whenCosted } from "../landed-detail.ts";
 import { CHAINS, type TradeRecord } from "../../service.ts";
 import type { Amount, Prepared, Side } from "../../types.ts";
 import { amount as fmtAmount, change, keptLine, usd } from "../format.ts";
-import { tradeUsd } from "../../trade-usd.ts";
+import { saleNetUsd, tradeUsd } from "../../trade-usd.ts";
+import { heldNetQuote, marketGapLine } from "../held-net.ts";
+import { buyCostLine } from "../receipt-words.ts";
+import { markIfUnsellable } from "../not-for-sale.ts";
 import { buyPresets, canTap, intentOf, queuedGoes } from "../intent.ts";
 import { createFeedback } from "../feedback.ts";
+import { followRecord, recordOf, UNCONFIRMED } from "../unconfirmed-follow.ts";
 import { useOnline } from "../online.ts";
 import { useFloat, useLive, useTrade } from "../runtime.tsx";
-import { ShortChain } from "./ShortChain.tsx";
+import { addWords, ShortChain, shortWay } from "./ShortChain.tsx";
 import { shortChain } from "../boards.ts";
 import { secsText, TradeMoment, type MomentPhase } from "./Moment.tsx";
 import { tapBurst } from "@zerofee/design/tap.ts";
 import "./sheet.css";
 import "./buy-check.css";
 import { useQuickBuy } from "./quick-buy.ts";
-import { ASK_LIMIT_MS, QUEUED_LIMIT_MS, boughtRaw, buttonWords, buyLabel, createAsks, createOneTap, openAmount, quoteDelayMs, withCommas, withinMs } from "./buy-button.ts";
+import { ASK_LIMIT_MS, QUEUED_LIMIT_MS, boughtRaw, buttonWords, buyButtonLabel, buyLabel, createAsks, createOneTap, openAmount, quoteDelayMs, withCommas, withinMs } from "./buy-button.ts";
 import { tradeProblems } from "../../trade-problems.ts";
 import { coinGlow } from "../glow.ts";
 import { useSwitchedLine } from "../../near/switched.ts";
-import { getLine, paidLine } from "../paid.ts";
+import { getLine, paidLine, saleLine } from "../paid.ts";
 import { WALLET_NAME } from "@zerofee/core/spending";
 
 const SELL_PRESETS = ["25", "50", "100"];
@@ -68,7 +72,7 @@ const GAS_USD = 2.5;
  *  the page stays as its receipt until Close (review 12). */
 export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onClose, onDone, onProblem, onOpen }: { side: Side; coin: CoinDetail; start?: string; filledBy?: string; onBusy?: (busy: boolean) => void; onSwitch?: (side: Side) => void; onClose: () => void; onDone: (r: TradeRecord, value: string) => void; onProblem: (p: Problem) => Promise<NextStep>; onOpen?: (screen: string, value: string) => boolean }) {
   const { svc, active } = useTrade();
-  const { bridge, tasks } = useShell();
+  const { bridge, tasks, endProblem } = useShell();
   const feel = useMemo(() => createFeedback(bridge), [bridge]);
   const online = useOnline();
   // the Quick buy amount from Settings, the one the row's Buy chip buys with: a buy opens on it, its chip lit (product decision, 5 Nov)
@@ -159,6 +163,8 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
     return () => { clearTimeout(first); clearInterval(again); };
   }, [value, side, coin.chain, coin.address, svc, active, Math.floor(chainReady), readied]);
 
+  // a coin the quote refused for it can't be sold says "Not for sale" on its list rows from now on (the audit's note)
+  useEffect(() => markIfUnsellable(quote.problem?.code, coin.chain, coin.address), [quote.problem?.code, coin.chain, coin.address]);
   const [gasAsked, setGasAsked] = useState(false);
   // a press kept for the intent it was made for (the quote not ready yet, or a sale's fee still on its way)
   const [queued, setQueued] = useState<string | null>(null);
@@ -166,8 +172,25 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
   // the moment (Moment.tsx): the page becomes the trade from the tap (D143: the core asks nothing, no Face ID), and the
   // real time from the tap to the chain is measured here, where the person's finger was
   // `got`: the coins ("7,505"); `usd`: the dollars from the signed quote, the chain's own figure once read (Receipt.tsx)
-  const [moment, setMoment] = useState<{ phase: MomentPhase; at: number; ms?: number; got: string; usd?: string; feeTaken?: boolean; feeUsd?: string; tx?: { chain: string; hash: string } } | null>(null);
+  const [moment, setMoment] = useState<{ phase: MomentPhase; at: number; ms?: number; got: string; usd?: string; feeTaken?: boolean; feeUsd?: string; tx?: { chain: string; hash: string }; cost?: string | null } | null>(null);
+  // T2-4 (the copy review's walk): the receipt's holding figure is what selling all of it gets now, by the Sell sheet's own function
+  // (trade-usd.ts heldNetUsd), from one sale quote for exactly the coins held. Until it answers, or if it can't, the line
+  // shows the coins only: the market price times the coins (pos.valueUsd) is not what a sale gets, so it is never shown here
+  const [heldNet, setHeldNet] = useState<{ raw: string; usd: number } | null>(null);
+  const done = moment?.phase === "done", heldRaw = pos.value?.raw;
+  useEffect(() => {
+    if (!done || !heldRaw || BigInt(heldRaw) <= 0n) return;
+    let live = true;
+    // the audit's MUST: a figure only (held-net.ts): the prepared sale is never readied, signed, sent or booked, and is dropped there
+    void heldNetQuote(svc.quote, coin.chain, coin.address, heldRaw).then((net) => {
+      if (live && net !== undefined) setHeldNet({ raw: heldRaw, usd: net });
+    }, () => undefined);
+    return () => { live = false; };
+  }, [done, heldRaw, coin.chain, coin.address, svc]);
   const leave = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // QA QA's SHOULD (8 Nov): a buy's receipt names, once, what lies between what it paid and its coins' worth: its own
+  // quote's gap over the market price and the network fee it paid (the chain's booked figure, else its quote's)
+  const costOf = (r: TradeRecord): string | null => (r.kind === "buy" ? buyCostLine(r.quote, r.costs?.feeUsd ?? r.quote?.feeUsd) : null);
   // the receipt's figures, read from the quote at the moment it lands (set below, where the quote is read)
   let heroOf = (): string => "";
   let coinsOf = (_fill?: TradeRecord["fill"]): string => "";
@@ -175,6 +198,13 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
   // as not gone in the 1.6 s between landing and onDone (re-review M1)
   useEffect(() => { onBusy?.(busy || moment?.phase === "done" || moment?.phase === "checking"); }, [busy, moment?.phase]);
   useEffect(() => () => clearTimeout(leave.current), []);
+  // QA and the audit's MUST (7 Nov): while the "not confirmed yet" card is on screen and Trade is, the service looks at
+  // the trade again every RECHECK_MS (history reads only); closing the card, leaving Trade or the background stops it
+  const [watching, setWatching] = useState(false);
+  useEffect(() => (watching && active ? svc.watch() : undefined), [watching, active, svc]);
+  // a trade still not confirmed when its card closed: its task is followed until it ends, or this page goes
+  const following = useRef<(() => void) | null>(null);
+  useEffect(() => () => { following.current?.(); following.current = null; }, []);
   // one tap, one trade: taken before any await, never React state (a second click lands before the next render)
   const oneTap = useRef(createOneTap()).current;
   const tap = async () => {
@@ -205,7 +235,7 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
         // the receipt's figure is the chain's once it is read (a buy's every cent out, a sale's every cent in)
         // its proof on the receipt: the short tx id, Copy and View (webd-money2 crawl, 4 Nov: no tx id on Bought / Sold)
         const last = rec.hashes?.[rec.hashes.length - 1];
-        setMoment({ phase: "done", at, got: coinsOf(rec.fill), usd: rec.costs ? usd(side === "sell" ? tradeUsd(rec) : rec.amountUsd) : heroOf(), ms: performance.now() - at, ...(last ? { tx: { chain: coin.chain, hash: last } } : {}) });
+        setMoment({ phase: "done", at, got: coinsOf(rec.fill), usd: rec.costs ? usd(side === "sell" ? tradeUsd(rec) : rec.amountUsd) : heroOf(), ms: performance.now() - at, ...(last ? { tx: { chain: coin.chain, hash: last } } : {}), cost: costOf(rec) });
         // told at once (the record, the ask, the next open's amount); the page stays as the receipt (review 12)
         onDone(rec, value);
         pos.reload();
@@ -223,6 +253,36 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
     } catch (e) {
       // a trade the core refused shows the core's Problem, named; nothing was sent
       setMoment(null);
+      // a trade sent that no read can place yet (it may still land): never a failed task or buzz; its card ends the moment
+      // the chain answers (the service's live re-check): landed is the normal done, a proven expiry its own card
+      if (e instanceof ProblemError && e.problem.code === UNCONFIRMED) {
+        const p = e.problem, rec = await recordOf(svc, p);
+        const wallet = side === "buy" ? `In ${walletName}` : `Back in ${walletName}`;
+        tasks?.update(taskId, { detail: "Not confirmed yet", steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "doing" }, { label: wallet, state: "waiting" }] });
+        let ended: TradeRecord | undefined, now: Problem = p;
+        const taskOf = (r: TradeRecord) => {
+          if (r.status === "done") { const t = Date.now(); tasks?.update(taskId, { detail: "Landed", steps: [{ label: "Sent", state: "done", at: taskAt }, { label: "Landed", state: "done", at: t }, { label: wallet, state: "done", at: t }] }); tasks?.end(taskId, "done"); }
+          else taskEnd("failed", r.problem?.whatHappened);
+        };
+        // its words changed (the live look stopped after an hour): the card is shown again with them
+        const stop = rec ? followRecord(svc, rec.id, (r) => { ended = r; taskOf(r); endProblem?.(now); }, (r) => { const was = now; now = r.problem!; endProblem?.(was); }) : () => {};
+        setWatching(true);
+        await onProblem(p);
+        while (!ended && now !== p && now.code === UNCONFIRMED) { const shown = now; await onProblem(shown); if (now === shown) break; }
+        setWatching(false);
+        if (!ended) { following.current?.(); following.current = stop; return; }
+        const r = ended as TradeRecord;
+        if (r.status === "done") {
+          void feel.filled(side);
+          setMoment({ phase: "done", at, got: coinsOf(r.fill), usd: r.costs ? usd(side === "sell" ? tradeUsd(r) : r.amountUsd) : heroOf(), ...(r.hashes.at(-1) ? { tx: { chain: coin.chain, hash: r.hashes.at(-1)! } } : {}), cost: costOf(r) });
+          onDone(r, value);
+          pos.reload();
+          return;
+        }
+        feel.failed();
+        if (r.problem) await onProblem(r.problem);
+        return;
+      }
       taskEnd("failed", e instanceof ProblemError ? e.problem.whatHappened : "It didn't go through. Nothing moved.");
       feel.failed();
       const next = e instanceof ProblemError ? await onProblem(e.problem) : undefined;
@@ -254,7 +314,11 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
   const gettingReady = side === "buy" && (!floatSnap.loaded || landing || stale) && /^trade\.(sol\.low|wallet\.empty)$/.test(quote.problem?.code ?? "");
   const ready = chainView ? buyRoomUsd(chainView) : side === "buy" && wallet.value ? instantUsd({ onChain: { [coin.chain]: wallet.value.nativeUsd }, floatUsd: 0 }, DEFAULT_POLICY, coin.chain) : 0;
   const short = side === "buy" && !!chainView && /^trade\.(sol\.low|wallet\.empty)$/.test(quote.problem?.code ?? "") && Number(value) > ready;
-  const shortBuyNow = short && chainView ? shortChain({ ...chainView, readyUsd: ready }, Number(value)).buyNow : undefined;
+  // T2-5 (the copy review's walk): the smaller buy is all it can spend, with cents like every Buy button ("Buy $144.06 instead"; was
+  // whole dollars, "$144"), the same figure as Max and the sheet's "to spend"
+  const shortBuyNow = short && chainView && shortChain({ ...chainView, readyUsd: ready }, Number(value)).buyNow !== undefined ? Math.floor(ready * 100) / 100 : undefined;
+  // and the one way on when nothing spare can move: the floor's quiet second button (ShortChain.shortWay)
+  const shortAdd = short && !!fc && !!chainView && shortWay(chainView, Number(value), floatSnap.reserveUsd) === "add";
 
   // step one of a sale with no gas: the fee goes from Trading to this chain's wallet, once
   useEffect(() => {
@@ -307,6 +371,8 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
   // (a web test, the copywriter's line)
   const keptUsd = side === "buy" && chainView ? Math.round((chainView.nativeUsd - buyRoomUsd(chainView)) * 100) / 100 : 0;
   const walletName = WALLET_NAME[coin.chain];
+  // a buy's wallet with nothing in it is never a dead Buy (the copy review's ruling, 7 Nov): its refusal, and one lit "Add money to it"
+  const empty = emptyWallet({ side, loaded: floatSnap.loaded, chain: chainView, landing, walletName });
   const gasAfter = side === "buy" && q && fc && wallet.value ? gasAfterBuy({ chain: fc, nativeUsd: wallet.value.nativeUsd, payUsd: q.payUsd, feeUsd: q.feeUsd, floatUsd: floatSnap.reserveUsd }) : null;
   // the review (TRADE-A-PLUS 13): dollars first, as the approved mockup has them; Max is what the wallet has ready. A sale is
   // a share of what is held (25 % · 50 % · All), said in the quote's own dollars
@@ -316,15 +382,18 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
     : SELL_PRESETS.map((v) => [v === "100" ? "All" : `${v}%`, v] as const);
   // the hero: a buy's typed dollars; a sale's dollars from its quote (a shimmer until it comes), never a percent
   // a sale's one figure (trade-usd.ts): what comes back, the same on the button, the receipt and Activity (test)
-  const saleFigure = q ? tradeUsd({ kind: "sell", amountUsd: q.getUsd, quote: q }) : 0;
+  // T2-4: the one net rule (trade-usd.ts saleNetUsd), the same function the receipt's holding line reads
+  const saleFigure = q ? saleNetUsd(q) : 0;
   const big = side === "buy" ? `$${withCommas(value || "0")}` : q ? usd(saleFigure) : "";
   const fs = big.length <= 4 ? 84 : big.length <= 6 ? 70 : big.length <= 8 ? 58 : 46;
   const ready2 = online && canTap(quote, intent, busy) && !quote.problem;
   const checking = !!q && !quote.checked && !busy && online;
   const soldText = side === "sell" && pos.value ? `${fmtAmount(BigInt(pos.value.raw) * BigInt(Math.round(share * 1e6)) / 1_000_000n, pos.value.decimals)} ${symbol}` : "";
   // a dot never leads the line (UI audit 5 Nov): a sale with no holding read yet says "Fee $0.002" alone (paid.ts getLine)
-  const getWords = q ? getLine(side === "buy" ? `About ${fmtAmount(q.getRaw, q.decimals)} ${symbol}` : soldText, usd(q.feeUsd)) : { head: "", fee: "" };
+  // T2-4: a sale says its fee once, "Fee $0.002", in the copy review's form (the quote's own network fee, never a figure made up)
+  const getWords = q ? (side === "buy" ? getLine(`About ${fmtAmount(q.getRaw, q.decimals)} ${symbol}`, usd(q.feeUsd)) : saleLine(soldText, usd(q.feeUsd))) : { head: "", fee: "" };
   const label2 = side === "sell" && q ? `Sell ${usd(saleFigure)} of ${symbol}` : label;
+  const gapLine = q ? marketGapLine(side, q) : null;
   // the moment's figures: dollars first (a buy's pay, a sale's proceeds), then the coins and where (review 12)
   heroOf = () => (q ? usd(side === "buy" ? q.payUsd : saleFigure) : "");
   // what landed (the fill), as Activity and Sell say it; the quote's figure only until the fill is known (re-test)
@@ -342,11 +411,23 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
           <TradeMoment phase={moment.phase} side={side} symbol={symbol} logo={coin.logoUrl} coinAmount={moment.got} where={walletName} usd={moment.phase !== "done" && side === "sell" ? `About ${heroOf()}` : moment.usd ?? heroOf()} tapAt={moment.at}
             {...(moment.phase === "done" && moment.tx ? { tx: moment.tx } : {})} {...(moment.feeTaken ? { feeTaken: true } : {})} {...(moment.feeUsd ? { feeUsd: moment.feeUsd } : {})} {...(moment.ms !== undefined ? { landedMs: moment.ms } : {})}
             {...(moment.phase === "done" ? {
-              held: pos.value && BigInt(pos.value.raw) > 0n ? { coins: `${fmtAmount(pos.value.raw, pos.value.decimals)} ${symbol}`, ...(pos.value.valueUsd !== undefined ? { usd: usd(pos.value.valueUsd) } : {}) } : undefined,
+              held: pos.value && BigInt(pos.value.raw) > 0n ? { coins: `${fmtAmount(pos.value.raw, pos.value.decimals)} ${symbol}`, ...(heldNet?.raw === pos.value.raw ? { usd: usd(heldNet.usd) } : {}) } : undefined,
+              ...(moment.cost ? { cost: moment.cost } : {}),
               ...(side === "buy" ? { onSell: () => onSwitch?.("sell"), onMore: () => { setMoment(null); feel.key(); } } : {}),
             } : moment.phase === "refused" ? { onMore: () => { setMoment(null); feel.key(); } } : {})}
             onDone={onClose} />
-        ) : (<>
+        ) : empty ? (<>
+          <div className="tp-coin">
+            <span className="zf-halo zf-halo--big is-on tp-logo">{coin.logoUrl && <img className="zf-halo__light" src={coin.logoUrl} alt="" />}<CoinIcon symbol={symbol} src={coin.logoUrl} size={56} /></span>
+          </div>
+          <div className="tr-inline tp-empty" role="alert" data-testid="trade-empty">
+            <p className="zf-body">{empty.head}</p>
+            <p className="zf-small">{empty.body}</p>
+          </div>
+          <div className="tp-floor">
+            <button className="zf-btn tr-press tp-go" data-ready="1" onClick={() => { feel.key(); onOpen?.("move", value); }}>{empty.add}</button>
+          </div>
+        </>) : (<>
           {/* the coin is its logo; its name is the title (said once, review 14) */}
           <div className="tp-coin">
             <span className="zf-halo zf-halo--big is-on tp-logo">{coin.logoUrl && <img className="zf-halo__light" src={coin.logoUrl} alt="" />}<CoinIcon symbol={symbol} src={coin.logoUrl} size={56} /></span>
@@ -360,6 +441,8 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
             {q ? <>{getWords.head}<span className="tp-fee">{getWords.fee}</span><span className="tp-chev" aria-hidden="true" /></>
               : " "}
           </button>
+          {/* the audit's SHOULD, the copy review's words: how far the quote is from the market price, one mute line, never called a fee */}
+          {gapLine && <p className="zf-small tp-gap" data-testid="trade-quote-gap">{gapLine}</p>}
           {switched && coin.chain === "near" && <p className="zf-small tp-switched" role="status" data-testid="near-switched">{switched}</p>}
           {filledBy && value === (start ?? value) && <p className="tp-filled" role="note"><span className="tp-orb" aria-hidden="true" />{filledBy}</p>}
           <p className="tp-pay">
@@ -381,7 +464,7 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
           ) : gettingReady ? (
             <div className="tr-inline"><div className="zf-body tr-getready"><Mark size={18} mode="loading" /> Getting {walletName} ready…</div></div>
           ) : short ? (
-            fc && <ShortChain chain={fc} wantUsd={Number(value)} walletName={walletName} onAdd={() => { onOpen?.("move", value); }} onProblem={onProblem} />
+            fc && <ShortChain chain={fc} wantUsd={Number(value)} wantText={big} haveUsd={usd(ready)} walletName={walletName} onProblem={onProblem} />
           ) : readying ? (
             <div className="tr-inline"><div className="zf-body tr-getready"><Mark size={18} mode="loading" /> Moving your NEAR to Rhea…</div></div>
           ) : quote.problem ? (
@@ -393,6 +476,8 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
                 // near/problems.ts RHEA_READY_SCREEN: the sheet's own step, run here (never Trade's screens)
                 if (p.next.kind === "open" && p.next.screen === "near-rhea-ready") { void readyNear(); return; }
                 if (p.next.kind === "open" && onOpen?.(p.next.screen, value)) return;
+                // "Go back" (an unseen trap coin's refusal, the audit's note): back to where the sheet was opened from
+                if (p.next.kind === "nothing") { onClose(); return; }
                 void onProblem(p).then((next) => { if (next.kind === "fix-input") { setFresh(true); setKeypad(true); } });
               }}>{quote.problem.next.label}</button>
             </div>
@@ -417,15 +502,17 @@ export function TradeSheet({ side, coin, start, filledBy, onBusy, onSwitch, onCl
               <button className={`zf-btn tr-press tp-go${checking ? " tp-go--checking" : ""}`} disabled={busy || queued === intent || !isPositive(value) || !online} onClick={(e) => press(e.currentTarget)} data-ready={ready2 ? "1" : undefined} aria-busy={checking || undefined}>
                 {/* the words stay "Buy $25 of DOPE" while it's checked (UX audit 4 Nov: they flipped twice on every amount);
                     the check is the thin line filling along the button's edge, and a press is kept */}
-                {buttonWords({ online, busy, queued: queued === intent, side, label: label2 })}
+                {buttonWords({ online, busy, queued: queued === intent, side, label: side === "buy" ? buyButtonLabel(value) : label2 })}
                 {checking && <span className="tp-check" aria-hidden="true" />}
               </button>
             )}
             {/* not enough money: the one button is the buy the wallet can pay (UX audit 4 Nov: the button went, and the
                 smaller buy was an underlined link) */}
             {short && shortBuyNow !== undefined && (
-              <button className="zf-btn tr-press tp-go" onClick={() => { feel.key(); setFresh(true); instant.current = true; setValue(String(shortBuyNow)); }}>{`Buy $${shortBuyNow.toLocaleString("en-US")} instead`}</button>
+              <button className="zf-btn tr-press tp-go" onClick={() => { feel.key(); setFresh(true); instant.current = true; setValue(String(shortBuyNow)); }}>{`Buy ${usd(shortBuyNow)} instead`}</button>
             )}
+            {/* T2-5: second and quiet, a real 44 px button (was bold text in the page) */}
+            {shortAdd && fc && <button className="zf-btn zf-btn--quiet tp-add-quiet" onClick={() => { onOpen?.("move", value); }}>{addWords(fc, walletName)}</button>}
           </div>
         </>)}
       </div>

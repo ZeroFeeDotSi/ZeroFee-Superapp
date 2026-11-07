@@ -147,7 +147,7 @@ test("privacy audit (4 Nov, review): Max says exactly what goes to them and that
   assert.equal(maxSendLine({ max: "5", symbol: "USDC", pocket: "5" }, "5", 6), null, "all of it already private: nothing rounded, nothing said");
   assert.equal(maxSendLine(sol, "1.42", undefined), "Some of it stays in Private.");
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
-  assert.match(form, /maxLine && <p className="zf-small wl-send2__coins" data-testid="send-max-line">\{maxLine\}<\/p>/, "the sheet shows it");
+  assert.match(form, /under\.max \? <p className="zf-small wl-send2__coins" data-testid="send-max-line">\{under\.max\}<\/p>/, "the sheet shows it, in the one slot (copy review, 6 Nov)");
 });
 
 test("QA's condition on D70's default: someone who expected their SOL wallet sees it's the Safe before any approval (control: a wallet preset still says its wallet)", async () => {
@@ -166,7 +166,7 @@ test("QA's condition on D70's default: someone who expected their SOL wallet see
   await mock.call("account.create", { recoveryDelaySeconds: 172_800 });
   await mock.call("ledger.sendFromSafe", { app: "wallet", tokenId: "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", amount: "5", to: { kind: "chain", chain: "sol", address: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU" } });
   assert.ok(sheet, "an approval sheet was shown");
-  assert.ok((sheet as { lines?: string[] }).lines!.some((l) => /leaves your private balance/.test(l)), JSON.stringify(sheet));
+  assert.ok((sheet as { lines?: string[] }).lines!.some((l) => /leaves Private on NEAR/.test(l)), JSON.stringify(sheet));
   assert.match(readFileSync(new URL("../../../../core/src/intents.ts", import.meta.url), "utf8"), /lines: \["From your Safe\."\]/);
 });
 

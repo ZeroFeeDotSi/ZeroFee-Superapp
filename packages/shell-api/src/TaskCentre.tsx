@@ -5,10 +5,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { LiveRow, progressOf, timeSlot, type LiveRowState } from "@zerofee/design/LiveRow.tsx";
+import { checkpointAt, checkpointKind } from "@zerofee/design/checkpoints.ts";
 import { ago, tickEvery } from "@zerofee/design/time.ts";
 import { ActSwap, AppAgent, AppBrowser, AppChat, AppHome, AppTrade } from "@zerofee/design/icons.tsx";
 import { useShell } from "./AppFrame.tsx";
-import { timeLeft } from "./job-steps.ts";
+import { cardStep, timeLeft } from "./job-steps.ts";
 import { TASK_APP_HOME, taskStore, type Task, type TaskApp } from "./tasks.ts";
 import { useAppHistories, useHistory } from "./history-slot.ts";
 import { earlierOf } from "./task-earlier.ts";
@@ -33,15 +34,15 @@ const ROW_STATE: Record<Task["state"], LiveRowState> = { pending: "going", done:
 
 /** A going task's one line: the step under way (or next) and the time LEFT from the protocol's own estimate (its endsAt;
  *  product decision, 5 Nov), or that there is none: never the time spent. */
-export function goingLine(t: Pick<Task, "steps" | "startedAt" | "endsAt">, now: number): string {
+export function goingLine(t: Pick<Task, "steps" | "startedAt" | "endsAt"> & { title?: string }, now: number): string {
   const step = t.steps.find((s) => s.state === "doing") ?? t.steps.find((s) => s.state === "waiting") ?? t.steps.at(-1);
   const left = timeLeft(t.endsAt, now, t.startedAt);
-  return step ? `${step.label} · ${left}` : left;
+  return step ? `${cardStep(step.label, t.title)} · ${left}` : left;
 }
 
 /** The going line's two columns (real-tap proof, 6 Nov: at 390 wide, "NEAR Intents is swapping it · 1 s left" lost its time):
  *  the step on the left, the time left under the dollars, as Home's own row (LiveTrack.tsx rowParts). No step: the time alone. */
-export function goingParts(t: Pick<Task, "steps" | "startedAt" | "endsAt">, now: number): { line: string; left?: string } {
+export function goingParts(t: Pick<Task, "steps" | "startedAt" | "endsAt"> & { title?: string }, now: number): { line: string; left?: string } {
   const line = goingLine(t, now);
   const at = line.lastIndexOf(" · ");
   return at < 0 ? { line } : { line: line.slice(0, at), left: line.slice(at + 3) };
@@ -94,7 +95,7 @@ export function TaskCentre({ onClose, onBack, only, onAll }: { onClose: () => vo
     const when = parts ? slot.when : ago(new Date(t.endedAt ?? t.updatedAt ?? t.startedAt).toISOString(), Date.now());
     return (
       <li key={`${t.app}:${t.id}`}>
-        <LiveRow mark={<Icon />} title={t.title} line={parts ? parts.line : line} {...(slot.below ? { below: slot.below } : {})} usd={t.usd} when={when} state={ROW_STATE[t.state]} p={going ? progressOf(t.steps) : undefined}
+        <LiveRow mark={<Icon />} title={t.title} line={parts ? parts.line : line} {...(slot.below ? { below: slot.below } : {})} usd={t.usd} when={when} state={ROW_STATE[t.state]} p={going ? progressOf(t.steps) : undefined} {...(going ? { track: { kind: checkpointKind(t), at: checkpointAt(t.steps) } } : {})}
           onOpen={() => (hasReceipt(t) ? setOver(<Receipt t={t} onClose={() => setOver(null)} onView={(url) => { setOver(null); onClose(); shell.openApp("browser", undefined, url); }} />) : open(t))} label={[t.title, line, t.usd, parts ? undefined : when, `Open ${TASK_APP_HOME[t.app].name}`].filter(Boolean).join(". ")} />
         {t.proof?.map((x) => <TxProofLine key={x.hash} tx={x} onView={(url) => { onClose(); shell.openApp("browser", undefined, url); }} />)}
       </li>

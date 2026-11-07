@@ -38,15 +38,15 @@ const CONVERT = mv({ id: "convert:c", kind: "convert", from: SOL, to: USDC, amou
 
 test("each Activity kind reads the coin that moved, with its own amount and dollars (known answers)", () => {
   const rows: [Movement, string, string, string | null][] = [
-    [HIDDEN_PAY, "Sent", "5 USDC from your private balance · to bob.near", "$5.00"],
-    [HIDDEN_ADDR, "Sent", "7.5 USDC from your private balance · to 13Qkxh…r6gjRK", "$7.50"],
-    [ROW_HIDDEN, "Sent", "0.0515 SOL from your private balance · to 13Qkxh…r6gjRK", "$5.24"],
-    [KIOSK, "Paid · Kiosk", "4.2 USDC · to kiosk.near", "$4.20"],
-    [SENT, "Sent", "18 USDC · to kim.near", "$18.00"],
-    [OUT, "Sent", "0.25 SOL · to 13Qkxh…r6gjRK", "$25.44"],
+    [HIDDEN_PAY, "Sent", "From Private · to bob.near", "$5.00"],
+    [HIDDEN_ADDR, "Sent", "From Private · to 13Qkxh…r6gjRK", "$7.50"],
+    [ROW_HIDDEN, "Sent", "From your SOL wallet · to 13Qkxh…r6gjRK", "$5.24"],
+    [KIOSK, "Paid · Kiosk", "to kiosk.near", "$4.20"],
+    [SENT, "Sent", "to kim.near", "$18.00"],
+    [OUT, "Sent", "to 13Qkxh…r6gjRK", "$25.44"],
     [IN, "Received", "42.1 USDC from Bitcoin · in your Safe", "$42.10"],
-    [TO_HIDDEN, "Moved to your private balance", "40 USDC · in your private balance · anyone can see this move", "$40.00"],
-    [FROM_HIDDEN, "Moved out of your private balance", "12.5 USDC · in your Safe", "$12.50"],
+    [TO_HIDDEN, "Moved to Private", "Into Private from your Safe.", "$40.00"],
+    [FROM_HIDDEN, "Moved out of Private", "in your Safe", "$12.50"],
     [TOP_UP, "Moved $10.00 to your NEAR wallet", "10.00 USDC · in your NEAR wallet", null],
     [CONVERT, "Converted", "0.5 SOL to USDC · in your Safe", "$50.88"],
   ];
@@ -57,14 +57,14 @@ test("each Activity kind reads the coin that moved, with its own amount and doll
 });
 
 test("the $10 Swap from your private balance into my own SOL row: 10.02 USDC moved to my SOL row, $10.02, never 0.09 USDC or a payment; control: the demo's old record reads $0.10", () => {
-  assert.deepEqual(describe(SWAP, TOKENS, CHAINS, OWN), { title: "Moved to your SOL wallet", detail: "10.02 USDC from your private balance" });
+  assert.deepEqual(describe(SWAP, TOKENS, CHAINS, OWN), { title: "Moved to your SOL wallet", detail: "From Private." }, "the copy review's words, 7 Nov");
   assert.equal(movementDollars(SWAP, TOKENS), "$10.02");
-  assert.deepEqual(describe({ ...SWAP, status: "moving" }, TOKENS, CHAINS, OWN), { title: "Moving to your SOL wallet", detail: "10.02 USDC from your private balance · on its way to your SOL wallet" });
+  assert.deepEqual(describe({ ...SWAP, status: "moving" }, TOKENS, CHAINS, OWN), { title: "Moving to your SOL wallet", detail: "From Private · on its way to your SOL wallet" });
   // an EVM row matched in any case
   assert.equal(describe({ ...SWAP, to: MY_ETH.toLowerCase() }, TOKENS, CHAINS, OWN).title, "Moved to your ETH (RH) wallet");
   // control: the demo's old record (SOL's out-amount under USDC, no payee) is the bug as QA saw it
   const old = { ...SWAP, amount: "0.09828010", to: undefined } as Movement;
-  assert.deepEqual(describe(old, TOKENS, CHAINS, OWN), { title: "Sent", detail: "0.09 USDC from your private balance" });
+  assert.deepEqual(describe(old, TOKENS, CHAINS, OWN), { title: "Sent", detail: "From Private" });
   assert.equal(movementDollars(old, TOKENS), "$0.10");
   // control: a site's own wallet is not one of my rows, and with no rows known it is a send
   assert.equal(describe({ ...SWAP, to: THEIR_SOL }, TOKENS, CHAINS, OWN).title, "Sent");
@@ -73,24 +73,24 @@ test("the $10 Swap from your private balance into my own SOL row: 10.02 USDC mov
 
 test("a record with no payee never ends on a bare \"with\"; control: with a payee it says who", () => {
   const none = describe({ ...HIDDEN_PAY, to: undefined } as Movement, TOKENS, CHAINS);
-  assert.equal(none.detail, "5 USDC from your private balance");
+  assert.equal(none.detail, "From Private");
   assert.doesNotMatch(none.detail, /(with|to)\s*$|·\s*$/);
-  assert.equal(describe({ ...HIDDEN_PAY, to: undefined, status: "moving" } as Movement, TOKENS, CHAINS).detail, "5 USDC from your private balance · on its way");
+  assert.equal(describe({ ...HIDDEN_PAY, to: undefined, status: "moving" } as Movement, TOKENS, CHAINS).detail, "From Private · on its way");
   assert.match(describe(HIDDEN_PAY, TOKENS, CHAINS).detail, /to bob\.near$/);
 });
 
 test("the Statement per kind: coin, amount, dollars at the time and which way; a swap into my own row is not \"went out\" (control: without my rows known it is)", () => {
   const row = (m: Movement, own: typeof OWN | null = OWN) => { const r = ledgerRow(m, TOKENS, CHAINS, own ?? undefined)!; return [r.coin, r.amount, r.dollars, r.from, r.to, r.way]; };
-  assert.deepEqual(row(SWAP), ["USDC", "10.02", "10.02", "Private balance", `Your SOL wallet (${MY_SOL})`, 0], "where it went, whole");
-  assert.deepEqual(row(SWAP, null), ["USDC", "10.02", "10.02", "Private balance", MY_SOL, -1], "control");
-  assert.deepEqual(row(HIDDEN_PAY), ["USDC", "5", "5.00", "Private balance", "bob.near", -1]);
-  assert.deepEqual(row(ROW_HIDDEN), ["SOL", "0.0515", "", "Private balance", THEIR_SOL, -1]);
+  assert.deepEqual(row(SWAP), ["USDC", "10.02", "10.02", "Private", `Your SOL wallet (${MY_SOL})`, 0], "where it went, whole");
+  assert.deepEqual(row(SWAP, null), ["USDC", "10.02", "10.02", "Private", MY_SOL, -1], "control");
+  assert.deepEqual(row(HIDDEN_PAY), ["USDC", "5", "5.00", "Private", "bob.near", -1]);
+  assert.deepEqual(row(ROW_HIDDEN), ["SOL", "0.0515", "", "SOL wallet", THEIR_SOL, -1], "it left the SOL wallet (audit, 7 Nov)");
   assert.deepEqual(row(KIOSK), ["USDC", "4.2", "4.20", "Safe", "kiosk.near", -1]);
   assert.deepEqual(row(SENT), ["USDC", "18", "18.00", "Safe", "kim.near", -1]);
   assert.deepEqual(row(OUT), ["SOL", "0.25", "", "Safe", `${THEIR_SOL} on Solana`, -1]);
   assert.deepEqual(row(IN), ["USDC", "42.1", "42.10", "Bitcoin", "Safe", 1]);
-  assert.deepEqual(row(TO_HIDDEN), ["USDC", "40", "40.00", "Safe", "Private balance", 0]);
-  assert.deepEqual(row(FROM_HIDDEN), ["USDC", "12.5", "12.50", "Private balance", "Safe", 0]);
+  assert.deepEqual(row(TO_HIDDEN), ["USDC", "40", "40.00", "Safe", "Private", 0]);
+  assert.deepEqual(row(FROM_HIDDEN), ["USDC", "12.5", "12.50", "Private", "Safe", 0]);
   assert.deepEqual(row(TOP_UP), ["USDC", "10", "10.00", "Safe", "NEAR wallet", 0]);
   assert.deepEqual(row(CONVERT), ["SOL", "0.5", "", "Safe", "Safe, as USDC", 0]);
 });

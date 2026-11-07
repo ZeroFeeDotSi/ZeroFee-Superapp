@@ -17,6 +17,7 @@ import { ProblemError, type Problem } from "./problem.ts";
 import { privateShort } from "./private-route.ts";
 import type { Bridge, BridgeResult } from "./bridge.ts";
 import { securityProblems } from "./security-problems.ts";
+import { movesNothing, readsOnly, unexpectedFor } from "./money-calls.ts";
 import { SERVICE_NAMES, serviceProblem } from "./services.ts";
 import { WNEAR, holdsCoin } from "./every-coin.ts";
 import { isAgentPocket, siteWallet } from "./site-wallets.ts";
@@ -130,10 +131,25 @@ export interface SpendingActivity {
   /** Paid from Private: the ledger's payments that are this one move (its fill and each wallet's payment), so Activity
    *  lists the move once, never its payments as Moves of their own (QA's Jobs re-crawl, 5 Nov: B4; the copy review's S5). */
   paid?: string[];
-  /** Paid from Private (rule 11): the wallets of `goesTo` whose payment is over: read on chain there (its wallet's own
-   *  read, begun after the ledger's end), or it came back to Private (the row's note says so). A Move paid from Private
-   *  has no leg rows: Activity waits on this, as on a Safe-paid Move's leg rows. */
+  /** The ledger's own movement for this row's Safe leg, when the row's id is its job's (`mv-<key>`): Activity lists the
+   *  Move once, never that movement as a row of its own (the copy review's Activity walk, 7 Nov: one Move, one row). */
+  ledgerId?: string;
+  /** Paid from Private (rule 11): the wallets of `goesTo` whose payment landed: the engine's Done, from a read on chain
+   *  there (its wallet's own read, begun after the ledger's end). Never a part in `missed`. A Move paid from Private has no
+   *  leg rows: Activity waits on this, as on a Safe-paid Move's leg rows. */
   landed?: SpendingNetwork[];
+  /** Paid from Private (the audit's ruling, 6 Nov): the wallets whose part never reached them: it stopped, never started, or came
+   *  back to Private. Their landing step never ticks (rule 8, rule 11). */
+  missed?: (SpendingNetwork | "near")[];
+  /** Paid from Private (audit, 6 Nov): the dollars of the parts in `missed`, each its own (their sum): Home's Hot never
+   *  counts them on their way (trading.ts), and a Try again on one wallet is that part's own figure, never the row's. */
+  missedUsd?: string;
+  /** Paid from Private (audit, 6 Nov): a part's payment ended unpaid with its money still on its way to Private (send-job's
+   *  slow end): no Try again until it's there, as a re-tap would fill Private from the Safe a second time. */
+  onWay?: true;
+  /** Paid from Private (the audit's ruling, 6 Nov): a part of it stopped with its money unknown (the ledger's `unsure`): no Try
+   *  again, only Activity, as a re-tap could pay it twice. */
+  unsure?: true;
   /** Paid from Private: NEAR Confidential's own word that every payment of it went (the ledger's end of each, 1Click's
    *  status): its job's paying step ticks on it; the landing step waits on `landed`'s chain read (rule 11). */
   paidDone?: true;
@@ -465,6 +481,9 @@ export interface EngineWallet { id: string; chain: SpendingNetwork; address?: st
 export interface EngineChain { chain: SpendingNetwork; name: string; nativeUsd: number; nativeAmount?: string; readyUsd: number; coinsUsd: number; closed?: true; unread?: true; inFlight?: { usd: number }; wallets: EngineWallet[] }
 export interface EngineMove {
   id: string; kind: "add" | "out" | "in" | "home"; chain?: SpendingNetwork; usd: number;
+  /** A row saved under its job's key (`mv-<key>`, float-core add): the ledger's own movement id for the Safe's leg
+   *  (ledger.toTrading), kept beside it (float-view MoveRow.mv). */
+  mv?: string;
   /** A Take out's move home: what the person approved at the tap, while `usd` is priced again (expected, then arrived). */
   askedUsd?: number;
   /** F5: set only from the core's own record of a move AgentZero's act door started (FloatMove.by). */
@@ -504,7 +523,7 @@ export interface EngineMove {
   /** Paid from Private (NEAR Confidential); `fill`, the Safe → Private step when Private was short; `parts`, each leg's
    *  payments as the ledger keeps them (their movement ids), with the ledger's end of each (float-view.ts); `chain`: the
    *  wallet's network. */
-  priv?: { fill?: "doing" | "done"; parts?: { wallet?: string; chain?: SpendingNetwork | "near"; ids?: readonly string[]; ends?: Record<string, string>; stopped?: string }[] };
+  priv?: { fill?: "doing" | "done"; parts?: { wallet?: string; chain?: SpendingNetwork | "near"; ids?: readonly string[]; ends?: Record<string, string>; stopped?: string; unsure?: true; usd?: number; money?: Record<string, string> }[] };
 }
 export interface EngineSnapshot { loaded?: boolean; unread?: true; totalUsd: number; reserveUsd: number; takeableUsd: number; chains: EngineChain[]; moves: EngineMove[] }
 export interface SpendingEngine {
@@ -551,17 +570,45 @@ export interface SpendingDeps {
 /** A Top up that ended other than done says where its money is, even when the engine gave no words (mainnet 2 Nov,
  *  m-refund: "Top up $3.00 (failed)" and nothing after it, while 1Click had refunded the $3 into Spending's cash). The
  *  engine's own note (packages/trade float-core.ts addEnd) is the precise one; these are for a row it left bare. */
-/** Rule 11, paid from Private (SpendingActivity.landed): the chain wallets whose payment is over: the engine's row Done
- *  (train 10's landed round: a read showed it, float-private arrivedRead / chainShown), or come back to Private. The
- *  ledger's "done" alone is no chain read. */
-function privLanded(m: EngineMove): SpendingNetwork[] {
-  const back = (p: NonNullable<NonNullable<EngineMove["priv"]>["parts"]>[number]) => !!p.stopped || (p.ids ?? []).some((id) => p.ends?.[id] === "problem" || p.ends?.[id] === "refunded");
-  const parts = (m.priv?.parts ?? []).filter((p) => p.chain && p.chain !== "near" && (m.status === "done" || back(p))).map((p) => p.chain as SpendingNetwork);
+type PrivPart = NonNullable<NonNullable<EngineMove["priv"]>["parts"]>[number];
+/** A part that never reached its wallet: it stopped (its money unknown, or it never started), or its payment came back
+ *  to Private. Pure: a table test. */
+const partMissed = (p: PrivPart): boolean => !!p.stopped || (p.ids ?? []).some((id) => p.ends?.[id] === "problem" || p.ends?.[id] === "refunded");
+/** SpendingActivity.missed: the wallets whose part never reached them (partMissed). Pure: a table test. */
+export function privMissed(m: Pick<EngineMove, "priv">): (SpendingNetwork | "near")[] {
+  return [...new Set((m.priv?.parts ?? []).filter((p) => p.chain && partMissed(p)).map((p) => p.chain!))];
+}
+/** SpendingActivity.missedUsd: the missed parts' own dollars (each part's `usd`, as the engine's row keeps it); none
+ *  missed: undefined. Pure: a table test. */
+export function privMissedUsd(m: Pick<EngineMove, "priv">): string | undefined {
+  const parts = (m.priv?.parts ?? []).filter((p) => p.chain && partMissed(p));
+  return parts.length ? usdText(parts.reduce((n, p) => n + (typeof p.usd === "number" && Number.isFinite(p.usd) ? p.usd : 0), 0)) : undefined;
+}
+/** SpendingActivity.onWay: a part's payment ended with its money on its way to Private (its Problem's money state, kept
+ *  on the part by float-private). Pure: a table test. */
+export function privOnWay(m: Pick<EngineMove, "priv">): boolean {
+  return (m.priv?.parts ?? []).some((p) => Object.values(p.money ?? {}).includes("on-the-way"));
+}
+/** SpendingActivity.unsure: a part stopped with its money unknown. A lone part that stopped counts so too, flag or not
+ *  (a record kept before the flag): its stop with nothing gone is thrown, never kept (private-move.ts). Pure: a table test. */
+export function privUnsure(m: Pick<EngineMove, "priv">): boolean {
+  const parts = m.priv?.parts ?? [];
+  // a payment whose money is unsure (its Problem's money state: leg 1 FAILED, or a hold past the keep, 83, 6 Nov) too
+  return parts.some((p) => p.unsure === true || Object.values(p.money ?? {}).includes("unsure")) || (parts.length === 1 && !!parts[0]!.stopped);
+}
+/** Rule 11, paid from Private (SpendingActivity.landed): the chain wallets whose payment landed: the engine's row Done
+ *  (train 10's landed round: a read showed it, float-private arrivedRead / chainShown). The ledger's "done" alone is no
+ *  chain read, and a part that stopped or came back never landed (the audit's ruling, 6 Nov: it ticked "It's in your BNB
+ *  wallet."). Pure: a table test. */
+export function privLanded(m: Pick<EngineMove, "priv" | "status" | "legs">): SpendingNetwork[] {
+  if (m.status !== "done") return [];
+  const missed = privMissed(m);
+  const parts = (m.priv?.parts ?? []).filter((p) => p.chain && p.chain !== "near").map((p) => p.chain as SpendingNetwork);
   // the engine's Done is the read (its landed round, or the restore path: a row an older build kept done stays done,
   // float-core readAdds): every wallet the Move goes to, so an older build's part with no `chain` is never "On its way"
   // for good beside a Done job (audit, 5 Nov)
-  const went = m.status === "done" ? (m.legs ?? []).map((l) => l.chain).filter((c): c is SpendingNetwork => c !== "near") : [];
-  return [...new Set([...parts, ...went])];
+  const went = (m.legs ?? []).map((l) => l.chain).filter((c): c is SpendingNetwork => c !== "near");
+  return [...new Set([...parts, ...went])].filter((c) => !missed.includes(c));
 }
 
 const TOP_UP_ENDED: Partial<Record<SpendingActivity["status"], string>> = {
@@ -726,7 +773,7 @@ export function createSpendingService(d: SpendingDeps): Bridge & { capUsd(): num
     const asked = lg > 0 && !m.ready ? lg : kind === "put-away" && m.askedUsd !== undefined && m.askedUsd > 0 ? m.askedUsd : undefined;
     return { id: m.id, kind, usd: usdText(m.usd), status, ...(lg > 0 && lg < m.usd - 0.004 && !m.ready ? { legsUsd: usdText(lg) } : {}), ...(asked !== undefined && Math.abs(asked - m.usd) >= 0.005 ? { askedUsd: usdText(asked) } : {}), ...(kind === "top-up" && m.ready ? { siteName: m.ready.name } : {}), shown: shownInActivity(kind, status), atIso: new Date(m.at).toISOString(), words, ...(m.chain ? { network: m.chain } : {}), ...(m.to ? { to: m.to } : {}), ...(m.held ? { held: m.held } : {}), ...(note ? { note } : {}),
       ...(etaOk(m.etaSec) && status === "on-its-way" && !m.held && !m.paused && !m.unshown ? { etaSeconds: m.etaSec } : {}), ...(m.unshown && status === "on-its-way" ? { unshown: true as const } : {}), ...(forSite ? { site: forSite } : {}), ...(m.by === "agentzero" ? { by: m.by } : {}), ...(m.of ? { of: m.of } : {}), ...(goesTo.length ? { goesTo } : {}), ...(kind === "top-up" && (m.ready?.failed || m.legs?.some((l) => l.failed)) ? { stoppedShort: true as const } : {}),
-      ...(parked !== undefined ? { parkedUsd: parked } : {}), ...(m.signing ? { signing: m.signing.orphan ? "checking" as const : "asked" as const } : {}), ...(m.priv ? { via: "private" as const, ...(m.priv.fill ? { fill: m.priv.fill } : {}), ...(paidIds(m.priv).length ? { paid: paidIds(m.priv) } : {}), ...(privLanded(m).length ? { landed: privLanded(m) } : {}), ...(privPaid(m.priv) ? { paidDone: true as const } : {}) } : {}), ...(m.proof ? { proof: m.proof } : {}) };
+      ...(parked !== undefined ? { parkedUsd: parked } : {}), ...(m.signing ? { signing: m.signing.orphan ? "checking" as const : "asked" as const } : {}), ...(typeof m.mv === "string" && m.mv !== m.id ? { ledgerId: m.mv } : {}), ...(m.priv ? { via: "private" as const, ...(m.priv.fill ? { fill: m.priv.fill } : {}), ...(paidIds(m.priv).length ? { paid: paidIds(m.priv) } : {}), ...(privLanded(m).length ? { landed: privLanded(m) } : {}), ...(privMissed(m).length ? { missed: privMissed(m), missedUsd: privMissedUsd(m)! } : {}), ...(privUnsure(m) ? { unsure: true as const } : {}), ...(privOnWay(m) ? { onWay: true as const } : {}), ...(privPaid(m.priv) ? { paidDone: true as const } : {}) } : {}), ...(m.proof ? { proof: m.proof } : {}) };
   }
 
   /** Every payment of a Move paid from Private ended done on the ledger's word (none listed yet: not paid). */
@@ -778,19 +825,22 @@ export function createSpendingService(d: SpendingDeps): Bridge & { capUsd(): num
   function oneTopUp(p: Record<string, unknown>): Promise<SpendingTopUp> {
     const key = p.key;
     if (key !== undefined && (typeof key !== "string" || !/^[A-Za-z0-9_-]{16,64}$/.test(key))) return Promise.reject(new ProblemError(securityProblems.requestInvalid("key is this move's own id: 16 to 64 letters, digits, - or _")));
-    const fields = JSON.stringify([p.usd, p.ready ?? null, p.swap ?? null, p.legs ?? null, p.home ?? null]);
+    const fields = JSON.stringify([p.usd, p.ready ?? null, p.swap ?? null, p.legs ?? null, p.home ?? null, p.others ?? null]);
     for (const [k, v] of toppedUp) if (now() - v.at > 10 * 60_000) toppedUp.delete(k);
     // review M2: a sheet left open or a read that never ends holds the others back 5 minutes at most
     if (topping && now() - topping.at > 5 * 60_000) topping = undefined;
     const had = key ? (topping?.key === key ? topping : toppedUp.get(key)) : undefined;
     if (had) return had.fields === fields ? had.run : Promise.reject(new ProblemError(securityProblems.requestInvalid("This move's key was used for another move.")));
-    if (topping) return Promise.reject(new ProblemError({ code: "spending.topup.busy", whatHappened: "Another move is getting ready or waiting for your Approve. Nothing else moved.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } }));
+    if (topping) return Promise.reject(new ProblemError({ code: "spending.topup.busy", whatHappened: "Another move is getting ready or waiting for your Approve, so nothing moved. Finish it, then try again.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "OK" } }));
     const run = topUp(p);
     const mine = { ...(key ? { key } : {}), fields, at: now(), run };
     topping = mine;
     const free = () => { if (topping === mine) topping = undefined; };
     // review L3: only a move that went is kept under its key; a refusal or a no can be asked again with it
-    run.then((r) => { free(); if (key && !("declined" in r)) toppedUp.set(key, { fields, at: now(), run }); }, free);
+    // C2: any end but a yes (Not now, Close, a refusal) ends the Move's kept wallet parts (spending-move.ts endOthers: off
+    // Home's first load)
+    const end = () => { if (typeof key === "string") { void moveDoor().then((m) => m.endOthers(key)); if (p.others !== undefined && p.caller === "wallet") void d.call("subwallet.moveOthers", { job: key, end: true }).catch(() => undefined); } };
+    run.then((r) => { free(); if (key && !("declined" in r)) toppedUp.set(key, { fields, at: now(), run }); else end(); }, () => { free(); end(); });
     return run;
   }
 
@@ -944,6 +994,17 @@ export function createSpendingService(d: SpendingDeps): Bridge & { capUsd(): num
     const leg = legs?.length === 1 ? legs[0]! : undefined;
     const get = leg && leg.chain !== "near" ? SWAP_GETS[leg.chain] : undefined;
     const then = p.home === true ? { home: true as const } : swap && get ? { swap: { pay: swap, get } } : undefined;
+    // C2 (the audit's conditions, 7 Nov): the Move's wallet parts, checked against the engine's own read (the page can only
+    // lower), kept under its key for its one Safe sheet and to cap its wallet legs; none confirmed: the Safe's side only
+    // only Home's own Move says wallet parts (D146's caller): any other asker's are never kept or sent across
+    const others = p.caller === "wallet" ? p.others : undefined;
+    if (jobKey && legs) {
+      const m = await moveDoor();
+      m.keepFor(jobKey, others, s);
+      // and the core keeps them by its own read (on the phone, the isolated core, where the sheet is built): started now,
+      // beside the Add's quote and steps; the sheet never waits for it
+      if (others !== undefined) void d.call("subwallet.moveOthers", { job: jobKey, others: m.othersToCross(others) }).catch(() => undefined);
+    }
     const r = await e.add(adds, from, ready, legs as never, then, asker, jobKey);
     return r === "declined" ? { declined: true } : activityOf(r);
   }
@@ -1041,8 +1102,10 @@ export function createSpendingService(d: SpendingDeps): Bridge & { capUsd(): num
         if (!READS_CAP_ITSELF.has(method)) await ready();
         return { ok: (await run(params)) as T };
       } catch (e) {
-        if (e instanceof ProblemError) return { problem: e.problem };
-        return { problem: securityProblems.partnerUnreachable("your NEAR wallet") };
+        // a Move, a Top up, a swap: a throw says nothing about its money, so never "Nothing was sent" (money-calls.ts)
+        if (movesNothing(method)) return { problem: e instanceof ProblemError ? e.problem : securityProblems.partnerUnreachable("your NEAR wallet") };
+        if (e instanceof ProblemError) return { problem: readsOnly(e.problem) ? securityProblems.unexpectedMoney(method, e) : e.problem };
+        return { problem: unexpectedFor(method, e) };
       }
     },
     on<T>(event: string, handler: (payload: T) => void): () => void {

@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
-const LABEL = "Be a second phone or a guardian";
+// the copy review's S5 (7 Nov): "Be a second phone or a guardian" became "Approve for someone else", in every place it shows
+const LABEL = "Approve for someone else";
 
 test("Welcome (no account) offers being a second phone or a guardian, and it opens the guardian screen", () => {
   const onboarding = read("./Onboarding.tsx");
@@ -34,7 +35,8 @@ test("the main phone's steps name what the other phone shows, in both places it 
   const pair = sec.slice(sec.indexOf("const PAIR_WORDS"), sec.indexOf("} as const;", sec.indexOf("const PAIR_WORDS")));
   for (const kind of ["phone", "guardian"]) {
     const block = pair.slice(pair.indexOf(`  ${kind}: {`));
-    const step = /steps: \["([^"]+)"\]/.exec(block)![1]!;
+    // step 1 alone in the words (B11: step 2 is its button's, pair-steps.ts)
+    const step = /step1: "([^"]+)"/.exec(block)![1]!;
     assert.ok(step.includes(LABEL), `${kind}: ${step}`);
     // control: main's step sent the other phone to Devices, which Welcome doesn't have
     assert.doesNotMatch(step, /Devices/, kind);

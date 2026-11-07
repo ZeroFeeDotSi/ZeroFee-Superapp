@@ -162,7 +162,7 @@ test("Settings' Passwords on the web wallet: a row that opens its On iPhone page
   const panel = src("./SettingsPanel.tsx");
   assert.match(panel, /<span><span>Passwords<\/span><small>\{WEB_PASSWORDS_LINE\}<\/small><\/span><span>\{ON_IPHONE\}<\/span>/);
   assert.match(panel, /\{logins \? \(\n\s+<button className="set__row set__row--btn" onClick=\{\(\) => setPasswords\(true\)\}><span>Passwords<\/span><span \/><\/button>/, "control: the phone's row");
-  assert.match(panel, /<div className="set__row"><span>Passwords<\/span><span>\{LOGINS_ON_PHONE_ONLY\}<\/span><\/div>/, "control: elsewhere, the phone has it");
+  assert.doesNotMatch(panel, /LOGINS_ON_PHONE_ONLY/, "the copy review's #7 (7 Nov): no dead row in any browser; the Sim opens the same page");
   assert.match(panel, /const OnIphoneSheet = lazy\(/, "loaded when opened");
 });
 

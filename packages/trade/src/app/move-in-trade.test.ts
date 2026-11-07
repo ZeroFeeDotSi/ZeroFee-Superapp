@@ -28,6 +28,6 @@ test("Trade's quick Move is Home's own: the tap makes the job and the sheet says
   // Done before the legs' ids are back: it went (the app that opened it hears so), never a Close that says nothing moved
   assert.match(sheet, /if \(!running\) return made !== null \? onDone\(""\) : onClose\(\);/);
   const run = readFileSync(new URL("../../../wallet/src/app/screens/move-run.ts", import.meta.url), "utf8");
-  assert.equal(run.match(/missed\.push\(/g)?.length, 2, "each leg that didn't go is said on the row");
+  assert.equal(run.match(/missed\.push\(/g)?.length, 4, "each leg that didn't go, and each that didn't start after an unknown one, is said on the row");
   assert.ok(run.indexOf('"spending.topUp"') < run.indexOf('"spending.move"'), "the Safe's Approve first");
 });

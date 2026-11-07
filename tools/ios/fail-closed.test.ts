@@ -87,13 +87,13 @@ test("the chip signs two NEP-413 messages only, each built natively: the email-a
   const name = read("apps/ios/ZeroFee/NearTx.swift");
   assert.match(name, /static let recipient = "chat\.zerofee\.si"/, "the Chat note's recipient is a constant");
   assert.match(name, /end <= now \+ 90 \* 86_400/, "a Chat note lasts at most 90 days");
-  assert.equal((sheet.match(/NearTx\.hash\(bytes\)/g) ?? []).length, 3, "a transaction, the alerts proof, the Chat note: nothing else is hashed for the chip");
+  assert.equal((sheet.match(/NearTx\.hash\(bytes\)/g) ?? []).length, 4, "a transaction, one Safe action's set of transactions (key.signSet, each decoded and checked here), the alerts proof, the Chat note: nothing else is hashed for the chip");
   assert.match(fn, /RelaySetting\.parse\(Bundle\.main/, "the recipient is the build's own relay");
   assert.match(fn, /recipient: relay\.host/);
   assert.doesNotMatch(fn, /p\["recipient"\]|p\["message"\]|p\["bytes"\]/, "never a recipient, message or bytes from the caller");
   const tx = read("apps/ios/ZeroFee/NearTx.swift");
   assert.match(tx, /until <= now \+ 11 \* 60/, "a deadline at most ten minutes ahead (a minute's grace)");
-  assert.match(read("apps/ios/ZeroFee/IsolatedCore.swift"), /\["info", "create", "sign", "signAlertsProof", "signChatName", "proof"\]\.contains\(op\)/, "the core may ask the chip for its key proof (L6), which signs nothing");
+  assert.match(read("apps/ios/ZeroFee/IsolatedCore.swift"), /\["info", "create", "sign", "signSet", "signAlertsProof", "signChatName", "proof"\]\.contains\(op\)/, "the core may ask the chip for its key proof (L6), which signs nothing");
 });
 
 test("D134: the web view is made and loading before the core starts, and the core starts off the main thread", () => {

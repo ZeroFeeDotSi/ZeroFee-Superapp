@@ -293,8 +293,8 @@ test("sending or cancelling a held request asks the sheet with that request's ow
   assert.deepEqual(titles, ["Send 6 NEAR to bob.near", "Cancel: Send 6 NEAR to bob.near", "Cancel: Send 6 NEAR to bob.near"]);
 });
 
-test("the Sim's Move as the core's fill sheet (the ruling, the audit and the copy review, 5 Nov): \"Move $30.00 to your SOL wallet\", then Private's part, what the Safe signs, what stays and Together, which add up; Private empty, the title and \"Your Safe adds ... to Private first.\"; Private covering it, no sheet (no Face ID)", async () => {
-  const split = (lines: string[]) => lines.filter((l) => /^(From Private|From your Safe|Stays in Private|Together) · /.test(l));
+test("the Sim's Move as the core's fill sheet (the ruling, the audit and the copy review, 5 Nov; the copy review's rows, 7 Nov): \"Move $30.00 to your SOL wallet\", then what the wallet gets, what the Safe signs and Private's part, never Together; Private empty, the wallet gets, the Safe's step and what stays with its why; Private covering it, no sheet (no Face ID)", async () => {
+  const split = (lines: string[]) => lines.filter((l) => /^(Your \S+.* gets|From Private|From your Safe|Private keeps the rest|Stays in Private|Together) · /.test(l));
   const sheetOf = async (privateUsdc: string, usd: number) => {
     const mock = createMockBridge({ latencyMs: 0, settleMs: 5, safeFillOpen: true, ...(privateUsdc ? { hiddenStart: { usdc: privateUsdc, near: "0" } } : {}) });
     const seen: string[][] = [];
@@ -303,16 +303,27 @@ test("the Sim's Move as the core's fill sheet (the ruling, the audit and the cop
     assert.ok("ok" in r, JSON.stringify(r));
     return seen;
   };
-  const both = await sheetOf("12.5", 30);
+  // Private's share past the buffer (the ledger's foldsWhole false, the Sim's mirror, 7 Nov): Private pays its $495, the
+  // Safe a $20 step over the $15 rest. the copy review's layout (7 Nov): the sources line, then the rows; Private's row is its own
+  // $495, what the fill leaves ($5) its own row, so the rows add up (the audit's SHOULD 4; was "From Private · $490.00")
+  const both = await sheetOf("495", 510);
   assert.equal(both.length, 1, "one sheet");
-  assert.equal(both[0]![0], "Move $30.00 to your SOL wallet", "the typed figure and its wallet");
-  // short $17.50: the Safe signs a $20 step (the bytes' figure), $2.50 of it stays in Private
-  // Sim re-check: Private's line is what Private really pays ($30 - the Safe's $20), not its $12.50 share
-  assert.deepEqual(split(both[0]!), ["From Private · $10.00", "From your Safe · $20.00", "Together · $30.00"]);
-  assert.deepEqual(both[0]!.slice(1, 4), split(both[0]!), "right under the title");
-  assert.deepEqual(both[0]!.slice(4), ["Anyone can see the Safe's part.", "Then NEAR Confidential pays $30.00 from Private."], "one leg, no second step");
+  assert.equal(both[0]![0], "Move $510.00 to your SOL wallet", "the typed figure and its wallet");
+  // fix/move-row-truth (QA's rule and the copy review's words, 7 Nov): no sources line (a second Safe figure), the rows right under the title
+  // J2-1 (8 Nov): Private's row is its NET change: $495 out, $5 of the fill kept, so "From Private · $490.00"; the sum
+  // closes on sight: $20.00 + $490.00 = $510.00 + Fee $0.00
+  // the audit's ruling (c), 8 Nov: the wallet's row is what its legs' quotes give (the Sim's simSwapCost, each leg on its own), at
+  // least their minAmountOut; what they keep joins the Fee: $20.00 + $490.00 = $507.36 + Fee $2.64 (was "gets · $510.00", Fee $0.00)
+  assert.deepEqual(split(both[0]!), ["Your SOL wallet gets · about $507.36, at least $502.28", "From your Safe · $20.00", "From Private · $490.00"]);
+  assert.deepEqual(both[0]!.slice(1, 4), split(both[0]!), "the rows right under the title");
+  // under the buffer the ledger folds the part whole into its fill (the audit's R2, one Face ID): $12.50 in Private, $30: a $40
+  // step, Private's share staying (the old Sim: "From your Safe · $20.00", "From Private · $10.00")
+  assert.deepEqual((await sheetOf("12.5", 30)).map(split), [["Your SOL wallet gets · about $29.58, at least $29.28", "From your Safe · $40.00", "Private keeps the rest · about $10.00"]]);
+  assert.deepEqual(both[0]!.slice(4), ["Fee · about $2.64", "Face ID approves the Safe's part. Private sends on its own.", "Anyone can see the Safe's part."], "one leg: no second step, no why sentence; the Sim's fill lands whole, the legs' quotes keep $2.64 (J2-2: a Fee row on every sheet)");
   const empty = await sheetOf("", 6);
-  assert.deepEqual(empty.map((x) => [x[0], x[1], split(x)]), [["Move $6.00 to your SOL wallet", "Your Safe adds $10.00 to Private first.", []]], "Private empty: the title and one line");
+  // the audit's ruling (c) and MUST (8 Nov): the Sim's quote for $6.00 to the SOL wallet keeps $0.32, inside the plan's bound
+  // (its percentage part and the SOL leg's $0.30 network fee): no head
+  assert.deepEqual(empty.map((x) => [x[0], split(x), x[4], x[5]]), [["Move $6.00 to your SOL wallet", ["Your SOL wallet gets · about $5.68, at least $5.62", "From your Safe · $10.00", "Private keeps the rest · about $4.00"], "Fee · about $0.32", "Anyone can see the Safe's part."]], "Private empty: the wallet gets, the Safe's step, what stays, the quiet line");
   assert.deepEqual(await sheetOf("12.5", 6), [], "control: Private covers it, no sheet");
 });
 
@@ -327,23 +338,28 @@ test("Sim re-check (QA, 5 Nov): the Sim's Move sheet says what Private really do
     const r = await mock.call("ledger.moveFromPrivate", { parts: [{ wallet: "sw-trade-sol", usd }], app: "trade" });
     assert.ok("ok" in r, JSON.stringify(r));
     const safeOut = safeBefore - (await safeUsdc());
-    return { safeOut, block: seen[0]!.lines.filter((l) => /^(From Private|From your Safe|Stays in Private|Together) · /.test(l)), amountSaid: seen[0]!.amountSaid, change: (await priv()) - before };
+    return { safeOut, block: seen[0]!.lines.filter((l) => /^(Your \S+.* gets|From Private|From your Safe|Private keeps the rest|Stays in Private|Together) · /.test(l)), fee: seen[0]!.lines.find((l) => l.startsWith("Fee · ")), amountSaid: seen[0]!.amountSaid, change: (await priv()) - before };
   };
-  const c = (l?: string) => (l ? Math.round(Number(l.split("$")[1]) * 100) : 0);
-  const big = await run("15", 50);
-  assert.deepEqual(big.block, ["From Private · $10.00", "From your Safe · $40.00", "Together · $50.00"]);
-  assert.equal(big.change, -c(big.block.find((l) => l.startsWith("From Private"))), "Private's line is what Private paid");
-  assert.equal(big.change, -1000);
+  // a row's first figure ("gets · about $9.40, at least $9.30": its $9.40)
+  const c = (l?: string) => (l ? Math.round(Number(/\$([\d.]+)/.exec(l)![1]) * 100) : 0);
+  // past the buffer (the Sim's mirror, 7 Nov: under it the ledger folds the part whole, so no From Private line)
+  const big = await run("495", 510);
+  // the copy review's layout (7 Nov): Private's own $495 and what the fill leaves, $5, each on its row; Private falls by their difference
+  assert.deepEqual(big.block, ["Your SOL wallet gets · about $507.36, at least $502.28", "From your Safe · $20.00", "From Private · $490.00"]);
+  assert.equal(big.change, c(big.block.find((l) => l.startsWith("Private keeps the rest"))) - c(big.block.find((l) => l.startsWith("From Private"))), "Private's row is its net change (J2-1)");
+  assert.equal(big.change, -49000);
   assert.equal(big.amountSaid, true, "no Amount line: one amount, said once");
   assert.equal(big.safeOut, c(big.block.find((l) => l.startsWith("From your Safe"))), "83: the From your Safe line is what left the Safe");
   const small = await run("5", 9.74);
-  assert.deepEqual(small.block, ["From your Safe · $10.00", "Stays in Private · $0.26", "Together · $9.74"]);
-  assert.equal(small.change, c(small.block.find((l) => l.startsWith("Stays in Private"))), "what stays is what Private gained");
-  assert.equal(small.change, 26);
-  assert.equal(small.safeOut, 1000, "83: the From your Safe line is what left the Safe");
-  for (const b of [big.block, small.block]) {
+  // folded whole (the audit's R2): a $20 step over $9.74, Private's $5 staying
+  assert.deepEqual(small.block, ["Your SOL wallet gets · about $9.40, at least $9.30", "From your Safe · $20.00", "Private keeps the rest · about $10.26"]);
+  assert.equal(small.change, c(small.block.find((l) => l.startsWith("Private keeps the rest"))), "what Private keeps is what Private gained");
+  assert.equal(small.change, 1026);
+  assert.equal(small.safeOut, 2000, "83: the From your Safe line is what left the Safe");
+  for (const { block: b, fee } of [big, small]) {
     const get = (k: string) => c(b.find((l) => l.startsWith(k)));
-    assert.equal(get("From Private") + get("From your Safe") - get("Stays in Private"), get("Together"), "the lines add up in cents");
+    // the audit's ruling (c): the wallet gets what its quotes give; what they keep is the Fee row's
+    assert.equal(get("From Private") + get("From your Safe") - get("Private keeps the rest"), get("Your SOL wallet gets") + c(fee), "the lines add up in cents");
   }
 });
 

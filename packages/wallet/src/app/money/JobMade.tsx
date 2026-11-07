@@ -1,11 +1,12 @@
 // The job is made (bug report, 5 Nov): the sheet becomes the design's one-object receipt, "away" (it grows at once; no
-// ring, no tick: those say landed, and only the chain can), "Job created." and where to watch it, and Done. It stays until
-// the person closes it. Swap, Send, Add to Private, Private's way home (Move and site top-ups draw their own, the same).
+// ring, no tick: those say landed, and only the chain can), "Job created.", what happened to the person (copy review, 7 Nov), the
+// protocol by name, its time and Done. It stays until the person closes it. Swap, Send, Add to Private, Private's way home (Move and site top-ups draw their own, the same).
 import { useEffect, useState, type ReactNode } from "react";
 import { MoneySheet } from "@zerofee/design/MoneySheet.tsx";
 import { mark } from "@zerofee/design/tap.ts";
-import { JOB_WORDS, watchShown } from "@zerofee/shell-api/job-start.ts";
-import { landedOf, receiptLeft } from "@zerofee/shell-api/job-steps.ts";
+import { JOB_WORDS, jobRows, watchShown } from "@zerofee/shell-api/job-start.ts";
+import { landedOf, receiptLeft, receiptStateOf, type ReceiptState } from "@zerofee/shell-api/job-steps.ts";
+import { receiptSaid } from "./receipt-said.ts";
 import { taskStore } from "@zerofee/shell-api/tasks.ts";
 import "@zerofee/design/receipt.css";
 
@@ -13,13 +14,15 @@ import "@zerofee/design/receipt.css";
 export const THROUGH_CONFIDENTIAL = "It goes through NEAR Confidential.";
 /** The time left under "Job created.", counting down from the protocol's own estimate (`etaSec`: its quote, or the
  *  route's measured time), or that there is none (product decision, 5 Nov; QA's Jobs hunt B3). Its job landed
- *  (the rows made since it opened, all done in the shared task store): "Landed early." before the estimate, and the clock
- *  stops (the copy review's rule, 5 Nov). `follow` false: a row's own time (Home's money on its way), no job of its own to follow. */
+ *  (the rows made since it opened, all done in the shared task store): how long it took ("Done in under a second."), and
+ *  the clock stops (the copy review's rule, 5 Nov; words 7 Nov). `follow` false: a row's own time (Home's money on its way), no job of its own to follow. */
 // `endsAt`: the job's own end (Hot's moving rows: from its legs, live-steps onLegs), else `etaSec` from now. With neither,
 // no line at all: "This job has no time estimate." never reaches the screen (a test of Hot, 5 Nov).
 // `watch`: also the receipt's "You can close this. It keeps going." under the time, while the job is still going.
 // `line` (a16): the line around the time (Hot's moving row: "On its way · About 29 s left."); the receipt's is bare.
-export function TimeLeft({ etaSec, endsAt: own, follow = true, watch = false, line }: { etaSec?: number | undefined; endsAt?: number | undefined; follow?: boolean; watch?: boolean; line?: (time: string) => string }) {
+// `job`: the job's id (runJob's made, startJob's handle): it landed when ITS rows did (jobRows), never another job's;
+// none, the rows started since it opened (job-steps.ts receiptRows' fallback).
+export function TimeLeft({ etaSec, endsAt: own, follow = true, watch = false, line, job }: { etaSec?: number | undefined; endsAt?: number | undefined; follow?: boolean; watch?: boolean; line?: (time: string) => string; job?: string | null | undefined }) {
   const [startMs] = useState(() => Date.now());
   const [fromNow] = useState(() => (etaSec && etaSec > 0 ? startMs + etaSec * 1000 : undefined));
   const endsAt = own !== undefined && Number.isFinite(own) ? own : fromNow;
@@ -28,10 +31,11 @@ export function TimeLeft({ etaSec, endsAt: own, follow = true, watch = false, li
   useEffect(() => {
     if (!follow || endsAt === undefined) return;
     const s = taskStore();
-    const read = () => setLanded(landedOf(s.list(), startMs));
+    const mine = job ? jobRows(job) : undefined;
+    const read = () => setLanded(landedOf(s.list(), startMs, mine));
     read();
     return s.subscribe(read);
-  }, [follow, endsAt, startMs]);
+  }, [follow, endsAt, startMs, job]);
   useEffect(() => {
     if (endsAt === undefined || landed !== undefined) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -43,10 +47,39 @@ export function TimeLeft({ etaSec, endsAt: own, follow = true, watch = false, li
   return <><p className="zf-receipt__line" data-testid="job-time-left">{line ? line(time) : time}</p>{watchLine}</>;
 }
 
-/** The receipt and its Done, inside a sheet the caller draws. `through`: the protocol's line; null for a job whose
- *  route isn't NEAR Confidential's (a NEAR wallet move: never say a protocol that doesn't do the work, rule 10). */
-export function JobReceipt({ amount, icon, testid, etaSec, through = THROUGH_CONFIDENTIAL, onDone }: { amount: string; icon: ReactNode; testid: string; etaSec?: number; through?: string | null; onDone: () => void }) {
+/** The receipt's job as its rows say, followed in the shared task store (`on` false: none): `job`'s own rows (jobRows);
+ *  no job id, the rows started since the receipt opened (receiptRows' fallback). */
+export function useReceiptState(on = true, job?: string | null): ReceiptState {
+  const [startMs] = useState(() => Date.now());
+  const [state, setState] = useState<ReceiptState>({ state: "going" });
+  useEffect(() => {
+    if (!on) return;
+    const s = taskStore();
+    const mine = job ? jobRows(job) : undefined;
+    const read = () => setState(receiptStateOf(s.list(), startMs, mine));
+    read();
+    return s.subscribe(read);
+  }, [on, startMs, job]);
+  return state;
+}
+/** A receipt's what-happened line in its tense (the receipts that draw their own: a site's Add). */
+export function SaidLine({ going, landed, testid, job }: { going: string; landed: string; testid: string; job?: string | null }) {
+  const state = useReceiptState(true, job);
+  return <p className="zf-receipt__line" data-testid={testid}>{receiptSaid({ going, landed }, state)}</p>;
+}
+
+/** The receipt and its Done, inside a sheet the caller draws. `said`: what happened to the person, under "Job created.",
+ *  from the job's own figures (receipt-said.ts: "Sent $25.00 to bob.near.", 53, 7 Nov). `through`: the protocol's line;
+ *  null for a job whose route isn't NEAR Confidential's (a NEAR wallet move: never say a protocol that doesn't do the
+ *  work, rule 10). */
+/** `paidLine`: the W1 line (job-start receiptPrivate) when Private pays the job whole, so no Face ID came. */
+/** `landedSaid`: the line once the job landed, its rows all ended done by their chain reads (receiptStateOf): "Sent $25.00
+ *  to bob.near." after "Sending …", Swap's "swapped: …" after "Swapping …" (the copy review's J5); stopped, `said` and its stop words
+ *  (receiptSaid, QA's MUST). */
+export function JobReceipt({ amount, icon, testid, etaSec, said, landedSaid, through = THROUGH_CONFIDENTIAL, paidLine = null, job, onDone }: { amount: string; icon: ReactNode; testid: string; etaSec?: number | undefined; said?: string | null | undefined; landedSaid?: string | null | undefined; through?: string | null; paidLine?: string | null; job?: string | null | undefined; onDone: () => void }) {
   useEffect(() => { mark("away"); }, []);
+  const state = useReceiptState(!!said, job);
+  const line = said ? receiptSaid({ going: said, landed: landedSaid ?? said }, state) : null;
   return (
     <>
       <div className="zf-receipt zf-receipt--job" data-state="away" role="status" aria-live="polite" data-testid={testid}>
@@ -56,8 +89,10 @@ export function JobReceipt({ amount, icon, testid, etaSec, through = THROUGH_CON
         </div>
         <p className="zf-receipt__amount">{amount}</p>
         <p className="zf-receipt__head">{JOB_WORDS.created}</p>
+        {line && <p className="zf-receipt__line" data-testid={`${testid}-said`}>{line}</p>}
         {through && <p className="zf-receipt__line" data-testid={`${testid}-through`}>{through}</p>}
-        <TimeLeft etaSec={etaSec} watch />
+        <TimeLeft etaSec={etaSec} watch job={job} />
+        {paidLine && <p className="zf-receipt__line" data-testid={`${testid}-from-private`}>{paidLine}</p>}
       </div>
       <button className="zf-btn wl-sheet-go" onClick={onDone} data-testid={`${testid}-done`}>Done</button>
     </>
@@ -65,10 +100,10 @@ export function JobReceipt({ amount, icon, testid, etaSec, through = THROUGH_CON
 }
 
 /** `away`: one of the job's own sheets is up (a hot wallet's send past its cap): the sheet steps aside meanwhile. */
-export function JobMade({ title, amount, icon, testid, away = false, etaSec, through, onDone }: { title: string; amount: string; icon: ReactNode; testid: string; away?: boolean; etaSec?: number; through?: string | null; onDone: () => void }) {
+export function JobMade({ title, amount, icon, testid, away = false, etaSec, said, through, job, onDone }: { title: string; amount: string; icon: ReactNode; testid: string; away?: boolean; etaSec?: number; said?: string | null; through?: string | null; job?: string | null; onDone: () => void }) {
   return (
     <MoneySheet title={title} away={away} onClose={onDone}>
-      <JobReceipt amount={amount} icon={icon} testid={testid} etaSec={etaSec} {...(through !== undefined ? { through } : {})} onDone={onDone} />
+      <JobReceipt amount={amount} icon={icon} testid={testid} etaSec={etaSec} said={said} {...(through !== undefined ? { through } : {})} job={job} onDone={onDone} />
     </MoneySheet>
   );
 }

@@ -2,6 +2,7 @@
 // (D52: the engine's own background moves are behind the scenes unless one failed, boards.ts shownMove)
 // (job-cards.ts, JobCard.tsx). A trade that didn't happen says so and what moved; an Add the account's protection holds
 // waits on its first step until the hold ends (D17), never done.
+import { useEffect } from "react";
 import { Mark } from "@zerofee/design/Mark.tsx";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { EarlierHistory } from "@zerofee/shell-api/EarlierHistory.tsx";
@@ -15,10 +16,14 @@ import "../activity.css";
  *  wallets: Trade shows its trades there, never each move a second time (QA's Jobs hunt M6, 5 Nov: one move,
  *  two rows, one saying "Now in your NEAR wallet", the other "in your SOL wallet"). Trade's own tab keeps them. */
 export function Activity({ tradesOnly = false }: { tradesOnly?: boolean } = {}) {
-  const { svc } = useTrade();
+  const { svc, active } = useTrade();
   const { bridge } = useShell();
   const { snap } = useFloat();
   const rows = useLive(() => svc.activity(), []);
+  // a "not confirmed yet" card on screen (Trade's tab, or the Activity centre over any app): the service looks at it
+  // again every RECHECK_MS (QA and the audit's MUST); none left, or this goes: it stops
+  const open = !!rows.value?.some((r) => r.status === "unconfirmed") && (tradesOnly || active);
+  useEffect(() => (open ? svc.watch() : undefined), [open, svc]);
   if (!rows.value) return <div className="tr-center tr-tall"><Mark size={56} mode="loading" /></div>;
   const name = (c?: string) => snap.chains.find((x) => x.chain === c)?.name;
   // one move, one card (QA, 3 Nov): a Move's leg on to a chain, or back from one, folds into its move's card as a line
@@ -32,7 +37,7 @@ export function Activity({ tradesOnly = false }: { tradesOnly?: boolean } = {}) 
     const more = legs(m.id).map((l) => moveCard(l, name(l.chain)).title);
     return more.length ? { ...c, result: [c.result, ...more].filter(Boolean).join(" · ") } : c;
   });
-  const cards = [...rows.value.map(tradeCard), ...(tradesOnly ? [] : moves)].sort((a, b) => b.at - a.at);
+  const cards = [...rows.value.map((r) => tradeCard(r)), ...(tradesOnly ? [] : moves)].sort((a, b) => b.at - a.at);
   if (cards.length === 0) return <><p className="zf-small tr-none">Nothing yet. Your trades will show here.</p><EarlierHistory bridge={bridge} /></>;
   return <div className="zf-enter tr-cards">{cards.map((c) => <JobCard key={c.id} card={c} />)}<EarlierHistory bridge={bridge} /></div>;
 }

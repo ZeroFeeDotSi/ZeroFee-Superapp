@@ -1,7 +1,8 @@
 // The person's own Claude key, straight to Anthropic from this device: the Anthropic SDK, Anthropic's address, and the
 // failures read by the SDK's own error classes. Only turn.ts's ownClaude() imports this file, and only where its inline
-// VITE_ZEROFEE_PUBLIC check allows: the public web build never contains it (its deploy check refuses "x-api-key" and
-// "api.anthropic.com" in the bundle), and the funded-wallet relay path never loads it.
+// checks allow (VITE_AGENTZERO_OWN_KEY=1 and not VITE_ZEROFEE_PUBLIC, or a node test): no build people get contains it
+// (the public deploy check refuses "x-api-key" and "api.anthropic.com"; tools/bundle-grep.sh names this file's chunk),
+// and the funded-wallet relay path never loads it.
 import { ANTHROPIC_BASE_URL } from "../claude.ts";
 import { anthropicReachable } from "./anthropic-check.ts";
 import { OWN_FAULT, chatRequest, type ChatMessage } from "./turn.ts";

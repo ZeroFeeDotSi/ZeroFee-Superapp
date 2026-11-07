@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { SpendingActivity } from "@zerofee/core/spending";
-import { describe, swapDetail, whereNow } from "./format.ts";
+import { describe, whereNow } from "./format.ts";
+import { swapDetail } from "./swap-detail.ts";
 import { movementFacts, spendingFacts } from "./statement.ts";
 import type { Chain, Movement, Token } from "../types.ts";
 
@@ -24,10 +25,12 @@ test("a Safe swap's row names its coin and where it is, never the coin's id (con
   assert.equal(whereNow(swap({ status: "refunded" }), "x"), "back in your Safe", "control: the Safe's swap");
   const old = { code: "ledger.convert.failed" } as never;
   assert.equal(whereNow(swap({ source: "private", status: "problem", problem: old }), "x"), "check your NEAR wallet", "a job kept with the old failed words");
-  assert.equal(whereNow(swap({ status: "problem", problem: old }), "x"), "with NEAR Intents", "control: the Safe's own failed swap");
+  assert.equal(whereNow(swap({ status: "problem", problem: old }), "x"), "check your Safe", "control: the Safe's own failed swap");
+  assert.equal(whereNow(swap({ kind: "pay", private: true, status: "problem", problem: old }), "x"), "check Private", "a payment from Private: its refund goes to Private");
+  assert.equal(whereNow(swap({ kind: "private", status: "problem", problem: old }), "x"), "check Private", "a move into Private: its refund goes to Private too (audit)");
   // the copy review's ruling (5 Nov): "to" a payee, "from" a payer, "with" only for a swap's partner
   assert.equal(whereNow(swap({ kind: "pay", to: "bob.near" }), "bob.near"), "to bob.near", "a payment names its payee with \"to\"");
-  assert.equal(describe(swap({ kind: "pay", to: "bob.near", from: USDC, amount: "5" }), TOKENS, CHAINS).detail, "5 USDC · to bob.near");
+  assert.equal(describe(swap({ kind: "pay", to: "bob.near", from: USDC, amount: "5" }), TOKENS, CHAINS).detail, "to bob.near");
   assert.equal(describe({ ...swap({ kind: "deposit", from: "sol", to: USDC, amount: "5" }) }, TOKENS, [{ id: "sol", name: "Solana" } as Chain]).detail, "5 USDC from Solana · in your Safe", "control: money in names where it came from");
 });
 

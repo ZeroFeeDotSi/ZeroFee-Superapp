@@ -9,7 +9,8 @@
 // A refusal names who said no (the swap service, NEAR, Solana) and where the money is, on the shell's Problem screen. A
 // service that failed (B28) is one line on the sheet itself, said before the tap when the relay's check already knows,
 // and the site wallet's read is read again by itself while it fails: never a page.
-import { TimeLeft } from "./JobMade.tsx";
+import { SaidLine, TimeLeft } from "./JobMade.tsx";
+import { addWords } from "./receipt-said.ts";
 import { LEG_SEC } from "@zerofee/shell-api/job-steps.ts";
 import { useContext, useEffect, useRef, useState } from "react";
 import type { NextStep, Problem } from "@zerofee/core/problem";
@@ -207,6 +208,8 @@ function SiteAddSheetFor({ wallet, name, network, safeUsd, coins, askedUsd, auto
   const { bridge, tasks } = useShell();
   /** The job is made (bug report, 5 Nov: no waiting screen): its dollars, and the sheet says "Job created." */
   const [made, setMade] = useState<string | null>(null);
+  /** The job its receipt follows (startJob's handle): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [madeJob, setMadeJob] = useState<string | null>(null);
   const start = String(Math.min(Number(askedUsd ?? SITE_ADD_USD) || SITE_ADD_USD, safeUsd !== null && Number(safeUsd) >= SITE_ADD_LEAST_USD ? Math.floor(Number(safeUsd) * 100) / 100 : SITE_ADD_USD));
   const [usd, setUsd] = useState(start);
   const [busy, setBusy] = useState(false);
@@ -260,6 +263,7 @@ function SiteAddSheetFor({ wallet, name, network, safeUsd, coins, askedUsd, auto
       if (job) return;
       // its time left from the route's measured time: Private pays the site's wallet straight (job-steps.ts LEG_SEC)
       job = startJob(tasks, { title: `Add ${amount} to your ${name} wallet`, usd: amount, etaSec: LEG_SEC.privateOut });
+      setMadeJob(job.id);
       mark("away");
       if (auto) onDone(`${amount} is on its way to ${name}.`); else { setMade(amount); setBusy(false); }
     };
@@ -333,7 +337,8 @@ function SiteAddSheetFor({ wallet, name, network, safeUsd, coins, askedUsd, auto
           </div>
           <p className="zf-receipt__amount">{made}</p>
           <p className="zf-receipt__head">{JOB_WORDS.created}</p>
-          <TimeLeft etaSec={LEG_SEC.privateOut} />
+          <SaidLine testid="site-add-said" {...addWords(made, name, network)} job={madeJob} />
+          <TimeLeft etaSec={LEG_SEC.privateOut} job={madeJob} />
         </div>
         <button className="zf-btn wl-sheet-go" onClick={() => onDone("")} data-testid="site-add-done">Done</button>
       </MoneySheet>
@@ -436,6 +441,8 @@ function SiteBackSheetFor({ wallet, also = [], name, safeUsd, askedUsd, onClose,
   const [legs, setLegs] = useState<Record<string, LegState>>({});
   /** The job is made at the tap (rule 2; QA's Sim test: "Getting it ready…", no job, no time): its dollars. */
   const [made, setMade] = useState<string | null>(null);
+  /** The job its receipt follows (startJob's handle): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [madeJob, setMadeJob] = useState<string | null>(null);
   const doneWith = useRef<{ line: string; id: string } | null>(null);
   const services = useServices(bridge, SHEET_NEEDS.takeout, "Take out");
   const priced = (w: SpendingWallet | null | undefined): number | null => (w && w.cashUsd !== undefined && !w.unread ? Number(w.cashUsd) : null);
@@ -476,6 +483,7 @@ function SiteBackSheetFor({ wallet, also = [], name, safeUsd, askedUsd, onClose,
     // pulse, "Job created." and its time left here; the core's answer hands the row to the Take out's own (back:<id>)
     const job = startJob(tasks, takeOutJob(picked, name));
     mark("away");
+    setMadeJob(job.id);
     setMade(`$${picked.toFixed(2)}`);
     const done: Record<string, LegState> = {};
     try {
@@ -542,7 +550,7 @@ function SiteBackSheetFor({ wallet, also = [], name, safeUsd, askedUsd, onClose,
           </div>
           <p className="zf-receipt__amount">{made}</p>
           <p className="zf-receipt__head">{JOB_WORDS.created}</p>
-          <TimeLeft etaSec={TAKE_OUT_ETA_SEC} watch />
+          <TimeLeft etaSec={TAKE_OUT_ETA_SEC} watch job={madeJob} />
         </div>
         <button className="zf-btn wl-sheet-go" onClick={end} data-testid="takeout-done">Done</button>
       </MoneySheet>

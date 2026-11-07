@@ -7,7 +7,7 @@ import type { Chain } from "./chain.ts";
 import { txHashOf } from "./chain.ts";
 import { NEAR_CLOSED, NEAR_COIN_WALLET, NEAR_GATE, NEAR_STORAGE_MAX_YOCTO, REF_EXCHANGE_ID, WNEAR } from "./near-gate.ts";
 import { nearAskRefusal, type NearTradeAsk } from "./near-trade.ts";
-import { NearTradeRefused, buildNearRegister, buildNearTrade, buildRheaAdd, buildRheaRoomBack, buildRheaSwap, buildRheaWithdraw, nearPublicKey, rheaAccountAt, signNearBuilt, type NearBuilt } from "./near-trade-sign.ts";
+import { NearTradeRefused, buildNearRegister, buildNearTrade, buildRheaAdd, buildRheaClaim, buildRheaRoomBack, buildRheaSwap, buildRheaWithdraw, nearPublicKey, rheaAccountAt, signNearBuilt, type NearBuilt } from "./near-trade-sign.ts";
 import { RHEA_HELD_LINE, type RheaRule } from "./near-rhea.ts";
 import { ProblemError } from "./problem.ts";
 import { securityProblems } from "./security-problems.ts";
@@ -174,6 +174,23 @@ export async function nearRegister(c: NearCoinCtx, coin: unknown, poolId?: unkno
   }, { register: coin });
 }
 
+/**
+ * A kept trade's coin back from Ref's lost and found (the audit's MUST, 7 Nov): Ref's claim_lostfound for the coin, 1 yocto,
+ * built only while Ref holds some of it for the wallet at an agreed block, its bytes held to rheaBytesRefusal's "claim"
+ * (exactly that method, deposit and { token_id }). The same key and caps as a trade (nothing new to approve: 1 yocto out).
+ * Only Trade asks. Nothing is sent here.
+ */
+export async function nearRheaClaim(c: NearCoinCtx, coin: unknown): Promise<NearSignedAnswer> {
+  if (!NEAR_GATE.open) throw new ProblemError(securityProblems.subwalletRefused(NEAR_CLOSED));
+  if (!isAccountId(coin) || coin === REF_EXCHANGE_ID) throw new ProblemError(securityProblems.requestInvalid("the coin is a NEAR coin's contract"));
+  return signed(c, async (chain, wallet, pk) => {
+    const b = await buildRheaClaim(chain, wallet, pk, coin);
+    // the copy review's words (7 Nov): the sheet, when the caps ask for one (only 1 yocto leaves, so they rarely do)
+    const about = `${(Number(b.held) / 10 ** b.decimals).toLocaleString("en-US", { maximumFractionDigits: 6 })} ${b.symbol}`;
+    return { b, sheet: { title: `Get your ${b.symbol} back from Rhea`, lines: [`Your NEAR wallet gets · about ${about}`, "Rhea sends it to your NEAR wallet."] } };
+  }, { rhea: "claim", token: coin });
+}
+
 /** A NEAR coin's dollar price from a source the app doesn't control: 1Click's token list, else the relay's market read. */
 async function coinUsd(c: NearCoinCtx, coin: string): Promise<number | null> {
   const listed = c.o.tokenPrice ? await c.o.tokenPrice(`nep141:${coin}`).catch(() => null) : null;
@@ -198,7 +215,7 @@ function signed(c: NearCoinCtx, build: (chain: Chain, wallet: string, publicKey:
     } catch (e) {
       if (e instanceof NearTradeRefused) {
         if (e.code === "near.rhea.room" || e.code === "near.rhea.unregistered") throw new ProblemError(nearRheaFirst(e.code === "near.rhea.room" ? "room" : "ready"));
-        if (e.code) throw new ProblemError(nearRegisterFirst(e.code === "near.wnear.unregistered" ? WNEAR : (rule as NearTradeAsk).coin));
+        if (e.code) throw new ProblemError(nearRegisterFirst(e.code === "near.wnear.unregistered" ? WNEAR : "rhea" in rule && rule.rhea === "claim" ? rule.token : (rule as NearTradeAsk).coin));
         throw new ProblemError(securityProblems.subwalletRefused(e.message));
       }
       throw e;

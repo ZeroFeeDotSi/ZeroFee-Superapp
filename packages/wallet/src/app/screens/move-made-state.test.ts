@@ -23,7 +23,9 @@ test("the receipt is Done when its job's legs landed (fails before: it kept the 
 test("MoveSheet draws the job's state: data-state from it, Done in place of the time, one clock from when the job was made", () => {
   assert.match(sheet, /const job = madeState\(runs, legs, follow\?\.length \?\? 0\);/);
   assert.match(sheet, /wl-mv-made" data-state=\{job\.state\}/, "fails before: data-state=\"away\" always");
-  assert.match(sheet, /\{job\.state === "landed" \? <p className="zf-receipt__line" data-testid="move-made-landed">\{MOVE_WORDS\.done\}<\/p> : job\.etaSec !== null && <TimeLeft \{\.\.\.\(madeAt !== null \? \{ endsAt: madeAt \+ job\.etaSec \* 1000 \}/);
+  assert.match(sheet, /\{job\.state === "landed" \? <p className="zf-receipt__line" data-testid="move-made-landed">\{MOVE_WORDS\.done\}<\/p> : job\.etaSec !== null \? <TimeLeft \{\.\.\.\(madeAt !== null \? \{ endsAt: madeAt \+ job\.etaSec \* 1000 \}/);
   assert.doesNotMatch(sheet, /<TimeLeft etaSec=\{Math\.max\(0, \.\.\.legs\.map\(legTime\)\)\} \/>/, "fails before: the plan's own countdown");
-  assert.match(sheet, /\{job\.state === "away" && <p className="zf-receipt__line">\{JOB_WORDS\.watch\}<\/p>\}/, "control: \"It keeps going\" only while it does");
+  // J2-4 (copy review, 8 Nov): "It keeps going" follows TimeLeft's own landing, never a line of its own under "Done in 6 seconds."
+  assert.match(sheet, /job\.etaSec \* 1000 \} : \{ etaSec: job\.etaSec \}\)\} watch job=\{madeJob\} \/>/, "control: \"It keeps going\" only while it does");
+  assert.doesNotMatch(sheet, /\{job\.state === "away" && <p className="zf-receipt__line">\{JOB_WORDS\.watch\}<\/p>\}/);
 });

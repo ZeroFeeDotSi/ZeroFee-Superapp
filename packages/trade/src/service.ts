@@ -11,8 +11,9 @@ import type { Bridge } from "@zerofee/core/bridge";
 import { ProblemError, type Problem } from "@zerofee/core/problem";
 import { copyReason } from "./market/spam.ts";
 import { approvalNeeded, rawToUsd, usdToRaw } from "./slippage.ts";
+import { ageOf, BACKOFF_AFTER_MS, checkableShape, liveCheckable, LIVE_MAX_MS } from "./live-check.ts";
 import { problemOf, tradeProblems } from "./trade-problems.ts";
-import type { Amount, ChainEngine, ChainId, CoinMeta, Fill, Prepared, Quote, Side, TxStatus, TxStep } from "./types.ts";
+import type { Amount, ChainEngine, ChainId, CoinMeta, FinalAgain, Fill, Prepared, Quote, Side, TxStatus, TxStep } from "./types.ts";
 
 /**
  * `funding`: how the main balance's coin reaches the trading wallet. "withdraw": ledger.withdraw home to its own chain (the
@@ -45,9 +46,24 @@ const VERIFY_MAX_MS = 600_000;
 const POLL_MS = 400, SLOW_POLL_MS = 1_000, FAST_POLL_MS = 150, FAST_FOR_MS = 3_000, STRICT_EVERY_MS = 1_000, REBROADCAST_MS: Record<ChainId, number> = { sol: 2_000, bsc: 4_000, hood: 4_000, near: 2_000 };
 /** Past this, the service stops waiting at the tap; the trade stays "unconfirmed" and is looked at again on the next open. */
 export const GIVE_UP_MS = 75_000;
+/**
+ * MUST (QA and 83, 7 Nov: "ZeroFee keeps checking" was only true on the next open): while an unconfirmed
+ * trade's card is on screen (watch()) and the app is in the foreground (foreground()), it is looked at again this often,
+ * by the engine's history-backed recheck() alone (never the tap's fast reads, never a send). One timer for the whole
+ * service, set again only after a round ends, so rounds never overlap or pile up.
+ */
+export const RECHECK_MS = 20_000;
+/** Each round looks at no more than this many unconfirmed trades, oldest first, one after another. */
+export const RECHECK_PER_ROUND = 3;
+export { liveCheckable };
+/** the audit's SHOULD (7 Nov): every open trade past BACKOFF_AFTER_MS (5 min from its send) is looked at this often instead;
+ *  past LIVE_MAX_MS (1 h) not at all, and its card says "Open this again to check." */
+export const RECHECK_SLOW_MS = 60_000;
 /** An EVM swap's deadline from its build (evm/context.ts DEADLINE_SEC, 120 s): the tap comes after the build, so this is a bound. */
 export const EVM_SWAP_DEADLINE_MS = 120_000;
 const KEEP_RECORDS = 200;
+/** One stored object: {positions, applied} (the audit's MUST, 7 Nov); the old "positions" key is read once, when this is missing. */
+const BOOK_KEY = "positions.v2";
 
 /** `current`: the chain's one wallet (D55); false, an older one (a sale of what it holds still signs from it). */
 export interface SubWallet { id: string; kind: string; chain: ChainId; address: string; label: string; current?: boolean }
@@ -79,8 +95,26 @@ export interface TradeRecord {
    *  saying it landed. "Landed in 0.62 s" is landedAt - tapAt (landedMs); no sheet asks in between (D143). */
   timing?: { tapAt: number; signedAt?: number; sentAt?: number; landedAt?: number };
   /** Done on one node's word; the two-node check still runs (its bytes are kept until it ends). If two nodes then say it
-   *  failed or expired, the record turns to that problem. */
-  verifying?: true;
+   *  failed or expired, the record turns to that problem. "fill": two nodes confirmed it, its fill not read yet (review
+   *  L5): the live round reads only the fill again (the audit's MUST, 7 Nov), and the next open checks it as any other. */
+  verifying?: true | "fill" | "book";
+  /** A NEAR coin's Rhea trade: what asks another node's FINAL again after a restart (finalAgain). */
+  again?: FinalAgain;
+  /** How often its kept fill failed to book (the audit's SHOULD, 7 Nov): the second time it is a named problem (bookInOrder). */
+  bookFails?: number;
+  /** Ref kept its coin out and nothing proved where (the audit's MUST, 7 Nov; trade.near.rhea-kept): what the card's way back
+   *  needs, the wallet that traded, the trade's hash and the coin out's contract. */
+  kept?: { wallet: string; hash: string; token: string };
+  /** Its coin came back by this claim's tx (the audit's MUST, 7 Nov): one claim covers every kept trade of the wallet and coin,
+   *  booked once under claim:<hash>; this trade's own fill is "about" its quote and never books on its own. */
+  claimed?: string;
+}
+
+/** A fill the positions can book: every figure the booking reads is one BigInt takes (the audit's SHOULD, 7 Nov: a corrupt kept
+ *  fill is refused before anything is written, never half booked or marked applied; exactly the fills that booked before). */
+export function fillReadable(f: Partial<Fill> | undefined): boolean {
+  const n = (v: unknown) => { try { BigInt(v as string); return true; } catch { return false; } };
+  return !!f && n(f.got) && n(f.spent) && n(f.fee) && (f.coinAfter === undefined || n(f.coinAfter));
 }
 
 /** "Landed in …": ms from the tap to the first node saying it landed; undefined when it hasn't landed, or its record
@@ -118,6 +152,8 @@ export interface TradeServiceDeps {
   walletKind?: "trade" | "extension";
   now?(): number;
   sleep?(ms: number): Promise<void>;
+  /** The live re-check's one timer (RECHECK_MS); tests hand a fake one. Default: setTimeout. */
+  timer?: { set(f: () => void, ms: number): unknown; clear(h: unknown): void };
   newId?(): string;
 }
 
@@ -147,13 +183,18 @@ export function createTradeService(d: TradeServiceDeps) {
   const listeners = new Set<() => void>();
   let records: TradeRecord[] | undefined;
   let positions: Record<string, Position> | undefined;
+  /** The fills already booked into the positions, by record id: when (stored with them, under BOOK_KEY). */
+  let applied: Record<string, number> = {};
+  /** Each claim's covered trades (the audit's MUST, 7 Nov), written with the claim's booking in the book's one write: a reopen
+   *  after a crash between the booking and the records closes them as claimed, never the help step (recoverClaims). */
+  let claims: Record<string, string[]> = {};
 
   const call = async <T>(method: string, params?: Record<string, unknown>): Promise<T> => {
     const r = await d.bridge.call<T>(method, params);
     if ("problem" in r) throw new ProblemError(r.problem);
     return r.ok;
   };
-  const changed = () => listeners.forEach((f) => f());
+  const changed = () => { listeners.forEach((f) => f()); kick(); };
   const load = async <T>(key: string, empty: T): Promise<T> => {
     try { const { value } = await call<{ value: string | null }>("device.store.get", { key }); return value ? JSON.parse(value) as T : empty; } catch { return empty; }
   };
@@ -161,17 +202,51 @@ export function createTradeService(d: TradeServiceDeps) {
   let saving: Promise<void> = Promise.resolve();
   const save = (): Promise<void> => {
     const write = async () => {
-      const activity = JSON.stringify((records ?? []).slice(0, KEEP_RECORDS)), pos = JSON.stringify(positions ?? {});
-      await Promise.all([call("device.store.set", { key: "activity", value: activity }), call("device.store.set", { key: "positions", value: pos })]);
+      // only ids still in the activity records. A claim's covered trades (claims) and its own booking key (claim:<tx hash>,
+      // the audit's MUST, 7 Nov) stay while ONE trade it covered is still kept, and go with the last (the audit's SHOULD, 8 Nov: the book
+      // never grows without end); a covered trade not yet closed as claimed (a save between the claim's booking and its
+      // close) still keeps them, so a crash there still recovers (recoverClaims)
+      const kept = (records ?? []).slice(0, KEEP_RECORDS), ids = new Set(kept.flatMap((r) => (r.claimed ? [r.id, `claim:${r.claimed}`] : [r.id])));
+      for (const h in claims) if (!(Array.isArray(claims[h]) && claims[h].some((id) => ids.has(id)))) delete claims[h];
+      for (const id in applied) if (!ids.has(id) && !(id.startsWith("claim:") && claims[id.slice(6)])) delete applied[id];
+      // the positions and the fills booked into them: one stored object, one write (the audit's MUST, 7 Nov)
+      const activity = JSON.stringify(kept), book = JSON.stringify({ positions: positions ?? {}, applied, claims });
+      await Promise.all([call("device.store.set", { key: "activity", value: activity }), call("device.store.set", { key: BOOK_KEY, value: book })]);
       changed();
     };
     return (saving = saving.then(write, write));
   };
+  /** A kept trade a claim covered (the audit's MUST, 7 Nov): done, its own figure "about" its quote, its id applied so its fill
+   *  never books on its own (the claim's rise is booked once, under claim:<hash>). */
+  function closeClaimed(x: TradeRecord, hash: string): void {
+    applied[x.id] = now();
+    const f: Fill = { ...x.fill!, got: x.quote!.getRaw, estimated: true };
+    delete f.kept;
+    x.fill = f; x.claimed = hash;
+    delete x.problem; delete x.kept;
+  }
+  /** the audit's MUST (7 Nov): a claim booked (the book written) whose records' save never landed: its covered trades, still
+   *  kept, close as claimed on the reopen; Rhea's lost and found (now empty) is never read for them. */
+  function recoverClaims(): void {
+    for (const [h, ids] of Object.entries(claims)) {
+      if (!applied[`claim:${h}`]) continue;
+      for (const x of records ?? []) if (ids.includes(x.id) && x.problem?.code === "trade.near.rhea-kept" && x.quote && x.fill) closeClaimed(x, h);
+    }
+  }
+  /** Sent and not yet decided, or done on a node's word with its fill still to book. */
+  const stillOpen = (r: TradeRecord) => !!r.verifying || r.status === "sending" || r.status === "confirming" || r.status === "unconfirmed";
   /** Signed bytes are short-lived authorisations: they stay only while a trade may still land, never after two nodes said how it ended. */
-  const forget = (rec: TradeRecord) => { if (!rec.verifying && rec.status !== "sending" && rec.status !== "confirming" && rec.status !== "unconfirmed") delete rec.signed; };
+  const forget = (rec: TradeRecord) => { if (!stillOpen(rec)) delete rec.signed; };
   const ensureLoaded = async () => {
-    records ??= (await load<TradeRecord[]>("activity", [])).map((r) => { forget(r); return r; });
-    positions ??= await load<Record<string, Position>>("positions", {});
+    // after a reload (the audit's MUST, 7 Nov): every trade still to book takes its place again, in tap order (the list is newest
+    // first), before any new tap
+    if (!records) { const l = (await load<TradeRecord[]>("activity", [])).map((r) => { forget(r); return r; }); if (!records) (records = l).filter(owes).reverse().forEach(takeSlot); }
+    if (!positions) {
+      // the positions with the fills booked into them; from before (the audit's MUST, 7 Nov): the old "positions" key, none applied
+      const b = await load<{ positions: Record<string, Position>; applied: Record<string, number>; claims?: Record<string, string[]> } | null>(BOOK_KEY, null);
+      const old = b ? undefined : await load<Record<string, Position>>("positions", {});
+      if (!positions) { positions = b?.positions ?? old ?? {}; applied = b?.applied ?? {}; claims = b?.claims ?? {}; recoverClaims(); }
+    }
   };
   // the shell ends every session when the phone locks or the app goes to the background (D18): the screens hear it at once,
   // and the next trade starts a new one (D143: no sheet)
@@ -272,7 +347,7 @@ export function createTradeService(d: TradeServiceDeps) {
     const pastDeadline = () => rec.chain !== "sol" && now() > (rec.startedAt ?? rec.sentAt ?? now()) + EVM_SWAP_DEADLINE_MS;
     const last = rec.steps!.length - 1;
     for (;;) {
-      const st = await e.status(rec.hashes[last]!, rec.steps![last]).catch(() => "unknown" as const);
+      const st = await e.status(rec.hashes[last]!, rec.steps![last], rec.startedAt).catch(() => "unknown" as const);
       if (st === "confirmed" || st === "failed" || st === "expired") return st;
       if (now() - t0 > GIVE_UP_MS) return "unconfirmed";
       if (now() - lastSend >= REBROADCAST_MS[rec.chain] && !pastDeadline()) { lastSend = now(); for (const tx of rec.signed!) await e.send(tx).catch(() => undefined); }
@@ -294,7 +369,7 @@ export function createTradeService(d: TradeServiceDeps) {
     for (;;) {
       if (!asking && now() - strictAt >= STRICT_EVERY_MS) {
         asking = true; strictAt = now();
-        void e.status(hash, step).catch(() => "unknown" as const).then((s) => { verdict = s; asking = false; });
+        void e.status(hash, step, rec.startedAt).catch(() => "unknown" as const).then((s) => { verdict = s; asking = false; });
       }
       if (final()) return verdict as "confirmed" | "failed" | "expired";
       if ((await e.landed!(hash, step).catch(() => "pending" as const)) === "landed") return "landed";
@@ -323,13 +398,14 @@ export function createTradeService(d: TradeServiceDeps) {
     if (st === "confirmed") {
       const f = await e.fill(p, rec.hashes.at(-1)!).catch(() => undefined);
       // review L5: a fill that can't be read yet stays to be read (resume() asks again), never a lasting "about"
-      if (f) { await bookInOrder(rec, q, f); delete rec.verifying; }
+      // its turn not come yet (an earlier tap on the coin still to book): it books in the background, still verifying
+      await bookOrDefer(rec, q, f);
       forget(rec);
       await save();
       return;
     }
     if (st === "unconfirmed" && (await stillLanded())) { await save(); return; }   // done on a node's word, checked again on the next open
-    const problem = st === "failed" ? tradeProblems.reverted(q.symbol) : st === "expired" ? tradeProblems.expired(q.symbol) : tradeProblems.unconfirmed(q.symbol, CHAINS[q.chain].name);
+    const problem = st === "failed" ? tradeProblems.reverted(q.symbol) : st === "expired" ? tradeProblems.expired(q.symbol, CHAINS[q.chain].name) : tradeProblems.unconfirmed(q.symbol, CHAINS[q.chain].name);
     delete rec.fill;
     delete rec.filledInMs;
     if (st !== "unconfirmed") delete rec.verifying;
@@ -347,26 +423,112 @@ export function createTradeService(d: TradeServiceDeps) {
    * Each coin's bookings in the order of the taps (review M1): a check that ends first doesn't book first. A sale tapped
    * after a buy waits for the buy's booking, so it never books against an empty position, and two buys' "balance after"
    * figures land in their own order. Each trade takes its place at the tap and gives it up once it booked or ended.
+   * the audit's MUST (7 Nov): a check that ends without booking (a node's word only, or a fill not readable yet) keeps the place
+   * until a later look books it or ends it: the next open (resume) for any of them; the live round (a card on screen)
+   * for one left unconfirmed, and for one two nodes confirmed whose fill wasn't read (verifying "fill": the round reads
+   * only its fill). A done-on-a-node's-word one still checking ("done", verifying) is looked at again only on the next
+   * open. So a later sale never books against a position missing that buy. A place held with no look running never
+   * blocks anyone's tap, open or round: a booking whose turn hasn't come waits in the background (deferred) and books the
+   * moment it comes; after a reload the places are taken again from the records, in tap order, before any new tap. A
+   * place is given up for good once nothing will look at the trade again in the live window (LIVE_MAX_MS from its send),
+   * so a trade unconfirmed for good blocks nobody: a waiting booking sets a wake at that moment (wakeAt), which gives the
+   * place up and books the one behind it with no other event.
    */
-  const coinOrder = new Map<string, Promise<void>>();
-  const slots = new Map<string, { before: Promise<void>; release: () => void }>();
-  function takeSlot(rec: TradeRecord): void {
-    if (slots.has(rec.id) || !rec.coin) return;
-    const k = posKey(rec.chain, rec.coin);
-    const before = coinOrder.get(k) ?? Promise.resolve();
-    let open!: () => void;
-    const mine = new Promise<void>((r) => (open = r));
-    const tail = before.then(() => mine);
-    coinOrder.set(k, tail);
-    void tail.then(() => { if (coinOrder.get(k) === tail) coinOrder.delete(k); });
-    slots.set(rec.id, { before, release: () => { slots.delete(rec.id); open(); } });
+  const queues = new Map<string, TradeRecord[]>();
+  /** Bookings waiting for their turn, woken when the trade before them gives up its place; deferred: those in the background. */
+  const waiters = new Map<TradeRecord, () => void>(), deferred = new Map<TradeRecord, Promise<void>>();
+  /** Taps whose own path (tradeOnce) runs now. */
+  const tapping = new Set<string>();
+  /** May this trade still book? Its own path or a check runs now, or a later look (resume, live re-check) will book or end
+   *  it: from its bytes, or a NEAR coin's still finishing (unconfirmed, sending) by the core's move id (followNear). */
+  const owesNow = (r: TradeRecord) => tapping.has(r.id) || checking.has(r.id) || deferred.has(r);
+  // "book": its final fill read, only its booking waited (the audit's MUST, 7 Nov): the next open books it from rec.fill, any age
+  const owes = (r: TradeRecord): boolean => owesNow(r) || r.verifying === "book" || (stillOpen(r) && (r.chain === "near" ? r.status === "unconfirmed" || r.status === "sending" || !!r.again : !!r.signed?.[0]) && liveCheckable(r, now()));
+  const qKey = (r: TradeRecord) => posKey(r.chain, r.coin!);            // no coin: no queue (takeSlot)
+  /** Drops the coin's front places that no longer owe a booking, then wakes the booking now first. */
+  function sweep(k: string): void {
+    const q = queues.get(k) ?? [];
+    while (q[0] && !owes(q[0])) unchecked(q.shift()!);
+    if (q[0]) waiters.get(q[0])?.(); else queues.delete(k);
   }
-  const releaseSlot = (rec: TradeRecord) => slots.get(rec.id)?.release();
+  function takeSlot(rec: TradeRecord): void {
+    const k = qKey(rec), q = queues.get(k) ?? [];
+    if (rec.coin && !q.includes(rec)) queues.set(k, [...q, rec]);
+  }
+  /** Gives up the place once the trade has booked or ended (nothing will book it any more); else keeps it. */
+  function settleSlot(rec: TradeRecord): void {
+    const k = qKey(rec), q = queues.get(k);
+    looked.add(rec.id);
+    if (owes(rec)) return wakeAt(k);
+    unchecked(rec);
+    q?.splice(q.indexOf(rec) >>> 0, 1);                                    // not there: -1 >>> 0, nothing removed
+    sweep(k);
+  }
+  /**
+   * A booking waits behind a place nothing works on now (no tap, check or booking of its own runs, so no event will come):
+   * a wake at the end of that trade's live window gives the place up and books the one behind (the audit's MUST, 7 Nov). One per
+   * coin; a place a look works on gets its own when that look ends (settleSlot). Unref'd where the timer has it (Node).
+   */
+  const wakes = new Set<string>();
+  function wakeAt(k: string): void {
+    const q = queues.get(k), h = q?.[0], ms = h && LIVE_MAX_MS + 1 - ageOf(h, now());
+    if (!ms || ms <= 0 || wakes.has(k) || owesNow(h) || !q.some((r) => waiters.has(r))) return;
+    wakes.add(k);
+    (timers.set(() => { wakes.delete(k); sweep(k); wakeAt(k); }, ms) as { unref?: () => void })?.unref?.();
+  }
+  /**
+   * the audit's MUST (ii), 7 Nov: a NEAR trade done on one node's word whose FINAL nothing will ask any more (its live window
+   * over with no answer, no look running) is never a silent "done": it says so (finalUnchecked), nothing of it is
+   * booked, and its place is given up. Only once a look in this run has asked (its own check, or the open's): one from
+   * before a restart is asked on the open first. Its own record only; the position is never touched here.
+   */
+  const looked = new Set<string>();
+  function unchecked(rec: TradeRecord): void {
+    if (rec.verifying !== true || !rec.again || !looked.has(rec.id) || owes(rec)) return;
+    const a = rec.again;
+    delete rec.verifying; delete rec.again;
+    // Ref kept the coin out (the audit's MUST, 7 Nov): the way back's facts kept, never "your wallet shows what you hold"
+    if (rec.fill?.kept) {
+      rec.kept = { wallet: a.signerId, hash: a.hash, token: a.ask.side === "buy" ? a.ask.coin : "wrap.near" };
+      rec.problem = tradeProblems.rheaKept(rec.symbol);
+    } else rec.problem = tradeProblems.finalUnchecked(rec.symbol, rec.kind === "sell" ? "sell" : "buy", CHAINS[rec.chain].name);
+    void save().catch(() => undefined);
+  }
+  /** Every earlier tap on this coin has booked or ended (its place is first, or it has none). */
+  function myTurn(rec: TradeRecord): boolean {
+    const k = qKey(rec);
+    sweep(k);
+    return (queues.get(k)?.indexOf(rec) ?? 0) < 1;                       // first (0), not there (-1), or no queue
+  }
   /** A fill booked after every earlier tap on the same coin has booked or ended. */
   async function bookInOrder(rec: TradeRecord, q: Quote, f: Fill): Promise<void> {
-    await slots.get(rec.id)?.before;
+    if (!myTurn(rec)) await new Promise<void>((r) => waiters.set(rec, r));
+    waiters.delete(rec);
     rec.fill = f;
-    await applyFill(rec, q, f);
+    try { await applyFill(rec, q, f); } catch (err) {
+      // the audit's SHOULD (7 Nov): a fill that can't be booked (a corrupt kept fill, a throw) is kept to try once more on the
+      // next open; the second time it is a named problem with nothing booked, its place given up, so the coin's later
+      // bookings are never blocked for good
+      rec.bookFails = (rec.bookFails ?? 0) + 1;
+      if (rec.bookFails < 2) { rec.verifying = "book"; void save().catch(() => undefined); throw err; }
+      delete rec.fill; delete rec.verifying; delete rec.again;
+      rec.problem = tradeProblems.finalUnchecked(rec.symbol, rec.kind === "sell" ? "sell" : "buy", CHAINS[rec.chain].name);
+    }
+  }
+  /**
+   * A confirmed trade's fill: booked now when it's this trade's turn (no longer verifying). Its turn not come yet, it stays
+   * verifying and books in the background the moment it comes, then is done (its bytes forgotten, saved); never waited
+   * for by the caller. No fill read yet (review L5): it stays verifying, read and booked on the next open. After a reload,
+   * resume reads its fill again and books it in order.
+   */
+  async function bookOrDefer(rec: TradeRecord, q: Quote, f?: Fill): Promise<void> {
+    rec.verifying = f ? true : "fill";
+    if (!f) return;
+    if (myTurn(rec)) { await bookInOrder(rec, q, f); delete rec.verifying; return; }
+    // its final fill kept: a reload books it from here, in order, with no chain read (verifying "book", the audit's MUST, 7 Nov)
+    Object.assign(rec, { fill: f, verifying: "book" });
+    deferred.set(rec, bookInOrder(rec, q, f).then(() => { delete rec.verifying; forget(rec); return save(); }).catch(() => undefined).finally(() => { deferred.delete(rec); settleSlot(rec); }));
+    wakeAt(qKey(rec));
   }
 
   /** Average cost: a buy adds what it cost (fee included); a sell takes out its share of the cost and books the rest as realized. */
@@ -379,6 +541,7 @@ export function createTradeService(d: TradeServiceDeps) {
     return next;
   }
   async function applyFillNow(rec: TradeRecord, q: Quote, f: Fill): Promise<void> {
+    if (!fillReadable(f)) throw new Error("This fill can't be booked.");
     // the chain's coin in dollars at the fill: the market's, else the quote's own (its dollars over its raw amount): a
     // cost basis written at $0 reads as profit for as long as the coin is held (audit 2 Nov)
     const c = CHAINS[q.chain];
@@ -389,29 +552,34 @@ export function createTradeService(d: TradeServiceDeps) {
     const dec = rhea ? 24 : c.decimals;
     const qUnits = Number(BigInt(qRaw)) / 10 ** dec;
     const px = (rhea ? undefined : await shownUsd(q.chain)) ?? (qUnits > 0 && qUsd > 0 ? qUsd / qUnits : 0);
-    const k = posKey(q.chain, q.coin);
-    const pos = positions![k] ?? { chain: q.chain, coin: q.coin, symbol: q.symbol, decimals: q.decimals, raw: "0", costUsd: 0, realizedUsd: 0 };
     const feeUsd = rawToUsd(f.fee, dec, px);
-    // each wallet's share (a position from before keeps what it held as one wallet's: the one that signs now)
-    const w = rec.walletId ?? "";
-    const by = pos.byWallet ?? (BigInt(pos.raw) > 0n ? { [w]: pos.raw } : {});
-    const mine = BigInt(by[w] ?? "0");
-    if (q.side === "buy") {
-      by[w] = (mine + BigInt(f.got)).toString();
-      pos.costUsd += rawToUsd(f.spent, dec, px) + feeUsd;
-    } else {
-      const held = BigInt(pos.raw), sold = BigInt(f.spent) > held ? held : BigInt(f.spent);
-      const costOut = held > 0n ? pos.costUsd * (Number(sold) / Number(held)) : 0;
-      pos.realizedUsd += rawToUsd(f.got, dec, px) - feeUsd - costOut;
-      pos.costUsd -= costOut;
-      by[w] = (mine > sold ? mine - sold : 0n).toString();
+    // a fill is booked into the positions once (the audit's MUST, 7 Nov): its id goes in the same stored write as the change, so
+    // an app closed before its record said "booked" never books it twice on the next open
+    if (!applied[rec.id]) {
+      applied[rec.id] = now();
+      const k = posKey(q.chain, q.coin);
+      const pos = positions![k] ?? { chain: q.chain, coin: q.coin, symbol: q.symbol, decimals: q.decimals, raw: "0", costUsd: 0, realizedUsd: 0 };
+      // each wallet's share (a position from before keeps what it held as one wallet's: the one that signs now)
+      const w = rec.walletId ?? "";
+      const by = pos.byWallet ?? (BigInt(pos.raw) > 0n ? { [w]: pos.raw } : {});
+      const mine = BigInt(by[w] ?? "0");
+      if (q.side === "buy") {
+        by[w] = (mine + BigInt(f.got)).toString();
+        pos.costUsd += rawToUsd(f.spent, dec, px) + feeUsd;
+      } else {
+        const held = BigInt(pos.raw), sold = BigInt(f.spent) > held ? held : BigInt(f.spent);
+        const costOut = held > 0n ? pos.costUsd * (Number(sold) / Number(held)) : 0;
+        pos.realizedUsd += rawToUsd(f.got, dec, px) - feeUsd - costOut;
+        pos.costUsd -= costOut;
+        by[w] = (mine > sold ? mine - sold : 0n).toString();
+      }
+      // the chain's own figure wins, for the wallet it is the figure of: the signing wallet's balance after its trade
+      if (f.coinAfter !== undefined) by[w] = f.coinAfter;
+      for (const [id, raw] of Object.entries(by)) if (BigInt(raw) === 0n) delete by[id];
+      pos.byWallet = by;
+      pos.raw = Object.values(by).reduce((n, x) => n + BigInt(x), 0n).toString();
+      if (BigInt(pos.raw) === 0n) delete positions![k]; else positions![k] = pos;
     }
-    // the chain's own figure wins, for the wallet it is the figure of: the signing wallet's balance after its trade
-    if (f.coinAfter !== undefined) by[w] = f.coinAfter;
-    for (const [id, raw] of Object.entries(by)) if (BigInt(raw) === 0n) delete by[id];
-    pos.byWallet = by;
-    pos.raw = Object.values(by).reduce((n, x) => n + BigInt(x), 0n).toString();
-    if (BigInt(pos.raw) === 0n) delete positions![k]; else positions![k] = pos;
     // one figure, the chain's: a buy's every lamport out (the coin, the fee, the deposit, pump.fun's one-time account), a
     // sale's every lamport in (its proceeds less the fee, and the deposit back); the parts are named beside it
     const usdOf = (raw: string | undefined) => (raw ? rawToUsd(raw, dec, px) : 0);
@@ -473,8 +641,10 @@ export function createTradeService(d: TradeServiceDeps) {
     rec.fill = r.fill;
     rec.hashes = [r.fill.txHash];
     // a NEAR coin's Rhea trade: timed, done on the first node's word, booked on another node's FINAL (near/book.ts)
-    if (r.verify) return (await import("./near/book.ts")).bookLater({ rec, r, tapAt, reverted: tradeProblems.reverted(q.symbol), save, bookInOrder, checking, verifying, now });
-    await bookInOrder(rec, q, r.fill);
+    if (r.verify) return (await import("./near/book.ts")).bookLater({ rec, r, tapAt, reverted: tradeProblems.reverted(q.symbol), save, bookInOrder, checking, verifying, now, settle: settleSlot });
+    // never waits for another trade's check (the audit's MUST, 7 Nov: a trade over 2 s is an F): an earlier tap on the coin still
+    // to book leaves it verifying, booked in the background the moment its turn comes, in tap order
+    await bookOrDefer(rec, q, r.fill);
     const endedAt = now();
     // the person's own wait, from the tap to the coin in Spending (D143: no sheet in between)
     Object.assign(rec, { status: "done", endedAt, filledInMs: endedAt - tapAt });
@@ -558,14 +728,16 @@ export function createTradeService(d: TradeServiceDeps) {
         Object.assign(rec, { status: "done", endedAt: landedAt, fill: est, verifying: true as const, filledInMs: landedAt - from });
         await save();
         checking.add(rec.id);
-        const v: Promise<void> = verify(e, p, rec, w).catch(() => undefined).finally(() => { verifying.delete(v); checking.delete(rec.id); releaseSlot(rec); });
+        const v: Promise<void> = verify(e, p, rec, w).catch(() => undefined).finally(() => { verifying.delete(v); checking.delete(rec.id); settleSlot(rec); });
         verifying.add(v);
         return rec;
       }
       if (st === "confirmed") {
         rec.timing.landedAt = now();
         const f = await e.fill(p, rec.hashes.at(-1)!).catch(() => undefined);
-        if (f) await bookInOrder(rec, q, f);
+        // never waits for another trade's check: an earlier tap on the coin still to book, or a fill not readable yet,
+        // leaves it verifying (resume reads and books it, review L5), keeping its place
+        await bookOrDefer(rec, q, f);
         // "done in …" is the person's own wait, from the tap to the receipt on screen, never only the chain's part of it
         // (grade 30 Oct, item 2: "done in under a second" was said after 2.75 s from the tap)
         const endedAt = now();
@@ -583,7 +755,7 @@ export function createTradeService(d: TradeServiceDeps) {
       }
       // a sale that ended without its swap may have left its approvals on chain (audit T-12): set back to 0, signed on their own
       if (q.side === "sell" && (st === "failed" || st === "expired") && e.revokeLeft) await revokeLeft(e, w, q).catch(() => undefined);
-      const problem = st === "failed" ? tradeProblems.reverted(q.symbol) : st === "expired" ? tradeProblems.expired(q.symbol) : tradeProblems.unconfirmed(q.symbol, CHAINS[q.chain].name);
+      const problem = st === "failed" ? tradeProblems.reverted(q.symbol) : st === "expired" ? tradeProblems.expired(q.symbol, CHAINS[q.chain].name) : tradeProblems.unconfirmed(q.symbol, CHAINS[q.chain].name);
       Object.assign(rec, { status: st === "unconfirmed" ? "unconfirmed" : st, problem, ...(st === "unconfirmed" ? {} : { endedAt: now() }) });
       forget(rec);
       await save();
@@ -660,10 +832,12 @@ export function createTradeService(d: TradeServiceDeps) {
     // its place in this coin's bookings, at the tap (review M1); a trade done on one node's word gives it up when its
     // background check ends, any other when the tap's own path ends
     takeSlot(rec);
+    tapping.add(rec.id);
     try {
       return await run(p, rec, tapAt);
     } finally {
-      if (!checking.has(rec.id)) releaseSlot(rec);
+      tapping.delete(rec.id);
+      settleSlot(rec);
     }
   }
 
@@ -735,7 +909,50 @@ export function createTradeService(d: TradeServiceDeps) {
     return rec;
   }
 
+  // ---- The live re-check (RECHECK_MS): an unconfirmed trade's card on screen, the app in the foreground ----
+  const timers = d.timer ?? { set: (f: () => void, ms: number) => setTimeout(f, ms), clear: (h: unknown) => clearTimeout(h as ReturnType<typeof setTimeout>) };
+  let watchers = 0, foreground = true, rounding = false, timer: unknown, lastRound: Promise<void> = Promise.resolve();
+  /** The trades a round looks at: unconfirmed, or confirmed with their fill still to read (the audit's MUST, 7 Nov); live-checkable,
+   *  not taken by another check (resume, verify). */
+  const liveOpen = () => (records ?? []).filter((r) => (r.status === "unconfirmed" || r.verifying === "fill") && liveCheckable(r, now()) && !checking.has(r.id)).sort((a, b) => a.startedAt - b.startedAt);
+  /** Past LIVE_MAX_MS and still saying "ZeroFee keeps checking.": its words are changed once the live look stops. */
+  const agedOut = () => (records ?? []).filter((r) => r.status === "unconfirmed" && checkableShape(r) && ageOf(r, now()) > LIVE_MAX_MS && r.problem?.code === "trade.trade.unconfirmed" && /keeps checking/.test(r.problem.whatHappened));
+  /** The next round's wait: RECHECK_MS while any open trade is under BACKOFF_AFTER_MS old, else RECHECK_SLOW_MS. */
+  const nextWait = () => (liveOpen().some((r) => ageOf(r, now()) < BACKOFF_AFTER_MS) ? RECHECK_MS : RECHECK_SLOW_MS);
+  const stopTimer = () => { if (timer !== undefined) { timers.clear(timer); timer = undefined; } };
+  /** Sets the one timer when a card is watched, the app is in the foreground and something is open; never a second one. */
+  function kick(): void {
+    if (!watchers || !foreground) { stopTimer(); return; }
+    if (timer !== undefined || rounding) return;
+    if (records === undefined || (!liveOpen().length && !agedOut().length)) return;   // watch() loads the records, then asks again
+    timer = timers.set(() => { timer = undefined; lastRound = round(); }, liveOpen().length ? nextWait() : RECHECK_SLOW_MS);
+  }
+  async function round(): Promise<void> {
+    if (rounding || !watchers || !foreground) return;
+    rounding = true;
+    try {
+      await ensureLoaded();
+      // the live look stops at LIVE_MAX_MS: the card's own words say so from then (never "keeps checking" with nobody looking)
+      const old = agedOut();
+      for (const rec of old) rec.problem = tradeProblems.unconfirmed(rec.symbol, CHAINS[rec.chain].name, false);
+      if (old.length) await save();
+      for (const rec of liveOpen().slice(0, RECHECK_PER_ROUND)) {
+        if (!watchers || !foreground) break;
+        await recheckOne(rec).catch(() => undefined);
+      }
+    } finally { rounding = false; kick(); }
+  }
+  /** One trade, looked at again by history reads only (recheck-one.ts, loaded the first time a round looks at one). */
+  const recheckOne = async (rec: TradeRecord) => (rec.chain === "near" ? followNear(rec) : (await import("./recheck-one.ts")).recheckOne({ rec, checking, now, CHAINS, problems: tradeProblems, walletsOn, engineOf, bookOrDefer, forget, save, takeSlot, settleSlot }));
+  /** A NEAR coin's trade 1Click was still finishing, looked at by the core's move id (resume's look, and the live one):
+   *  in near/book.ts, loaded the first time one is looked at (Home's first load, its JS budget). */
+  /** A kept trade's claim, one per trade at a time (the audit's MUST (3), 7 Nov): a second tap waits on the first, one tx. */
+  const claiming = new Map<string, Promise<{ got: string } | undefined>>();
+  const followNear = async (rec: TradeRecord) => (await import("./near/book.ts")).followNear({ rec, checking, engineOf, bookOrDefer, save, now, takeSlot, settleSlot, reverted: tradeProblems.reverted });
+
   return {
+    /** The service's own clock (TradeServiceDeps.now; the wall's by default): Activity's "now" and clock times read it. */
+    now: (): number => now(),
     /** Every chain's trading wallet, with its native balance (none yet: no id or address). */
     async wallets(): Promise<TradingWallet[]> {
       return Promise.all(chains.map(async (chain) => {
@@ -864,7 +1081,26 @@ export function createTradeService(d: TradeServiceDeps) {
       const { e } = await engineOf(chain, await holderOf(chain, coin));
       return (await e.holdings([coin])).coins.find((h) => h.coin === coin)?.raw ?? "0";
     },
-    async activity(): Promise<TradeRecord[]> { await ensureLoaded(); return [...records!]; },
+    async activity(): Promise<TradeRecord[]> { await ensureLoaded(); records!.forEach(unchecked); return [...records!]; },
+    /** A kept trade (trade.near.rhea-kept): what Ref's lost and found holds of its coin for the wallet, raw, on two nodes;
+     *  null: can't tell (near/kept.ts). */
+    async keptHeld(id: string): Promise<string | null> {
+      await ensureLoaded();
+      const rec = records!.find((r) => r.id === id);
+      return rec ? (await import("./near/kept.ts")).keptHeld({ rec, engineOf }) : null;
+    },
+    /** A kept trade's coin claimed back: Ref sends the coin's WHOLE lost and found, so every kept trade of the wallet and
+     *  coin is done by it, the measured rise booked once (near/kept.ts): the rise, raw; undefined can't tell. A second tap
+     *  while one runs, on any of them, gets the same answer (one tx). */
+    async claimKept(id: string): Promise<{ got: string } | undefined> {
+      await ensureLoaded();
+      const rec = records!.find((r) => r.id === id);
+      if (!rec?.kept) return undefined;
+      const key = `${rec.kept.wallet}|${rec.kept.token}`;
+      const run = claiming.get(key) ?? (async () => (await import("./near/kept.ts")).claimKept({ rec, records: () => records!, engineOf, bookInOrder, save, covered: (h, ids) => { claims[h] = ids; }, close: closeClaimed }))().finally(() => claiming.delete(key));
+      claiming.set(key, run);
+      return run;
+    },
     /**
      * Trade on screen (product decision, 4 Nov): the Trade session starts here, never at the tap. On the
      * phone it asks nothing (D143); in a browser it is the one password per unlock, asked now, as Trade opens. Nothing
@@ -895,25 +1131,19 @@ export function createTradeService(d: TradeServiceDeps) {
     async resume(): Promise<void> {
       await ensureLoaded();
       // NEAR coins (TN2): a trade 1Click was still finishing, looked at again by the core's move id
-      for (const rec of records!.filter((r) => r.chain === "near" && (r.status === "unconfirmed" || r.status === "sending") && r.quote)) {
-        const { e } = await engineOf("near").catch(() => ({ e: undefined }));
-        // the core's move id is `fm-<key>` (review L5): followed, never asked for again
-        const id = rec.hashes[0] ?? `fm-${`swap-${rec.id}`.padEnd(16, "0").slice(0, 64)}`;
-        const f = await e?.followMove?.(id, rec.symbol).catch(() => "pending" as const);
-        if (!f || f === "pending") continue;
-        if ("problem" in f) Object.assign(rec, { status: "failed", problem: f.problem, endedAt: now() });
-        else { rec.fill = f.fill; await applyFill(rec, rec.quote!, f.fill); Object.assign(rec, { status: "done", endedAt: now() }); delete rec.problem; }
-        await save();
-      }
-      const open = (r: TradeRecord) => (r.status === "sending" || r.status === "confirming" || r.status === "unconfirmed" || !!r.verifying) && !!r.signed?.length && r.kind !== "fund" && !checking.has(r.id);
+      // and a Rhea trade whose FINAL check the app closed on, asked again by its hash
+      for (const rec of records!.filter((r) => r.chain === "near" && (r.status === "unconfirmed" || r.status === "sending" || (r.verifying === true && r.again)) && r.quote)) await followNear(rec).catch(() => undefined);
+      const open = (r: TradeRecord) => stillOpen(r) && (r.verifying === "book" || !!r.signed?.length) && r.kind !== "fund" && !checking.has(r.id) && !deferred.has(r);
       // oldest tap first, each in its coin's booking order (review M1): every one takes its place before any is looked at
       const todo = records!.filter(open).sort((a, b) => a.startedAt - b.startedAt);
       for (const rec of todo) takeSlot(rec);
       for (const rec of todo) {
         // review L3: looked at again right here (another resume, or a check, may have taken it or forgotten its bytes)
-        if (!open(rec)) { releaseSlot(rec); continue; }
+        if (!open(rec)) { settleSlot(rec); continue; }
         checking.add(rec.id);
         try {
+          // its final fill already read, only its booking waited when the app closed: booked from it, no chain read
+          if (rec.verifying === "book") { await bookOrDefer(rec, rec.quote!, rec.fill!).catch(() => undefined); forget(rec); await save(); continue; }
           const signer = rec.walletId ? (await walletsOn(rec.chain).catch(() => [])).find((w) => w.id === rec.walletId) : undefined;
           const { e } = await engineOf(rec.chain, signer).catch(() => ({ e: undefined }));
           if (!e || !rec.signed?.length) continue;
@@ -926,15 +1156,16 @@ export function createTradeService(d: TradeServiceDeps) {
           if (rec.verifying && rec.quote) {
             if (st === "confirmed") {
               const f = await fillOf();
-              // a fill not readable yet stays to be read on the next open (review L5)
-              if (f) { await bookInOrder(rec, rec.quote, f); delete rec.verifying; }
+              // a fill not readable yet stays to be read on the next open (review L5); its turn not come yet: booked
+              // in the background, still verifying (the audit's MUST, 7 Nov)
+              await bookOrDefer(rec, rec.quote, f);
               // done again (it may have read "unconfirmed" while it waited)
               rec.status = "done";
               rec.endedAt ??= now();
               delete rec.problem;
             } else if (st === "failed" || st === "expired") {
               delete rec.verifying; delete rec.fill; delete rec.filledInMs;
-              Object.assign(rec, { status: st, problem: st === "failed" ? tradeProblems.reverted(rec.symbol) : tradeProblems.expired(rec.symbol), endedAt: now() });
+              Object.assign(rec, { status: st, problem: st === "failed" ? tradeProblems.reverted(rec.symbol) : tradeProblems.expired(rec.symbol, CHAINS[rec.chain].name), endedAt: now() });
             }
             forget(rec);
             await save();
@@ -942,21 +1173,40 @@ export function createTradeService(d: TradeServiceDeps) {
           }
           if (st === "confirmed" && rec.quote && rec.kind !== "withdraw") {
             const f = await fillOf();
-            if (f) await bookInOrder(rec, rec.quote, f);
+            // a fill not readable yet: verifying, read and booked on the next open (review L5), never a lasting unbooked "done"
+            await bookOrDefer(rec, rec.quote, f);
           }
           Object.assign(rec, { status: st === "confirmed" ? "done" : st, ...(st === "unconfirmed" ? {} : { endedAt: now() }) });
           forget(rec);
           await save();
         } finally {
           checking.delete(rec.id);
-          releaseSlot(rec);
+          settleSlot(rec);
         }
       }
     },
 
     on(f: () => void): () => void { listeners.add(f); return () => listeners.delete(f); },
-    /** Resolves once every background two-node check started so far has ended (tests). */
-    async checked(): Promise<void> { while (verifying.size) await Promise.all([...verifying]); },
+    /**
+     * An unconfirmed trade's card is on screen (the problem card, Activity, a list row): while any is, and the app is in
+     * the foreground, unconfirmed trades are looked at again every RECHECK_MS (history reads only). Returns the card's
+     * close: the last one closed stops the timer. Counted, so two cards never set two timers.
+     */
+    watch(): () => void {
+      watchers++;
+      if (records === undefined) void ensureLoaded().then(kick, () => undefined); else kick();
+      let open = true;
+      return () => { if (!open) return; open = false; watchers--; kick(); };
+    },
+    /** The app came to the foreground (true) or went to the background (false): the live re-check's timer stops at once. */
+    foreground(on: boolean): void { foreground = on; kick(); },
+    /** Resolves once every background two-node check started so far has ended, and every booking whose turn came has
+     *  booked; one still waiting for an earlier trade nobody is checking now is left waiting (tests). */
+    async checked(): Promise<void> {
+      for (let due; (due = [...verifying, ...[...deferred].filter(([r]) => myTurn(r)).map(([, v]) => v)]).length;) await Promise.all(due);
+    },
+    /** Resolves once the live re-check's round now running (if any) has ended (tests). */
+    roundDone(): Promise<void> { return lastRound; },
   };
 }
 

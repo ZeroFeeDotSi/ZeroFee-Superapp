@@ -8,6 +8,7 @@ import type { Problem } from "@zerofee/core/problem";
 import { Check } from "@zerofee/design/icons.tsx";
 import { More } from "@zerofee/design/More.tsx";
 import { ThisDevice } from "@zerofee/shell-api/approval-words.ts";
+import { keyPlaceWords } from "@zerofee/shell-api/key-place.ts";
 import { isProblem, keyProofWords, type KeyProofWords } from "./key-proof-words.ts";
 
 /** The money line of a Problem shown inside the card (the Problem screen's own words). */
@@ -34,7 +35,8 @@ const keepLine = (line: string | null) => {
 
 /** Job 1, criterion 7: one line, "Your key is in this phone ✓"; where it was made and how we know, under Details. It
  *  paints at once (the last match kept on this device, else the plain line with no tick yet) and never blocks (B13). */
-/** `row` (Devices, design review §2.5 and change 5): one fact row, "This phone · Your key is here ✓"; a tap shows its
+/** `row` (Devices, design review §2.5 and change 5): one fact row, "This phone · Your key is here ✓" (in a browser,
+ *  "This device · Your key is on this device.": key-place.ts's one table, the copy review and the audit, 7 Nov); a tap shows its
  *  proof (it matches the account, where it was made), with no server names. */
 export function KeyProofCard({ bridge, seq = 0, row = false }: { bridge: Bridge; seq?: number; row?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -61,7 +63,7 @@ export function KeyProofCard({ bridge, seq = 0, row = false }: { bridge: Bridge;
       <div className="sec-key-row" aria-busy={state.k === "reading" ? true : undefined}>
         <button className="sec-fact-row sec-fact-row--btn" aria-expanded={open} disabled={state.k !== "shown"} onClick={() => setOpen((o) => !o)}>
           <span>{ThisDevice()}</span>
-          <span className="v">{ticked ? <>Your key is here <span className="zf-tick on sec-key-row__tick" aria-hidden="true"><Check /></span></> : "Your key"}</span>
+          <span className="v">{ticked ? <>{keyPlaceWords().isHere} <span className="zf-tick on sec-key-row__tick" aria-hidden="true"><Check /></span></> : "Your key"}</span>
         </button>
         {open && state.k === "shown" && <div className="sec-key-row__more">{[state.words.match, state.words.where].map((l) => <p key={l} className="zf-small">{l}</p>)}</div>}
       </div>

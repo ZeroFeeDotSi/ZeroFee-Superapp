@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { formatAmount, fourPlacesText } from "@zerofee/core/format";
-import { coinSaid, coinShown } from "./send-cap.ts";
+import { coinSaid, coinShown, underAmount } from "./send-cap.ts";
 import { safeAmount } from "./send-sources.ts";
 
 // the sheet's coin words: intents.ts money() (formatAmount over the units) under fourPlacesText
@@ -23,7 +23,9 @@ test("the form and the sheet print the same coin text for the same send: 1.12865
   assert.equal(coinSaid("1.10000", "NEAR"), "1.1 NEAR", "no trailing zeros, as the sheet");
   assert.equal(coinSaid("1e-7", "NEAR"), "0.0000001 NEAR", "a figure written with an exponent still reads");
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
-  assert.match(form, /`\$\{coinSaid\(amount, source\.symbol\)\} from \$\{source\.place\}`/, "the line under the keypad is coinSaid");
+  // changed pin (S1, 6 Nov): the line is send-cap.ts underAmount's, read as behaviour; the form shows `under.coins`
+  assert.equal(underAmount({ over: false, exact: null, amount, symbol: "NEAR", place: "your Safe", maxLine: null }).coins, "1.1286 NEAR from your Safe", "the line under the keypad is coinSaid");
+  assert.match(form, /under\.coins && <p className="zf-small wl-send2__coins"/);
   assert.doesNotMatch(form, /coinShown\(amount, "up"\)/, "control: the up-rounded line is gone");
 });
 
@@ -31,9 +33,11 @@ test("control: display only; the amount sent is the exact unrounded figure, neve
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
   // the ask and the fee's quote carry `amount` itself (c6-send-figure.test.ts pins the same), and coinSaid is only the line
   assert.match(form, /onSend\(\{\s*source, recipient: who\.recipient, network, [^\n]*amountIn: amount\.replace\(\/\\\.\$\/, ""\), usd,/);
-  const uses = form.split("\n").filter((l) => /coinSaid\(/.test(l) && !/^\s*import /.test(l));
-  assert.equal(uses.length, 1, uses.join("\n"));
-  assert.match(uses[0]!, /wl-send2__coins/, "only the line under the keypad reads it");
+  // changed pin (S1, 6 Nov): the form calls coinSaid nowhere; underAmount (send-cap.ts) is its one display use there
+  assert.equal(form.split("\n").filter((l) => /coinSaid\(/.test(l) && !/^\s*import /.test(l)).length, 0);
+  const cap = readFileSync(new URL("./send-cap.ts", import.meta.url), "utf8");
+  const under = cap.slice(cap.indexOf("export function underAmount"), cap.indexOf("export function underAmount") + 900);
+  assert.match(under, /coins: Number\(o\.amount\) > 0 \? `\$\{coinSaid\(o\.amount, o\.symbol\)\} from \$\{o\.place\}`/, "only the line under the keypad reads it");
   const amount = "1.128653627";
   const source = { id: "safe:near", row: null, tokenId: "near", label: "", place: "your Safe", symbol: "NEAR", chain: "near", amount: "10", usd: "44.3", max: "10" };
   assert.equal(safeAmount({ source: source as never, amountIn: amount, usd: 5 }), amount, "amountIn reaching the quote is the unrounded figure");

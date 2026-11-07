@@ -26,8 +26,8 @@ export function toAddress(line: string): string | null {
 }
 
 /** The line that says where the payee's side lands (OUTSIDE_WORDS.seen, the copy review's words): shown quiet. */
-export const isLandsLine = (line: string): boolean => /^(Public on [^.]+\.|Private\.)$/.test(line);
+export const isLandsLine = (line: string): boolean => /^(Public on [^.]+\.( Anyone can see the Safe's part on NEAR\.)?|Private\.)$/.test(line);
 
 /** A Send fill sheet's first leg, "They get · 1.2345 SOL ($40.00)" (the UI lead's rulings, 5 Nov: core private-route.ts
  *  SEND_LEG_WORDS): drawn in ink, the two legs under it quiet. Only this line: "They get about $2.71" stays plain. */
-export const isLeadLine = (line: string): boolean => /^They get · /.test(line);
+export const isLeadLine = (line: string): boolean => /^(They|You) get · /.test(line);

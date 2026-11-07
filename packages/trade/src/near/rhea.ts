@@ -14,7 +14,7 @@ import { ProblemError } from "@zerofee/core/problem";
 import { WNEAR, nearOutcome, type NearTradeAsk } from "@zerofee/core/near-trade";
 import type { NearRpc } from "../market/near.ts";
 import { nearProblems } from "./problems.ts";
-import type { Amount, ChainEngine, CoinMeta, Fill, Prepared, Quote, Side } from "../types.ts";
+import type { Amount, ChainEngine, CoinMeta, FinalAgain, Fill, Prepared, Quote, Side } from "../types.ts";
 
 export const REF = "v2.ref-finance.near";
 /** How far the price may move between the quote and the tap: the least is the pool's answer less this (the core refuses
@@ -69,6 +69,18 @@ const fromBytes = (r: any): unknown => {
 };
 const big = (v: unknown): bigint | null => (typeof v === "string" && /^\d{1,39}$/.test(v) ? BigInt(v) : null);
 
+/**
+ * What a FINAL answer says of the fill already shown (the audit's MUST, 7 Nov): true only for the same amount; false only for a
+ * proven failure (a Failure status or receipt, Rhea refused or refunded it); anything else can't tell (undefined), never
+ * "didn't happen": a landed answer with ANOTHER amount, and a balance under the least on a success the chain reported
+ * (notArrived: our read is off, never the trade).
+ */
+export function finalVerdict(o: { got: bigint } | { notArrived: true } | { refunded: true } | { failed: string } | { refused: string } | { unproven: true } | null | undefined, got: string): boolean | undefined {
+  if (!o || "unproven" in o || "notArrived" in o) return undefined;
+  if ("got" in o) return o.got.toString() === got ? true : undefined;
+  return false;
+}
+
 export interface RheaEngine extends ChainEngine {
   /** The coin's Rhea pool (checked on chain), or undefined: none, and the 1Click engine trades it. */
   poolOf(coin: string): Promise<{ id: number; feeBps: number } | undefined>;
@@ -78,6 +90,11 @@ export interface RheaEngine extends ChainEngine {
   rheaOf(): Promise<RheaBalances>;
   /** "Ready NEAR for trading" (the person's one tap): all the wallet can move goes into its own account in Rhea. */
   readyNear(): Promise<void>;
+  /** What Ref's lost and found holds of a coin for the wallet (get_lostfound_token), the same on both nodes; else null. */
+  keptHeld(token: string): Promise<bigint | null>;
+  /** A kept trade's coin claimed back from Ref's lost and found (claim_lostfound, signed by the core): the wallet's rise
+   *  in the coin on both nodes at a final block past the claim (the chain's figure); undefined: can't tell. */
+  claimKept(token: string): Promise<{ got: bigint; hash: string } | undefined>;
 }
 
 export function createRheaEngine(d: RheaDeps): RheaEngine {
@@ -130,7 +147,7 @@ export function createRheaEngine(d: RheaDeps): RheaEngine {
   async function walletHeld(coin: string): Promise<bigint> {
     return big(await view(coin, "ft_balance_of", { account_id: await walletOf() })) ?? 0n;
   }
-  async function rheaOf(rpc: NearRpc = d.rpc, at?: { finality: string }): Promise<RheaBalances> {
+  async function rheaOf(rpc: NearRpc = d.rpc, at?: { finality: string } | { block_id: number }): Promise<RheaBalances> {
     const w = await walletOf();
     const q = (method: string) => rpc("query", { request_type: "call_function", ...(at ?? { finality: "final" }), account_id: REF, method_name: method, args_base64: b64json({ account_id: w }) }).then(fromBytes);
     const [deps, state] = await Promise.all([q("get_deposits"), q("get_user_storage_state")]);
@@ -178,7 +195,9 @@ export function createRheaEngine(d: RheaDeps): RheaEngine {
    * landed (the smaller rise). Less: the coin didn't arrive (decided, never "refunded"). Anything unread, or the nodes
    * apart: null (pending, never a verdict).
    */
-  async function byFinalBalance(token: string, wallet: string, before: bigint, minOut: string, final: any): Promise<{ landed: true; got: bigint } | { notArrived: true } | null> {
+  /** `atTx` (after a restart, the audit's MUST, 7 Nov): read at the trade's own last receipt's block, never the latest final one
+   *  (hours later other trades of the coin are in it); a node that can't serve that block any more: null, can't tell. */
+  async function byFinalBalance(token: string, wallet: string, before: bigint, minOut: string, final: any, atTx = false, inRhea = false): Promise<{ landed: true; got: bigint } | { notArrived: true } | null> {
     const hashes = [...new Set((Array.isArray(final?.receipts_outcome) ? final.receipts_outcome : []).map((ro: any) => ro?.block_hash).filter((h: unknown): h is string => typeof h === "string"))];
     if (!hashes.length) return null;
     const heights = await Promise.all(hashes.map((h) => d.rpc("block", { block_id: h }).then((b: any) => Number(b?.header?.height), () => NaN)));
@@ -192,7 +211,9 @@ export function createRheaEngine(d: RheaDeps): RheaEngine {
       await sleep(500);
     }
     if (!at) return null;
-    const read = (rpc: NearRpc) => rpc("query", { request_type: "call_function", block_id: at, account_id: token, method_name: "ft_balance_of", args_base64: b64json({ account_id: wallet }) }).then((r: any) => big(fromBytes(r)), () => null);
+    if (atTx) at = txHeight;
+    // `inRhea`: a one-call swap's coin is in the wallet's own Rhea account (get_deposits), read at that same block
+    const read = (rpc: NearRpc) => inRhea ? rheaOf(rpc, { block_id: at }).then((x) => x.deposits.get(token) ?? 0n, () => null) : rpc("query", { request_type: "call_function", block_id: at, account_id: token, method_name: "ft_balance_of", args_base64: b64json({ account_id: wallet }) }).then((r: any) => big(fromBytes(r)), () => null);
     const [x, y] = await Promise.all([read(d.rpc), read(d.rpc2)]);
     if (x === null || y === null || x !== y) return null;
     const got = x - before;
@@ -273,16 +294,74 @@ export function createRheaEngine(d: RheaDeps): RheaEngine {
 
   /** What a one-call swap's answer says: its amount out (Ref's swap returns it), Rhea's refusal (nothing moved: the call
    *  is the swap, all of it or none), or null (not executed yet). */
-  function swapOutcome(r: any, ask: NearTradeAsk): { got: bigint } | { refused: string } | null {
+  // the audit's MUST (7 Nov): a success whose amount can't be read, or reads under the least (Ref panics under it, so the read is
+  // wrong, not the trade), is unproven: decided by the balance at the trade's block, never "Rhea refused it" (a second tap
+  // would buy twice)
+  function swapOutcome(r: any, ask: NearTradeAsk): { got: bigint } | { refused: string } | { unproven: true } | null {
     const status = r?.status;
     if (!status || typeof status !== "object" || !("SuccessValue" in status || "Failure" in status)) return null;
     if ("Failure" in status) return { refused: "Rhea refused it." };
     if ((Array.isArray(r?.receipts_outcome) ? r.receipts_outcome : []).some((ro: any) => ro?.outcome?.status && typeof ro.outcome.status === "object" && "Failure" in ro.outcome.status)) return { refused: "Rhea refused it." };
     let got: bigint | null = null;
     try { got = big(JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(String(status.SuccessValue)), (c) => c.charCodeAt(0))))); } catch { got = null; }
-    if (got === null) return { refused: "Its answer can't be read." };
-    if (got < BigInt(ask.minOut)) return { refused: "Less came back than the least." };
+    if (got === null || got < BigInt(ask.minOut)) return { unproven: true };
     return { got };
+  }
+
+  /** An "about" fill's FINAL (the audit's MUST, 7 Nov): a readable amount, or the Rhea balance at the trade's block, gives the
+   *  fill its figure and true; false only for a FINAL that itself shows the failure. A rise under the least at that block,
+   *  on a success the chain itself reported, means our read is off (a stale before, a deposit in the same block), never
+   *  that the trade failed: can't tell, and the card says the amount is unchecked after the window. */
+  async function provenFill(v: ReturnType<typeof swapOutcome>, f: unknown, before: bigint | null, token: string, signer: string, minOut: string, fill: Fill): Promise<boolean | undefined> {
+    if (!v) return undefined;
+    if ("refused" in v) return false;
+    const got = "got" in v ? v.got : before === null ? undefined : await byFinalBalance(token, signer, before, minOut, f, true, true).then((b) => (b && "got" in b ? b.got : undefined));
+    if (got === undefined) return undefined;
+    fill.got = got.toString(); delete fill.estimated;
+    return true;
+  }
+
+  /**
+   * A two-step trade's FINAL (the audit's MUST, 7 Nov): landed, the chain's figure; a refund or a Failure status, false; unproven,
+   * the balance at the trade's block on both nodes against the one before it: the wallet's own (the core's `before`) or,
+   * when Ref kept the coin out on its side (`kept`), the wallet's Rhea deposit against that deposit at the core's build
+   * block (`atHeight`). Nothing to read from (no before): undefined, nothing read. A coin in Ref's lost and found shows in
+   * neither: can't tell, the "amount unchecked" card. The proven figure goes on `fill`.
+   */
+  async function provenNear(v: ReturnType<typeof nearOutcome>, f: unknown, before: bigint | null, atHeight: number | undefined, token: string, signer: string, minOut: string, fill: Fill): Promise<boolean | undefined> {
+    if (!v) return undefined;
+    if ("refunded" in v || "failed" in v) return false;
+    let got: bigint | undefined;
+    // Ref kept the coin out on its side (the audit's MUST, 7 Nov): said on the fill, so an unchecked end shows the way back
+    if ("unproven" in v && v.kept) fill.kept = true;
+    if ("landed" in v) got = v.got;
+    else if (v.kept) {
+      const was = atHeight === undefined ? null : await rheaAt(token, atHeight);
+      got = was === null ? undefined : await byFinalBalance(token, signer, was, minOut, f, true, true).then((b) => (b && "got" in b ? b.got : undefined));
+    } else got = before === null ? undefined : await byFinalBalance(token, signer, before, minOut, f, true).then((b) => (b && "got" in b ? b.got : undefined));
+    if (got === undefined) return undefined;
+    fill.got = got.toString(); delete fill.estimated; delete fill.kept;
+    if ("used" in v && v.used !== undefined) fill.spent = v.used.toString();
+    return true;
+  }
+  /** A fill already shown, against FINAL read as provenNear reads it: true only for that same figure; another figure
+   *  can't tell; a proven failure false (the audit's MUST, 7 Nov). */
+  async function sameAs(v: ReturnType<typeof nearOutcome>, f: unknown, before: bigint | null, atHeight: number | undefined, token: string, signer: string, minOut: string, got: string, mark?: Fill): Promise<boolean | undefined> {
+    const seen: Fill = { txHash: "", got: "", spent: "0", fee: "0" };
+    const ok = await provenNear(v, f, before, atHeight, token, signer, minOut, seen);
+    if (seen.kept && mark) mark.kept = true;
+    return ok === true ? (seen.got === got ? true : undefined) : ok;
+  }
+  /** A coin the wallet holds on its own (ft_balance_of) at one block, the same on both nodes; else null. */
+  async function walletAt(token: string, height: number): Promise<bigint | null> {
+    const w = await walletOf();
+    const [x, y] = await Promise.all([d.rpc, d.rpc2].map((rpc) => rpc("query", { request_type: "call_function", block_id: height, account_id: token, method_name: "ft_balance_of", args_base64: b64json({ account_id: w }) }).then((r: any) => big(fromBytes(r)), () => null)));
+    return x === null || y === null || x !== y ? null : x;
+  }
+  /** The wallet's Rhea deposit of a coin at one block, the same on both nodes; else null. */
+  async function rheaAt(token: string, height: number): Promise<bigint | null> {
+    const [x, y] = await Promise.all([d.rpc, d.rpc2].map((rpc) => rheaOf(rpc, { block_id: height }).then((r) => r.deposits.get(token) ?? 0n, () => null)));
+    return x === null || y === null || x !== y ? null : x;
   }
 
   async function settleFast(p: Prepared, onMove?: (id: string) => void) {
@@ -314,6 +393,15 @@ export function createRheaEngine(d: RheaDeps): RheaEngine {
       const o = swapOutcome(out, ask);
       if (!o) throw new ProblemError(nearProblems.rheaPending(q.symbol));
       if ("refused" in o) throw new ProblemError({ ...nearProblems.rheaRefunded(q.symbol), money: { state: "safe", where: "in your NEAR wallet" }, more: o.refused });
+      if ("unproven" in o) {
+        // a success its amount can't be read from (the audit's MUST, 7 Nov): done on the node's word, "about" the quote's figure,
+        // booked only when the Rhea balance at the trade's block says what came; that figure is the fill's then
+        const landedAt = now();
+        const fill: Fill = { txHash: r.hash, got: q.getRaw, spent: q.payRaw, fee: "0", estimated: true };
+        const verify = d.rpc2("tx", { tx_hash: r.hash, sender_account_id: r.signerId, wait_until: "FINAL" })
+          .then((f) => (before === null ? undefined : provenFill(swapOutcome(f, ask), f, before, tokenOut, r.signerId, ask.minOut, fill)), () => undefined);
+        return { fill, timing: { signedAt, sentAt: signedAt, landedAt }, verify, again: { hash: r.hash, signerId: r.signerId, ask, fast: true as const, about: true as const, ...(before !== null ? { before: before.toString() } : {}) } };
+      }
       // and the wallet's new Rhea balance, read (the receipt's own block, then the next): at least what the swap gave
       if (before !== null) {
         const t1 = now();
@@ -328,10 +416,9 @@ export function createRheaEngine(d: RheaDeps): RheaEngine {
       const fill: Fill = { txHash: r.hash, got: o.got.toString(), spent: q.payRaw, fee: "0" };
       // booked on another node's FINAL answer, the same amount out (behind the receipt, never in the tap's wait)
       const verify = d.rpc2("tx", { tx_hash: r.hash, sender_account_id: r.signerId, wait_until: "FINAL" }).then((f) => {
-        const v = swapOutcome(f, ask);
-        return v ? "got" in v && v.got === o.got : undefined;
+        return finalVerdict(swapOutcome(f, ask), o.got.toString());
       }, () => undefined);
-      return { fill, timing: { signedAt, sentAt: signedAt, landedAt }, verify };
+      return { fill, timing: { signedAt, sentAt: signedAt, landedAt }, verify, again: { hash: r.hash, signerId: r.signerId, ask, fast: true as const } };
     });
   }
 
@@ -441,38 +528,81 @@ export function createRheaEngine(d: RheaDeps): RheaEngine {
         if (!o) throw new ProblemError(nearProblems.rheaPending(q.symbol));
         if ("refunded" in o) throw new ProblemError(nearProblems.rheaRefunded(q.symbol));
         if ("failed" in o) throw new ProblemError({ ...nearProblems.rheaRefunded(q.symbol), more: o.failed });
-        let got: bigint;
         if ("unproven" in o) {
-          // no transfer line says where the coin went: NEAR's FINAL answer, then the balance at a final block past it,
-          // on both nodes, decide; until then it is pending (re-review M), never "refunded"
-          const final = await d.rpc2("tx", { tx_hash: r.hash, sender_account_id: r.signerId, wait_until: "FINAL" }).catch(() => undefined)
-            ?? await d.rpc("tx", { tx_hash: r.hash, sender_account_id: r.signerId, wait_until: "FINAL" }).catch(() => undefined);
-          const f = final ? nearOutcome(final, ask, r.signerId) : null;
-          if (f && "landed" in f) got = f.got;
-          else if (f && "refunded" in f) throw new ProblemError(nearProblems.rheaRefunded(q.symbol));
-          else if (f && "unproven" in f && before !== null) {
-            const v = await byFinalBalance(tokenOut, r.signerId, before, ask.minOut, final);
-            if (!v) throw new ProblemError(nearProblems.rheaPending(q.symbol));
-            if ("notArrived" in v) throw new ProblemError(nearProblems.rheaNotArrived(q.symbol));
-            got = v.got;
-          } else throw new ProblemError(nearProblems.rheaPending(q.symbol));
-        } else got = o.got;
+          // a success whose amount no line the core reads gives (the audit's MUST, 7 Nov): done on the node's word, "about" the
+          // quote's figure, never in the tap's wait; FINAL, then the balance at the trade's block on both nodes, gives
+          // the fill its figure and books it; nothing proven: can't tell (the "amount unchecked" card after the window)
+          // a failed transfer with the input used (`kept`) is the same: the input WAS spent, never "nothing was bought"
+          const landedAt = now(), signerId = r.signerId, atHeight = typeof r.atHeight === "number" ? r.atHeight : undefined;
+          // the part the chain says it used, when it said one (the audit's SHOULD, 7 Nov): the fill's spent is the chain's figure
+          const fill: Fill = { txHash: r.hash, got: q.getRaw, spent: o.used !== undefined ? o.used.toString() : q.payRaw, fee: "0", estimated: true };
+          const verify = d.rpc2("tx", { tx_hash: r.hash, sender_account_id: signerId, wait_until: "FINAL" })
+            .then((f) => provenNear(nearOutcome(f, ask, signerId), f, before, atHeight, tokenOut, signerId, ask.minOut, fill), () => undefined);
+          return { fill, timing: { signedAt, sentAt, landedAt }, verify, again: { hash: r.hash, signerId, ask, about: true as const, ...(before !== null ? { before: before.toString() } : {}), ...(atHeight !== undefined ? { atHeight } : {}) } };
+        }
+        const got = o.got;
         const landedAt = now();
         const fill: Fill = { txHash: r.hash, got: got.toString(), spent: q.payRaw, fee: "0" };
         // booked on another node's FINAL answer, the same outcome (behind the receipt, never in the tap's wait)
         const signerId = r.signerId;
+        const atHeight = typeof r.atHeight === "number" ? r.atHeight : undefined;
         const verify = d.rpc2("tx", { tx_hash: r.hash, sender_account_id: signerId, wait_until: "FINAL" }).then(async (f) => {
-          let v = nearOutcome(f, ask, signerId);
-          if (v && "unproven" in v) {
-            if (before === null) return undefined;
-            const b = await byFinalBalance(tokenOut, signerId, before, ask.minOut, f);
-            if (!b) return undefined;
-            return "landed" in b && b.got === got;
-          }
-          if (!v) return undefined;
-          return "landed" in v && v.got === got;
+          const v = nearOutcome(f, ask, signerId);
+          // unproven on FINAL: its figure read as provenNear reads one (the wallet, or Ref's side when kept), the same
+          return sameAs(v, f, before, atHeight, tokenOut, signerId, ask.minOut, got.toString(), fill);
         }, () => undefined);
-        return { fill, timing: { signedAt, sentAt, landedAt }, verify };
+        // the core's before kept with it (the audit's MUST (i), 7 Nov): FINAL with no transfer line decides after a restart too
+        return { fill, timing: { signedAt, sentAt, landedAt }, verify, again: { hash: r.hash, signerId, ask, ...(before !== null ? { before: before.toString() } : {}), ...(atHeight !== undefined ? { atHeight } : {}) } };
+      });
+    },
+
+    // the audit's MUST (7 Nov): after a restart, the same FINAL question as `verify` above, by the trade's hash. An answer that
+    // needs the balance from before the trade reads the one kept at the tap (a.before, the core's own, the audit's MUST (i)) the
+    // same way verify does; none kept (a record from before): can't tell, undefined, never booked on one node's word
+    async finalAgain(a: FinalAgain, got: string, fill?: Fill) {
+      const f = await d.rpc2("tx", { tx_hash: a.hash, sender_account_id: a.signerId, wait_until: "FINAL" }).catch(() => undefined);
+      if (!f) return undefined;
+      if (a.about) {
+        // an "about" fill (the audit's MUST, 7 Nov): its figure comes from FINAL or the balance at its block, kept on the fill given
+        const token = a.ask.side === "buy" ? a.ask.coin : WNEAR;
+        if (!fill) return undefined;
+        return a.fast ? provenFill(swapOutcome(f, a.ask), f, big(a.before), token, a.signerId, a.ask.minOut, fill)
+          : provenNear(nearOutcome(f, a.ask, a.signerId), f, big(a.before), a.atHeight, token, a.signerId, a.ask.minOut, fill);
+      }
+      if (a.fast) return finalVerdict(swapOutcome(f, a.ask), got);
+      const v = nearOutcome(f, a.ask, a.signerId);
+      // at the trade's own block (the audit's MUST, 7 Nov): later trades of the coin never count for this one
+      return sameAs(v, f, big(a.before), a.atHeight, a.ask.side === "buy" ? a.ask.coin : WNEAR, a.signerId, a.ask.minOut, got, fill);
+    },
+
+    // the audit's MUST (7 Nov): what Ref's lost and found holds for the wallet, read on BOTH nodes at final; apart or unread: null
+    async keptHeld(token: string) {
+      const w = await walletOf();
+      const [x, y] = await Promise.all([d.rpc, d.rpc2].map((rpc) => view(REF, "get_lostfound_token", { account_id: w, token_id: token }, rpc).then(big, () => null)));
+      return x === null || y === null || x !== y ? null : x;
+    },
+    // the audit's MUST (7 Nov): the claim, through the trade's own signing path (the core builds and checks claim_lostfound);
+    // the coin's account opened first when the wallet has none (Ref's transfer to it would fail again); the wallet's
+    // balance before at one final block on both nodes, after at one past the claim on both: the rise is the chain's figure
+    claimKept(token: string) {
+      return oneAtATime(async () => {
+        const head = await d.rpc("block", { finality: "final" }).then((b: any) => Number(b?.header?.height), () => NaN);
+        const before = Number.isFinite(head) ? await walletAt(token, head) : null;
+        if (before === null) return undefined;
+        type Signed = { signedTx: string; hash: string; signerId: string };
+        const sign = () => d.call<Signed | { declined: true }>("subwallet.near.rheaClaim", { coin: token });
+        const r = await sign().catch(async (e: unknown) => {
+          const prob = e instanceof ProblemError ? e.problem : undefined;
+          if (prob?.code !== "security.near.register" || prob.more !== token) throw e;
+          await register(token, token === WNEAR ? undefined : (await poolOf(token))?.id);
+          return sign();
+        });
+        if ("declined" in r) return undefined;
+        const out = await d.rpc("send_tx", { signed_tx_base64: r.signedTx, wait_until: "EXECUTED_OPTIMISTIC" });
+        if (!out?.status || "Failure" in out.status) throw new ProblemError(nearProblems.nearNothingMoved(token));
+        const f = await d.rpc2("tx", { tx_hash: r.hash, sender_account_id: r.signerId, wait_until: "FINAL" }).catch(() => undefined);
+        const b = f ? await byFinalBalance(token, r.signerId, before, "1", f) : null;
+        return b && "got" in b ? { got: b.got, hash: r.hash } : undefined;
       });
     },
 

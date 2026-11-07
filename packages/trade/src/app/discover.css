@@ -148,6 +148,12 @@
    only at the cell's end (never a few letters short with room beside it), its market cap says what it is, and the cap
    drops under the name when both do not fit */
 .dc-tabs { margin-right: 16px; padding-right: 24px; }
+/* T2-2 (the copy review's walk, 8 Nov): the chosen wallet chip is always whole. The strip fades its last 28 px; a chip scrolled into
+   view (Discover's scrollIntoView, inline nearest) stops 32 px short of the edge, so the fade starts after it, and the
+   scroll's end has the same room. A chip's label never clamps: it is as wide as its words ("ETH (RH) wallet", ~150 px at 17 px). */
+.dc-tabs { padding-right: 32px; scroll-padding-inline: 0 32px; }
+.dc-tabs button { min-width: max-content; }
+.dc-tab-two, .dc-tab-name { white-space: nowrap; overflow: visible; text-overflow: clip; }
 /* a16 (Sim re-walk, 5 Nov): the second line is one line: the name gives way ("Slimy Liquidity Market Ma…"), the figure
    never does and never drops to a third line; it stands alone after a dot, with no label ("mcap" and "cap" are jargon
    either way); the coin page's Market cap names it */
@@ -158,3 +164,25 @@
    tab (which sits 16 away); the list pills are never narrower than 44 (1h was 43.8). */
 .dc-tabs button[data-chain="all"]::after { inset: 0 -14px 0 -13px; }
 .dc-wins button { min-width: 44px; }
+/* 53, 6 Nov, item 9 (fix/trade-list-coin): each wallet chip is two lines, its name over its figure ("SOL wallet" / "$169.37");
+   a row's name is on its own line, whole, wrapping to 2 ("Farming Season", never "Farming …"), its worth beside the symbol */
+.dc-tab-two { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.dc-tab-name { font: 500 12px/1.1 var(--font); letter-spacing: 0; }
+.dc-tab-quiet .dc-tab-two { gap: 2px; }
+.dc-sym .dc-cap { font: 400 13px/1.2 var(--font-money, var(--font)); color: var(--mute); margin-left: -4px; }
+.dc-sym .dc-cap::before { margin: 0 .3em 0 0; }
+.dc-row .zf-lrow__d:has(> .dc-sub--name) { white-space: normal; overflow: visible; text-overflow: clip; }
+.dc-sub--name { display: block; }
+.dc-name--whole { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+/* the copy review's final words (7 Nov, T3): the chip's name 12 px in --mute over its figure 15 px in --ink; the list pills 44 tall, "All"
+   never narrower than 44, Move 44 tall */
+.dc-tabs .dc-tab-name { color: var(--mute); }
+.dc-tabs .dc-tab-usd { font-size: 15px; color: var(--ink); }
+.dc-tabs button[data-chain="all"] { min-width: 44px; }
+.dc-wins button { min-height: 44px; }
+.dc-move { height: 44px; margin-top: -2px; }
+/* the chips name their wallet in words, so the coin mark goes: both chips, Move and Settings fit 390 pt (after-walk, 7 Nov) */
+.dc-tabs { gap: 14px; }
+/* T2-5 (the copy review's walk, 8 Nov): "Not for sale" in mute where a refused coin's Buy was; the row keeps room for it */
+.dc-rr--nfs .dc-row { padding-right: 86px; }
+.dc-nfs { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: var(--mute); font: 500 13px/1 var(--font); white-space: nowrap; pointer-events: none; }

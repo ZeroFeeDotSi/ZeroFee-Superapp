@@ -20,7 +20,7 @@ export function nearEngines(d: NearEngineDeps, relay: string | undefined = build
 }
 
 /** The build's relay (VITE_ZEROFEE_RELAY), read where a bundler set it; nothing under node. */
-const buildRelay = (): string | undefined => (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_RELAY;
+const buildRelay = (): string | undefined => import.meta.env?.VITE_ZEROFEE_RELAY;
 
 /**
  * The NEAR trade's two nodes (rules 3 and 9): with a relay, its two PAID doors (doors.ts: door 1 FastNEAR's, door 2 the
@@ -53,6 +53,10 @@ export function createNearRoute(rhea: RheaEngine, oneClick: ChainEngine): ChainE
       return isRhea(p) ? rhea.settle!(p, key, onMove) : oneClick.settle!(p, key, onMove, session);
     },
     followMove: (id, symbol) => oneClick.followMove!(id, symbol),
+    // the fill given too (the audit's MUST, 7 Nov): an "about" fill's figure, and Ref keeping its coin, are kept on it
+    finalAgain: (a, got, fill) => rhea.finalAgain!(a, got, fill),
+    keptHeld: (token) => rhea.keptHeld(token),
+    claimKept: (token) => rhea.claimKept(token),
     async holdings(coins?: string[]) {
       const [a, b] = await Promise.all([oneClick.holdings(coins), rhea.holdings(coins ?? []).catch(() => ({ native: "0", coins: [] }))]);
       const sum = new Map(a.coins.map((c) => [c.coin, { ...c }]));

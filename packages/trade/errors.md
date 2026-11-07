@@ -10,7 +10,7 @@ code there is listed here. Coin and chain names in the words are examples.
 | `trade.coin.low` | You don't have that much BONK. | safe: in your trading money | Change the amount (fix-input → amount) |
 | `trade.pool.thin` | There isn't enough BONK for sale for that much. | safe: in your trading money | Try a smaller amount (fix-input → amount) |
 | `trade.coin.unavailable` | ZeroFee can't trade {symbol} right now. | safe: in your trading money | Try again (retry) |
-| `trade.coin.unsellable` | A test sale of {symbol} didn't go through, so ZeroFee won't buy it. | safe: in your trading money | Find another coin (open → search) |
+| `trade.coin.unsellable` | Not for sale. ZeroFee won't buy {symbol}. | safe: in your trading money | Go back (nothing) |
 | `trade.coin.freezable` | {symbol}'s maker can freeze it and stop you selling. Trade doesn't offer it. | safe: in your trading money | Find another coin (open → search) |
 | `trade.coin.delegated` | {symbol}'s maker can take it from any wallet, at any time. Trade doesn't offer it. | safe: in your trading money | Find another coin (open → search) |
 | `trade.coin.pausable` | {symbol}'s maker can pause it and stop you selling. Trade doesn't offer it. | safe: in your trading money | Find another coin (open → search) |
@@ -22,8 +22,10 @@ code there is listed here. Coin and chain names in the words are examples.
 | `trade.network.down` | {chain} didn't answer. | safe: in your trading money | Try again (retry) |
 | `trade.slippage.over` | Not traded: {symbol}'s price could move NaN%, over your NaN% limit. | safe: in your trading money | Change my limit (open: settings) |
 | `trade.trade.reverted` | The {symbol} trade didn't go through on its network. You still have what you had. | safe: in your trading money | Try again (retry) |
-| `trade.trade.expired` | The {symbol} trade ran out of time, so nothing was traded. | safe: in your trading money | Try again (retry) |
-| `trade.trade.unconfirmed` | The {symbol} trade was sent, but {chain} hasn't confirmed it yet. | on-the-way: on Solana | Wait a moment (wait) |
+| `trade.trade.expired` | {chain} didn't confirm it in time, so nothing was traded. | safe: in {your chain's wallet} | Try again (retry) |
+| `trade.trade.unconfirmed` | {chain} hasn't confirmed this trade yet. ZeroFee keeps checking. | unsure: either in {your chain's wallet} or already traded; Check {it} first. | Open {your chain's wallet} (open: wallets) |
+| `trade.near.rhea-kept` | Your {symbol} didn't reach your NEAR wallet. | on-the-way: with Rhea | OK (nothing) |
+| `trade.trade.final-unchecked` | ZeroFee couldn't confirm how much {symbol} you got. Your {chain} wallet shows what you hold. | safe: in {your chain's wallet} | Open {your chain's wallet} (open: wallets) |
 | `trade.swap.different` | This trade didn't match its price, so it wasn't sent. | safe: in your SOL wallet | Try again (retry) |
 | `trade.coin.unpriced` | The price feed has no price for {symbol}, so it wasn't traded. | safe: in your wallet | Try again (retry) |
 | `trade.market.busy` | GeckoTerminal, the price feed, didn't answer. These prices are from the last read. | not involved | Try again (retry) |
@@ -39,7 +41,6 @@ code there is listed here. Coin and chain names in the words are examples.
 | `trade.near.slow` | 1Click is still finishing your QTC trade. (More: it lands in your NEAR wallet by itself, or your money comes back there.) | on-the-way: inside your NEAR wallet | OK (nothing) |
 | `trade.near.slow.rhea` | Your QTC trade went to NEAR. It isn't confirmed yet. (More: Activity says when it is.) | on-the-way: in your NEAR wallet | OK (nothing) |
 | `trade.near.rhea-refunded` | Rhea couldn't fill your QTC trade, so nothing was bought. | safe: back in your NEAR wallet | Try again (retry) |
-| `trade.near.not-arrived` | The QTC trade ran, but the coin didn't reach your wallet. | on-the-way: with Rhea | OK (nothing) |
 | `trade.near.refunded` | 1Click couldn't fill your QTC trade, so nothing was bought. | safe: back in your NEAR wallet | Try again (retry) |
 | `trade.near.rhea-no-pool` | Rhea doesn't trade QTC for NEAR, so it can't be bought here. | safe: in your NEAR wallet | Go back (nothing) |
 | `trade.near.rhea-price` | Rhea can't price QTC right now. Nothing moved. | safe: in your NEAR wallet | Try again (retry) |

@@ -52,7 +52,7 @@ export async function setUpKey(raw: string, o: { fetch?: typeof fetch; save: (ke
   if (shape.kind !== "claude") return { ok: false, line: KEY_LINE[shape.kind] };
   // the key check (Anthropic's address and the key's header) is its own file, loaded only where a key is used at all:
   // the public web build reads this flag inline and leaves it, and the address, out
-  if ((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_PUBLIC === "1") return { ok: false, line: KEY_LINE.unavailable };
+  if (import.meta.env?.VITE_ZEROFEE_PUBLIC === "1") return { ok: false, line: KEY_LINE.unavailable };
   const checked = await (await import("./anthropic-check.ts")).checkClaudeKey(shape.key, o.fetch);
   if (checked !== "ok") return { ok: false, line: KEY_LINE[checked] };
   if (!(await o.save(shape.key).catch(() => false))) return { ok: false, line: "This iPhone couldn't keep the key. Try again." };

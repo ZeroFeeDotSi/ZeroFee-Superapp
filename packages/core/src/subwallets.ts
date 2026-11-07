@@ -41,6 +41,9 @@ import { SIGN_IN_GAP_MS, SIGN_IN_PER_HOUR, SIGN_IN_RERUN_PER_HOUR, eip191Hash, e
 import type { SignIn, TypedData } from "./sign-message.ts";
 import type { Nep413Payload } from "./private-pocket.ts";
 import type { PrivateLegRecord } from "./private-route.ts";
+import { fillStepUsd, quoteGot } from "./private-route.ts";
+import { moveSplit, othersForSheet, partsThatFit, planLegRefusal } from "./move-plan.ts";
+import { usdCoinDecimals } from "./known-contracts.ts";
 import { ProblemError, type Problem } from "./problem.ts";
 import { securityProblems } from "./security-problems.ts";
 import { hotNeedsApproval } from "./approval-policy.ts";
@@ -201,8 +204,14 @@ const LIST = "subwallets";
 /** The moves into the pocket the core quoted itself, for the main sheet's words (privateQuoteIn); each good for 30 minutes. */
 const PRIVATE_INS = "private-in-quotes";
 const PRIVATE_IN_MS = 30 * 60_000;
+/** Leg 2 of a Send from the Safe, signed with leg 1's one Face ID and kept until its job ends (send-words KeptPair). */
+const SEND_PAIRS = "send-pair-kept";
 /** A Move's Private leg joins its Safe leg only when paid this recently before it (privateLeg): one Move's own taps. */
 const PRIVATE_LEG_MS = 2 * 60_000;
+/** A Move's plan is kept this long in memory (its legs are all asked within the Move's one call; Resume is a new Move). */
+const MOVE_PLAN_MS = 30 * 60_000;
+/** An address as a plan keys it: an EVM address in lower case (1Click may sign it checksummed), any other as it is. */
+const planKey = (a: string): string => (/^0x[0-9a-fA-F]{40}$/.test(a) ? a.toLowerCase() : a);
 /** Room left in the SOL row for Solana's fee and the account's own minimum (lamports). */
 const HIDDEN_ROW_SOL_ROOM = 1_000_000n;
 /** Hidden from a row (V4 Send): each row's own coin as 1Click names it, and the row's name on its sheet. */
@@ -419,6 +428,8 @@ export interface SubWalletOptions {
   marketPrices?: (chain: "sol" | "bsc" | "hood", coins: string[]) => Promise<Map<string, number>>;
   /** Tests only: what the private pocket holds, in dollars, in place of reading it. */
   pocketUsd?: () => Promise<number>;
+  /** Tests only: what the private pocket holds of one coin, in its units, in place of reading it (a Move's plan). */
+  pocketHeld?: (tokenId: string) => Promise<bigint>;
   /** A confidential quote, read back by its deposit address through the pinned quote server (1Click's public status
    *  doesn't know confidential addresses). Not set: the private pocket can't pay yet. */
   privateStatus?: (depositAddress: string, statusTag?: string) => Promise<unknown | null>;
@@ -543,6 +554,8 @@ const TRADE_ASKS = {
   "wide-slippage": "You may get over 5% less than shown, so ZeroFee asks you.",
 } as const;
 
+/** C2 on the phone (audit, 7 Nov): the core's own read of a Move's wallet parts gets 1 s; later, the Safe's side only. */
+export const OTHERS_READ_MS = 1_000;
 export class SubWallets {
   private readonly o: SubWalletOptions;
   /**
@@ -675,15 +688,24 @@ export class SubWallets {
         }),
       unpaid: async (chain, ref, depositAddress, tried) => this.unpaidIn(await this.walletOf(chain, ref), depositAddress, tried).catch(() => false),
       depositTxs: async (chain, address) => (chain === "sol" ? ((await this.o.sol.recentSignatures?.(address, ADD_HINT_TXS)) ?? []) : []),
-      // Where the core's own transfer stands, as two nodes have it: any "ok" landed; both "failed" failed; both
-      // without it, none (audit RM-2). Anything else can't be said.
-      landed: async (chain, txId) => {
+      // Where the core's own transfer stands, as two nodes have it: any "ok" landed; both "failed" failed (audit RM-2).
+      // "none" only when it provably never landed (the audit's MUST, 7 Nov: a null from Solana's recent status cache, or a
+      // node that didn't answer, read as "none" and ended a move that had paid): Solana, two full histories and the
+      // wallet's own indexed signature list without it; EVM, both nodes answered no receipt and the wallet's nonce it
+      // was signed with is still unused on both. Anything else can't be said.
+      landed: async (chain, txId, proof) => {
         const seen = chain === "sol" ? await this.o.sol.status?.(txId) : await this.o.evm.receipt(chain, txId);
         if (!seen || seen.length < 2) return null;
         if (seen.includes("ok")) return "ok";
         if (seen.every((x) => x === "failed")) return "failed";
-        if (seen.every((x) => x === null)) return "none";
-        return null;
+        if (!seen.every((x) => x === null) || !proof) return null;
+        const w = await this.walletOf(chain, proof.ref).catch(() => null);
+        if (!w || w.chain !== chain) return null;
+        if (chain === "sol") return this.o.sol.absent && (await this.o.sol.absent(txId, w.address, proof.since).catch(() => false)) ? "none" : null;
+        const nonce = proof.tried?.nonce;
+        if (nonce === undefined || !this.o.evm.account) return null;
+        const counts = await this.o.evm.account(chain as EvmWalletChain, w.address).catch(() => []);
+        return counts.length === 2 && counts.every((a) => a !== null && a.latest <= nonce && a.pending <= nonce) ? "none" : null;
       },
       // S21: what the Safe holds inside NEAR Intents, by intents.near itself (two nodes at one agreed block)
       ...(options.near ? { safeHeld: async (accountId: string, tokenId: string) => {
@@ -1626,6 +1648,11 @@ export class SubWallets {
     if (!NEAR_GATE.open) throw new ProblemError(securityProblems.subwalletRefused(NEAR_CLOSED));
     return (await import("./near-coin.ts")).nearRheaSwap(this.nearCtx(), ask);
   }
+  /** A kept trade's coin back from Ref's lost and found (the audit's MUST, 7 Nov): near-coin.ts nearRheaClaim. */
+  async nearRheaClaim(coin: unknown): Promise<NearSignedAnswer> {
+    if (!NEAR_GATE.open) throw new ProblemError(securityProblems.subwalletRefused(NEAR_CLOSED));
+    return (await import("./near-coin.ts")).nearRheaClaim(this.nearCtx(), coin);
+  }
   /** "Ready NEAR for trading": the wallet's NEAR into its own account in Rhea, sent by the core: near-coin.ts nearRheaAdd. */
   async nearRheaAdd(amount: unknown): Promise<{ hashes: string[]; amount: string }> {
     if (!NEAR_GATE.open) throw new ProblemError(securityProblems.subwalletRefused(NEAR_CLOSED));
@@ -2185,7 +2212,7 @@ export class SubWallets {
    * name. Its record is marked `through`, so only a Send's own leg 2 may join it (hiddenFromRow, privatePay with
    * inDeposit), and Home's Add line never lists it.
    */
-  async privateQuoteIn(tokenId: unknown, amount: unknown, outside = false, through = false, intents = false): Promise<{ depositAddress: string; amountIn: string; minAmountOut: string; deadlineIso: string; amountInUsd?: string; feeUsd?: string; etaSeconds?: number; statusTag?: string }> {
+  async privateQuoteIn(tokenId: unknown, amount: unknown, outside = false, through = false, intents = false, job?: unknown): Promise<{ depositAddress: string; amountIn: string; minAmountOut: string; deadlineIso: string; amountInUsd?: string; feeUsd?: string; etaSeconds?: number; statusTag?: string }> {
     // BNB Chain's coin is nep245 (BNB_COIN): from its own chain only, and only once BNB Chain opens (E8's shut gate)
     const bnb = outside && tokenId === BNB_COIN;
     if (typeof tokenId !== "string" || !(/^nep141:[a-z0-9_.-]{2,64}$/.test(tokenId) || bnb)) throw new ProblemError(securityProblems.requestInvalid("tokenId is a NEAR coin (nep141:…)"));
@@ -2194,6 +2221,8 @@ export class SubWallets {
     if (typeof amount !== "string" || !/^\d{1,30}$/.test(amount) || BigInt(amount) === 0n) throw new ProblemError(securityProblems.requestInvalid("amount is the coin's smallest units, as text"));
     const pocket = (await this.stored()).find(isPocket);
     if (!pocket) throw new ProblemError(securityProblems.subwalletRefused("Set up your private balance first."));
+    // a Move's ONE fill (the audit's condition 1, 7 Nov): exactly the fill this core worked out from the Move's own plan, once
+    const plan = job === undefined ? undefined : this.planFill(job, tokenId, amount, outside || !through);
     // Move's fill (one bridge leg, QA 5 Nov): money only passing through, paid from the Safe's own NEAR Intents
     // balance by one mt_transfer inside intents.near (INTENTS), never out of it and back (ORIGIN_CHAIN). Only `through`
     if (intents && (outside || !through)) throw new ProblemError(securityProblems.requestInvalid("intents is a Send's or Move's own fill"));
@@ -2247,8 +2276,10 @@ export class SubWallets {
       if (!through && held + pending + Number(usd) > POCKET_PAYMENT_MAX_USD) {
         throw new ProblemError(securityProblems.subwalletRefused(`Your private balance holds at most ${POCKET_MAX_TEXT}: it has about $${(held + pending).toFixed(2)}, so up to $${Math.max(0, POCKET_PAYMENT_MAX_USD - held - pending).toFixed(2)} more.`));
       }
-      await this.o.vault.put(PRIVATE_INS, utf8(JSON.stringify([...kept, { depositAddress, ...(tag ? { tag } : {}), atMs: at, usd: Number(usd), ...(outside ? { outside: true, untilMs: Date.parse(q!.deadline) } : {}), ...(through ? { through: true } : {}) }])));
+      await this.o.vault.put(PRIVATE_INS, utf8(JSON.stringify([...kept, { depositAddress, ...(tag ? { tag } : {}), atMs: at, usd: Number(usd), ...(outside ? { outside: true, untilMs: Date.parse(q!.deadline) } : {}), ...(through ? { through: true } : {}), ...(plan ? { job: plan.job } : {}) }])));
     });
+    // the plan's one fill: no second quote binds to it
+    if (plan) plan.inDeposit = depositAddress;
     // For the sheet's one line only (never a check): 1Click's own signed estimate of the time, and its fee as the dollars
     // in less the dollars out it signed.
     const eta = Number(q!.timeEstimate);
@@ -2332,7 +2363,7 @@ export class SubWallets {
    *  both as 1Click signed them) and to whom, named only when ownPayee says it is the person's own (`own`). */
   private joinPrivateLeg(inDeposit: string, q: QuoteFacts, own: boolean): void {
     const now = Date.now();
-    const pay: PrivateLegRecord = { tokenId: q.originAsset, ...(/^\d{1,40}$/.test(q.amountIn) ? { payUnits: q.amountIn } : {}), recipient: q.recipient, own };
+    const pay: PrivateLegRecord = { tokenId: q.originAsset, ...(/^\d{1,40}$/.test(q.amountIn) ? { payUnits: q.amountIn } : {}), recipient: q.recipient, own, ...(typeof q.destinationAsset === "string" ? { toTokenId: q.destinationAsset } : {}) };
     for (let i = this.pocketShares.length - 1; i >= 0; i--) {
       const s = this.pocketShares[i]!;
       if (s.recipient !== q.recipient || s.tokenId !== q.originAsset || now - s.atMs > PRIVATE_LEG_MS) continue;
@@ -2347,9 +2378,41 @@ export class SubWallets {
   sendPayout(depositAddress: string): SendPayout | null {
     return this.sendPayouts.get(depositAddress) ?? null;
   }
+  /** C2 on the phone (the audit's shape, 7 Nov): a Move's wallet parts kept in THIS core (on the phone, the isolated one, where
+   *  its sheet is built), well formed and checked against this core's own read of each wallet (spending-move.ts
+   *  keepInCore: the page can only lower). `end`: the Safe's step ended with no yes. It runs beside the Add's quote and
+   *  steps, and the sheet never waits for it: a read past OTHERS_READ_MS keeps none (the Safe's side only). */
+  async moveOthers(job: unknown, others: unknown, end: boolean): Promise<{ kept: number }> {
+    if (typeof job !== "string" || !/^[A-Za-z0-9_-]{16,64}$/.test(job)) throw new ProblemError(securityProblems.requestInvalid("job is the Move's own key"));
+    const m = await import("./spending-move.ts");
+    if (end) return (m.endOthers(job), { kept: 0 });
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<never>((_, no) => (t = setTimeout(() => no(new Error("late")), OTHERS_READ_MS)));
+    try {
+      return { kept: await m.keepInCore(job, others, (from) => Promise.race([this.othersRead(from), late])) };
+    } finally { clearTimeout(t); }
+  }
+  /** This core's own read of what each wallet can move: its chain's current wallet's own coin (its fee kept back) at this
+   *  core's price, and the NEAR wallet's cash; one it can't read says so (none kept). */
+  private async othersRead(from: string[]): Promise<{ reserveUsd: number; chains: { chain: string; nativeUsd: number; readyUsd: number; coinsUsd: number; unread?: true }[] }> {
+    const chains = await Promise.all(from.filter((c): c is TradeChain => c === "sol" || c === "hood" || c === "bsc").map(async (chain) => {
+      const [units, px] = await Promise.all([this.walletOf(chain, {}).then((w) => this.spendable(w)), this.o.usdPrice?.(chain) ?? null]).catch(() => [0n, null] as const);
+      return px && px > 0 ? { chain, nativeUsd: (Number(units) / 10 ** (chain === "sol" ? 9 : 18)) * px, readyUsd: 0, coinsUsd: 0 } : { chain, nativeUsd: 0, readyUsd: 0, coinsUsd: 0, unread: true as const };
+    }));
+    const reserveUsd = from.includes("near") ? await this.floatMoves.balance().then((b) => (b.unread ? NaN : b.usd), () => NaN) : 0;
+    return { reserveUsd, chains };
+  }
+
   /** The Private leg joined to this move in's address (above), for the main key's sheet; null for any other. */
   privateLeg(depositAddress: string): PrivateLegRecord | null {
-    return this.privateLegs.get(depositAddress) ?? null;
+    const leg = this.privateLegs.get(depositAddress) ?? null;
+    // a Move's one fill (the audit's ruling, 7 Nov): every part of its plan, as signed or held, for the one sheet
+    const plan = [...this.movePlans.values()].find((p) => p.inDeposit === depositAddress);
+    if (!leg || !plan) return leg;
+    const move = plan.order.map((a) => ({ recipient: a, units: (plan.paid.get(a) ?? 0n).toString(), payUnits: (plan.held.get(a)?.units ?? 0n).toString(), toTokenId: plan.held.get(a)?.toTokenId, out: plan.held.get(a)?.out, got: plan.got?.get(a) })).filter((p) => p.units !== "0" || p.payUnits !== "0");
+    // the Move's wallet parts kept under this very plan's key, for this one fill only (C2, the audit's conditions 2 and 4)
+    const others = othersForSheet(plan.job, depositAddress);
+    return { ...leg, move: move.map((p) => ({ recipient: p.recipient, own: plan.own.has(p.recipient), units: p.units, payUnits: p.payUnits, ...(p.toTokenId ? { toTokenId: p.toTokenId } : {}), ...(p.out ? { outUnits: p.out.units, ...(p.out.usd ? { outUsd: p.out.usd } : {}) } : {}), ...(p.got?.ok ? { gotCents: p.got.got.toString(), leastCents: p.got.least.toString() } : {}) })), ...(others ? { others } : {}) };
   }
 
   /** For the main key's sheet: a move into the pocket the core quoted itself (within 30 minutes), as the relay has it; null for any other address. */
@@ -2363,17 +2426,17 @@ export class SubWallets {
    * What 1Click holds in Trading's balance ("trade") or the private pocket ("private"), read with that wallet's own
    * sign-in (oneclick-account.ts): its money is confidential, so no chain shows it.
    */
-  async confidentialBalances(kind: "trade" | "private"): Promise<{ tokenId: string; amount: string }[]> {
+  async confidentialBalances(kind: "trade" | "private", strict?: boolean): Promise<{ tokenId: string; amount: string }[]> {
     const w = (await this.stored()).find(kind === "private" ? isPocket : isFloat);
     if (!w) throw new ProblemError(securityProblems.subwalletRefused(kind === "private" ? "Set up your private balance first." : "Move money to your NEAR wallet first."));
     if (!this.o.intentsSalt) throw new ProblemError(securityProblems.subwalletRefused("This phone can't read private balances yet."));
-    return this.heldBy(w.address, await this.secret(w));
+    return this.heldBy(w.address, await this.secret(w), strict);
   }
 
-  private async heldBy(signerId: string, secret: Uint8Array): Promise<{ tokenId: string; amount: string }[]> {
+  private async heldBy(signerId: string, secret: Uint8Array, strict?: boolean): Promise<{ tokenId: string; amount: string }[]> {
     if (!this.o.intentsSalt) throw new ProblemError(securityProblems.subwalletRefused("This phone can't read private balances yet."));
     try {
-      return await privateBalances({ signerId, secret, salt: this.o.intentsSalt, ...(this.o.oneClickFetch ? { fetch: this.o.oneClickFetch } : {}) });
+      return await privateBalances({ signerId, secret, salt: this.o.intentsSalt, ...(strict ? { strict } : {}), ...(this.o.oneClickFetch ? { fetch: this.o.oneClickFetch } : {}) });
     } catch (e) {
       this.o.forgetSalt?.();
       // Bug 8 (3 Nov): this read is 1Click's (the pocket's own sign-in), so it is said as 1Click, never as "NEAR is
@@ -2445,7 +2508,7 @@ export class SubWallets {
   private editIns(f: (ins: Awaited<ReturnType<SubWallets["privateIns"]>>) => unknown[]): Promise<unknown> {
     return this.turn("private-ins", async () => this.o.vault.put(PRIVATE_INS, utf8(JSON.stringify(f(await this.privateIns()))))).catch(() => undefined);
   }
-  private async privateIns(): Promise<{ depositAddress: string; tag?: string; atMs: number; usd?: number; outside?: true; through?: true; untilMs?: number; used?: true; endedAtMs?: number }[]> {
+  private async privateIns(): Promise<{ depositAddress: string; tag?: string; atMs: number; usd?: number; outside?: true; through?: true; untilMs?: number; used?: true; endedAtMs?: number; /** a Move's one fill: the plan it is bound to (the audit's condition 1) */ job?: string }[]> {
     const raw = await this.o.vault.get(PRIVATE_INS);
     const list = raw ? JSON.parse(new TextDecoder().decode(raw)) : [];
     return Array.isArray(list) ? list : [];
@@ -2466,7 +2529,7 @@ export class SubWallets {
    * `send` (Home's Send, D128: the pocket is no longer a pot with a $100 cap): the pocket pays its own share of a Send
    * straight out, on a Send's own words; the core's $100 is gone from it (the quote relay's own limit on one quote holds).
    */
-  async privatePay(id: unknown, depositAddress: unknown, intent: unknown, why: unknown, statusTag?: unknown, inDeposit?: unknown, send?: unknown, payee?: unknown): Promise<{ signedData: ReturnType<typeof signNep413> }> {
+  async privatePay(id: unknown, depositAddress: unknown, intent: unknown, why: unknown, statusTag?: unknown, inDeposit?: unknown, send?: unknown, payee?: unknown, pair?: unknown, job?: unknown): Promise<{ signedData: ReturnType<typeof signNep413> } | { pair: { hash: string } }> {
     const w = await this.find(id);
     if (w.kind !== "private") throw new ProblemError(securityProblems.subwalletRefused("Only your private balance pays this way."));
     if (w.oldWords) throw new ProblemError(securityProblems.subwalletRefused("This private balance is from your old backup words. Its money moves to your new one. Nothing was paid."));
@@ -2484,6 +2547,9 @@ export class SubWallets {
     if (refusal) throw new ProblemError(securityProblems.subwalletRefused(refusal));
     const usd = quote!.amountInUsd ?? "";
     const t = pocketTransfer(payload);
+    // a Move's leg (the audit's condition 1, 7 Nov): one of its kept plan's, at most what it keeps for that wallet; a leg into a
+    // Move's one fill always names its plan. Nothing is taken from the plan yet (planTake, once it is held or signed)
+    const leg = await this.planLeg(job, typeof inDeposit === "string" ? inDeposit : undefined, quote!.recipient, quote!.amountIn, quote!.destinationAsset, quote!.amountOut ? { units: quote!.amountOut, ...(quote!.amountOutUsd ? { usd: String(quote!.amountOutUsd) } : {}), min: quote!.minAmountOut } : undefined);
     if (typeof inDeposit === "string" || send === true) {
       // audit C1: the pocket's own share of a Send (no leg from the Safe, whose own sheet covers a Safe's Send) counts
       // against the one cap at 1Click's signed dollars; past it, one tap
@@ -2499,7 +2565,20 @@ export class SubWallets {
           if (capped && !(await this.capSheet("Send from your private balance", [`About $${Number(usd || 0).toFixed(2)} leaves your private balance.`], capped, "wallet"))) throw new ProblemError(securityProblems.sendDeclined("in your private balance"));
         }
       }
+      // the one Face ID (the audit's c1, R1, 6 Nov): leg 2 of a Send from the Safe is checked now, before the Safe's one sheet, and
+      // held in this core's memory only; it is signed only when the chip's signatures of leg 1 check (releasePair), once
+      if (typeof inDeposit === "string" && pair === true) {
+        // a Move's one fill pays every leg joined to it: their sum within what it promises (each leg one of the plan's)
+        await this.sendPayChecks(w, leg ? { ...t, amount: String(BigInt(t.amount) + this.heldLegs(inDeposit)) } : t, usd, inDeposit);
+        leg?.take();
+        this.joinPrivateLeg(inDeposit, quote!, await this.ownPayee(quote!.recipient));
+        this.sendPayouts.set(inDeposit, { recipient: quote!.recipient, recipientType: quote!.recipientType, originAsset: quote!.originAsset, destinationAsset: quote!.destinationAsset, amountIn: quote!.amountIn, amountOut: quote!.amountOut ?? "", ...(quote!.amountInUsd ? { amountInUsd: String(quote!.amountInUsd) } : {}), ...(quote!.amountOutUsd ? { amountOutUsd: String(quote!.amountOutUsd) } : {}) });
+        return { pair: { hash: this.holdPair(w, payload, inDeposit, { outDeposit: depositAddress, ...(tag ? { outTag: tag } : {}), leg2In: t.amount }, leg !== null) } };
+      }
+      // a Move's one fill pays its legs only once the Safe signed it (held, above), never one signed straight here
+      if (leg && typeof inDeposit === "string") throw new ProblemError(securityProblems.subwalletRefused("Private pays this Move only with your Safe's one approval, so ZeroFee stopped this. Nothing moved."));
       const signed = await this.sendPay(w, payload, t, usd, typeof inDeposit === "string" ? inDeposit : undefined);
+      leg?.take();
       // a Move's two legs to one payee, said on the Safe's one sheet from this record (privateLeg)
       if (typeof inDeposit === "string") {
         this.joinPrivateLeg(inDeposit, quote!, await this.ownPayee(quote!.recipient));
@@ -2517,6 +2596,255 @@ export class SubWallets {
     const capped = await this.capGate(Number(usd));
     if (capped && !(await this.capSheet("Pay from your private balance", [`About $${Number(usd).toFixed(2)} leaves your private balance.`], capped, "wallet", undefined, !(await this.ownPayee(quote!.recipient))))) throw new ProblemError(securityProblems.subwalletRefused("You said not now. Nothing moved."));
     return { signedData: signNep413(payload, await this.secret(w)) };
+  }
+
+  /**
+   * A Move's plan (the audit's ruling, 7 Nov: ONE fill for the whole Move): the core works out the split itself from the Move's
+   * parts and Private's share (private-route moveSplit), never from a page's sums, and keeps it in memory under the Move's
+   * key for the Move's life. The one fill's quote must be exactly its fill (privateQuoteIn `job`), and every leg of that
+   * Move, Private's own or one joined to the fill, must be one of its wallets for at most what it keeps there (planLeg).
+   * `parts`: each wallet by the core's own id ("near": the NEAR wallet's private balance) and its units. the audit's MUST (7 Nov):
+   * every figure that sizes the fill or the R2 check is the core's own. Private's share is min(the page's `share`, the
+   * core's own read of Private); what Private holds beyond it still counts toward the buffer. The coin's price and
+   * decimals are the stablecoin rule ($1, the known list's decimals) or 1Click's token list as the core reads it: the
+   * page's `price` and `decimals` are never read. What the Safe holds is the core's own read of intents.near (wNEAR: and
+   * the account's NEAR), lowered only by the page's `safeHas`; a Safe it can't read is refused by name, never unbounded.
+   * A plan with nothing taken from it yet may be made again (a fill sized down); one in use may not.
+   */
+  private readonly movePlans = new Map<string, { job: string; tokenId: string; fill: bigint; atMs: number; inDeposit?: string; viaFill: Map<string, bigint>; fromPrivate: Map<string, bigint>; used?: true;
+    /** the wallets in the order asked, and what was signed (Private's own) or held (the fill's) for each: the one sheet's words */
+    order: string[]; paid: Map<string, bigint>; held: Map<string, { units: bigint; toTokenId?: string; /** leg 2's signed quote, words only (J2-2: a Swap's "You get") */ out?: { units: string; usd?: string } }>;
+    /** what every signed quote of a wallet's legs gives, in cents (quoteGot summed; `ok` false once a leg had none): words only */
+    got?: Map<string, { got: bigint; least: bigint; ok: boolean }>; /** a wallet whose key was never shown (ownPayee's rule): named on the sheet */ own: Set<string> }>();
+  async movePlan(job: unknown, tokenId: unknown, parts: unknown, share: unknown, price: unknown, decimals: unknown, whole?: unknown, safeHas?: unknown): Promise<{ fill: string; parts: { fromPrivate: string; viaFill: string; at: number }[] }> {
+    const units = (v: unknown) => (typeof v === "string" && /^\d{1,40}$/.test(v) ? BigInt(v) : null);
+    const list = Array.isArray(parts) ? (parts as { wallet?: unknown; units?: unknown }[]) : [];
+    void price; void decimals; // the page's: never read (the audit's MUST, 7 Nov); the core's own below
+    if (typeof job !== "string" || !/^[A-Za-z0-9_-]{16,64}$/.test(job) || typeof tokenId !== "string" || !/^nep141:[a-z0-9_.-]{2,64}$/.test(tokenId) || !list.length || list.length > 4 || list.some((p) => typeof p?.wallet !== "string" || !(units(p.units)! > 0n)) || units(share) === null || (safeHas !== undefined && units(safeHas) === null)) {
+      throw new ProblemError(securityProblems.requestInvalid("A Move's plan: its key, its coin, 1 to 4 parts by wallet and units, Private's share."));
+    }
+    const had = this.movePlans.get(job);
+    if (had && (had.used || had.inDeposit)) throw new ProblemError(securityProblems.subwalletRefused("This Move is already on its way, so ZeroFee stopped this. Nothing more moved."));
+    const stored = (await this.stored()).filter((w) => !w.oldWords);
+    const own = new Set<string>();
+    const addressOf = (wallet: string): string => {
+      const w = wallet === "near" ? stored.find((x) => x.kind === "trade" && x.chain === "near") : stored.find((x) => x.id === wallet && x.kind !== "private" && (x.chain === "sol" || x.chain === "hood" || x.chain === "bsc"));
+      if (!w) throw new ProblemError(securityProblems.subwalletRefused("That wallet isn't one of yours, so ZeroFee stopped this. Nothing moved."));
+      if (!w.keyExported) own.add(planKey(w.address));
+      return planKey(w.address);
+    };
+    const to = list.map((p) => addressOf(p.wallet as string));
+    // the core's own figures (the audit's MUST, 7 Nov): the coin, Private and the Safe, read here; the page can only lower them
+    const [coin, inPrivate, safeRead] = await Promise.all([this.planCoin(tokenId), this.pocketHas(tokenId), this.safeHas(tokenId)]);
+    const pageShare = units(share)!, pageSafe = safeHas === undefined ? null : units(safeHas)!;
+    const mine = pageShare < inPrivate ? pageShare : inPrivate;
+    const safeCap = pageSafe !== null && pageSafe < safeRead ? pageSafe : safeRead;
+    const scale = 10 ** coin.decimals, px = coin.usd;
+    const usd = (u: bigint) => (Number(u) / scale) * px;
+    const step = (u: bigint) => { const s = BigInt(Math.ceil((fillStepUsd(usd(u)) / px) * scale)); return s > u ? s : u; };
+    const split = moveSplit(list.map((p) => units(p.units)!), mine, { ...(whole === true ? { whole: true } : {}), safeHas: safeCap, inPrivate, step, usd });
+    const viaFill = new Map<string, bigint>(), fromPrivate = new Map<string, bigint>();
+    split.parts.forEach((p, i) => {
+      if (p.viaFill > 0n) viaFill.set(to[i]!, (viaFill.get(to[i]!) ?? 0n) + p.viaFill);
+      if (p.fromPrivate > 0n) fromPrivate.set(to[i]!, (fromPrivate.get(to[i]!) ?? 0n) + p.fromPrivate);
+    });
+    this.movePlans.set(job, { job, tokenId, fill: split.fill, atMs: Date.now(), viaFill, fromPrivate, order: [...new Set(to)], paid: new Map(), held: new Map(), own });
+    // kept for the Move's life only (the ledger's own record of it, PRIVATE_KEEP_MS): an older plan is gone
+    for (const [k, v] of this.movePlans) if (Date.now() - v.atMs > MOVE_PLAN_MS) this.movePlans.delete(k);
+    return { fill: split.fill.toString(), parts: split.parts.map((p) => ({ fromPrivate: p.fromPrivate.toString(), viaFill: p.viaFill.toString(), at: p.at })) };
+  }
+  /** A Move's coin for its plan (the audit's MUST, 7 Nov): a stablecoin at $1 with the known list's decimals; any other at
+   *  1Click's token list, as the core reads it (tokenPrice). Neither: refused by name, nothing planned. */
+  private async planCoin(tokenId: string): Promise<{ usd: number; decimals: number }> {
+    const dollar = usdCoinDecimals(tokenId);
+    if (dollar !== undefined) return { usd: 1, decimals: dollar };
+    const t = await this.o.tokenPrice?.(tokenId).catch(() => null);
+    if (!t || !(t.usd > 0) || !Number.isInteger(t.decimals) || t.decimals < 0 || t.decimals > 30) throw new ProblemError(securityProblems.subwalletRefused("ZeroFee couldn't read this coin's price, so it stopped this. Nothing moved.", true));
+    return { usd: t.usd, decimals: t.decimals };
+  }
+  /** What Private holds of one coin, by its own sign-in (confidentialBalances): the core's own read. A read that fails, or
+   *  a row it can't read (strict), is refused by name, never "Private has 0" (the audit's SHOULD, 7 Nov). No row: none held. */
+  private async pocketHas(tokenId: string): Promise<bigint> {
+    try {
+      if (this.o.pocketHeld) return await this.o.pocketHeld(tokenId);
+      const row = (await this.confidentialBalances("private", true)).find((t) => t.tokenId === tokenId);
+      return row ? BigInt(row.amount) : 0n;
+    } catch {
+      // the copy review's words (confirmed 7 Nov); a read failure: Try again
+      throw new ProblemError(securityProblems.subwalletRefused("ZeroFee couldn't read Private, so it stopped this. Nothing moved.", true));
+    }
+  }
+  /** What the Safe holds of one coin: intents.near's own mt_balance_of on two nodes at one block; wNEAR also counts the
+   *  account's NEAR (the fill may pay from it). No nodes, no account, or a read that fails: refused by name. */
+  private async safeHas(tokenId: string): Promise<bigint> {
+    const unread = () => new ProblemError(securityProblems.subwalletRefused("ZeroFee couldn't read your Safe, so it stopped this. Nothing moved.", true));
+    const near = this.o.near;
+    const id = this.o.mainAccount ? await this.o.mainAccount().catch(() => null) : null;
+    if (!near || !id) throw unread();
+    try {
+      const block = await near.commonBlock();
+      const raw = await near.view(INTENTS.account, "mt_balance_of", { account_id: id, token_id: tokenId }, block);
+      if (typeof raw !== "string" || !/^\d{1,40}$/.test(raw)) throw unread();
+      return BigInt(raw) + (tokenId === "nep141:wrap.near" ? ((await near.account(id, block))?.balanceYocto ?? 0n) : 0n);
+    } catch (e) {
+      throw e instanceof ProblemError ? e : unread();
+    }
+  }
+  /** The one fill's quote (privateQuoteIn `job`): exactly the plan's fill, in its coin, a Move's own (`through`), once. */
+  private planFill(job: unknown, tokenId: unknown, amount: unknown, notThrough: boolean) {
+    const plan = typeof job === "string" ? this.movePlans.get(job) : undefined;
+    if (!plan || notThrough || plan.inDeposit || plan.fill <= 0n || plan.tokenId !== tokenId || amount !== plan.fill.toString()) throw new ProblemError(securityProblems.subwalletRefused("Your Safe's fill isn't the one this Move planned, so ZeroFee stopped this. Nothing moved."));
+    return plan;
+  }
+  /**
+   * A Move's leg against its kept plan (the audit's condition 1): `job` named, the leg is one of its wallets for at most what the
+   * plan keeps there (planLegRefusal: refused by name), a leg into the Move's one fill only into that fill. A leg into a
+   * fill bound to a plan always names it. None named and no plan bound: null (a Send, as before). `take()` counts the leg
+   * against the plan once it is held or signed, so the same wallet is never paid twice from it.
+   */
+  private async planLeg(job: unknown, inDeposit: string | undefined, recipient: string, amountIn: string, toTokenId?: string, out?: { units: string; usd?: string; min?: string }): Promise<{ take: () => void } | null> {
+    const bound = inDeposit ? (await this.privateIns()).find((k) => k.depositAddress === inDeposit)?.job : undefined;
+    if (job === undefined && bound === undefined) return null;
+    const plan = typeof job === "string" ? this.movePlans.get(job) : undefined;
+    if (bound !== undefined && (job !== bound || plan?.inDeposit !== inDeposit)) throw new ProblemError(securityProblems.subwalletRefused("Private's payment isn't part of this Move, so ZeroFee stopped this. Nothing moved."));
+    if (plan && inDeposit && plan.inDeposit !== inDeposit) throw new ProblemError(securityProblems.subwalletRefused("Private's payment isn't part of this Move, so ZeroFee stopped this. Nothing moved."));
+    const kept = plan ? (inDeposit ? plan.viaFill : plan.fromPrivate) : null;
+    const amount = /^\d{1,40}$/.test(amountIn) ? BigInt(amountIn) : -1n;
+    const key = planKey(recipient);
+    const why = amount < 0n ? "Private's payment has no amount, so ZeroFee stopped this. Nothing moved." : planLegRefusal(kept, key, amount);
+    if (why) throw new ProblemError(securityProblems.subwalletRefused(why));
+    return {
+      take: () => {
+        kept!.set(key, kept!.get(key)! - amount);
+        plan!.used = true;
+        // every signed quote of this wallet's legs, in cents (the audit's ruling (c), 8 Nov, words only): the sheet's "gets ·
+        // about $X, at least $Y"; one leg without its figures and the wallet has none (never a part guessed)
+        const q = out ? quoteGot({ amountOut: out.units, ...(out.min ? { minAmountOut: out.min } : {}), ...(out.usd ? { amountOutUsd: out.usd } : {}) }) : null;
+        const g = (plan!.got ??= new Map()).get(key);
+        plan!.got.set(key, q && (!g || g.ok) ? { got: (g?.got ?? 0n) + q.got, least: (g?.least ?? 0n) + q.least, ok: true } : { got: 0n, least: 0n, ok: false });
+        if (!inDeposit) return void plan!.paid.set(key, (plan!.paid.get(key) ?? 0n) + amount);
+        const h = plan!.held.get(key);
+        // leg 2's signed amountOut (J2-2, words only): kept for a leg of one, never summed over two
+        plan!.held.set(key, { units: (h?.units ?? 0n) + amount, ...(typeof toTokenId === "string" ? { toTokenId } : {}), ...(out && !h ? { out: { units: out.units, ...(out.usd ? { usd: out.usd } : {}) } } : {}) });
+      },
+    };
+  }
+
+  /** Leg 2 held for the Safe's one sheet (send-words HeldPair): by leg 1's address, in memory only, never written. A Move's
+   *  one fill (the audit's ruling, 7 Nov) holds every leg joined to it (`legs`): one hash over them all, released together. */
+  private readonly pairs = new Map<string, import("./send-words.ts").HeldPair>();
+  private readonly pairLegs = new Map<string, { w: Stored; payload: Nep413Payload; hash: string; out: { outDeposit: string; outTag?: string; leg2In: string } }[]>();
+  /** What the legs already held for this fill pay (units): a Move's next leg joins only within what the fill promises. */
+  private heldLegs(inDeposit: string): bigint {
+    return (this.pairLegs.get(inDeposit) ?? []).reduce((n, l) => n + BigInt(l.out.leg2In), 0n);
+  }
+  private holdPair(w: Stored, payload: Nep413Payload, inDeposit: string, out: { outDeposit: string; outTag?: string; leg2In: string }, planned = false): string {
+    const one = Array.from(sha256(utf8(JSON.stringify(payload))), (b) => b.toString(16).padStart(2, "0")).join("");
+    // a Send's pair, or a Move's first leg: one; a Move's next leg into the same planned fill: joined to it
+    const legs = [...(planned ? this.pairLegs.get(inDeposit) ?? [] : []), { w, payload, hash: one, out }];
+    this.pairLegs.set(inDeposit, legs);
+    // one leg: its own hash (as before); more: the hash of their hashes, in the order held
+    const hash = legs.length === 1 ? one : Array.from(sha256(utf8(legs.map((l) => l.hash).join(","))), (b) => b.toString(16).padStart(2, "0")).join("");
+    this.pairs.set(inDeposit, {
+      inDeposit, hash, atMs: Date.now(),
+      // the audit's MUST (6 Nov): leg 2, once signed, is kept in this core's sealed vault BEFORE leg 1 is sent (L2), never in the
+      // page's storage; it leaves only to 1Click, by pairHand, once leg 1 reads SUCCESS with its tag
+      release: async () => {
+        await this.markPaid(inDeposit, "This send's move into your private balance wasn't priced here, or its price ran out. Nothing moved.", true);
+        const inTag = (await this.privateIns()).find((k) => k.depositAddress === inDeposit)?.tag;
+        const signed: import("./send-words.ts").KeptLeg[] = [];
+        for (const l of legs) signed.push({ ...l.out, signed: signNep413(l.payload, await this.secret(l.w)) });
+        const until = Math.max(...await Promise.all(legs.map(async (l) => (await sendWords()).keptPairUntil(l.payload, Date.now()))));
+        await this.writeKeptPairs((all) => { all[inDeposit] = { ...signed[0]!, ...(inTag ? { inTag } : {}), atMs: Date.now(), untilMs: until, ...(signed.length > 1 ? { legs: signed } : {}) }; });
+        return true;
+      },
+    });
+    return hash;
+  }
+  /** The pair a Safe signature paying these addresses may release (none: null); read before the sheet, for its hash. */
+  async pairOf(paid: readonly string[]): Promise<{ inDeposit: string; hash: string } | null> {
+    const p = (await sendWords()).pairFor(this.pairs, paid, Date.now());
+    return p ? { inDeposit: p.inDeposit, hash: p.hash } : null;
+  }
+  /** Released once, after the chip's signatures of leg 1 checked (dev-signer.ts), before leg 1 is sent: marked paid,
+   *  signed, and kept in the sealed vault (true). A second ask, another address or another hash: refused (null), nothing
+   *  signed. */
+  async releasePair(inDeposit: string, hash: string): Promise<true | null> {
+    const p = this.pairs.get(inDeposit);
+    this.pairs.delete(inDeposit);
+    try {
+      if (!p || p.hash !== hash || Date.now() - p.atMs > (await sendWords()).PAIR_KEEP_MS) return null;
+      return (await p.release()) === true ? true : null;
+    } finally {
+      this.pairLegs.delete(inDeposit);
+    }
+  }
+
+  /** Leg 2's kept signature, by leg 1's address, in the sealed vault (send-words KeptPair); one past its keep is gone. */
+  private async keptPairs(): Promise<Record<string, import("./send-words.ts").KeptPair>> {
+    const raw = await this.o.vault.get(SEND_PAIRS);
+    let all: Record<string, import("./send-words.ts").KeptPair> = {};
+    try { const v = raw ? JSON.parse(new TextDecoder().decode(raw)) : {}; if (v && typeof v === "object" && !Array.isArray(v)) all = v; } catch { /* none */ }
+    const now = Date.now();
+    return Object.fromEntries(Object.entries(all).filter(([, k]) => now <= k.untilMs));
+  }
+  private writeKeptPairs(f: (all: Record<string, import("./send-words.ts").KeptPair>) => void): Promise<void> {
+    return this.turn("send-pairs", async () => {
+      const all = await this.keptPairs();
+      f(all);
+      await this.o.vault.put(SEND_PAIRS, utf8(JSON.stringify(all)));
+    });
+  }
+  /**
+   * Leg 2 handed to 1Click (the follower's rule, the audit's MUST, 6 Nov): only once leg 1 reads SUCCESS, read here with its own
+   * tag, with at least leg 2's amount landed in Private. Otherwise nothing leaves (handed: false). Sending the same signed
+   * payment again is harmless (its one-time number is spent once), so the follower may ask again while 1Click hasn't it.
+   */
+  async pairHand(inDeposit: unknown, outDeposit?: unknown): Promise<{ handed: boolean }> {
+    if (typeof inDeposit !== "string") throw new ProblemError(securityProblems.requestInvalid("inDeposit is a Send's own leg 1 address"));
+    const k = (await this.keptPairs())[inDeposit];
+    const relay = this.o.floatRelay;
+    if (!k || !relay || !this.o.privateStatus) return { handed: false };
+    // a Move's one fill pays several legs (the audit's condition 3, 7 Nov): this one, by its own address
+    const legs = (await sendWords()).keptLegs(k);
+    const at = typeof outDeposit === "string" ? legs.findIndex((l) => l.outDeposit === outDeposit) : 0;
+    if (at < 0 || legs[at]!.ended) return { handed: false };
+    const s = (await this.o.privateStatus(inDeposit, k.inTag).catch(() => null)) as { status?: unknown; swapDetails?: { amountOut?: unknown } } | null;
+    if (!(await sendWords()).leg1Landed(s, legs[at]!.leg2In)) return { handed: false };
+    // what landed pays the legs that fit, the smallest first, never one in pieces; the rest stays in Private
+    if (!partsThatFit(BigInt(String(s!.swapDetails!.amountOut)), legs.map((l) => BigInt(l.leg2In))).includes(at)) return { handed: false };
+    await relay.submitIntent(legs[at]!.signed);
+    return { handed: true };
+  }
+  /** The Send's job ended (paid or not), or leg 1 was refused before it went: leg 2's kept signature is deleted. A Move's
+   *  leg (`outDeposit`): only that leg's; the record goes with its last. */
+  async pairEnd(inDeposit: unknown, outDeposit?: unknown): Promise<void> {
+    if (typeof inDeposit !== "string") return;
+    this.pairs.delete(inDeposit);
+    this.pairLegs.delete(inDeposit);
+    const k = (await this.keptPairs())[inDeposit];
+    if (!k) return;
+    const legs = (await sendWords()).keptLegs(k);
+    if (typeof outDeposit === "string" && legs.length > 1) {
+      // the ended leg stays counted (what landed paid it), its signature gone; the record goes with the last
+      if (!legs.some((l) => l.outDeposit === outDeposit)) return;
+      const left = legs.map((l) => (l.outDeposit === outDeposit ? { outDeposit: l.outDeposit, leg2In: l.leg2In, signed: null, ended: true as const } : l));
+      if (!left.every((l) => l.ended)) return void (await this.writeKeptPairs((all) => { all[inDeposit] = { ...k, legs: left }; }));
+    }
+    await this.writeKeptPairs((all) => void delete all[inDeposit]);
+  }
+  /** A pair's end without its signature (Not now, Close, a refusal, the Safe's sheet errored): dropped unsigned. */
+  dropPair(inDeposit: string): void {
+    this.pairs.delete(inDeposit);
+    this.pairLegs.delete(inDeposit);
+  }
+  private async sendPayChecks(w: Stored, t: ReturnType<typeof pocketTransfer>, usd: string, inDeposit: string): Promise<void> {
+    await (await sendWords()).sendPayCheck({
+      pocket: w.address,
+      keptThrough: async (dep, now) => (await this.privateIns()).find((k) => k.depositAddress === dep && k.through === true && !k.outside && k.used !== true && now - k.atMs <= PRIVATE_IN_MS) ?? null,
+      readQuote: async (dep, tag) => parseQuote(await this.o.privateStatus!(dep, tag), dep, this.o.quoteKey),
+      refused: (why) => new ProblemError(securityProblems.subwalletRefused(why)),
+    }, t, usd, inDeposit);
   }
 
   /** A move in's address marked paid, in one turn with every other change to the list, only if it isn't marked already
@@ -3031,10 +3359,10 @@ export class SubWallets {
   }
 
   /** Done only when both nodes have it, ok; failed when both say so; nodes that disagree say so; else "not yet". */
-  private async confirmed(seenNow: () => Promise<("ok" | "failed" | null)[]>, txHash: string, explorerUrl: string, network?: string): Promise<TxOutcome> {
+  private async confirmed(seenNow: () => Promise<("ok" | "failed" | null | "unread")[]>, txHash: string, explorerUrl: string, network?: string): Promise<TxOutcome> {
     const { everyMs, forMs } = this.o.confirm ?? { everyMs: 2000, forMs: 90_000 };
     for (let waited = 0; waited <= forMs; waited += everyMs) {
-      const seen = await seenNow().catch((): ("ok" | "failed" | null)[] => [null, null]);
+      const seen = await seenNow().catch((): ("ok" | "failed" | null | "unread")[] => ["unread", "unread"]);
       if (seen.includes("ok") && seen.includes("failed")) return { status: "problem", problem: securityProblems.nodesDisagree() };
       if (seen.length === 2 && seen.every((x) => x === "ok")) return { status: "done", txHash, explorerUrl };
       if (seen.length === 2 && seen.every((x) => x === "failed")) return { status: "problem", problem: securityProblems.subwalletSendFailed(explorerUrl, network) };

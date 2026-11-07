@@ -14,6 +14,6 @@ export function siteWalletLines(list: readonly SpendingWallet[]): SiteWalletLine
     // an empty wallet is "$0.00" as every other empty row, never "0 ETH" (a Base wallet with no price: the proof, 5 Nov)
     const none = !w.unread && /^0(\.0+)?(\s|$)/.test(w.holds ?? "");
     const figure = usd === null || !Number.isFinite(usd) ? (none ? "$0.00" : w.holds ?? "Can't see it now") : `$${usd.toFixed(2)}`;
-    return { id: w.id, title: `${w.label.replace(/ wallet$/, "")} · ${figure}`, line: CHAIN_NAMES[w.network] ?? w.network };
+    return { id: w.id, title: `${w.label.replace(/ wallet$/, "")}${figure.startsWith("$") ? " " : " · "}${figure}`, line: CHAIN_NAMES[w.network] ?? w.network };
   });
 }

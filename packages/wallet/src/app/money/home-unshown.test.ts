@@ -54,11 +54,14 @@ test("S21: the third state on the Home row, the Jobs card and the job page: the 
   assert.equal(endLine(t), HOME_UNREAD, "the Home row says the copy review's line, whole");
   const card = readFileSync(new URL("./LiveTrack.tsx", import.meta.url), "utf8");
   assert.match(card, /if \(t\.end\?\.ok\) return "done";\n\s+if \(t\.end\?\.slow \|\| slowAdd\(t, now\)\) return "slow";/, "rowState: never done while not ok");
-  assert.match(card, /if \(t\.end\) return endLine\(t\) \?\? t\.end\.line;/, "rowLine: the line, no time left");
+  assert.match(card, /if \(t\.end\) return t\.end\.row \?\? endLine\(t\) \?\? t\.end\.line;/, "rowLine: the line, no time left (a stopped Move's own row line first: moveStopFace)");
   // the job page: "On its way" over the line, never "Slower than usual", "Stopped" or Done
-  assert.match(card, /: t\.end\.unshown \? UNSHOWN_STATUS : stillGoing\(t\)/);
-  assert.match(card, /export const UNSHOWN_STATUS = "On its way";/);
-  assert.match(card, /\{t\.end && <p className=\{`lv-tracker__end\$\{t\.end\.ok \|\| stillGoing\(t\) \? "" : " is-bad"\}`\}>\{endLine\(t\)\}<\/p>\}/, "its line under it, not red");
+  // (the copy review's Part 2, 6 Nov: the page is job-face.ts's) its face is "late": the title "Move", no --bad dot, no choice, its line
+  const { jobFace } = await import("./job-face.ts");
+  const f = jobFace(t);
+  assert.deepEqual([f.state, f.bar, f.bad, f.choices.length, f.out], ["late", "Move", false, 0, "x"]);
+  assert.ok(f.reason?.startsWith(HOME_UNREAD.replace(/[.\s]+$/, "")), "its line under it");
+  assert.doesNotMatch(card, /"Stopped"/, "never a bare Stopped on the page");
   // the Jobs card: still a pending Job, saying the line, no time left
   const job = taskOf(t);
   assert.deepEqual([job.state, job.where, job.endsAt], ["pending", HOME_UNREAD, undefined]);

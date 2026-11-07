@@ -11,10 +11,12 @@ import { useEffect, useRef, useState } from "react";
 import type { Bridge } from "@zerofee/core/bridge";
 import type { PlainWords } from "@zerofee/core/signer";
 import { iosHost } from "../host/ios.ts";
-import { approvalAnswered, approvalOpened, hostSheets } from "@zerofee/shell-api/approval-answered.ts";
+import { approvalAnswered, approvalAsked, approvalOpened, closePending, hostSheets, jobSigned, onPending, pendingShown, refusingClosed, type Pending as Getting } from "@zerofee/shell-api/approval-answered.ts";
+import { movesMoney } from "@zerofee/shell-api/job-run.ts";
 import { moneyOpenNow, onScreenLeft, screenAppNow } from "./screen-app.ts";
 import { mayShowSheet } from "@zerofee/core/approval-policy";
 import { passwordAnswer } from "./approval-password.ts";
+import { keptArm } from "./approval-arm.ts";
 
 // The view and its words have their own module (ApprovalSheetView.tsx), loaded a moment after the shell starts and
 // never in Home's first load (speed budget); the first sheet finds it loaded.
@@ -40,7 +42,20 @@ export function ApprovalSheet({ bridge, inWindow }: { bridge: Bridge; inWindow?:
   }, []);
   // the jobs hear this sheet (job-run.ts): asked here first, "Job created." on its yes; the phone's Safe Face ID is Swift's
   useEffect(() => hostSheets({ safe: !iosHost() }), []);
+  // the core's word that a Safe job's last signature is made (before anything is sent): the job is made on it (job-run.ts)
+  useEffect(() => bridge.on<{ jobKey?: string }>("job.signed", (p) => jobSigned(p?.jobKey)), [bridge]);
+  // the core's word that a job's sheet is about to show (the chip's own on the phone, never heard here): that job waits on it
+  useEffect(() => bridge.on<{ jobKey?: string }>("approval.asked", (p) => approvalAsked(p?.jobKey)), [bridge]);
+  // the Safe's "Check this" at the tap, before the core has bound the amounts (the copy review's W2); the core's sheet takes its place
+  const [getting, setGetting] = useState<Getting | null>(() => pendingShown());
+  const lastGetting = useRef<Getting | null>(null);
+  useEffect(() => onPending((g) => { if (g) lastGetting.current = g; setGetting(g); }), []);
   useEffect(() => bridge.on<Pending>("approval.needed", (p) => {
+    // a Close on the Getting-ready sheet is the person's No: a money sheet its call still asks is answered No unseen
+    if (refusingClosed() && movesMoney(p.words ?? {})) {
+      void bridge.call("approval.answer", { id: p.id, approve: false });
+      return;
+    }
     // D146: asked by an app the person isn't on (a late ask), it never shows: answered Not now, nothing signed
     if (!mayShowSheet(p.app ?? p.words?.asker, screenAppNow() || undefined, moneyOpenNow())) {
       void bridge.call("approval.answer", { id: p.id, approve: false });
@@ -66,6 +81,9 @@ export function ApprovalSheet({ bridge, inWindow }: { bridge: Bridge; inWindow?:
       .catch(() => bridge.call("approval.answer", { id: showing.id, approve: false }).then(() => false))
       .then((yes) => { setQueue((q) => q.filter((x) => x.id !== showing.id)); approvalAnswered(yes === true, showing); });
   }, [showing?.id, bridge]);
+  if (!showing && getting && !inWindow && ApprovalSheetView) {
+    return <ApprovalSheetView key={`getting-${getting.at}`} words={{ title: getting.headline, lines: [], warnings: [], effect: [] }} onAnswer={() => { closePending(); }} pending={getting.failed ? { failed: true } : {}} />;
+  }
   if (!showing || inWindow) return null;
   /** Answers the sheet. A password sheet's Approve waits for the core: a wrong password or a wait gives back why, and the
    *  sheet stays open to type again; anything else ends it. */
@@ -99,5 +117,8 @@ export function ApprovalSheet({ bridge, inWindow }: { bridge: Bridge; inWindow?:
     return null;
   };
   if (!ApprovalSheetView) return null;
-  return <ApprovalSheetView key={showing.id} id={showing.id} words={showing.words} onAnswer={answer} {...(showing.password ? { password: true } : {})} />;
+  // R4 (audit, 6 Nov): bound figures that are the Getting-ready sheet's own keep its arm (and its frame); different ones,
+  // or a signed quote past the plan's bound (the audit's ruling (c), 8 Nov), swap in as a new sheet and the 700 ms arm starts again
+  const same = keptArm(lastGetting.current, showing.words);
+  return <ApprovalSheetView key={same ? `getting-${same.at}` : showing.id} id={showing.id} words={showing.words} onAnswer={answer} {...(showing.password ? { password: true } : {})} {...(same ? { armAt: same.at } : {})} />;
 }

@@ -28,7 +28,8 @@ test("New on All: every market chain's newest launches together, newest first", 
 
 test("the same six lists on every chain (Hot first), the field is the one pill, no label over the list", () => {
   const rules = readFileSync(new URL("./screens/discover-rules.ts", import.meta.url), "utf8");
-  assert.match(rules, /\["trending", "Hot"\], \["new", "New"\], \["m5", "5m"\], \["h1", "1h"\], \["h6", "6h"\], \["h24", "24h"\]/);
+  // the copy review's final words (7 Nov, T3, fix/trade-list-coin): the windows worded ("5m" → "5 min" …)
+  assert.match(rules, /\["trending", "Hot"\], \["new", "New"\], \["m5", "5 min"\], \["h1", "1 hour"\], \["h6", "6 hours"\], \["h24", "24 hours"\]/);
   assert.match(src, /LISTS\.map/, "the screen shows them all, on every chain");
   assert.doesNotMatch(src, /dc-head|zf-chg|dc-wchip/, "no list label, no tinted change box, no wallet chips");
   assert.match(src, /GeckoTerminal isn't answering\. Trying again\./);
@@ -63,7 +64,8 @@ test("Activity's row: the coins in their own units, the dollars, a status only w
   assert.equal(done.status, undefined, "control: a done row says no status");
   assert.equal(tradeCard({ ...base, status: "sending" }).status, "Sending…");
   assert.equal(tradeCard({ ...base, status: "failed" }).status, "Didn't go through");
-  assert.equal(tradeCard({ ...base, status: "sending", hashes: [] }).steps[0]!.label, "Sent to Solana", "the network by name (Copywriter row 68)");
+  assert.equal(tradeCard({ ...base, status: "sending", hashes: [] }).steps[0]!.label, "Paid from your SOL wallet", "T2-6 (the copy review's walk): a buy pays from its wallet, by name");
+  assert.equal(tradeCard({ ...base, kind: "sell", status: "sending", hashes: [] }).steps[0]!.label, "Sent to Solana", "control: a sale names the network (Copywriter row 68)");
 });
 
 // Finding 14 (real money, 4 Nov): "0xNOTANADDRESS!!zzz" waited on the market, then said "GeckoTerminal isn't answering".
@@ -77,11 +79,12 @@ test("finding 14: a search that can't be an address says so at once and asks the
 });
 
 test("product decision, 5 Nov: on All the line is the coin's name and worth, the chain is the logo's badge, spoken (webd-money2: CASHCAT's row must still say ETH (RH)); control: one chain's own list has no badge", () => {
-  assert.match(src, /<span className="dc-sub"><span className="dc-name">\{r\.name\}<\/span>/);
+  // 53, 6 Nov, item 9 (fix/trade-list-coin): the name is its own line, whole; the worth moved beside the symbol
+  assert.match(src, /<span className="dc-sub dc-sub--name"><span className="dc-name dc-name--whole">\{words\.name\}<\/span>/);
   assert.ok(!/dc-name">\{showChain/.test(src), "no chain words pushing the name off the line");
   assert.match(src, /\{showChain && !buy && <span className="dc-badge" role="img" aria-label=\{`on \$\{CHAIN_SHORT\[r\.chain\]\}`\}>/);
   // audit 5 Nov: the worth is its own span that never shrinks, so the name gives way, never the number
-  assert.match(src, /<span className="dc-cap">\{capWords\(r\.marketCapUsd\)\}<\/span>/);
+  assert.match(src, /<span className="dc-cap">\{words\.cap\}<\/span>/);
   assert.match(src, /showChain=\{chain === "all"\}/, "control: only on All");
   assert.match(src, /hood: "ETH \(RH\)"/);
 });

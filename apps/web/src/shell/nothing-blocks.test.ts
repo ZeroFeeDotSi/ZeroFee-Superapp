@@ -95,7 +95,7 @@ const SPINE = [
   "Words", "Money in", "Protected", "Second device", "Done",
   "Write down your backup words", "Check your backup words", "Waiting for your SOL", "Waiting for your SOL", "Your SOL is here", "Some NEAR arrived, not all", "Opening your account",
   "Choose what big payments need", "Add a second device", "Add money to your Safe",
-  "Your account", "Protection", "What big payments need", "Devices", "Only this phone", "Recovery", "Backup words · a new phone waits 48 hours", "A new device is waiting", "Activity", "What you did", "Details", "Your address on each network",
+  "Your account", "Protection", "What big payments need", "Devices", "Only this phone", "Recovery", "Backup words", "A new device is waiting", "Activity", "What you did", "Details", "Your address on each network",
   "Your key is in this phone", "Big payments can need its yes too.", "Add my laptop", "Add a guardian", "Be someone's guardian",
   "From your Safe to Spending", "That fills Spending.", "Getting it ready…", "Sent $5.00 (5.00 USDC) to kiosk.near", "$327.46 is on its way to Spending.", "$500.00 is on its way to your Safe.",
   "NEAR didn't answer, so this is your money as last read. It's all still in your Safe.", "Retry", "Reading your activity…", "Anything more stays in your Safe.", "Show all 5 coins",

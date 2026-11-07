@@ -66,7 +66,7 @@ test("with nothing held, Protection shows no such line", async () => {
   const shown = runtime.text();
   runtime.unmount();
   assert.doesNotMatch(shown, /Your new rules/);
-  assert.match(shown, /Your NEAR account keeps these rules/);
+  assert.match(shown, /Your Safe keeps these rules/);
 });
 
 test("the held change's line: its end time, or ready to finish, or the second device's yes", () => {

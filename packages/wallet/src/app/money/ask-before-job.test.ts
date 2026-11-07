@@ -1,7 +1,9 @@
 // QA's MUST (Sim test): "Job created." painted at ~57 ms, then the "Check
 // this" sheet over it, then "Job created." again ~650 ms after Approve. Where the approve sheet is the shell's own (the
 // web, the Sim), it comes first and "Job created." comes once, on its yes, at once. Where no sheet of ours comes (a hot
-// wallet in its session, the Safe on the iPhone: Swift's own Face ID), "Job created." stays at the tap (rule 2: painted in the tap's own turn, no await).
+// wallet in its session), "Job created." stays at the tap (rule 2: painted in the tap's own turn, no await).
+// Bug report (6 Nov, one Face ID): a Safe job, on the web and on the iPhone alike, is made on the core's job.signed (its
+// last signature, before anything is sent), in that same turn; never at the tap and never on a sheet's yes alone.
 // Send and a site's Add say their time left.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -9,7 +11,7 @@ import { readFileSync } from "node:fs";
 import type { Problem } from "@zerofee/core/problem";
 import { taskStore } from "@zerofee/shell-api/tasks.ts";
 import { runJob, type Answer, type onOwnApproval } from "@zerofee/shell-api/job-run.ts";
-import { hostSheets, sheetsHeard } from "@zerofee/shell-api/approval-answered.ts";
+import { hostSheets, pendingShown, sheetsHeard } from "@zerofee/shell-api/approval-answered.ts";
 import { LEG_SEC, sendSec } from "@zerofee/shell-api/job-steps.ts";
 import { runMove, type MoveRunIo } from "../screens/move-run.ts";
 import { planOf, type Leg } from "../screens/move-split.ts";
@@ -29,6 +31,12 @@ function slow<T>() {
 function sheets() {
   const s: { fire?: (yes: boolean) => void; opened?: () => void } = {};
   const on = ((fn: (yes: boolean) => void, o: { opened?: () => void } = {}) => { s.fire = fn; s.opened = o.opened; return () => { s.fire = undefined; }; }) as typeof onOwnApproval;
+  return { s, on };
+}
+/** The core's job.signed stream the test drives: signed() is the Safe's last signature made. */
+function signs() {
+  const s: { signed?: () => void } = {};
+  const on = (fn: () => void) => { s.signed = fn; return () => { s.signed = undefined; }; };
   return { s, on };
 }
 const DECLINED: Problem = { code: "wallet.declined", whatHappened: "You said no.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "Go back" } };
@@ -51,16 +59,19 @@ test("sheet needed (the web's Safe Swap): \"Job created.\" never before Approve;
   const off = hostSheets({ safe: true });
   const c = slow<{ id: string }>();
   const { s, on } = sheets();
+  const sig = signs();
   const made: string[] = [];
-  const end = runJob({ tasks, title: "Swap $10.00 of NEAR for USDC", usd: "$10.00", etaSec: 240, safe: true, money: ["safe"], call: c.call, declined: () => false, made: () => { made.push("made"); }, onApproval: on });
+  const end = runJob({ tasks, title: "Swap $10.00 of NEAR for USDC", usd: "$10.00", etaSec: 240, safe: true, money: ["safe"], call: c.call, declined: () => false, made: () => { made.push("made"); }, onApproval: on, onSigned: sig.on });
   await flush();
   s.opened?.();
   assert.equal(made.length, 0, "the Check this sheet first: no Job created under it");
   assert.equal(rows().length, 0, "no row on Home before the yes");
-  // no wall clock (rule: no wall-clock tests): painted in the same turn as the Approve, with no await, no timer and no
+  // no wall clock (rule: no wall-clock tests): painted in the same turn as the signature, with no await, no timer and no
   // core answer between them, so it is instant on any machine; the order is the assertion
   s.fire?.(true);
-  assert.deepEqual(made, ["made"], "Job created on Approve, in the same turn (nothing awaited)");
+  assert.deepEqual(made, [], "a yes is not a signature: nothing yet (one Face ID, 6 Nov)");
+  sig.s.signed?.();
+  assert.deepEqual(made, ["made"], "Job created on the Safe's signature, in the same turn (nothing awaited)");
   const row = rows()[0]!;
   assert.equal(row.steps[0]?.label, "Approved", "its row starts approved");
   assert.ok(row.endsAt !== undefined, "its time left");
@@ -96,8 +107,12 @@ test("no sheet comes (a hot wallet in its session; the Safe on the iPhone): \"Jo
     const at: string[] = [];
     // made inside the tap's own call (no await before the paint): checked before this test awaits anything
     const a = runJob({ tasks, title: "Swap $10.00 of SOL for ETH", safe: false, money: ["row:sol"], call: hot.call, declined: () => false, made: () => { at.push("hot"); } });
-    const b = runJob({ tasks, title: "Move $10.00 to your SOL wallet", safe: true, money: ["safe"], call: safe.call, declined: () => false, made: () => { at.push("safe"); }, onApproval: sheets().on });
-    assert.deepEqual(at, ["hot", "safe"], "both made at the tap, in the same turn, before any answer");
+    const sig = signs();
+    const b = runJob({ tasks, title: "Move $10.00 to your SOL wallet", safe: true, money: ["safe"], call: safe.call, declined: () => false, made: () => { at.push("safe"); }, onApproval: sheets().on, onSigned: sig.on });
+    assert.deepEqual(at, ["hot"], "the hot wallet's made at the tap, in the same turn, before any answer; the Safe's not (one Face ID)");
+    assert.equal(pendingShown()?.headline, "Move $10.00 to your SOL wallet", "the Safe's Check this is up at the tap instead");
+    sig.s.signed?.();
+    assert.deepEqual(at, ["hot", "safe"], "the Safe's made on its signature, in that same turn");
     hot.answer({ ok: { id: "h" } }); safe.answer({ ok: { id: "s" } });
     await Promise.all([a, b]);
     assert.equal(at.length, 2, "never twice");
@@ -130,12 +145,15 @@ test("a wallet's Send to someone else (asks: its one-tap sheet first): made on i
 });
 
 const SAFE_SOL: Leg[] = [{ from: "safe", to: "sol", usd: 10 }];
-function moveIo(answer: () => Promise<unknown>, approvals: { fire?: (yes: boolean) => void }, asks?: boolean) {
+function moveIo(answer: () => Promise<unknown>, approvals: { fire?: (yes: boolean) => void; signed?: () => void }, asks?: boolean) {
   const seen = { made: [] as number[] };
+  // the core's job.signed names the Move's own key (its spending.topUp's `key`), as the real core does
+  let key: string | undefined;
   const o: MoveRunIo = {
-    call: async <T,>() => (await answer()) as { ok: T } | { problem: Problem },
+    call: async <T,>(m: string, p: Record<string, unknown>) => { if (m === "spending.topUp") key = p.key as string; return (await answer()) as { ok: T } | { problem: Problem }; },
     tasks, keyFor: (w) => `home-move-${w.replace(/[^a-z0-9]/gi, "").slice(0, 20).padEnd(16, "x")}`,
     onApproval: (fn) => { approvals.fire = fn; return () => { approvals.fire = undefined; }; },
+    onSigned: (fn) => { approvals.signed = () => fn(key); return () => { approvals.signed = undefined; }; },
     say: () => {}, asking: () => {},
     made: (usd) => seen.made.push(usd), refused: () => {}, declined: () => {},
     ...(asks !== undefined ? { asks } : {}),
@@ -143,27 +161,31 @@ function moveIo(answer: () => Promise<unknown>, approvals: { fire?: (yes: boolea
   return { o, seen };
 }
 
-test("Move Safe -> SOL wallet on the web: the Check this sheet first, \"Job created.\" on Approve, once (control: the iPhone, made at the tap)", async () => {
+test("Move Safe -> SOL wallet on the web: the Check this sheet first, \"Job created.\" on the Safe's signature, once (control: the iPhone too, never at the tap since one Face ID)", async () => {
   clear();
   let answer!: (r: unknown) => void;
-  const a: { fire?: (yes: boolean) => void } = {};
+  const a: { fire?: (yes: boolean) => void; signed?: () => void } = {};
   const { o, seen } = moveIo(() => new Promise((r) => { answer = r; }), a, true);
   const run = runMove(SAFE_SOL, planOf(SAFE_SOL), o);
   await flush();
   assert.deepEqual(seen.made, [], "nothing under the sheet");
   assert.equal(rows().length, 0);
   a.fire?.(true);
-  assert.deepEqual(seen.made, [10], "on Approve, at once");
+  assert.deepEqual(seen.made, [], "a yes is not a signature");
+  a.signed?.();
+  assert.deepEqual(seen.made, [10], "on the signature, at once");
   answer({ ok: { id: "mv-1", state: "moving" } });
   await run;
   assert.deepEqual(seen.made, [10], "exactly once");
-  // control: the phone (its Face ID is Swift's own): at the tap
+  // control: the phone (its Face ID is Swift's own, never heard): no longer at the tap (bug report, 6 Nov), on its signature
   clear();
-  const b: { fire?: (yes: boolean) => void } = {};
+  const b: { fire?: (yes: boolean) => void; signed?: () => void } = {};
   const phone = moveIo(() => new Promise(() => {}), b, false);
   void runMove(SAFE_SOL, planOf(SAFE_SOL), phone.o);
   await flush();
-  assert.deepEqual(phone.seen.made, [10], "made at the tap");
+  assert.deepEqual(phone.seen.made, [], "not at the tap");
+  b.signed?.();
+  assert.deepEqual(phone.seen.made, [10], "made on its signature");
 });
 
 test("Send says its time left (\"This job has no time estimate.\"); a site's Add too", () => {
@@ -177,7 +199,7 @@ test("Send says its time left (\"This job has no time estimate.\"); a site's Add
   assert.match(send, /<JobReceipt amount=\{flying\} icon=\{<ActSend \/>\} testid="send-sent" etaSec=\{etaSec\}/, "the receipt says it");
   assert.match(send, /\.\.\.\(a\.source\.row \? \{ asks: sheetsHeard\("hot"\) \} : \{\}\)/, "a wallet's Send asks first");
   const site = src("./SiteMoney.tsx");
-  assert.match(site, /<TimeLeft etaSec=\{LEG_SEC\.privateOut\} \/>/);
+  assert.match(site, /<TimeLeft etaSec=\{LEG_SEC\.privateOut\} job=\{madeJob\} \/>/);
   assert.match(site, /startJob\(tasks, \{ title: `Add \$\{amount\} to your \$\{name\} wallet`, usd: amount, etaSec: LEG_SEC\.privateOut \}\)/);
   assert.match(site, /const stop = onOwnApproval\(\(yes\) => \{ if \(yes\) \{ (?:mark\("approved"\); )?sayWent\(""\); make\(\); \} \}\);/, "a site's Add: made on the Safe's yes, never before");
 });

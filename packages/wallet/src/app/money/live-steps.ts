@@ -12,12 +12,15 @@ import type { Bridge } from "@zerofee/core/bridge";
 import type { SpendingActivity } from "@zerofee/core/spending";
 import type { Movement } from "../../types.ts";
 import type { Task, Tasks, TaskInput } from "@zerofee/shell-api/tasks.ts";
-import { payeeWords } from "../format.ts";
+import { payeeWords, sendFrom } from "../format.ts";
 import { DECIMALS, shortWords, type AddOnWay } from "./adds-on-way.ts";
 import { ADD_ROWS } from "./add-coins.ts";
 import { every } from "@zerofee/shell-api/rest.ts";
 import { carried, type Carried } from "@zerofee/shell-api/job-carry.ts";
-import { LANDED_UNREAD } from "@zerofee/core/private-route";
+import { PRIVATE_HOME_TITLE } from "@zerofee/shell-api/job-start.ts";
+import { paidFrom } from "./paid-from.ts";
+export { paidFrom };
+import { LANDED_UNREAD, PRIVATE_KEEP_MS } from "@zerofee/core/private-route";
 import { LEG_SEC, MEASURED_SEC, etaLine, legsEndsAt, markStep, privateMoveSteps, safeMoveSteps, sendLegs, stepLabel } from "@zerofee/shell-api/job-steps.ts";
 import { mark } from "@zerofee/design/tap.ts";
 import { SAFE_SWAP } from "@zerofee/shell-api/task-earlier.ts";
@@ -25,7 +28,9 @@ import { isHomeSwapRow } from "./swap-ended.ts";
 import { NEAR_SWAP_BACK, SWAP_AGAIN, swapEndOf } from "../../near-swap-words.ts";
 
 export type StepState = "waiting" | "doing" | "done" | "failed";
-export interface LiveStep { label: string; state: StepState; /** ms from the start, once done */ atMs?: number; /** job-steps.ts's key ("safe", "near", "intents", "land"): the crawl's marks */ key?: string }
+export interface LiveStep { label: string; state: StepState; /** ms from the start, once done */ atMs?: number; /** job-steps.ts's key ("safe", "near", "intents", "land"): the crawl's marks */ key?: string;
+  /** The step's own line under its words (a job of several parts, jobSteps: "to your SOL and NEAR wallets"). */
+  note?: string }
 export type LiveKind = "add" | "send" | "swap" | "move";
 export interface LiveTrack {
   id: string;
@@ -40,7 +45,11 @@ export interface LiveTrack {
   end?: { ok: boolean; line: string; slow?: true; /** the line says what stopped itself (never the step's "didn't finish" before it) */ whole?: true; /** the job's own title for how it stopped, in place of "<verb> stopped" and "Stopped" */ head?: string; /** a true refund (near-swap-words.ts swapEndOf): the neutral "back" face, on its sheet too */ back?: true;
     /** S21 (the copy review's ruling, 5 Nov): NEAR Intents says it's done, the Safe's read hasn't shown it. Still on its way (slow), its
      *  line only: no time left, never the green Done; a Job that stays pending until the read shows it. */
-    unshown?: true };
+    unshown?: true;
+    /** A stopped Move's cause, one plain line under its words (moveStopFace). */
+    cause?: string;
+    /** The Jobs row's own line when it isn't the whole end line (moveStopFace: "Nothing moved. Your money is safe."). */
+    row?: string };
   endMs?: number;
   /** No quote and no job's carry yet: when the route's measured time says it ends (withCarry makes it endsAt). */
   measuredEndsAt?: number;
@@ -56,7 +65,19 @@ export interface LiveTrack {
   /** Each step's leg in seconds (job-steps.ts LEG_SEC, the one time model): the time left is re-counted from the last step
    *  a read ticked (onLegs), so it shrinks on the real legs (QA's Sim re-check, 5 Nov). */
   legSec?: number[];
+  /** Where the money is, as the job's own reads say it (the job page's money line, job-face.ts): `at` the places by Home's
+   *  keys (safe, private, sol, hood, near, bsc); `going` on its way to them; `unknown` no read says where (never an
+   *  automatic step on it); `proven` a read shows it there. `from`, `to`: the job's own ends; `usd` the figure moved. */
+  money?: MoneyAt;
+  /** A Swap's coin in (the copy review's J2-4, 8 Nov: "You got 0.12 SOL."): `figure` with its coin; `about` when it is the sheet's quote
+   *  at the tap, not a figure the job's own record landed (never a made-up one). */
+  got?: { figure: string; about: boolean };
+  /** The job's dollars on its Jobs row (taskOf), for a track that takes over its starting row in place (homeTracks). */
+  usd?: string;
 }
+/** `unsure` (audit, 6 Nov): the ledger can't say whether it is in Private or still with NEAR Intents (a FAILED leg 1, a hold
+ *  past the keep): the money line says exactly that, never "on its way". */
+export interface MoneyAt { at: string[]; going?: true; unknown?: true; unsure?: true; proven?: true; from: string[]; to: string[]; usd?: string }
 
 /** The time left from the job's legs (job-steps.ts legsEndsAt): a going job's end, from the last step a read ticked and
  *  each step still to tick. Ended, or no legs: as it was. */
@@ -67,7 +88,7 @@ export function onLegs(t: LiveTrack): LiveTrack {
 }
 
 /** Where a stopped job's tap goes: Move again to that wallet (it pays from Private first), Private's own screen, or Send. */
-export type StopGo = { kind: "move"; to: string; usd?: string } | { kind: "private" } | { kind: "send"; wallet?: string } | { kind: "swap" };
+export type StopGo = { kind: "move"; to: string; from?: string; usd?: string } | { kind: "private" } | { kind: "send"; wallet?: string } | { kind: "swap" } | { kind: "close" } | { kind: "activity" };
 export interface StopNext { label: string; go: StopGo }
 /** A stopped job's words and taps (the design review, 5 Nov): the figure when known, never "your money". */
 export const STOP_WORDS = {
@@ -79,7 +100,7 @@ export const STOP_WORDS = {
   swapAgain: SWAP_AGAIN,
 } as const;
 
-const NAME: Record<string, string> = { safe: "your Safe", private: "your private balance", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+const NAME: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 const CHAIN: Record<string, string> = { sol: "Solana", hood: "Robinhood Chain", near: "NEAR", bsc: "BNB Chain" };
 const nameOf = (w: string | undefined) => NAME[w ?? ""] ?? "your wallet";
 const ms = (iso: string | undefined) => (iso ? Date.parse(iso) : NaN);
@@ -166,7 +187,9 @@ export function addTrack(a: AddOnWay, symbol?: string): LiveTrack | null {
 }
 
 /** A move this phone sees only by its legs so far (a take-out's legs land before its move home is made): never done. */
-export type Folded = SpendingActivity & { pending?: true };
+/** `parts`: the job's other core moves (job-start made(): a Move's Safe part and each wallet's leg), each whole: the job
+ *  is one track (jobTrack), never one card per part (the audit's M1, 7 Nov). They are in `legs` too (one row, one task). */
+export type Folded = SpendingActivity & { pending?: true; parts?: SpendingActivity[] };
 const ENDED = (s: SpendingActivity["status"]) => s === "failed" || s === "refused" || s === "refunded";
 /** The engine's own word that the money left: it landed, or it was out and stopped or came back. Never "refused" (it
  *  stayed: not signed, nothing moved), never "on-its-way" or "waiting" (a move is listed before its signature). */
@@ -223,6 +246,173 @@ export function withCarry(t: LiveTrack, c: Carried | undefined): LiveTrack {
   const title = c?.usd && t.kind === "move" ? t.title.replace(/^Move \$[\d,.]+ /, `Move ${c.usd} `) : t.title;
   const endsAt = t.end || t.endsAt !== undefined ? undefined : c?.endsAt ?? t.measuredEndsAt;
   return { ...t, title, ...(endsAt !== undefined ? { endsAt } : {}) };
+}
+
+/** The plan's order of places (move-split PLACES): one order on every screen (copy review, 7 Nov). */
+const PLACE_ORDER = ["safe", "private", "sol", "hood", "near", "bsc"];
+const BARE: Record<string, string> = { sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+/** Where a job ends, by name, in the plan's order (B13's walletsWords): "your SOL wallet", "your SOL and NEAR wallets",
+ *  "your SOL, NEAR and ETH (RH) wallets" as ordered; the Safe beside wallets "your Safe and your SOL wallet". Pure. */
+export function placesSaid(places: readonly string[]): string {
+  const u = PLACE_ORDER.filter((p) => places.includes(p) && p !== "private");
+  // B13's walletsWords (core move-plan.ts), said here (a table test holds them equal): importing the plan's module into this
+  // chunk grows Home's first load by 0.08 KB (the speed budget)
+  const w = u.filter((p) => p !== "safe").map((p) => BARE[p]!);
+  const ws = w.length === 0 ? "" : w.length === 1 ? `your ${w[0]} wallet` : `your ${w.slice(0, -1).join(", ")} and ${w.at(-1)} wallets`;
+  return u.includes("safe") ? (ws ? `your Safe and ${ws}` : "your Safe") : ws;
+}
+
+const CHAIN_WALLET = ["sol", "hood", "near", "bsc"];
+/** A part that leaves one chain's wallet for one place (a wallet to a wallet, a wallet home): its own record's figure. */
+const fromWallet = (t: LiveTrack): boolean => t.kind === "move" && !!t.money && t.money.from.length === 1 && CHAIN_WALLET.includes(t.money.from[0]!) && t.money.to.length === 1;
+const dollars = (s: string | undefined): number | undefined => { const n = Number(String(s ?? "").replace(/[$,]/g, "")); return Number.isFinite(n) && n > 0 ? n : undefined; };
+const money2 = (n: number): string => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** A figure summed from the job's records: "about" when any piece is an estimate (a wallet's coin priced); none when any
+ *  piece is unknown (never a guess). */
+const figure = (xs: readonly { usd: number | undefined; about: boolean }[]): string | undefined =>
+  xs.length === 0 || xs.some((x) => x.usd === undefined) ? undefined : `${xs.some((x) => x.about) ? "about " : ""}${money2(xs.reduce((n, x) => n + x.usd!, 0))}`;
+/** Several steps as one: failed if any failed, done once all are, going once any began. */
+const together = (xs: readonly StepState[]): StepState => xs.length === 0 ? "waiting" : xs.some((x) => x === "failed") ? "failed" : xs.every((x) => x === "done") ? "done" : xs.some((x) => x !== "waiting") ? "doing" : "waiting";
+const lastAt = (xs: readonly LiveStep[]): number | undefined => { const t = xs.map((x) => x.atMs).filter((x): x is number => x !== undefined && Number.isFinite(x)); return t.length ? Math.max(...t) : undefined; };
+const LAND_BY: Record<string, string> = { sol: "Solana", hood: "Robinhood Chain", near: "NEAR", bsc: "BNB Chain", safe: "NEAR" };
+/** A job page's grouped words (the copy review's ruling on M4, 7 Nov: grouped by what the person sees, never one step per leg).
+ *  Provisional where 53 gave none: `signing`, `leaving`, the landing's going and waiting forms, `notDone`. */
+export const JOB_PAGE_WORDS = {
+  signed: "Signed.",
+  signing: "Waiting for your approval.",
+  left: (from: string, usd: string) => `Left ${from} · ${usd}`,
+  leaving: (from: string, usd: string) => `Leaving ${from} · ${usd}`,
+  wentTo: (places: string) => `to ${places}`,
+  through: (usd: string | undefined) => (usd ? `${CONFIDENTIAL_STEP} · ${usd}` : CONFIDENTIAL_STEP),
+  moving: { doing: (to: string) => `NEAR Confidential is moving it to ${to}.`, done: (to: string) => `NEAR Confidential moved it to ${to}.`, next: (to: string) => `Then NEAR Confidential moves it to ${to}.` },
+  landed: (into: string, usd?: string) => `It's in ${into}${usd ? ` · ${usd}` : ""}`,
+  landing: (by: string, into: string, usd?: string) => `${by} is landing it in ${into}${usd ? ` · ${usd}` : ""}`,
+  lands: (by: string, into: string, usd?: string) => `Then ${by} lands it in ${into}${usd ? ` · ${usd}` : ""}`,
+  partFrom: (usd: string, from: string) => `${usd} of it from ${from}`,
+  allFrom: (from: string) => `from ${from}`,
+  done: "Done.",
+  doneIn: (sec: number) => `Done in ${sec} seconds.`,
+  notDone: "Then it's done.",
+} as const;
+/**
+ * A job of several parts as the person sees it (the copy review's ruling on M4, 7 Nov), at most: Signed; one "Left <wallet>" per
+ * SOURCE wallet with its parts' figure and where they went; one "Through NEAR Confidential" for the whole run with the
+ * job's figure (every part goes through it); one "It's in <wallet>" per wallet it lands in, with that wallet's share and,
+ * on its line, only what the records prove of where it came from (a source wallet's own part; never the Safe or Private:
+ * the plan's legs don't record which fed which); Done once every part ended done. Each step's state is its parts' own
+ * (together), its time the last of theirs. `steps`: each track's steps on the job's one clock; `legsOf`: the Safe's
+ * part's legs as its plan sized them (job-carry). Pure but for the carry's read.
+ */
+export function jobSteps(ts: readonly LiveTrack[], steps: readonly (readonly LiveStep[])[], legsOf: (id: string) => readonly { to: string; usd: string }[] | undefined = (id) => carried(id)?.legs): LiveStep[] {
+  const W = JOB_PAGE_WORDS;
+  const parts = ts.map((t, i) => ({ t, s: steps[i]!, wallet: fromWallet(t) }));
+  const safe = parts.filter((p) => !p.wallet), wallets = parts.filter((p) => p.wallet);
+  const safeTo = (p: (typeof parts)[number]): string[] => { const l = legsOf(p.t.id); return l?.length ? l.map((x) => x.to) : p.t.money?.to ?? []; };
+  const dests = PLACE_ORDER.filter((c) => c !== "private" && (safe.some((p) => safeTo(p).includes(c)) || wallets.some((p) => p.t.money!.to[0] === c)));
+  const out: LiveStep[] = [];
+  const at = (st: StepState, x: readonly LiveStep[]) => { const a = st === "done" ? lastAt(x) : undefined; return a !== undefined ? { atMs: a } : {}; };
+  // 1: the signature (the job's rows exist once it signed): done once any part moved on
+  const any = parts.some((p) => p.s.some((x) => x.state === "done" || (x.state === "doing" && (x.key === "safe" || x.key === "intents"))));
+  const unsigned = parts.every((p) => p.s[0]?.state === "failed" && !p.s.some((x) => x.state === "done"));
+  out.push(unsigned ? { label: W.signing, state: "failed" } : any ? { label: W.signed, state: "done", atMs: 0 } : { label: W.signing, state: "doing" });
+  // 2: each source wallet, once
+  for (const w of [...new Set(wallets.map((p) => p.t.money!.from[0]!))]) {
+    const ps = wallets.filter((p) => p.t.money!.from[0] === w);
+    const st = together(ps.map((p) => p.s[0]?.state ?? "waiting"));
+    const usd = figure(ps.map((p) => ({ usd: dollars(p.t.money!.usd), about: true }))) ?? "";
+    const label = usd ? (st === "done" ? W.left : W.leaving)(nameOf(w), usd) : `${st === "done" ? "Left" : "Leaving"} ${nameOf(w)}`;
+    out.push({ label, state: st, note: W.wentTo(placesSaid(ps.map((p) => p.t.money!.to[0]!))), ...at(st, ps.map((p) => p.s[0]!).filter(Boolean)) });
+  }
+  // 3: NEAR Confidential, once, the whole run's figure (every part goes through it)
+  const thr = parts.map((p) => p.s.find((x) => x.key === "intents") ?? p.s[1] ?? p.s[0]!).filter(Boolean);
+  const tst = together(thr.map((x) => x.state));
+  const total = figure(parts.map((p) => { const l = p.wallet ? undefined : legsOf(p.t.id); return l?.length ? { usd: l.reduce((n, x) => n + (dollars(x.usd) ?? NaN), 0) || undefined, about: true } : { usd: dollars(p.t.money?.usd), about: p.wallet }; }));
+  const onto = dests.filter((c) => c !== "safe").length >= 3 ? "your wallets" : placesSaid(dests);
+  out.push({ label: W.through(total), state: tst, note: (tst === "done" ? W.moving.done : tst === "waiting" ? W.moving.next : W.moving.doing)(onto), ...at(tst, thr) });
+  // 4, 5: each wallet it lands in, its share, and what the records prove of where it came from
+  for (const c of dests) {
+    const name = nameOf(c);
+    const mine = safe.filter((p) => safeTo(p).includes(c)), ins = wallets.filter((p) => p.t.money!.to[0] === c);
+    const pieces: LiveStep[] = [
+      ...mine.map((p) => p.s.find((x) => x.key === "land" && x.label.includes(name)) ?? { label: "", state: (p.t.end ? (p.t.end.ok && !p.t.end.slow ? "done" : p.t.end.slow ? "doing" : "failed") : p.s.at(-1)?.state ?? "waiting") as StepState, ...(p.s.at(-1)?.atMs !== undefined ? { atMs: p.s.at(-1)!.atMs! } : {}) }),
+      ...ins.map((p) => p.s.at(-1)!).filter(Boolean),
+    ];
+    // a part that stopped never reads as landing there: its piece failed (its own end, rule 8)
+    if ([...mine, ...ins].some((p) => p.t.end && !p.t.end.ok && !p.t.end.slow)) pieces.push({ label: "", state: "failed" });
+    const st = together(pieces.map((x) => x.state));
+    // the Safe's share is the plan's figure, an estimate (the audit's SHOULD, 7 Nov): exact only for a dollar coin paid by an
+    // exact-out quote, which no record here proves; no landing record carries an amount yet (one would win over the plan)
+    const share = figure([...mine.map((p) => ({ usd: dollars(legsOf(p.t.id)?.find((l) => l.to === c)?.usd), about: true })), ...ins.map((p) => ({ usd: dollars(p.t.money!.usd), about: true }))]);
+    const srcs = [...new Set(ins.map((p) => p.t.money!.from[0]!))];
+    const note = !ins.length ? undefined : !mine.length ? W.allFrom(andList(srcs.map(nameOf)))
+      : srcs.map((w) => { const f = figure(ins.filter((p) => p.t.money!.from[0] === w).map((p) => ({ usd: dollars(p.t.money!.usd), about: true }))); return f ? W.partFrom(f, nameOf(w)) : null; }).filter(Boolean).join(" and ") || undefined;
+    const by = LAND_BY[c] ?? "NEAR";
+    out.push({ label: st === "done" ? W.landed(name, share) : st === "waiting" ? W.lands(by, name, share) : W.landing(by, name, share), state: st, ...(note ? { note } : {}), ...at(st, pieces) });
+  }
+  // 6: done once every part ended done
+  const ok = ts.every((t) => !!t.end && t.end.ok && !t.end.slow && !t.end.unshown);
+  const end = ok ? lastAt(out) : undefined;
+  out.push(ok ? { label: end !== undefined && end > 0 ? W.doneIn(Math.round(end / 1000)) : W.done, state: "done", ...(end !== undefined ? { atMs: end } : {}) } : { label: W.notDone, state: "waiting" });
+  return out;
+}
+
+/** A job's page steps: each part's steps in turn (the Safe's part, then each wallet's), on one clock from the first
+ *  start, grouped as the person sees them (jobSteps: at most six for a two-wallet Move). One track: itself.
+ *  Pure. */
+export function joinTracks(tracks: readonly (LiveTrack | null | undefined)[]): (Pick<LiveTrack, "startMs" | "steps"> & { joined?: true }) | null {
+  const ts = tracks.filter((t): t is LiveTrack => !!t);
+  if (ts.length < 2) return ts[0] ?? null;
+  const starts = ts.map((t) => t.startMs).filter(Number.isFinite);
+  const startMs = starts.length ? Math.min(...starts) : NaN;
+  const onClock = ts.map((t) => t.steps.map((s) => (s.atMs !== undefined && Number.isFinite(t.startMs) && Number.isFinite(startMs) ? { ...s, atMs: s.atMs + t.startMs - startMs } : (({ atMs: _drop, ...rest }) => rest)(s))));
+  return { startMs, steps: jobSteps(ts, onClock), joined: true };
+}
+
+/**
+ * One Move, one job (the audit's M1-M3, 7 Nov: a two-wallet Move's row said "Move $119.33 to your SOL wallet · In your SOL
+ * wallet." with a tick while two of its parts still went in Now). The job's parts (the head first) as ONE track:
+ * - its steps every part's (joinTracks);
+ * - it ends only once EVERY part ended: all landed, "In your SOL and NEAR wallets."; one stopped, that part's end; one
+ *   merely slow (or S21's unshown) while the rest ended, that one's end (still going);
+ * - its title the job's own figure (the receipt's) to every place it goes, in the plan's order (`to`: the job's carry;
+ *   else each part's own ends);
+ * - its money every part's places.
+ * Fewer than two parts: the one track as it is. Pure: a table test.
+ */
+export function jobTrack(tracks: readonly (LiveTrack | null | undefined)[], o: { usd?: string; to?: readonly string[] } = {}): LiveTrack | null {
+  const ts = tracks.filter((t): t is LiveTrack => !!t);
+  if (ts.length < 2) return ts[0] ?? null;
+  const { end: _e, endsAt: _a, legSec: _l, measuredEndsAt: _m, next: _n, eta: _t, endMs: _x, money: _y, ...first } = ts[0]!;
+  const joined = joinTracks(ts)!;
+  const to = o.to?.length ? o.to : [...new Set(ts.flatMap((t) => t.money?.to ?? []))];
+  const where = placesSaid(to);
+  const over = (t: LiveTrack) => !!t.end && !t.end.slow && !t.end.unshown;
+  const bad = ts.find((t) => over(t) && !t.end!.ok);
+  const late = ts.find((t) => t.end && !over(t));
+  const end: LiveTrack["end"] = ts.every(over) ? (bad ? bad.end : { ok: true, line: `In ${where || "your wallets"}.` }) : ts.every((t) => t.end) ? late!.end : undefined;
+  const usd = o.usd ?? ts[0]!.money?.usd;
+  const left = ts.map((t) => t.endsAt).filter((x): x is number => x !== undefined && Number.isFinite(x));
+  const ms = ts.map((t) => t.money).filter((m): m is MoneyAt => !!m);
+  const u = (xs: string[][]) => [...new Set(xs.flat())];
+  const money: MoneyAt | undefined = ms.length ? { at: u(ms.map((m) => m.at)), from: u(ms.map((m) => m.from)), to: to.length ? [...to] : u(ms.map((m) => m.to)), ...(usd ? { usd } : {}), ...(ms.some((m) => m.going) ? { going: true as const } : {}), ...(ms.some((m) => m.unknown) ? { unknown: true as const } : {}), ...(ms.some((m) => m.unsure) ? { unsure: true as const } : {}), ...(ms.every((m) => m.proven) ? { proven: true as const } : {}) } : undefined;
+  return {
+    ...first, title: usd && where ? `Move ${usd} to ${where}` : first.title, wallets: u(ts.map((t) => t.wallets)), startMs: joined.startMs, steps: joined.steps,
+    ...(end ? { end } : {}), ...(end && bad?.next ? { next: bad.next } : {}), ...(!end && left.length ? { endsAt: Math.max(...left) } : {}), ...(money ? { money } : {}),
+  };
+}
+
+/** A Spending row's track: a job's row (its other core moves in `parts`; Activity's foldJobs, watchLive's foldInto) is the
+ *  job's ONE track (jobTrack), its own part read without them; any other row, moveTrack. */
+export function rowTrack(r: Folded & { own?: SpendingActivity["status"] }, swapWords = carried(`move:${r.id}`)?.words, lands = carried(`move:${r.id}`)?.lands): LiveTrack | null {
+  if (!r.parts?.length) return moveTrack(r, swapWords, lands);
+  const ids = new Set(r.parts.map((p) => p.id));
+  const { parts, own, ...head } = r;
+  const legs = (head.legs ?? []).filter((l) => !ids.has(l.id));
+  const self: Folded = { ...head, status: own ?? head.status };
+  if (legs.length) self.legs = legs; else delete self.legs;
+  const tracks = [moveTrack(self, swapWords, lands), ...parts.map((p) => moveTrack(p as Folded))].map((t) => (t ? withCarry(t, carried(t.id)) : t));
+  const c = carried(`move:${r.id}`);
+  return jobTrack(tracks, { ...(c?.usd ? { usd: c.usd } : {}), ...(c?.to?.length ? { to: c.to } : {}) });
 }
 
 /**
@@ -323,35 +513,146 @@ export function moveTrack(r: Folded, swapWords = carried(`move:${r.id}`)?.words,
   const kind: LiveKind = swapHome || swapWords ? "swap" : "move";
   const usd = r.pending && !r.askedUsd ? legs.reduce((n, l) => n + (Number(l.usd) || 0), 0).toFixed(2) : onTo(r);
   const title = swapWords ?? (swapHome || (site && r.kind === "top-up" && r.siteName) ? r.words : /^\d+(\.\d+)?$/.test(usd) ? `${site ? "Add" : "Move"} $${Number(usd).toFixed(2)} to ${where}` : r.words);
-  return { id: `move:${r.id}`, kind, title, wallets: [...new Set([...from, ...to, "near"])], startMs: Number.isFinite(startMs) ? startMs : NaN, steps, ...(end ? { end } : {}), ...quoted(r, startMs, !!end, kind === "move" ? routeSec(r.kind, from, to) : undefined) };
+  const first = !!bad && (r.kind === "put-away" ? bad !== r || legs.length === 0 : bad === r);
+  const money = routeMoney({ from, to, usd: /^\d+(\.\d+)?$/.test(usd) ? `$${Number(usd).toFixed(2)}` : undefined, arrived, mid: arriving, left, first, bad: bad ? { status: bad.status, note: bad.note ?? bad.words } : undefined, mover: "near" });
+  const base = { id: `move:${r.id}`, kind, title, wallets: [...new Set([...from, ...to, "near"])], startMs: Number.isFinite(startMs) ? startMs : NaN, money };
+  // a stopped Move from wallets (the reviewer's A-6/A-28, the audit's money truth): one title, its parts' own truth, its taps
+  if (bad && end && kind === "move" && !site && r.kind !== "top-up") {
+    const parts = stopPartsOf(r, legs);
+    // Try again is the face's to give: only when the parts prove nothing moved (moveStopFace)
+    const again = stopAgain(r, parts, to);
+    const face = moveStopFace(parts, { line: end.line, ...(again ? { again } : {}) });
+    if (face.nothingMoved) {
+      // nothing moved: no steps to tick (the reviewer: ticked plainly or dropped), the body, its cause, Try again and Close
+      return { ...base, money: { ...money, at: from, proven: true }, bar: "Move", steps: [], end: { ok: false, line: face.body, head: face.title, whole: true, ...(face.cause ? { cause: face.cause } : {}), ...(face.row ? { row: face.row } : {}) }, next: face.buttons };
+    }
+    return { ...base, bar: "Move", steps, end: { ...end, head: face.title } };
+  }
+  return { ...base, steps, ...(end ? { end } : {}), ...quoted(r, startMs, !!end, kind === "move" ? routeSec(r.kind, from, to) : undefined) };
 }
 
-/** Where a Send left from (QA's crawl, 5 Nov: every Send said "Leaving your Safe"): a wallet's send its wallet
- *  (its coin as send-to.ts LANDS_AS names it), the private balance's share the private balance, the Safe's the Safe. */
-export const sendFrom = (m: Pick<Movement, "id" | "from">, f = m.from ?? ""): string =>
-  m.id.startsWith("hidden-row:") ? /(sol|hood)[.-][0-9a-z]*\.?omft/.exec(f)?.[1] ?? (f.includes(":56_") ? "bsc" : "row") : m.id.startsWith("pocket-send:") || f == "private" ? "private" : "safe";
+/** Where a Send left from (QA's crawl, 5 Nov: every Send said "Leaving your Safe"): format.ts sendFrom, the one rule
+ *  Activity's row and its page read too (the audit's MUST, 7 Nov: never two words for one Send). */
+export { sendFrom };
+
+/** A stopped Move's part, as its record says it: never started, refused before anything was signed, went (left its
+ *  wallet: landed, stopped on the way, came back), or unsure (its money unknown: on its way, or waiting with no word).
+ *  `at`: where its money was (a wallet key: safe, private, sol, hood, near, bsc); `why`: its refusal's own words. */
+export interface StopPart { at: string; state: "not-started" | "refused" | "went" | "unsure"; why?: string }
+/** A stopped Move's face (the UI reviewer's build, 6 Nov, A-6/A-28): one title, the body, the cause as one plain line,
+ *  the taps (the first lit), and the Jobs row's line. */
+export interface StopFace { title: string; body: string; cause?: string; row?: string; buttons: StopNext[]; nothingMoved: boolean }
+/** The reviewer's words (6 Nov): "Move stopped", "Nothing moved. Your money is still in your SOL wallet and your ETH (RH)
+ *  wallet.", "Those wallets don't hold that much.", "Try again", "Close", the row's "Nothing moved. Your money is safe.". */
+export const STOP_FACE = {
+  title: "Move stopped",
+  still: (names: string) => `Nothing moved. Your money is still in ${names}.`,
+  row: "Nothing moved. Your money is safe.",
+  fundsMany: "Those wallets don't hold that much.",
+  /** provisional: one wallet, by name (rule 8: never "that wallet") */
+  fundsOne: (name: string) => `${name.charAt(0).toUpperCase()}${name.slice(1)} doesn't hold that much.`,
+  close: "Close",
+} as const;
+/** A place by the app's name for it, in a sentence: "your SOL wallet", "your Safe", "Private". */
+const STOP_NAME: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+const andList = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+/** A refusal that says the wallet hadn't enough (the core's and the Sim's words). */
+const FUNDS = /doesn't (have|hold) (that|enough)|not enough|too little|isn't enough/i;
+/** A cause fit to show as is: one plain sentence, no machine text (no brackets, ";", "·", "Not signed" or chain names). */
+const PLAIN_CAUSE = (w: string) => w.length <= 120 && !/[()[\];·]|Not signed|Solana|Robinhood|BNB Chain|Ethereum/i.test(w);
+/**
+ * A stopped Move's face, from its parts (the audit's money truth, 6 Nov, over the reviewer's words): "Nothing moved" and Try
+ * again ONLY when every part's record proves nothing moved (each never started, or refused before anything was signed),
+ * its money still where it was, each place by name. A part that went, or one whose money is unknown, keeps the job's
+ * own words (`line`) and its own taps (`next`), never a Try again: a re-tap could pay twice. Pure: a table test.
+ */
+export function moveStopFace(parts: readonly StopPart[], o: { line: string; next?: StopNext[]; again?: StopGo }): StopFace {
+  const nothingMoved = parts.length > 0 && parts.every((p) => p.state === "not-started" || p.state === "refused");
+  if (!nothingMoved) return { title: STOP_FACE.title, body: o.line, buttons: (o.next ?? []).filter((n) => n.go.kind !== "move"), nothingMoved };
+  const places = [...new Set(parts.map((p) => p.at))];
+  const names = places.map((w) => STOP_NAME[w] ?? "your wallet");
+  const whys = [...new Set(parts.filter((p) => p.state === "refused" && p.why).map((p) => p.why!.split(" · ")[0]!.trim()))];
+  const funds = whys.length > 0 && whys.every((w) => FUNDS.test(w));
+  const cause = funds ? (names.length > 1 ? STOP_FACE.fundsMany : STOP_FACE.fundsOne(names[0]!))
+    : whys.length === 1 && PLAIN_CAUSE(whys[0]!) ? `${whys[0]!.replace(/[.\s]+$/, "")}.` : undefined;
+  const buttons: StopNext[] = [...(o.again ? [{ label: STOP_WORDS.tryAgain, go: o.again }] : []), { label: STOP_FACE.close, go: { kind: "close" } }];
+  return { title: STOP_FACE.title, body: STOP_FACE.still(andList(names)), ...(cause ? { cause } : {}), row: STOP_FACE.row, buttons, nothingMoved };
+}
+/** A row's or leg's record as a StopPart (moveStopFace): refused is its own word that nothing was signed; a move that
+ *  landed, stopped on the way or came back went; on its way, or waiting with no word, is unknown. */
+const stopPart = (x: SpendingActivity, at: string): StopPart =>
+  x.status === "refused" ? { at, state: "refused", ...(x.note ?? x.words ? { why: x.note ?? x.words } : {}) } : MOVED(x.status) ? { at, state: "went" } : { at, state: "unsure" };
+/** A Move from wallets (moveTrack's own branch: a Take out home, a wallet to a wallet, Make ready) as its parts: a Take
+ *  out's legs in (each from its wallet; with none, the NEAR wallet's own move home), a wallet's move its own leg out of
+ *  that wallet, then its legs on. Pure. */
+export function stopPartsOf(r: Folded, legs: readonly SpendingActivity[]): StopPart[] {
+  if (r.kind === "put-away") return legs.length ? legs.map((l) => stopPart(l, l.network ?? "near")) : [stopPart(r, r.network ?? "near")];
+  if (r.kind === "move") return [stopPart(r, r.network ?? "near"), ...legs.map((l) => stopPart(l, "near"))];
+  return [stopPart(r, "near")];
+}
+/** The Try again of a Move whose parts prove nothing moved: Move again from the same wallets to the same place; one
+ *  wallet's own dollars, never a figure for a split or after a refusal for funds (it would only be refused again). */
+function stopAgain(r: Folded, parts: readonly StopPart[], to: string[]): StopGo | undefined {
+  if (r.kind === "ready") return undefined;
+  const from = [...new Set(parts.map((p) => p.at))];
+  const dest = r.kind === "put-away" ? "safe" : to[0];
+  if (!dest) return undefined;
+  const funds = parts.some((p) => p.why && FUNDS.test(p.why));
+  const one = from.length === 1 && !funds && /^\d+(\.\d+)?$/.test(onTo(r)) ? { usd: Number(onTo(r)).toFixed(2) } : {};
+  return { kind: "move", to: dest, ...(from.length === 1 ? { from: from[0]! } : {}), ...one };
+}
+
+/** Where a Move through the NEAR wallet has the money (moveTrack's routes, safeMove), by its reads: landed there; once the
+ *  first part landed (`mid`), on its way to the wallets; once it left (`left`), on its way to the NEAR wallet; before,
+ *  still where it was. Stopped: a first part refused or that never left is still at its start; a later part that never
+ *  started (float-jobs NOT_STARTED: "... your NEAR wallet") left it in the NEAR wallet; any other stop is unknown (never a
+ *  guess, never an automatic step). Pure: a table test. */
+export function routeMoney(o: { from: string[]; to: string[]; usd?: string | undefined; arrived: boolean; mid: boolean; left: boolean; first: boolean; bad?: { status: string; note: string } | undefined; mover: string }): MoneyAt {
+  const base = { from: o.from, to: o.to, ...(o.usd ? { usd: o.usd } : {}) };
+  if (o.bad) {
+    // unsure (audit, 7 Nov): the leg's own words name where it may be; the page says that place, never a guess
+    const maybe = unsureAt(o.bad.note);
+    if (maybe) return { ...base, at: [maybe], unknown: true, unsure: true };
+    const stayed = o.bad.status === "refused" || /never left|so the money stayed/i.test(o.bad.note);
+    if (o.first) return stayed ? { ...base, at: o.from, proven: true } : { ...base, at: o.from, unknown: true };
+    return stayed || /your NEAR wallet/i.test(o.bad.note) ? { ...base, at: [o.mover], proven: true } : { ...base, at: o.to, unknown: true };
+  }
+  if (o.arrived) return { ...base, at: o.to, proven: true };
+  if (o.mid) return { ...base, at: o.to, going: true };
+  if (o.left) return { ...base, at: [o.mover], going: true };
+  return { ...base, at: o.from };
+}
 
 /** A Move paid from Private (moveTrack): the Safe's fill when Private was short, then NEAR Confidential paying each
  *  wallet (job-steps.ts privateMoveSteps); each ticks only on the ledger's word (the payment's own status). */
-function privateMove(r: Folded, to: string[], at: (x: SpendingActivity) => number, swapWords?: string, lands?: string): LiveTrack {
+function privateMove(r: Folded, to0: string[], at: (x: SpendingActivity) => number, swapWords?: string, lands?: string): LiveTrack {
+  // the plan's legs (move-run's carry): the Safe's part pays the NEAR wallet too, which the row's `goesTo` (chains only)
+  // never names (the audit's M4, 7 Nov: the Safe's $101.48 to the NEAR wallet had no step); each wallet in the plan's order
+  const planLegs = swapWords || r.site ? undefined : carried(`move:${r.id}`)?.legs;
+  const to = planLegs?.length ? PLACE_ORDER.filter((p) => to0.includes(p) || planLegs.some((l) => l.to === p)) : to0;
   const onward = to.filter((c) => c !== "safe");
   // a site's Add names the site's wallet, as its row does ("Moving $10.00 to your pump.fun wallet")
   // the row says "Putting $5.00 in your pump.fun wallet" (Sim crawl, 5 Nov: "in" missed, so the job named your SOL wallet)
   const site = r.site ? /(?:to|in) (your .+ wallet)$/.exec(r.words)?.[1] : undefined;
   // a Swap names what NEAR Intents swaps it for, from its own name ("Swap $10 of USDC for SOL")
   const swapFor = swapWords ? /\bfor ([A-Za-z0-9$.]{1,12})$/.exec(swapWords)?.[1] : undefined;
-  const words = privateMoveSteps(onward.length ? onward : ["near"], { fill: !!r.fill, ...(site ? { where: site } : {}), ...(swapFor ? { swapFor } : {}) });
+  // the plan's wallets by name ("NEAR Confidential paid your SOL and NEAR wallets."), never "your wallets"
+  const named = !site && planLegs?.length && onward.length > 1 ? placesSaid(onward) : undefined;
+  const words = privateMoveSteps(onward.length ? onward : ["near"], { fill: !!r.fill, ...(site ? { where: site } : named ? { where: named } : {}), ...(swapFor ? { swapFor } : {}) });
   const ended = ENDED(r.status), done = r.status === "done";
   // every step shown, each ticked in order and only on its read (rule 11): the fill on the core's own word, NEAR
   // Confidential's payment on the ledger's end of each payment (paidDone), the landing on the wallet's chain read (the
   // row's Done: the core's landed round). Stopped: the step it stopped at, failed; the rest waiting.
   const payAt = r.fill ? 1 : 0;
   const reached = done ? words.length : r.paidDone ? payAt + 1 : r.fill && r.fill !== "done" ? 0 : payAt;
-  // a landing step per chain (the copy review's ruling), each done on its own wallet's chain read (`landed`), or the row's Done
-  const landed = r.landed ?? [];
+  // a landing step per chain (the copy review's ruling), each done on its own wallet's chain read (`landed`), or the row's Done; a
+  // part that never reached its wallet (`missed`: stopped, never started, came back) never ticks (the audit's ruling, 6 Nov):
+  // failed beside the parts that went, waiting once the whole row ended (its paying step says it failed)
+  const landed = r.landed ?? [], missed = r.missed ?? [];
   const steps: LiveStep[] = words.map((w, i) => {
+    const miss = !!w.chain && missed.includes(w.chain as never);
     const state: StepState = i > payAt
-      ? (done || (!!w.chain && landed.includes(w.chain as never)) ? "done" : reached > payAt ? (ended ? "failed" : "doing") : "waiting")
+      ? (miss ? (ended ? "waiting" : "failed") : done || (!!w.chain && landed.includes(w.chain as never)) ? "done" : reached > payAt ? (ended ? "failed" : "doing") : "waiting")
       : i < reached ? "done" : i === reached ? (ended ? "failed" : "doing") : "waiting";
     // a step still to come says "Then …", never its done words with no tick ("NEAR Confidential paid …")
     return { key: w.key, label: stepLabel(w, state), state };
@@ -360,7 +661,8 @@ function privateMove(r: Folded, to: string[], at: (x: SpendingActivity) => numbe
   const payout = swapWords ? LEG_SEC.privateSwap : onward.length ? LEG_SEC.privateOut : MEASURED_SEC.safeToNear;
   const legSec = [...(r.fill ? [0] : []), payout - LEG_SEC.read, ...words.slice(payAt + 1).map((_, i) => (i === 0 ? LEG_SEC.read : 0))];
   const startMs = at(r);
-  const where = site ?? many(onward.length ? onward : ["near"]);
+  // the plan's wallets by name, in its order ("your SOL and NEAR wallets"), never "your wallets"
+  const where = site ?? named ?? many(onward.length ? onward : ["near"]);
   const plain = (x: SpendingActivity) => `${(x.note ?? x.words).replace(/[.\s]+$/, "")}.`;
   // it came back (NEAR Confidential's refund lands in Private, the core's PRIVATE_BACK): rule 8, who didn't pay which wallet,
   // the figure back in Private, and a next tap that works (QA's Sim crawl, 5 Nov, 081: none, and Private had no
@@ -369,12 +671,57 @@ function privateMove(r: Folded, to: string[], at: (x: SpendingActivity) => numbe
   const back = ended && (!r.note || /sent it back/i.test(r.note));
   // landed, and its reads failed to show it (float-private missedRead): still on its way, saying so (audit, 5 Nov)
   const end = ended ? (back ? { ok: false, line: STOP_WORDS.movePaid(where, usd), whole: true as const } : { ok: false, line: plain(r) }) : done ? { ok: true, line: r.note ? plain(r) : swapWords && lands ? swapCame(lands, where) : `In ${where}.` } : r.note === LANDED_UNREAD ? { ok: false, slow: true as const, line: LANDED_UNREAD } : undefined;
-  const again = ended && !site && !swapWords && onward.length === 1 ? [{ label: STOP_WORDS.tryAgain, go: { kind: "move" as const, to: onward[0]!, ...(usd ? { usd: usd.slice(1) } : {}) } }] : [];
+  // Try again only when a re-tap can't pay twice: never after a part whose money is unknown (`unsure`, the ledger's own
+  // flag; the audit's ruling, 6 Nov), whose words already say "Check Activity before you try again."
+  const again = ended && !r.unsure && !r.onWay && !site && !swapWords && onward.length === 1 ? [{ label: STOP_WORDS.tryAgain, go: { kind: "move" as const, to: onward[0]!, ...againUsd(r, onward[0]!) } }] : [];
   const next: StopNext[] = ended ? [...again, { label: STOP_WORDS.openPrivate, go: { kind: "private" } }] : [];
   // a Swap from the Safe paid from Private is the person's Swap, never "Move" (QA's Sim crawl, 5 Nov); a site's
   // Add paid from Private is the person's Add (5 Nov: its Activity row said "Move $10.00 ...")
   const title = swapWords ?? (usd ? `${r.site ? "Add" : "Move"} ${usd} to ${where}` : r.words);
-  return { id: `move:${r.id}`, kind: swapWords ? "swap" : "move", title, wallets: [...new Set(["safe", ...to, "near"])], startMs: Number.isFinite(startMs) ? startMs : NaN, steps, ...(end ? { end } : {}), ...(next.length ? { next } : {}), ...quoted(r, startMs, !!end, payout), ...(end ? {} : { legSec }) };
+  const money = privateMoney(r, onward.length ? onward : ["near"], { back, usd });
+  // what the Swap brought in: the record holds no landed coin figure, so only the sheet's quote, said as "about" (J2-4)
+  const got = swapWords && lands ? { got: { figure: lands, about: true } } : {};
+  return { id: `move:${r.id}`, ...got, kind: swapWords ? "swap" : "move", title, wallets: [...new Set(["safe", ...to, "near"])], startMs: Number.isFinite(startMs) ? startMs : NaN, steps, ...(end ? { end } : {}), ...(next.length ? { next } : {}), ...quoted(r, startMs, !!end, payout), ...(end ? {} : { legSec }), money };
+}
+
+
+/**
+ * Where a Move paid from Private has the money, by its own reads (the job page's money line; the owner's HARD rule, 6 Nov:
+ * the line follows the ticks). Landed (the row's Done, a chain read): there. Came back (1Click's REFUNDED, the core's
+ * PRIVATE_BACK): Private. Paid (NEAR Confidential's word, `paidDone`) and not read landed: on its way to the wallets. A part
+ * whose money the ledger can't place (`unsure`, `onWay`): unknown, never a place. Paid, its landing's reads failing
+ * (LANDED_UNREAD, the bug of 6 Nov): on its way to the wallet, as the ticks say. Before the payment: Private once the Safe's fill is in (or none was needed), else still the Safe. Pure: a table.
+ */
+/** The place unsureIn's words name ("either in your Safe or still with NEAR Intents"), as its wallet key (audit, 7 Nov: a
+ *  Move whose Safe leg ended FAILED is unsure in the Safe, never "Private" by default). None: no such words. Pure. */
+export function unsureAt(note: string | undefined): string | undefined {
+  const said = note && /either in (Private|your Safe|your SOL wallet|your ETH \(RH\) wallet|your NEAR wallet|your BNB wallet) or still with /.exec(note)?.[1];
+  return said ? ({ Private: "private", "your Safe": "safe", "your SOL wallet": "sol", "your ETH (RH) wallet": "hood", "your NEAR wallet": "near", "your BNB wallet": "bsc" } as Record<string, string>)[said] : undefined;
+}
+export function privateMoney(r: Pick<SpendingActivity, "status" | "note" | "fill" | "paid" | "paidDone" | "unsure" | "onWay" | "landed" | "missed" | "missedUsd">, to: string[], o: { back: boolean; usd: string | null }): MoneyAt {
+  const base = { from: paidFrom(r), to, ...(o.usd ? { usd: o.usd } : {}) };
+  const ended = ENDED(r.status);
+  if (r.status === "done") return { ...base, at: to, proven: true };
+  if (r.unsure) return { ...base, at: [unsureAt(r.note) ?? "private"], unknown: true, unsure: true };
+  if (r.onWay) return { ...base, at: to, unknown: true };
+  if (ended && o.back) return { ...base, at: ["private"], proven: true };
+  const missed = (r.missed ?? []).map(String);
+  if (r.paidDone) {
+    const going = to.filter((c) => !missed.includes(c) && !(r.landed ?? []).map(String).includes(c));
+    // stopped after the payment with no read where it is: unknown, never "lost" and never a guess
+    if (ended) return { ...base, at: going.length ? going : to, unknown: true };
+    return going.length ? { ...base, at: going, going: true } : { ...base, at: to, proven: true };
+  }
+  if (r.fill && r.fill !== "done") return { ...base, at: ["safe"], ...(ended ? { proven: true as const } : {}) };
+  return { ...base, at: ["private"], ...(ended ? { proven: true as const } : {}) };
+}
+
+/** A stopped Move's Try again to its one wallet (audit, 6 Nov): the dollars of the part that missed it, its own (`missedUsd`),
+ *  when it is the one part that missed; a split that missed more than that wallet, or no record of it: no figure. Never
+ *  the row's whole figure (it prefilled SOL with a SOL + NEAR wallet Move's sum). Pure: a table test. */
+export function againUsd(r: Pick<SpendingActivity, "missed" | "missedUsd">, to: string): { usd?: string } {
+  const missed = r.missed ?? [];
+  return missed.length === 1 && missed[0] === to && r.missedUsd && Number(r.missedUsd) >= 0.01 ? { usd: Number(r.missedUsd).toFixed(2) } : {};
 }
 
 /** A Move from the Safe (moveTrack): Your Safe signed, in your NEAR wallet, NEAR Intents to the chain, that chain
@@ -409,8 +756,12 @@ function safeMove(r: Folded, legs: SpendingActivity[], to: string[], all: Spendi
   const etaSec = onward.length ? MEASURED_SEC.safeToChain : r.etaSeconds ?? MEASURED_SEC.safeToNear;
   const eta = etaLine(onward.length ? { measuredSec: etaSec } : r.etaSeconds ? { quotedSec: etaSec } : { measuredSec: etaSec }) ?? undefined;
   const title = /^\d+(\.\d+)?$/.test(onTo(r)) ? `Move $${Number(onTo(r)).toFixed(2)} to ${where}` : r.words;
-  return { id: `move:${r.id}`, kind: "move", title, wallets: [...new Set(["safe", ...to, "near"])], startMs: Number.isFinite(startMs) ? startMs : NaN, steps, ...(end ? { end } : {}), ...(eta && !end ? { eta, ...(Number.isFinite(startMs) ? { endsAt: startMs + etaSec * 1000 } : {}) } : {}) };
+  const money = routeMoney({ from: ["safe"], to: onward.length ? onward : ["near"], usd: /^\d+(\.\d+)?$/.test(onTo(r)) ? `$${Number(onTo(r)).toFixed(2)}` : undefined, arrived, mid: inNear, left: signed, first: bad === r, bad: bad ? { status: bad.status, note: bad.note ?? bad.words } : undefined, mover: "near" });
+  return { id: `move:${r.id}`, money, kind: "move", title, wallets: [...new Set(["safe", ...to, "near"])], startMs: Number.isFinite(startMs) ? startMs : NaN, steps, ...(end ? { end } : {}), ...(eta && !end ? { eta, ...(Number.isFinite(startMs) ? { endsAt: startMs + etaSec * 1000 } : {}) } : {}) };
 }
+
+/** A Send's legs folded onto its steps (one step to a NEAR account: the payout and its read are that step's). Pure. */
+export const legsFor = (legs: readonly number[], n: number): number[] => (legs.length <= n ? [...legs] : [...legs.slice(0, n - 1), legs.slice(n - 1).reduce((a, b) => a + b, 0)]);
 
 /** A Send, from the ledger's movement: it left, it goes through NEAR privately, it's paid (1Click's status says). */
 /** `usd`: the dollars the Send was made for at the tap (job-carry.ts): its row keeps them to its end (Jobs hunt M5). */
@@ -420,7 +771,11 @@ export function sendTrack(m: Movement, fromWallet?: string, payee = "them", usd 
   if (!(m.kind === "pay" || m.kind === "withdraw" || m.kind === "transfer" || (m.kind === "private" && m.from !== "private" && m.from !== "oldWords"))) return null;
   if (m.status === "waiting") return null; // held by the account's rules: the Waiting screen says it, not a tracker
   const from = nameOf(fromWallet ?? sendFrom(m));
-  const labels = [`Leaving ${from}`, m.private ? CONFIDENTIAL_STEP : "On its way", `Paid to ${payee}`];   // audit H1: only what's true
+  // to a NEAR account the protocol's payment IS the paying (the copy review's J2-4, 8 Nov: "Then NEAR Confidential pays alice.near." and
+  // "Then NEAR pays alice.near." were one step said twice; bare "NEAR" never): one step, its own payer by name. To another
+  // chain, that chain pays it on (its own step, named)
+  const toNear = !m.toChain || m.toChain === "near";
+  const labels = toNear ? [`Leaving ${from}`, `Paid to ${payee}`] : [`Leaving ${from}`, m.private ? CONFIDENTIAL_STEP : "On its way", `Paid to ${payee}`];   // audit H1: only what's true
   const startMs = ms(m.startedAtIso);
   // D137 honest: it left once the chain has its transaction (an explorer link), never on the ask alone; a problem with
   // nothing sent and the money where it was is a step never signed
@@ -430,12 +785,13 @@ export function sendTrack(m: Movement, fromWallet?: string, payee = "them", usd 
   // paying bob.near"; done, where it is ("Through NEAR Confidential", "Paid to bob.near")
   const by = m.private ? "NEAR Confidential" : "NEAR Intents";
   // (the copy review's ruling, 5 Nov: "NEAR Confidential is paying 0x7D06…7e3D."; a step not begun, "Then …")
-  const lands = m.toChain && m.toChain !== "near" ? CHAIN[m.toChain] ?? "That chain" : "NEAR";
-  const named: Record<number, { doing: string; next: string }> = { 1: { doing: `${by} is paying ${payee}.`, next: `Then ${by} pays ${payee}.` }, 2: { doing: `${lands} is paying ${payee}.`, next: `Then ${lands} pays ${payee}.` } };
-  const steps = firstStep(m.status === "done" ? progress(labels, 3) : m.status === "moving" ? progress(labels, sent ? 1 : 0) : progress(labels, stayed ? 0 : 1, true), from)
+  const lands = toNear ? undefined : CHAIN[m.toChain!] ?? "That chain";
+  const named: Record<number, { doing: string; next: string }> = { 1: { doing: `${by} is paying ${payee}.`, next: `Then ${by} pays ${payee}.` } };
+  if (lands) named[2] = { doing: `${lands} is paying ${payee}.`, next: `Then ${lands} pays ${payee}.` };
+  const steps = firstStep(m.status === "done" ? progress(labels, labels.length) : m.status === "moving" ? progress(labels, sent ? 1 : 0) : progress(labels, stayed ? 0 : 1, true), from)
     .map((s, i) => (!named[i] || s.state === "done" ? s : { ...s, label: s.state === "waiting" ? named[i]!.next : named[i]!.doing }));
   if (steps[0]!.state === "done") steps[0]!.atMs = 0;
-  if (m.status === "done" && Number.isFinite(ms(m.updatedAtIso))) steps[2]!.atMs = Math.max(0, ms(m.updatedAtIso) - startMs);
+  if (m.status === "done" && Number.isFinite(ms(m.updatedAtIso))) steps.at(-1)!.atMs = Math.max(0, ms(m.updatedAtIso) - startMs);
   const end = m.status === "done" ? { ok: true, line: `Paid to ${payee}.` }
     // rule 8 (Sim test: "Your money is where it left from."): who didn't pay, the figure, the place by name. A private
     // payment's refund lands in Private (private-pay.ts refundTo: the pocket); any other where it left from
@@ -444,11 +800,49 @@ export function sendTrack(m: Movement, fromWallet?: string, payee = "them", usd 
       : m.status === "problem" ? { ok: false, line: [m.problem?.whatHappened, m.problem?.money && "where" in m.problem.money && m.problem.money.where ? `Your money is ${m.problem.money.where}.` : null].filter(Boolean).join(" ") || "It didn't go. Activity shows where the money is." } : undefined;
   // the time left: NEAR Intents' own quote where the movement has one, else the Send's legs (job-steps.ts sendLegs, the
   // receipt's own sum), re-counted as each step ticks on its read (QA's Sim re-check: "58 s left", then Done at once)
-  const toNear = !m.toChain || m.toChain === "near";
   const row = fromWallet && fromWallet !== "safe" && fromWallet !== "private" ? fromWallet : undefined;
-  const eta = end ? {} : typeof m.etaSeconds === "number" && m.etaSeconds > 0 && Number.isFinite(startMs) ? { endsAt: startMs + m.etaSeconds * 1000 } : { legSec: sendLegs({ row, toNear }) };
+  const eta = end ? {} : typeof m.etaSeconds === "number" && m.etaSeconds > 0 && Number.isFinite(startMs) ? { endsAt: startMs + m.etaSeconds * 1000 } : { legSec: legsFor(sendLegs({ row, toNear }), steps.length) };
   return { id: `send:${m.id}`, kind: "send", title: m.label ?? (usd ? `Send ${usd} to ${payee}` : coinOf(m.from) && m.amount ? `Send ${m.amount} ${coinOf(m.from)} to ${payee}` : `Send to ${payee}`), wallets: [fromWallet ?? "safe"], startMs, steps, ...(end ? { end } : {}),
     ...(m.status === "refunded" ? { next: [m.private ? { label: STOP_WORDS.openPrivate, go: { kind: "private" as const } } : { label: STOP_WORDS.sendAgain, go: { kind: "send" as const, wallet: fromWallet ?? "safe" } }] } : {}), ...eta };
+}
+
+/** Private's way home (Private.tsx homeFromPrivate; the audit's MUST, 8 Nov: it made no Jobs row): the core moves each coin on
+ *  its own (ledger.fromPrivate, kind "private" from "private"), the page names the coins' movements as parts of its one
+ *  job (job-carry `job`), and this is that job's ONE track, under the job's own starting id, so its row goes on in place
+ *  (job-start made([job.id])): going while any coin is on its way, done once every coin is in the Safe. */
+export const HOME_TRACK_WORDS = {
+  title: PRIVATE_HOME_TITLE,
+  leaving: "Leaving Private",
+  doing: "NEAR Confidential is moving it to your Safe.",
+  next: "Then NEAR Confidential moves it to your Safe.",
+  inSafe: "In your Safe",
+  landed: "In your Safe.",
+  stayed: "It's still in Private.",
+  part: "Part of it is in your Safe. The rest is still in Private.",
+} as const;
+/** A movement out of Private to the Safe (the ledger's private-pay.ts fromPrivate and the Sim's own). */
+export const isHomeMove = (m: Pick<Movement, "kind" | "from">): boolean => m.kind === "private" && m.from === "private";
+export function homeTracks(movements: readonly Movement[], jobOf: (id: string) => string | undefined = (id) => carried(`send:${id}`)?.job, usdOf: (job: string) => string | undefined = (job) => carried(job)?.usd): LiveTrack[] {
+  const jobs = new Map<string, Movement[]>();
+  for (const m of movements) { if (!isHomeMove(m)) continue; const j = jobOf(m.id); if (j) jobs.set(j, [...(jobs.get(j) ?? []), m]); }
+  const w = HOME_TRACK_WORDS;
+  return [...jobs].map(([job, parts]) => {
+    const done = parts.filter((m) => m.status === "done").length;
+    const ended = parts.every((m) => m.status === "done" || m.status === "refunded" || m.status === "problem");
+    const ok = ended && done === parts.length;
+    const at = ok ? 3 : 1;
+    const state = (i: number): LiveStep["state"] => (i < at ? "done" : i > at ? "waiting" : ended ? "failed" : "doing");
+    // the middle step names who does the work while it runs (rule 11), "Then …" before it, the place once done
+    const label = (i: number): string => (i === 0 ? w.leaving : i === 2 ? w.inSafe : state(1) === "doing" ? w.doing : state(1) === "waiting" ? w.next : CONFIDENTIAL_STEP);
+    const steps: LiveStep[] = [0, 1, 2].map((i) => ({ label: label(i), state: state(i) }));
+    steps[0]!.atMs = 0;
+    const startMs = Math.min(...parts.map((m) => ms(m.startedAtIso)));
+    const last = Math.max(...parts.map((m) => ms(m.updatedAtIso)));
+    if (ok && Number.isFinite(last) && Number.isFinite(startMs)) steps[2]!.atMs = Math.max(0, last - startMs);
+    const end = ok ? { ok: true, line: w.landed } : ended ? { ok: false, line: done ? w.part : w.stayed, whole: true as const } : undefined;
+    const usd = usdOf(job);
+    return { id: job, kind: "move" as const, title: w.title, wallets: ["safe"], startMs, steps, ...(end ? { end } : { legSec: legsFor(sendLegs({ toNear: true }), steps.length) }), ...(usd ? { usd } : {}) };
+  });
 }
 
 /** The test Activity centre (3 Nov): "Move $3.00 to your SOL wallet" stuck on "Arriving…" for nearly three hours. A move
@@ -474,7 +868,9 @@ export const stillGoing = (t: LiveTrack): boolean => !t.end || t.end.slow === tr
 export const DONE_SHOWN_MS = 2 * 60_000;
 /** The tracks to show now: everything still going, and what ended in the last two minutes. Newest first. */
 export function liveNow(tracks: readonly LiveTrack[], now: number): LiveTrack[] {
-  return tracks.filter((t) => !t.end || t.end.unshown || (t.endMs ?? now) > now - DONE_SHOWN_MS).sort((a, b) => b.startMs - a.startMs);
+  // a slow one is still going (stillGoing): it stays shown until it ends (bug report, 6 Nov: dropped after 2 min, its
+  // place on Home went to the centre's "stopped" copy)
+  return tracks.filter((t) => stillGoing(t) || t.end?.unshown || (t.endMs ?? now) > now - DONE_SHOWN_MS).sort((a, b) => b.startMs - a.startMs);
 }
 
 /** One line for a card: each step with its mark and time, "Left your SOL wallet ✓ 0:04 · Through NEAR…". */
@@ -500,13 +896,13 @@ export type LiveWatch = (() => void) & { poke: () => void };
 const watching = new Set<() => void>();
 export const pokeLive = (): void => { for (const read of watching) read(); };
 
-export function watchLive(bridge: Bridge, inputs: () => { adds: AddOnWay[]; movements: Movement[] }, on: (t: LiveTrack[], covered: ReadonlySet<string>, /** what the Activity centre must hear: every track this phone saw going, until its end was told */ tell?: LiveTrack[], /** tracks seen going, then gone from every list for GONE_AFTER_MS: the centre ends them */ gone?: string[]) => void, words: (id: string) => string | undefined = () => undefined, /** a Swap's coin and figure, by its row's id */ lands: (id: string) => string | undefined = () => undefined): LiveWatch {
+export function watchLive(bridge: Bridge, inputs: () => { adds: AddOnWay[]; movements: Movement[] }, on: (t: LiveTrack[], covered: ReadonlySet<string>, /** what the Activity centre must hear: every track this phone saw going, until its end was told */ tell?: LiveTrack[], /** tracks seen going, then gone from every list for GONE_AFTER_MS: the centre ends them */ gone?: string[], /** a job's parts, now in its one track: their own tasks go (dropMerged) */ merged?: string[]) => void, words: (id: string) => string | undefined = () => undefined, /** a Swap's coin and figure, by its row's id */ lands: (id: string) => string | undefined = () => undefined): LiveWatch {
   let live = true;
   let seen: Seen = {};
   /** Each track's step states as last marked (the crawl's step:<key>:<state>, once per change). */
   const marked = new Map<string, string>();
   const goneSince = new Map<string, number>();
-  let rows: SpendingActivity[] = [];
+  let rows: Folded[] = [];
   // a site wallet's Take outs (site-back.ts): reading them also sends a landed first leg on home, so a reload or a
   // closed app resumes one with no tap (bug report, 5 Nov)
   let backs: SiteBack[] = [];
@@ -528,13 +924,17 @@ export function watchLive(bridge: Bridge, inputs: () => { adds: AddOnWay[]; move
     // never a "Send to …" row of their own (Sim re-check, 5 Nov: one Swap was three Home lines; a Sim walk:
     // "Sent to the address you gave" for a Move's leg), as Activity's list already leaves them out (activity-rows.ts `paid`)
     const paid = new Set(rows.flatMap((r) => r.paid ?? []));
-    const raw = [...adds.map((a) => addTrack(a)), ...rows.map((r) => moveTrack(r, words(r.id), lands(r.id))), ...backs.filter((b) => !(ms(b.back.startedAtIso) <= now - ROWS_FOR_MS)).map((b) => backTrack(b, now)), ...movements.filter((m) => ms(m.startedAtIso) > hour && !paid.has(m.id)).map((m) => sendTrack(m, sendFrom(m), payeeWords(m.to ?? ""), carried(`send:${m.id}`)?.usd))].filter((t): t is LiveTrack => !!t).map((t) => withCarry(t, carried(t.id)));
+    const raw = [...adds.map((a) => addTrack(a)), ...rows.map((r) => rowTrack(r, words(r.id), lands(r.id))), ...backs.filter((b) => !(ms(b.back.startedAtIso) <= now - ROWS_FOR_MS)).map((b) => backTrack(b, now)), ...movements.filter((m) => ms(m.startedAtIso) > hour && !paid.has(m.id)).map((m) => sendTrack(m, sendFrom(m), payeeWords(m.to ?? ""), carried(`send:${m.id}`)?.usd)), ...homeTracks(movements.filter((m) => ms(m.startedAtIso) > hour))].filter((t): t is LiveTrack => !!t).map((t) => withCarry(t, carried(t.id)));
     const all = raw.map((t) => slowed(onLegs(stamp(t, seen, now)), now));
     // keep the phone's record small: only tracks still listed, and one seen going until its end is told
     const ids = new Set(all.map((t) => t.id));
+    // the audit's M1 (7 Nov): a job's part seen as its own card before the job's carry named it is in its job's one track now:
+    // its own card and task go (merged), never left "Moving" in Now, never ended as gone
+    const merged = rows.flatMap((r) => (r.parts ?? []).map((p) => `move:${p.id}`));
     const gone: string[] = [];
     for (const k of Object.keys(seen)) {
       if (ids.has(k)) { goneSince.delete(k); continue; }
+      if (merged.includes(k)) { goneSince.delete(k); delete seen[k]; continue; }
       if (!seen[k]!.old && !seen[k]!.told) {
         const since = goneSince.get(k) ?? now;
         goneSince.set(k, since);
@@ -563,11 +963,13 @@ export function watchLive(bridge: Bridge, inputs: () => { adds: AddOnWay[]; move
     going = drawn.some((t) => !t.end || t.end.slow);
     // D144: each track this phone saw going is told to the Activity centre until its end was (the owner's nearly three hours: a move
     // over an hour old, or one that ended while the app was closed, left its task "Arriving…" for good)
-    const tell = all.filter((t) => !seen[t.id]?.old && !seen[t.id]?.told);
+    // a job that took over its starting row in place (homeTracks: "job:" ids) is told even when first seen ended: that row
+    // is pending until told, never left "Getting ready"
+    const tell = all.filter((t) => (!seen[t.id]?.old || t.id.startsWith("job:")) && !seen[t.id]?.told);
     for (const t of tell) if (t.end && !t.end.slow) seen[t.id]!.told = true;
     // every row a track stands for (its parts too), so the screen draws it once: as its card, or not at all once ended
     void bridge.call("device.store.set", { key: SEEN_KEY, value: JSON.stringify(seen) }).catch(() => undefined);
-    on(shown, new Set([...ids, ...rows.flatMap((r) => (r.legs ?? []).map((l) => `move:${l.id}`))]), tell, gone);
+    on(shown, new Set([...ids, ...rows.flatMap((r) => (r.legs ?? []).map((l) => `move:${l.id}`))]), tell, gone, merged);
   };
   const read = () => void bridge.call<SpendingActivity[]>("spending.activity").then((r) => {
     if (!live) return;
@@ -608,23 +1010,40 @@ export function afterEnd(tracks: readonly LiveTrack[], seen: Seen): LiveTrack[] 
  * A leg into its move (as Activity's one move, one row): the rows with `of` set join their move's `legs`. A take-out's
  * legs land before its move home is made: until it is, they join a move of their own, marked pending (never done).
  */
-export function foldInto(rows: readonly SpendingActivity[]): Folded[] {
+export function foldInto(rows: readonly SpendingActivity[], jobOf: (id: string) => string | undefined = carriedJobOf): Folded[] {
   const ids = new Set(rows.map((r) => r.id));
+  // one job, one track (the copy review's MUST 2, 6 Nov: one $161 Move showed two going rows): a Move's core moves (the Safe's top-up and
+  // each wallet's leg) share no `of`, so the rows saved under one job (job-start made()) are legs of its earliest row, as `of`
+  const head = new Map<string, SpendingActivity>();
+  for (const r of rows) { const j = jobOf(r.id); if (!j) continue; const h = head.get(j); if (!h || ms(r.atIso) < ms(h.atIso) || (ms(r.atIso) === ms(h.atIso) && r.id < h.id)) head.set(j, r); }
+  const ofOf = (r: SpendingActivity): string | undefined => {
+    if (r.of && r.of !== r.id) return r.of;
+    const j = jobOf(r.id);
+    const h = j ? head.get(j) : undefined;
+    return h && h.id !== r.id ? h.id : undefined;
+  };
   const legsOf = new Map<string, SpendingActivity[]>();
+  const partsOf = new Map<string, SpendingActivity[]>();
   const orphans = new Map<string, SpendingActivity[]>();
   for (const r of rows) {
-    if (!r.of || r.of === r.id) continue;
-    const into = ids.has(r.of) ? legsOf : r.kind === "put-away" ? orphans : null;
-    into?.set(r.of, [...(into.get(r.of) ?? []), r]);
+    const of = ofOf(r);
+    if (!of) continue;
+    const into = ids.has(of) ? legsOf : r.kind === "put-away" ? orphans : null;
+    into?.set(of, [...(into.get(of) ?? []), r]);
+    // a part by its job (no `of` of its own): the job's track joins it whole (jobTrack)
+    if (into === legsOf && !(r.of && r.of !== r.id)) partsOf.set(of, [...(partsOf.get(of) ?? []), r]);
   }
-  const joined = (r: SpendingActivity) => !!r.of && r.of !== r.id && (ids.has(r.of) || (r.kind === "put-away" && orphans.has(r.of)));
-  const kept: Folded[] = rows.filter((r) => !joined(r)).map((r) => (legsOf.has(r.id) ? { ...r, legs: legsOf.get(r.id)! } : r));
+  const joined = (r: SpendingActivity) => { const of = ofOf(r); return !!of && (ids.has(of) || (r.kind === "put-away" && orphans.has(of))); };
+  const kept: Folded[] = rows.filter((r) => !joined(r)).map((r) => (legsOf.has(r.id) ? { ...r, legs: legsOf.get(r.id)!, ...(partsOf.has(r.id) ? { parts: partsOf.get(r.id)!.map((x) => (legsOf.has(x.id) ? { ...x, legs: legsOf.get(x.id)! } : x)) } : {}) } : r));
   const pending: Folded[] = [...orphans].map(([of, legs]) => {
     const first = legs.reduce((a, b) => (ms(a.atIso) <= ms(b.atIso) ? a : b));
     return { id: of, kind: "put-away", usd: "", status: "on-its-way", shown: true, atIso: first.atIso, words: "Moving to your Safe", legs, pending: true };
   });
   return [...kept, ...pending];
 }
+
+/** The job a core row was made under (activity-rows.ts carriedJob's read; kept here so the two files don't import each other). */
+const carriedJobOf = (id: string): string | undefined => carried(`move:${id}`)?.job;
 
 /** The step it stopped at and where the money is: "Through NEAR didn't finish. Your SOL is in your NEAR wallet." */
 export function endLine(t: LiveTrack): string | null {
@@ -642,15 +1061,22 @@ function stoppedAt(label: string): string {
   return who ? `${who[1]} didn't finish ${who[2]}.` : `${label} didn't finish.`;
 }
 
+/** A track's state in the Activity centre: still going (no end, S21's unshown, or merely slow) is pending; done; else
+ *  failed. Never "stopped" with no words (bug report, 6 Nov). Pure: a table test. */
+export const taskState = (t: Pick<LiveTrack, "end">): "pending" | "done" | "failed" => (!t.end || t.end.unshown || t.end.slow ? "pending" : t.end.ok ? "done" : "failed");
+
 /** D144: a track as the Activity centre's task: the same steps, each at its own time, and where the money is. */
-export function taskOf(t: LiveTrack): TaskInput & { state: "pending" | "done" | "failed" | "stopped" } {
+export function taskOf(t: LiveTrack): TaskInput & { state: "pending" | "done" | "failed" } {
   const startedAt = Number.isFinite(t.startMs) ? t.startMs : Date.now();
   return {
     id: t.id,
     title: t.title,
+    ...(t.usd ? { usd: t.usd } : {}),
     steps: t.steps.map((s) => ({ label: s.label, state: s.state, ...(s.atMs !== undefined && Number.isFinite(s.atMs) ? { at: startedAt + s.atMs } : {}) })),
     // S21: the third state stays a pending Job (no time left, its line), so the read that shows it can still end it Done
-    state: !t.end || t.end.unshown ? "pending" : t.end.ok ? "done" : t.end.slow ? "stopped" : "failed",
+    // bug report (6 Nov): a SLOW job is still going (stillGoing), never "stopped": it was ended "stopped" with no
+    // words, so its page read "Move stopped" twice over a bare "Stopped" (taskState, a table)
+    state: taskState(t),
     startedAt,
     ...(t.end ? { where: endLine(t)! } : {}),
     ...(t.endsAt !== undefined && !t.end ? { endsAt: t.endsAt } : {}),
@@ -667,6 +1093,12 @@ export function endGone(tasks: Tasks | undefined, gone: readonly string[] | unde
   }
 }
 
+/** the audit's M1 (7 Nov): a job's part published as its own task before its job's carry named it goes from the centre once it is
+ *  in its job's one track: one Move, one job in Now, never a part frozen at "Moving" beside it. */
+export function dropMerged(tasks: Tasks | undefined, merged: readonly string[] | undefined, sent: Map<string, string>): void {
+  for (const id of merged ?? []) { if (tasks?.drop?.(id)) sent.delete(id); }
+}
+
 /** Publishes each track to the Activity centre once it changes (Home's tasks are these tracks; the centre is a view). */
 export function publishTracks(tasks: Tasks | undefined, list: readonly LiveTrack[], sent: Map<string, string>): void {
   if (!tasks) return;
@@ -675,10 +1107,13 @@ export function publishTracks(tasks: Tasks | undefined, list: readonly LiveTrack
     const key = JSON.stringify(task);
     if (sent.get(t.id) === key) continue;
     sent.set(t.id, key);
-    if (task.state === "pending") tasks.publish(task);
+    // a slow job whose task an older build ended "stopped" with no words (wordlessStop): the store keeps an ended task ended,
+    // so its words go on it, never a bare "Stopped"
+    if (task.state === "pending") { if (!tasks.publish(task) && task.where) tasks.update(t.id, { detail: task.where }); }
     else {
       tasks.publish({ ...task, state: "pending" });
-      tasks.end(t.id, task.state);
+      // its words go with its end: the centre never draws a bare "Didn't finish" for a job that said why
+      tasks.end(t.id, task.state, task.where || undefined);
     }
   }
 }
@@ -698,13 +1133,32 @@ export function startingTracks(list: readonly Task[], now: number = Date.now()):
   // a swap in place has no core row to replace it, so this is its one row for good: going, then its neighbours' ended window
   // (done, it holds and folds as a finished row does; stopped, the hour). It never shows here once done and folded.
   const homeSwap = (t: Task) => t.app === "home" && isHomeSwapRow(t.id) && (t.state === "pending" || now - (t.endedAt ?? t.startedAt) < (t.state === "done" ? FOLD_AFTER_MS + FOLD_MS : 60 * 60_000));
-  return list.filter((t) => safeSwap(t) || homeSwap(t) || (t.app === "home" && (t.id.startsWith("job:") || t.id.startsWith("move:mv-")) && (t.state === "pending" || now - (t.endedAt ?? t.startedAt) < 60 * 60_000))).map((t) => ({
-    id: t.id, kind: KIND[t.title.split(" ")[0] ?? ""] ?? "move", title: t.title, wallets: [], startMs: t.startedAt, ...(t.endsAt !== undefined ? { endsAt: t.endsAt } : {}),
+  // a wordless stop is on its way within the keep (oldStop), so it stays shown as a going one does; past it, the hour
+  const shown = (t: Task) => t.state === "pending" || (wordlessStop(t) && oldStop(t, now) === "going") || now - (wordlessStop(t) ? Math.max(t.endedAt ?? t.startedAt, t.startedAt + PRIVATE_KEEP_MS) : t.endedAt ?? t.startedAt) < 60 * 60_000;
+  return list.filter((t) => safeSwap(t) || homeSwap(t) || (t.app === "home" && (t.id.startsWith("job:") || t.id.startsWith("move:mv-")) && shown(t))).map((t) => ({
+    id: t.id, kind: KIND[t.title.split(" ")[0] ?? ""] ?? "move", title: t.title, wallets: rowWallets(t), startMs: t.startedAt, ...(t.endsAt !== undefined ? { endsAt: t.endsAt } : {}),
     steps: t.steps.map((x) => ({ label: x.label, state: x.state })),
     ...(isHomeSwapRow(t.id) ? { bar: "Swap", ...(t.state !== "pending" && t.detail === NEAR_SWAP_BACK ? { next: [{ label: STOP_WORDS.swapAgain, go: { kind: "swap" as const } }] } : {}) } : {}),
-    ...(t.state === "pending" ? {} : { end: isHomeSwapRow(t.id) && t.state !== "done" ? { ok: false, ...swapEndOf(t.detail ?? "") } : { ok: t.state === "done", line: t.detail ?? "" }, ...(t.endedAt !== undefined ? { endMs: t.endedAt } : {}) }),
+    ...(t.state === "pending" ? {} : { end: isHomeSwapRow(t.id) && t.state !== "done" ? { ok: false, ...swapEndOf(t.detail ?? "") } : wordlessStop(t) ? (oldStop(t, now) === "going" ? { ok: false, slow: true as const, line: SLOW_WORDS.line(t.title.match(/ to (your [^.]+)$/)?.[1] ?? "your wallet") } : { ok: false, line: "" }) : { ok: t.state === "done", line: t.detail ?? "" }, ...(wordlessStop(t) && oldStop(t, now) === "unknown" ? { endMs: t.startedAt + PRIVATE_KEEP_MS } : t.endedAt !== undefined ? { endMs: t.endedAt } : {}) }),
   }));
 }
+
+/** The one wallet a starting row's job runs in, by its id (its done page names it: job-face donePlace, 83, 7 Nov): a Safe
+ *  coin's Buy or Sell (Trade's native-) in the Safe; a swap in place in the NEAR wallet (InplaceSwap's own track says so);
+ *  any other (a Move, a Send) none: its title or its end places it. */
+export const rowWallets = (t: Pick<Task, "app" | "id">): string[] => (t.app === "trade" && SAFE_SWAP.test(t.id) ? ["safe"] : t.app === "home" && isHomeSwapRow(t.id) ? ["near"] : []);
+
+/** A Move's task ended "stopped" with no words: only the old slow end wrote one (publishTracks before the bug, 6
+ *  Nov), so on a phone that kept one it is still on its way, never "Move stopped" over a bare "Stopped". */
+export const wordlessStop = (t: Pick<Task, "state" | "detail" | "id">): boolean => t.state === "stopped" && !t.detail && !isHomeSwapRow(t.id);
+
+/** How long a wordless stop is read as on its way (audit, 6 Nov): within PRIVATE_KEEP_MS (the core's keep for a payment still
+ *  on its way) from its tap; past it, with no core row behind it (that row, by id, wins on Home: homeRows), its money is
+ *  unknown: the unknown face ("<who> hasn't shown it yet." and the money line), never going for good. Pure: `now` given. */
+export const oldStop = (t: Pick<Task, "startedAt">, now: number): "going" | "unknown" => (now - t.startedAt < PRIVATE_KEEP_MS ? "going" : "unknown");
+
+/** Home's starting rows behind the core's own: a core row with the same id wins; a done starting row is never drawn. */
+export const homeRows = (starting: readonly LiveTrack[], tracks: readonly LiveTrack[]): LiveTrack[] => starting.filter((s) => !s.end?.ok && !tracks.some((t) => t.id === s.id));
 
 /** The tracker's job as now read (`next`, by its id), or the newest kept when it isn't listed any more; one that ended
  *  (done, stopped, came back: not merely slow) stays ended, never back on an earlier step. */
@@ -734,3 +1188,11 @@ export const oneLine = (line: string): string => line.replace(". · ", " · ");
 export const endFace = (end: { line: string; back?: true }): "back" | "stopped" => (end.back || /came back/i.test(end.line) ? "back" : "stopped");
 /** The mark on a job's sheet: under way, landed, refused, or a true refund's neutral one. */
 export const trackMark = (t: LiveTrack): "away" | "landed" | "refused" | "back" => (!t.end ? "away" : t.end.ok ? "landed" : stillGoing(t) ? "away" : t.end.back ? "back" : "refused");
+
+/** J1 (the copy review's walk, 7 Nov): the Activity centre's Now row ("activity:<task id>") opens that job's own page at once, never the
+ *  Activity list with its Jobs above (a third tap): the live track with that id, while it is one. An Add's and a way
+ *  back's pages are Activity's own (openAdd, openBack). Pure. */
+export function openTrackOf<T extends { id: string }>(openId: string | undefined, tracks: readonly T[]): T | undefined {
+  if (!openId || /^(add|back):/.test(openId)) return undefined;
+  return tracks.find((t) => t.id === openId);
+}

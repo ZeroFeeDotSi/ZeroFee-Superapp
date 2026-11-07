@@ -1,7 +1,7 @@
 // Settings > Open source. Monument: hairlines, spaced capitals, air. Every notice is plain text (React children, never
 // HTML); every link (TradingView's attribution, a licence kept in a package's repository) opens through the shell's browser sheet via `onOpenUrl`. No hooks, so
 // the screen is the same tree on every render (each licence folds open with the platform's own <details>).
-import { CODE_LABEL, NOTICES, POSITIONING, codeHref, noticeMeta, type Notices } from "./open-source.ts";
+import { CODE_LABEL, NOTICES, POSITIONING, codeHref, licencesLabel, noticeMeta, plainName, type Notices } from "./open-source.ts";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
 import "./open-source.css";
 
@@ -31,13 +31,16 @@ export function OpenSourceScreen({ onClose, onOpenUrl, notices = NOTICES, codeUr
             <span className="os__notice">{tv.noticeText}</span>
           </div>
         )}
+        {/* the copy review's S6 (7 Nov): the package list folds under one row, each by its plain name */}
+        <details className="os__all">
+        <summary className="os__row os__all-row"><span className="os__name">{licencesLabel(notices.packages.length)}</span></summary>
         <ul className="os__list">
           {notices.packages.map((n) => (
             <li key={`${n.name}@${n.version}`} className="os__item">
               {n.licenceText || n.noticeText ? (
                 <details>
                   <summary className="os__row">
-                    <span className="os__name">{n.name}</span>
+                    <span className="os__name">{plainName(n.name)}</span>
                     <span className="os__meta">{noticeMeta(n)}</span>
                   </summary>
                   {n.noticeText && <pre className="os__text">{n.noticeText}</pre>}
@@ -45,7 +48,7 @@ export function OpenSourceScreen({ onClose, onOpenUrl, notices = NOTICES, codeUr
                 </details>
               ) : (
                 <div className="os__row">
-                  <span className="os__name">{n.name}</span>
+                  <span className="os__name">{plainName(n.name)}</span>
                   <span className="os__meta">{noticeMeta(n)}</span>
                   {n.licenceUrl && onOpenUrl && <button className="os__link" onClick={() => onOpenUrl(n.licenceUrl!)}>Licence text</button>}
                 </div>
@@ -53,6 +56,7 @@ export function OpenSourceScreen({ onClose, onOpenUrl, notices = NOTICES, codeUr
             </li>
           ))}
         </ul>
+        </details>
       </div>
     </Sheet>
   );

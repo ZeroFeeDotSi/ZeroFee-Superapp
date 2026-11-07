@@ -9,7 +9,7 @@ const css = readFileSync(new URL("../wallet.css", import.meta.url), "utf8");
 
 test("a row's page draws where `overlay` draws (a full-screen sheet over the list), never inline in the list when an overlay is given (control: the old inline render is caught)", () => {
   // S10b: through its own slot of the overlay (overlay-slot.ts), so the live tracker's reads never close it
-  assert.match(activity, /const slot = useMemo\(\(\) => \(overlay \? ownSlot\(overlay\) : null\), \[overlay\]\);\s*useEffect\(\(\) => \{ slot\?\.draw\(detail\); \}, \[shown, Detail\]\);/);
+  assert.match(activity, /const slot = useMemo\(\(\) => \(overlay \? ownSlot\(overlay\) : null\), \[overlay\]\);\s*useEffect\(\(\) => \{ slot\?\.draw\(detail\); \}, \[shown, Detail, job, Tracker, Proof\]\);/); // J2 (7 Nov): the Send's job face draws in the same slot
   assert.match(activity, /\{overlay \? null : detail\}/);
   assert.doesNotMatch(activity, /\n\s*\{detail\}\n\s*<\/div>/, "control: the list no longer holds the page");
 });

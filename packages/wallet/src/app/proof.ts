@@ -8,7 +8,9 @@ import type { Movement } from "../types.ts";
 
 /** One end of a step: its public transaction, or the private balance (no public transaction), or not known yet. */
 export type ProofEnd = { tx: TxProof } | { private: true };
-export interface ProofStep { label: string; atIso?: string; usd?: string; start?: ProofEnd; end?: ProofEnd; ended?: true }
+export interface ProofStep { label: string; atIso?: string; usd?: string; start?: ProofEnd; end?: ProofEnd; ended?: true; /** its own line before the time (a job of several parts: "to your SOL and NEAR wallets") */ note?: string;
+  /** the step under way ("Going") or the one that stopped ("Stopped"): the only steps whose line says a status word */
+  live?: true; stopped?: true }
 export interface ProofPage {
   /** The transaction that set it off, and the one that landed it (none until it landed). */
   started?: ProofEnd;
@@ -37,6 +39,9 @@ export const PROOF_WORDS = {
   private: "This step is private. It has no public record.",
   notYet: "Not finished yet.",
   doneNoLink: "Done.",
+  done: "Done",
+  going: "Going",
+  stopped: "Stopped",
   copy: "Copy",
   copied: "Copied",
   view: "View",
@@ -44,6 +49,23 @@ export const PROOF_WORDS = {
   problem: "What happened",
   close: "Close",
 } as const;
+
+/** A step's one line under its label (the UI reviewer, 6 Nov, line 26: "Finished / Done." under every step, said over and
+ *  over): its dollars, its time, then "Done" once it ended with no landing transaction to show; a step with its own
+ *  landing keeps its Finished row (its proof), so no Done here. */
+/** the copy review's grade of M4 (7 Nov): a finished step's date is its proof, no trailing "Done"; a status word only on the live step
+ *  ("Going") and a stopped one ("Stopped"). */
+export function stepLine(s: Pick<ProofStep, "usd" | "end" | "ended" | "note" | "live" | "stopped">, time: string): string {
+  return [s.note ?? "", s.usd ? `$${s.usd}` : "", time, s.stopped ? PROOF_WORDS.stopped : s.live ? PROOF_WORDS.going : ""].filter(Boolean).join(" · ");
+}
+
+/** Whether the page lists its steps (more than one, or a swap in place's one). */
+export const stepsShown = (page: Pick<ProofPage, "steps" | "stepsShown">): boolean => page.steps.length > 1 || (!!page.stepsShown && page.steps.length > 0);
+const sameEnd = (a: ProofEnd | undefined, b: ProofEnd | undefined): boolean => !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
+/** The page head's Finished row: said once (QA 20 and 53, 6 Nov: "Finished / This step is private" on the head and again
+ *  under Steps). Where a listed step carries that same end, it stays on the step's own line only. */
+export const headFinished = (page: Pick<ProofPage, "steps" | "stepsShown" | "finished">): ProofEnd | undefined =>
+  page.finished && !(stepsShown(page) && page.steps.some((s) => sameEnd(s.end, page.finished))) ? page.finished : undefined;
 
 /** A link from the record (a Movement's explorerUrls) as proof: its chain and id from a known explorer's page; any other
  *  link keeps its id only (no link the Browser won't open). */
@@ -115,15 +137,32 @@ function stepLabel(r: SpendingActivity, first: boolean): string {
  * A Move, a Swap, a Top up or a Put away (Spending's row, its legs folded in): each leg is a step with its own proof. The
  * first leg from the Safe (a Top up) is the ledger's Add: its transaction is the Safe's, from `ledger` (the same id).
  */
+/** Every leg of a job had no public transaction (audit, 7 Nov): paid from Private alone (no Safe fill), one part (no wallet's
+ *  part beside it), no leg with a proof and no Safe send on the ledger. Pure: a table test. */
+export function everyLegPrivate(r: SpendingActivity & { parts?: readonly unknown[] }, ledger: readonly Movement[] = []): boolean {
+  const legs = [r, ...(r.legs ?? [])];
+  return r.via === "private" && !r.fill && !r.parts?.length && !(r.paid ?? []).some((id) => id.startsWith("safe-send:"))
+    && !legs.some((x) => x.proof?.start || x.proof?.end || (ledger.find((m) => m.id === x.id)?.explorerUrls.length ?? 0) > 0);
+}
+/** The line under a page's title: its words, then when ("In your SOL and NEAR wallets · 7 Nov"): no full stop
+ *  before the dot (the copy review's grade of M4, 7 Nov). Pure. */
+export const headLine = (line: string | undefined, time: string | undefined): string => (time ? [line?.replace(/\.\s*$/, ""), time] : [line]).filter(Boolean).join(" · ");
+
 export function spendingPage(r: SpendingActivity, ledger: readonly Movement[] = []): ProofPage {
   const legs = [r, ...(r.legs ?? [])];
+  const allPrivate = everyLegPrivate(r, ledger);
   const steps: ProofStep[] = legs.map((x, i) => {
     const add = x.kind === "top-up" ? ledger.find((m) => m.id === x.id) : undefined;
     const fromSafe = add?.explorerUrls.map(txFromUrl).find((t): t is TxProof => !!t);
     const start = fromSafe ? { tx: fromSafe } : fromProof(x.proof, "start") ?? (x.kind === "top-up" ? undefined : undefined);
-    // the Safe's Add lands in the NEAR wallet's private balance: no public transaction there
-    const end = fromProof(x.proof, "end") ?? (x.kind === "top-up" && (x.status === "done" || add?.status === "done") ? { private: true as const } : undefined);
-    return { label: stepLabel(x, i === 0), atIso: x.atIso, ...(x.usd ? { usd: x.usd } : {}), ...(start ? { start } : {}), ...(end ? { end } : {}) };
+    // "This step is private" is never a Move's landing or Finished (the audit's MUST, 7 Nov): a Move to any wallet ends in a public
+    // transaction (the chain wallet's payout, or the NEAR wallet's transfer out of intents). Only a step whose own action
+    // happens inside NEAR Confidential may say it (withTrackSteps: Private paying, the fill landing in Private)
+    const proofEnd = fromProof(x.proof, "end");
+    const end = proofEnd && !("private" in proofEnd) ? proofEnd : undefined;
+    // a private start ("out of it: no public record") the same: only when every leg is private
+    const startShown = start && "private" in start && !allPrivate ? undefined : start;
+    return { label: stepLabel(x, i === 0), atIso: x.atIso, ...(x.usd ? { usd: x.usd } : {}), ...(startShown ? { start: startShown } : {}), ...(end ? { end } : {}) };
   });
   const done = r.status === "done" || r.status === "refunded";
   const ended = endSteps(steps, r.status === "done");
@@ -137,14 +176,23 @@ export function spendingPage(r: SpendingActivity, ledger: readonly Movement[] = 
  *  (QA's lap on main, 5 Nov: a Move's page had one row, "From Safe · To NEAR wallet", no steps, no
  *  protocol). `t`: the job's track (live-steps.ts moveTrack); the page's first transaction stays on the first step, its
  *  landing one on the last. No track, or one step: the page as it was. */
-export function withTrackSteps(page: ProofPage, t: { startMs: number; steps: readonly { label: string; state: string; atMs?: number }[] } | null | undefined): ProofPage {
+/** A step whose own action happens inside NEAR Confidential (the audit's MUST, 7 Nov): Private paying ("NEAR Confidential paid
+ *  your SOL wallet."), or the Safe's fill landing in Private ("NEAR Confidential moved it to Private."), once done: the
+ *  only steps that may say "This step is private". Never a landing, never Finished, never a whole job. Pure. */
+export const insideConfidential = (s: { label: string; state: string }): boolean => s.state === "done" && /^NEAR Confidential (paid |moved it to Private\.)/.test(s.label);
+
+export function withTrackSteps(page: ProofPage, t: { startMs: number; steps: readonly { label: string; state: string; atMs?: number; note?: string }[]; joined?: true } | null | undefined): ProofPage {
   if (!t || t.steps.length < 2) return page;
   const first = page.steps[0], last = page.steps.at(-1), n = t.steps.length;
   const steps: ProofStep[] = t.steps.map((s, i) => {
     const at = s.atMs !== undefined && Number.isFinite(t.startMs + s.atMs) ? new Date(t.startMs + s.atMs).toISOString() : undefined;
-    const end = i === n - 1 && s.state === "done" ? last?.end : undefined;
-    return { label: s.label, ...(at ? { atIso: at } : {}), ...(i === 0 && first?.start ? { start: first.start } : {}), ...(end ? { end } : s.state === "done" ? { ended: true as const } : {}) };
+    // a job of several parts (copy review): no "Finished" row, its "Done in N seconds." says it
+    // the last step's own landing proof, else the private line on a step inside NEAR Confidential (which still reads done)
+    const lastEnd = i === n - 1 && s.state === "done" && !t.joined ? last?.end : undefined;
+    const end = lastEnd ?? (insideConfidential(s) ? { private: true as const } : undefined);
+    return { label: s.label, ...(s.note ? { note: s.note } : {}), ...(s.state === "doing" ? { live: true as const } : s.state === "failed" ? { stopped: true as const } : {}), ...(at ? { atIso: at } : {}), ...(i === 0 && first?.start ? { start: first.start } : {}), ...(end ? { end } : {}), ...(!lastEnd && s.state === "done" ? { ended: true as const } : {}) };
   });
+  if (t.joined) { const { finished: _f, ...rest } = page; return { ...rest, steps, ended: null }; }
   return { ...page, steps };
 }
 

@@ -54,7 +54,7 @@ export function movingMoves(s: SpendingStatus): { a: SpendingActivity; to: strin
     // the figure the person approved (core askedUsd: a Move's legs, never the inflow grid's amount the Safe sent)
     const to = movingTo(a), usd = num(a.askedUsd ?? a.usd);
     if (!to || !(usd >= 0.01)) continue;
-    if (paidStraight(a)) { out.push({ a, to, usd, own: true }); continue; }
+    if (paidStraight(a)) { const own = straightUsd(a, usd); if (own >= 0.01) out.push({ a, to, usd: own, own: true }); continue; }
     if (usd > left + ROUNDING_USD) continue;
     out.push({ a, to, usd });
     left -= usd;
@@ -73,6 +73,18 @@ export function movingMoves(s: SpendingStatus): { a: SpendingActivity; to: strin
 function paidStraight(a: SpendingActivity): boolean {
   const to = a.kind === "top-up" && a.via === "private" && !a.site && !a.siteName ? a.goesTo ?? [] : [];
   return to.length > 0 && !to.every((c) => (a.landed ?? []).includes(c as never));
+}
+/**
+ * What of a Move paid straight from Private is still on its way into Hot (audit, 6 Nov): never a part that never reached its
+ * wallet (`missed`: it stopped, never started or came back; the same rule as its landing step, spending.ts privLanded),
+ * so its dollars (`missedUsd`, the parts' own) come off the row's figure; every wallet it goes to missed or landed: none.
+ * Pure: a table test.
+ */
+export function straightUsd(a: Pick<SpendingActivity, "goesTo" | "landed" | "missed" | "missedUsd">, usd: number): number {
+  const missed = a.missed ?? [];
+  const going = (a.goesTo ?? []).filter((c) => !missed.includes(c) && !(a.landed ?? []).includes(c));
+  if (!going.length) return 0;
+  return Math.max(0, Math.round((usd - num(a.missedUsd)) * 100) / 100);
 }
 
 /** The money on its way inside Hot: the sum of the person's own moves on their way (movingMoves). Hot shows it as rows

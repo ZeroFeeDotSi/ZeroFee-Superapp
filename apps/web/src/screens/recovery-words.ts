@@ -111,8 +111,9 @@ export function oldPhoneCount(p: RecoveryPending, device = "your second device",
     return { untilIso: p.fallbackAtIso, before: `It can finish now if ${device} says yes. Without it, it finishes in `, after: " unless you stop it.", atZero: "It can finish now unless you stop it." };
   }
   if (p.needsSecondDevice && !p.approved) return { untilIso: p.readyAtIso, before: "It can finish in ", after: `, only if ${device} says yes.`, atZero: `It can finish now if ${device} says yes.` };
-  if (p.needsSecondDevice && p.approved) return { untilIso: p.canFinishAtIso ?? p.readyAtIso, before: `${Device} said yes. It finishes in `, after: ".", atZero: `${Device} said yes. It can finish now.` };
-  return { untilIso: p.readyAtIso, before: "It finishes in ", after: " unless you stop it.", atZero: "It can finish now unless you stop it." };
+  if (p.needsSecondDevice && p.approved) return { untilIso: p.canFinishAtIso ?? p.readyAtIso, before: `${Device} said yes. Finishes in `, after: ".", atZero: `${Device} said yes. It can finish now.` };
+  // the copy review (7 Nov): one sentence form for a countdown, "Finishes in 1 day 23 hours unless you stop it." (countdown.ts waitWords)
+  return { untilIso: p.readyAtIso, before: "Finishes in ", after: " unless you stop it.", atZero: "It can finish now unless you stop it." };
 }
 
 /** The second device's two answers to a waiting move, and what each does (the laptop page and the demo's laptop). */

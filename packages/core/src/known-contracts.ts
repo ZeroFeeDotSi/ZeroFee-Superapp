@@ -280,6 +280,8 @@ export function coinAmount(coin: string, units: string): string {
 }
 
 const USD_COINS: Record<string, number> = { "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1": 6, "nep141:usdt.tether-token.near": 6 };
+/** A stablecoin's decimals (USDC, USDT on NEAR Intents), counted at $1 (the stablecoin rule); undefined: not one. */
+export const usdCoinDecimals = (tokenId: string): number | undefined => (Object.hasOwn(USD_COINS, tokenId) ? USD_COINS[tokenId] : undefined);
 
 /**
  * A NEAR limit carries the dollars it was set from (one fact, one figure: grade 02e, E3, "$490 vs $492 vs $493"): its

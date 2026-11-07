@@ -14,11 +14,8 @@ import type { Recordings } from "./recorded.ts";
 /** The honeypot coins' logo, bundled (every coin has a logo, and no host the CSP refuses): a jar, in the coin-icon style. */
 export const HONEYPOT_LOGO = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#f2b33d"/><path d="M13 15h14l-1.5 15a2 2 0 0 1-2 1.8h-7a2 2 0 0 1-2-1.8z" fill="#fff"/><rect x="12" y="11" width="16" height="4" rx="1.5" fill="#fff"/><path d="M15.5 22h9" stroke="#f2b33d" stroke-width="2" stroke-linecap="round"/></svg>');
 
-export interface SampleCoin { chain: EvmChain; address: string; pool: string; dex: string; symbol: string; name: string; priceUsd: number }
-export const SAMPLE_UNSELLABLE: Record<EvmChain, SampleCoin> = {
-  bsc: { chain: "bsc", address: "0x5a3e00000000000000000000000000000000b5c1", pool: "0x5a3e0000000000000000000000000000000b5c01", dex: "pancakeswap-v3-bsc", symbol: "NOSELL", name: "Honeypot coin", priceUsd: 0.0042 },
-  hood: { chain: "hood", address: "0x5a3e00000000000000000000000000000000400d", pool: "0x5a3e0000000000000000000000000000000400d1", dex: "uniswap-v3-robinhood", symbol: "NOSELL", name: "Honeypot coin", priceUsd: 0.0017 },
-};
+export { SAMPLE_UNSELLABLE, type SampleCoin } from "./demo-traps.ts";
+import { SAMPLE_UNSELLABLE, type SampleCoin } from "./demo-traps.ts";
 const sampleOf = (chain: string, address: string): SampleCoin | undefined => {
   const s = SAMPLE_UNSELLABLE[chain as EvmChain];
   return s && s.address === address.toLowerCase() ? s : undefined;

@@ -62,3 +62,20 @@ li:last-child > .zf-lrow::after { content: none; }
 .zf-lrow__r:not(:has(> .zf-lrow__v)) { align-self: stretch; align-content: end; }
 .zf-lrow__r:not(:has(> .zf-lrow__v)) > .zf-lrow__w { margin-top: 0; }
 .zf-lrow { scroll-margin-bottom: calc(var(--zf-end, 0px) + 12px); }
+
+/* the copy review's checkpoints (6 Nov, Checkpoints.tsx): a going job's track under its words, across the text column to the figure's
+   right edge, never under the mark; 10 px above it, 30 px tall. The row's words sit at the top beside the mark. */
+/* a17's shape under the track (copy review, 6 Nov): the step line is clamped to TWO lines, never cut to one with "…", and the
+   time words sit right on its last line: the text and the right column open into the row's grid (title and figure on
+   row 1, the step line and the time on row 2, a slow row's second line on row 3, the track last). */
+.zf-lrow.has-track { align-items: start; }
+.zf-lrow.has-track > .zf-lrow__mark { grid-row: 1 / span 2; }
+.zf-lrow.has-track > .zf-lrow__text, .zf-lrow.has-track > .zf-lrow__r { display: contents; }
+.zf-lrow.has-track .zf-lrow__t { grid-column: 2; grid-row: 1; }
+.zf-lrow.has-track .zf-lrow__text > .zf-lrow__d:nth-child(2) { grid-column: 2; grid-row: 2; }
+.zf-lrow.has-track .zf-lrow__text > .zf-lrow__d:nth-child(3) { grid-column: 2 / 4; grid-row: 3; }
+.zf-lrow.has-track .zf-lrow__d { white-space: normal; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; }
+.zf-lrow.has-track .zf-lrow__v { grid-column: 3; grid-row: 1; padding-left: 12px; text-align: right; }
+.zf-lrow.has-track .zf-lrow__w { grid-column: 3; grid-row: 2; align-self: end; padding-left: 12px; text-align: right; }
+.zf-lrow__cp { grid-column: 2 / 4; grid-row: 4; margin-top: 10px; }

@@ -56,7 +56,7 @@ import { linkParts } from "../links.ts";
 import { DM_RELAYS, askedPlace, localRelay, relaysFor, sharedWithBitChat } from "../relays.ts";
 import "./chat.css";
 
-export const PUBLIC_BUILD = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_PUBLIC === "1";
+export const PUBLIC_BUILD = import.meta.env?.VITE_ZEROFEE_PUBLIC === "1";
 /** Where Wallet's Send can pay out today (send-reach.ts): NEAR, Solana and its EVM networks. */
 const SENDABLE = chatCanSendOn;
 /** Networks a request can name: no memo needed, an address Wallet shows for the vault. */

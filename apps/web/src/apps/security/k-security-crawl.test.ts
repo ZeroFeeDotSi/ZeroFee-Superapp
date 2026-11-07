@@ -38,6 +38,6 @@ test("S4: the Settings line names what Settings really holds; no Face ID row pro
 
 test("S4: no \"NEAR contract\" or \"guardian key\" on the screen", async () => {
   const { INTRO } = await import("./protection-words.ts");
-  assert.equal(INTRO, "Your NEAR account keeps these rules. Only you can change them.");
+  assert.equal(INTRO, "Your Safe keeps these rules. Only you can change them.", "the copy review's S5: the Safe, never \"NEAR account\"");
   assert.doesNotMatch(read("./GuardianSide.tsx"), /This device's guardian key/);
 });

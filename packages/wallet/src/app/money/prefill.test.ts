@@ -46,7 +46,7 @@ test("Send filled in: the address or name goes in exactly as if typed (lookup, g
   assert.match(form, /if \(!filled\?\.usd \|\| usdFilled\.current \|\| !source \|\| perCoin === null\) return;\n\s+usdFilled\.current = true;\n\s+setPreset\(true\);\n\s+type\(filled\.usd\);/, "dollars, typed once the price is here");
   const effects = form.slice(form.indexOf("const usdFilled"), form.indexOf("const chainFilled"));
   assert.doesNotMatch(effects, /setWho|setPicked|setExact|onSend|go\(/, "control: it never sets who or the network itself, and never sends");
-  assert.match(form, /<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">\{label\}<\/button>/, "the only way to send is the tap (no hold: product decision, 5 Nov)");
+  assert.match(form, /<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">\{floor\.label\}<\/button>/, "the only way to send is the tap (no hold: product decision, 5 Nov)");
   assert.match(form, /const ready = !!source && !!who && !!network && !why && !waits && !busy/, "with every check on");
 });
 

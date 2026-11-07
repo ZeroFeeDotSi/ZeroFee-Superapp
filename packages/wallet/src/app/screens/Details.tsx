@@ -2,13 +2,12 @@
 // address (tap to copy), what it holds and its marks ("Key exported", old words). One wallet per network, shared by Trade,
 // the apps and Chat; an older one is listed while it holds anything. The Safe's phone key never leaves the chip, so the
 // Safe has no export: its backup is the 24 words, which the phone doesn't keep (SIMPLE-SUPERAPP-v2 §1.3): "Get new words"
-// replaces them. A Spending wallet's key exports from one card after the list ("Show a key", then which wallet; 5 Nov,
+// replaces them. A Spending wallet's key exports from one card after the list ("Show this wallet's key", then which wallet; 5 Nov,
 // it was "Export key" on every card) behind a plain warning, a typed phrase (audit K-5), the core's own sheet and Face ID; on the phone it shows only on ZeroFee's own screen, which hides from screenshots (SecretSheet.swift). D56:
 // after an export ZeroFee keeps using the wallet. "Behind the scenes" lists the quiet moves (refills, gas, older wallets).
 import { useEffect, useState } from "react";
 import type { Problem } from "@zerofee/core/problem";
 import type { SpendingActivity, SpendingWallet } from "@zerofee/core/spending";
-import { shortKey } from "@zerofee/core/format";
 import { SIM_ACCOUNT, accountWords } from "@zerofee/chat/account-words.ts";
 import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
 import { More } from "@zerofee/design/More.tsx";
@@ -17,6 +16,7 @@ import { Waiting } from "../Waiting.tsx";
 import { ago, amountOf, coins, dollars, safeLines, type lines } from "../format.ts";
 import { useWallet } from "../runtime.tsx";
 import { ThisDevice } from "@zerofee/shell-api/approval-words.ts";
+import { keyPlaceWords } from "@zerofee/shell-api/key-place.ts";
 import { SHOW_KEY_PHRASE, marksOf, showKeyConfirmed, statusWords } from "../hub.ts";
 
 const SHOWN_MS = 60_000;
@@ -25,16 +25,16 @@ const NETWORK: Record<string, string> = { near: "NEAR", sol: "Solana", hood: "Ro
 import { copyText } from "../copy-text.ts";
 const copy = copyText;
 
-/** The Safe's account (the copy review's desktop audit, 5 Nov): "Your account" is the headline; its id is a quiet line under it, short
- *  (the core's shortKey), never the raw "zf-sample…testnet" as a title. Copy copies all of it. */
+/** The Safe's address (the copy review's S4, 7 Nov): one row, "Your Safe address" with Copy; its id is never on the screen (it was
+ *  "zf-sam…tnet"). Copy copies all of it. */
 function AccountLine({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
   // the copy review's Sim re-walk (5 Nov): the Sim's own "zf-account" is machine text, and nothing paid to it lands: it says Chat's
   // words for it (chat account-words.ts, "Sample account"), with no Copy
   if (id === SIM_ACCOUNT) return <p className="zf-small" data-testid="details-account">{accountWords(id)}</p>;
   return (
-    <button className="wl-dt-addr" data-testid="details-account" aria-label="Copy your account address" onClick={() => { void copy(id); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>
-      <span className="zf-small" translate="no">{shortKey(id)}</span>
+    <button className="wl-dt-addr" data-testid="details-account" aria-label="Copy your Safe's address" onClick={() => { void copy(id); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>
+      <span className="wl-dt-addr__text">{DETAILS_WORDS.address}</span>
       <span className="zf-chip">{copied ? "Copied" : "Copy"}</span>
     </button>
   );
@@ -57,6 +57,11 @@ function Address({ text, label }: { text: string; label: string }) {
     </>
   );
 }
+
+/** the copy review's S4 (7 Nov): the Safe card's words. Its first row is the address (the "Safe" heading names the card; 53, 7 Nov:
+ *  no "Your Safe" line under it). Where the key is comes from the one platform table (key-place.ts): "the phone" only
+ *  inside the iPhone app, "this device" in a browser. */
+export const DETAILS_WORDS = { address: "Your Safe address" } as const;
 
 /** The wallets' read didn't answer (MoneyHost's own words for it). */
 export const WALLETS_DIDNT_ANSWER = "Your wallets didn't answer.";
@@ -88,6 +93,8 @@ export function Details({ onNewWords, onProblem }: { onNewWords: () => void; onP
     void bridge.call<SpendingActivity[]>("spending.activity").then((r) => live && "ok" in r && setQuiet(r.ok.filter((x) => !x.shown)));
     return () => { live = false; };
   }, [bridge, tick]);
+  // where the Safe's key is, as this platform can say it (key-place.ts); the web says it once, on the row
+  const key = keyPlaceWords();
   const safe = balances ? safeLines(balances, pocket, chains, earning) : null;
   // Spending lists an older wallet only while it holds anything (D55); every other one always
   // Spending's own cash first, then one wallet per network (D55); an older one only while it holds anything
@@ -96,7 +103,6 @@ export function Details({ onNewWords, onProblem }: { onNewWords: () => void; onP
     <div className="wl wl-dt zf-enter">
       <div className="zf-label wl-dt-head">Safe</div>
       <div className="wl-dt-card">
-        <div className="wl-dt-row1"><span className="t">Your account</span><span className="zf-small">NEAR</span></div>
         {account ? <AccountLine id={account} /> : <p className="zf-small">Reading your account…</p>}
         {/* A list over 3 collapses (UI-SIMPLICITY-RULES 4): the three biggest coins, the rest one tap down. */}
         {safe && safe.lines.slice(0, 3).map((l) => <CoinRow key={l.key} l={l} />)}
@@ -105,7 +111,7 @@ export function Details({ onNewWords, onProblem }: { onNewWords: () => void; onP
             {safe.lines.slice(3).map((l) => <CoinRow key={l.key} l={l} />)}
           </More>
         )}
-        <More label="No export for this key" className="wl-dt-more" lines={["Its key never leaves this device, so there's nothing to export.", "Your 24 backup words bring your Safe back on a new device, after its wait."]} />
+        <More label={key.neverLeaves} className="wl-dt-more" lines={[...(key.neverLeavesWhy ? [key.neverLeavesWhy] : []), "Your 24 backup words bring your Safe back on a new device, after its wait."]} />
       </div>
       <div className="wl-dt-card">
         <div className="wl-dt-row1"><span className="t">Backup words</span></div>
@@ -162,7 +168,7 @@ const nameOf = (w: SpendingWallet) => (w.role === "hub" ? "Your NEAR wallet's ca
 const shortAddress = (a: string) => (/^[0-9a-zA-Z]{25,}$/.test(a) ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
 
 /** The Details words for a wallet's key (the Copywriter, 5 Nov). */
-export const KEY_WORDS = { head: "A wallet's key", note: "Use it to open a wallet in another app.", show: "Show a key", pick: "Which wallet?", hub: "Its key stays in ZeroFee." } as const;
+export const KEY_WORDS = { head: "A wallet's key", note: "Use it to open a wallet in another app.", show: "Show this wallet's key", pick: "Which wallet?", hub: "Its key stays in ZeroFee." } as const;
 
 function WalletCard({ w }: { w: SpendingWallet }) {
   const name = nameOf(w);
@@ -180,7 +186,7 @@ function WalletCard({ w }: { w: SpendingWallet }) {
   );
 }
 
-/** Every wallet's key in one place: "Show a key", which wallet, then the same warning, typed phrase and export as before
+/** Every wallet's key in one place: "Show this wallet's key", which wallet, then the same warning, typed phrase and export as before
  *  (audit K-5; the core's own sheet and Face ID). The NEAR wallet's cash has no key to show (it stays in ZeroFee). */
 function KeysCard({ wallets, onProblem, onExported }: { wallets: SpendingWallet[]; onProblem: (p: Problem) => void; onExported: () => void }) {
   const [picking, setPicking] = useState(false);

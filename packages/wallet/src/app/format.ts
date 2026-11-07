@@ -9,7 +9,7 @@ import type { Balance, Chain, Movement, PrivatePocket, Token } from "../types.ts
 import { ThisDevice } from "@zerofee/shell-api/approval-words.ts";
 import { shortId } from "./money/send-words.ts";
 import { SERVICE_NAMES } from "@zerofee/core/services";
-import { NEAR_SWAP_CARD_LINE, NEAR_SWAP_CHECK, NEAR_SWAP_HEAD, NEAR_SWAP_UNFINISHED } from "../near-swap-words.ts";
+import { NEAR_SWAP_HEAD } from "../near-swap-words.ts";
 
 /** USDC on NEAR: Trading's own coin (ledger.ts TRADING_USDC), so its Adds read in dollars. */
 const USDC_ON_NEAR = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
@@ -326,6 +326,16 @@ export const exactOf = (amount: string, symbol: string) => coins(amount, (amount
 export const titleOf = (l: { listed: boolean; name: string; symbol: string }) => (l.listed ? l.name : "Unlisted coin");
 export const claimOf = (symbol: string) => `Calls itself "${symbol}"`;
 
+/** the copy review's words for ended rows (7 Nov). */
+export const ACTIVITY_WORDS = {
+  /** The Safe's top-up of Private (a move into Private, kind "private"). */
+  intoPrivate: "Into Private from your Safe.",
+  /** A leg paid from Private (a payment to the person's own wallet). */
+  fromPrivate: "From Private.",
+  /** A Send that came back (provisional, for 53): where it is now, by the leg's own record (whereNow). */
+  cameBack: (place: string) => `Came back to ${place}.`,
+} as const;
+
 /** "now", "5 min", "3 h", "Yesterday", then the date. */
 export function ago(iso: string, now: number): string {
   const s = Math.max(0, (now - Date.parse(iso)) / 1000);
@@ -399,6 +409,24 @@ export function ownRowOf(m: Pick<Movement, "to" | "private">, own: OwnRows | und
   return rows.length === 1 ? `your ${rows[0]![0]} wallet` : undefined;
 }
 
+/**
+ * Where a Send's money LEFT (the audit's MUST, 7 Nov: the Safe sent $30.00 and Private paid bob.near $25.00, yet the row said
+ * "From Private" while the job said "Leaving your Safe"): ONE rule for Activity's row (describe), the row's page and the
+ * statement (statement.ts ledgerRow's From) and the job (live-steps sendTrack). A wallet's Send (hidden-row:) its wallet
+ * (its coin as send-to.ts LANDS_AS names it); the Safe's Send that NEAR Confidential pays out (safe-send:) the Safe;
+ * Private's own payment (pocket-send:, a payment from Private's balance: private-pay.ts pay:) Private; else the Safe.
+ * `private` alone says it went through NEAR Confidential, never where it left. Pure: a table test.
+ */
+export const sendFrom = (m: Pick<Movement, "id" | "from" | "private">, f = m.from ?? ""): string => {
+  const k = m.id.split(":")[0]!;
+  if (k === "hidden-row") return /(sol|hood)[.-][0-9a-z]*\.?omft/.exec(f)?.[1] ?? (f.includes(":56_") ? "bsc" : "row");
+  // the audit's M1 (7 Nov): a private record's place is its id's, from this table only; one it doesn't name says no place ("")
+  return (m.private || k !== "pay") && SEND_FROM[k] ? SEND_FROM[k]! : f === "private" ? "private" : m.private ? "" : "safe";
+};
+/** Each id a private payment record is written with (safe-send.ts, hidden-row.ts, private-pay.ts, the Sim's MockBridge),
+ *  and the place its money left: never a guess from `private` (the audit's M1, 7 Nov; send-from-truth.test.ts scans the writers). */
+export const SEND_FROM: Record<string, string> = { "safe-send": "safe", "pocket-send": "private", pay: "private" };
+
 /** Problems after which it may or may not have gone: the balance tells. */
 const UNCONFIRMED = new Set(["ledger.send.unread", "ledger.hold.unknown"]);
 
@@ -412,7 +440,7 @@ const INTO_WORDS: Record<NonNullable<Movement["into"]>, string> = { safe: "Safe"
 export function whereNow(m: Movement, to: string): string {
   if (m.status === "waiting") return "nothing has moved yet";
   // Out of Private: a refund goes back to Private.
-  if (m.kind === "private" && m.from === "private") return m.status === "moving" ? "on its way to your Safe" : m.status === "done" ? "in your Safe" : "still in your private balance";
+  if (m.kind === "private" && m.from === "private") return m.status === "moving" ? "on its way to your Safe" : m.status === "done" ? "in your Safe" : "still in Private";
   // S5: a payment from the private balance comes back there (its refund address, core private-pocket.ts), never the Safe
   if (m.status === "refunded") return m.kind === "trading" || (m.kind === "swap" && m.source === "private") ? "back in your NEAR wallet" : m.private && (m.kind === "pay" || m.kind === "transfer" || m.kind === "withdraw") ? "back in Private" : "back in your Safe";
   if (m.status === "problem" && UNCONFIRMED.has(m.problem?.code ?? "")) return "check your Safe";
@@ -420,6 +448,9 @@ export function whereNow(m: Movement, to: string): string {
   if (m.status === "problem" && (m.problem?.code === "ledger.swap.near-unread" || m.problem?.code === "ledger.swap.near-failed")) return "check your NEAR wallet";
   // the same end on a job kept before these words: it holds the old problem, and the row must not say where the money is
   if (m.status === "problem" && m.kind === "swap" && m.source === "private" && m.problem?.code === "ledger.convert.failed") return "check your NEAR wallet";
+  // 1Click's FAILED: where to look, never where it is (audit, 6 Nov)
+  if (m.status === "problem" && m.problem?.code === "ledger.convert.failed") return m.private || m.kind === "private" ? "check Private" : "check your Safe";
+  if (m.status === "problem" && m.problem?.code === "ledger.topup.failed") return "check your NEAR wallet";
   if (m.status === "problem" && m.problem?.code === "ledger.transfer.part-returned") return "the rest is back in your Safe";
   if (m.kind === "trading" && m.from === "trading") return m.status === "moving" ? "on its way to your Safe" : m.status === "done" ? "in your Safe" : "still in your NEAR wallet";
   switch (m.kind) {
@@ -428,7 +459,7 @@ export function whereNow(m: Movement, to: string): string {
       if (m.into && m.into !== "safe" && m.status === "done") return `in your ${INTO_WORDS[m.into]}`;
       return m.status === "moving" ? "on its way to your Safe" : m.status === "problem" ? "not in your Safe" : "in your Safe";
     case "private":
-      return m.status === "moving" ? "on its way to your private balance" : m.status === "done" ? "in your private balance" : "still in your Safe";
+      return m.status === "moving" ? "on its way to Private" : m.status === "done" ? "in Private" : "still in your Safe";
     case "trading":
       // Always one of three places: the main balance, in flight, or Spending (a refund comes back to Spending).
       return m.status === "moving" ? "on its way to your NEAR wallet" : m.status === "done" ? "in your NEAR wallet" : "still in your Safe";
@@ -462,24 +493,6 @@ export function movementDollars(m: Movement, tokens: Map<string, Token>): string
   return Number(usd) < 0.01 ? "under $0.01" : dollars(usd);
 }
 
-/**
- * A swap's page, by how it ended (copy review, 6 Nov): never "Not finished yet" under "Finished". `ended`: its card (null: none
- * while it runs), with where to look when nobody can prove where its money is. A NEAR wallet swap's sub-line is what it was,
- * then the time on its own line. null: not a swap.
- */
-export function swapDetail(m: Movement, tokens: Map<string, Token>, chains: Chain[], rows?: OwnRows): { ended: { label: string; line: string; check?: string } | null; line?: string; dayFirst?: true } | null {
-  if (m.kind !== "swap") return null;
-  const what = describe(m, tokens, chains, rows).detail.split(" · ")[0]!;
-  const near = m.source === "private" ? { line: what, dayFirst: true as const } : {};
-  if (m.status === "done") {
-    const paid = what.split(" to ")[0]!, into = tokens.get(m.to ?? "")?.symbol;
-    return { ended: { label: "Finished", line: `Swapped ${paid} for ${[m.amountOut, into].filter(Boolean).join(" ") || "the coin"}.` }, ...near };
-  }
-  if (m.status === "refunded") return { ended: { label: "Ended", line: `${SERVICE_NAMES.oneclick} couldn't swap it. Your money is ${whereNow(m, "")}.` }, ...near };
-  if (m.status === "problem") return { ended: m.source === "private" ? { label: "Ended", line: NEAR_SWAP_CARD_LINE, check: NEAR_SWAP_CHECK } : { label: "Ended", line: NEAR_SWAP_UNFINISHED }, ...near };
-  return { ended: null };
-}
-
 /** A site wallet's Take out, by the site's name (crawl F6; one word for the move: Take out). */
 export const siteOutTitle = (_status: Movement["status"], usd: string, site: string): string => `Take out ${usd} from your ${site} wallet`;
 export function describe(m: Movement, tokens: Map<string, Token>, chains: Chain[], rows?: OwnRows): { title: string; detail: string } {
@@ -493,6 +506,14 @@ export function describe(m: Movement, tokens: Map<string, Token>, chains: Chain[
   const amount = `${dollarsOfUsdc ? coins(m.amount, 2, 2) : amountOf(m.amount, symbol, symbol === "NEAR" ? 24 : own, 0)} ${symbol}`.trim();
   const to = m.to ? payeeWords(m.to) : "";
   const where = whereNow(m, to);
+  // a row's figure is its dollars, said once, in the right column (movementDollars); its line never leads with the raw
+  // coin ("200 USDC · …", the Activity walk, 6 Nov, item 5); the coin only where there is no price
+  const coin = movementDollars(m, tokens) ? "" : amount;
+  // where the money LEFT (sendFrom, the one rule the page and the job read too; the audit's MUST, 7 Nov), only on a Send through
+  // NEAR Confidential: "From your Safe" for the Safe's Send, "From Private" for Private's own, never m.private's guess
+  // (the copy review's "From Private." for a leg Private paid; "your Safe", "your SOL wallet": INTO_WORDS, the wallets' one name)
+  const left = sendFrom(m), at = left === "private" ? "Private" : `your ${INTO_WORDS[left as "safe"] ?? "wallet"}`;
+  const fromPlace = (w: string) => (m.private && left ? (w ? `${w} from ${at}` : `From ${at}`) : w);
   // A step from the account's record that moved no money (a rules change, a key): its own words, and which key signed,
   // as Security's Activity says it (grade 02f, item 4: one Activity, the same rows in both).
   if (m.kind === "account") {
@@ -517,8 +538,9 @@ export function describe(m: Movement, tokens: Map<string, Token>, chains: Chain[
       const word = m.status === "done" ? (m.kind === "pay" && m.caller !== "wallet" ? "Paid" : "Sent") : m.status === "moving" ? "Sending" : m.status === "refunded" ? "Came back" : UNCONFIRMED.has(m.problem?.code ?? "") ? "Unconfirmed" : m.problem?.code === "ledger.transfer.part-returned" ? "Some came back" : "Not sent";
       // into the person's own row (a Swap from Hidden lands there): a move between their own places, never a payment
       const mine = ownRowOf(m, rows);
-      if (mine && (m.status === "done" || m.status === "moving")) return { title: `${m.status === "done" ? "Moved" : "Moving"} to ${mine}`, detail: `${amount}${m.private ? " from your private balance" : ""}${m.status === "moving" ? ` · on its way to ${mine}` : ""}` };
-      return { title: m.label ? `${word} · ${m.label}` : word, detail: [`${amount}${m.private ? " from your private balance" : ""}`, where].filter(Boolean).join(" · ") };
+      // a leg paid from Private, ended (the copy review's words, 7 Nov): "From Private."
+      if (mine && (m.status === "done" || m.status === "moving")) return { title: `${m.status === "done" ? "Moved" : "Moving"} to ${mine}`, detail: m.status === "done" && m.private && left && !coin ? `${fromPlace("")}.` : [fromPlace(coin), m.status === "moving" ? `on its way to ${mine}` : ""].filter(Boolean).join(" · ") };
+      return { title: m.label ? `${word} · ${m.label}` : word, detail: [fromPlace(coin), where].filter(Boolean).join(" · ") };
     }
     case "private": {
       // Security audit 4 Nov, finding 2: the core's move from the old wallets (replaced backup words) into the new ones.
@@ -528,12 +550,14 @@ export function describe(m: Movement, tokens: Map<string, Token>, chains: Chain[
         return { title: `${m.status === "done" ? "Moved" : "Moving"} ${what} from your old wallets to ${into}`, detail: amount };
       }
       if (m.from === "private") {
-        const title = m.status === "done" ? "Moved out of your private balance" : m.status === "moving" ? "Moving out of your private balance" : m.status === "refunded" ? "Came back to your private balance" : "Not moved";
-        return { title, detail: `${amount} · ${where}` };
+        const title = m.status === "done" ? "Moved out of Private" : m.status === "moving" ? "Moving out of Private" : m.status === "refunded" ? "Came back to Private" : "Not moved";
+        return { title, detail: [coin, where].filter(Boolean).join(" · ") };
       }
       // The move into Private (D27): visible on chain, which Activity says plainly.
-      const title = m.status === "done" ? "Moved to your private balance" : m.status === "moving" ? "Moving to your private balance" : m.status === "refunded" ? "Came back" : "Not moved";
-      return { title, detail: `${amount} · ${where} · anyone can see this move` };
+      const title = m.status === "done" ? "Moved to Private" : m.status === "moving" ? "Moving to Private" : m.status === "refunded" ? "Came back" : "Not moved";
+      // the title says where it went: the line never says it again ("in Private" under "Moved to Private")
+      // the copy review's words (7 Nov): where it came from, plainly; never "anyone can see this move"
+      return { title, detail: [coin, m.status === "done" ? "" : where, ACTIVITY_WORDS.intoPrivate].filter(Boolean).join(" · ") };
     }
     case "trading": {
       // Top up (ledger.toTrading) and Put away (D52): dollars of USDC, to the cent ("$14.47"), cut as Balance counts it.

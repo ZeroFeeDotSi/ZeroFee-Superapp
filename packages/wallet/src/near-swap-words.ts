@@ -7,7 +7,7 @@ const ONE_CLICK = SERVICE_NAMES.oneclick;
 /** A NEAR wallet swap with no provable end: 1Click's FAILED, or one stuck past reading. Never on a true refund or a no. */
 export const NEAR_SWAP_UNFINISHED = `${ONE_CLICK} didn't finish this swap.`;
 /** Where its money is then: the places it can be, and where to look first (copy review, 6 Nov). */
-export const NEAR_SWAP_UNSURE = { state: "unsure" as const, where: `either in your NEAR wallet or still with ${ONE_CLICK}`, check: "Check your NEAR wallet's balance first." };
+export const NEAR_SWAP_UNSURE = { state: "unsure" as const, where: `either in your NEAR wallet or still with ${ONE_CLICK}`, check: "Check your NEAR wallet first." };
 /** The money line of that end, on its own (no headline). */
 const NEAR_SWAP_WHERE = `Your money is ${NEAR_SWAP_UNSURE.where}.`;
 /** The ended swap's sheet (copy review, 6 Nov): its title, its step when 1Click didn't finish it, and its one line under them. */

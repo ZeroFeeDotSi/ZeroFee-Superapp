@@ -10,6 +10,7 @@ import CryptoKit
 import Foundation
 import LocalAuthentication
 import Security
+import UIKit
 
 /**
  * The phone check (H16, H17; RC-7): what stops this iPhone making or using the key, before anything is made or signed.
@@ -66,7 +67,9 @@ enum ChipKey {
   /** Fixed words for the Face ID prompt. The page can't choose them: what is being signed is on the native sheet. */
   private static let reason = "Approve what ZeroFee's sheet shows"
 
-  struct Refused: Error { let what: String }
+  /** `next`: the sheet's one lit button after it (copy review, 6 Nov): Try again (a new Face ID), or Close; none: as before. */
+  struct Refused: Error { let what: String; var next: Next = .none
+    enum Next { case none, tryAgain, close } }
   /** The phone check stopped it: its code goes to the page, which shows that blocker's own screen. */
   struct Blocked: Error { let check: PhoneCheck }
 
@@ -135,29 +138,77 @@ enum ChipKey {
   }
 
   /**
-   * Sign one 32-byte hash inside the chip, after its own Face ID (a fresh context, used for this one signature and
-   * invalidated right after). Only the native sheet calls this (NativeSheet.swift), with the hash it computed itself from
-   * transaction bytes it checked; the page can't reach it with a hash of its own.
+   * Sign one 32-byte hash inside the chip, after its own Face ID (signMany of one hash: a fresh context, used for this
+   * one signature and invalidated right after). Only the native sheet calls this (NativeSheet.swift), with the hash it
+   * computed itself from transaction bytes it checked; the page can't reach it with a hash of its own.
    */
   static func sign(hash: Data) async throws -> Data {
+    guard let one = try await signMany(hashes: [hash]).first else { throw Refused(what: "ZeroFee couldn't read what to approve, so it didn't approve it.") }
+    return one
+  }
+
+  /** The most hashes one Face ID may sign (the audit's R3, 6 Nov): one sheet's steps, never split across sheets. */
+  static let maxHashes = 4
+  /** How long one Face ID's yes may sign for (the audit's R5): past it the context is dead and nothing more is signed. */
+  static let unlockSeconds: TimeInterval = 60
+
+  /**
+   * One Face ID, then every hash of ONE sheet signed back to back inside the chip under that one context (D3/D4, the audit's
+   * R3/R5). 1 to 4 hashes, each 32 bytes, all computed by the native sheet from bytes it decoded and checked itself.
+   * The unlock is single use: it ends at the last signature, on any refusal, on going to the background, or 60 s after
+   * Face ID said yes, whichever is first; then the context is invalidated, the key object dropped and the handle's copy
+   * zeroed. Never reused across sheets; no reuse window (touchIDAuthenticationAllowableReuseDuration stays 0).
+   */
+  static func signMany(hashes: [Data]) async throws -> [Data] {
     let context = LAContext()
-    defer { context.invalidate() }
-    guard hash.count == 32 else { throw Refused(what: "ZeroFee couldn't read what to approve, so it didn't approve it.") }
+    context.touchIDAuthenticationAllowableReuseDuration = 0
+    let unlock = Unlock(context: context)
+    defer { unlock.end() }
+    guard (1...maxHashes).contains(hashes.count) else { throw Refused(what: "This has more steps than one Face ID covers, so ZeroFee stopped it. Your money hasn't moved.", next: .close) }
+    guard hashes.allSatisfy({ $0.count == 32 }) else { throw Refused(what: "ZeroFee couldn't read what to approve, so it didn't approve it.") }
     guard chipAvailable else { throw Refused(what: "This device has no secure chip, so it can't approve anything.") }
-    guard let handle = try Keychain.get(Keychain.chipKey, handleItem) else { throw Refused(what: "This phone has no account key yet.") }
+    guard var handle = try Keychain.get(Keychain.chipKey, handleItem) else { throw Refused(what: "This phone has no account key yet.") }
+    defer { handle.resetBytes(in: 0..<handle.count) }
     context.localizedFallbackTitle = ""
+    // going to the background ends the unlock (the audit's R5): the context dies, nothing more is signed
+    let away = await MainActor.run { NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { _ in unlock.end() } }
+    defer { NotificationCenter.default.removeObserver(away) }
     do {
       try await FaceIdPrompt.around { try await context.evaluateAccessControl(try access(), operation: .useKeySign, localizedReason: reason) }
     } catch {
       if let blocked = PhoneCheck.from(error, biometry: context.biometryType) { throw Refused(what: blocked.sheetWords) }
       throw Refused(what: "Face ID didn't approve it. Your money hasn't moved. Try again, or tap Not now.")
     }
+    unlock.start(seconds: unlockSeconds)
+    // the key built here from `handle` itself (audit, 6 Nov: a copy for the task would be a second buffer the defer never
+    // zeroes); the task gets only the key object
+    let key = try SecureEnclave.MLDSA65.PrivateKey(dataRepresentation: handle, authenticationContext: context)
     return try await Task.detached(priority: .userInitiated) {
-      let key = try SecureEnclave.MLDSA65.PrivateKey(dataRepresentation: handle, authenticationContext: context)
-      let signature = try key.signature(for: hash)
-      guard key.publicKey.isValidSignature(signature, for: hash) else { throw Refused(what: "The secure chip's approval didn't check out, so ZeroFee didn't use it. Your money hasn't moved.") }
-      return signature
+      var out: [Data] = []
+      for hash in hashes {
+        guard unlock.live() else { throw Refused(what: "The Face ID approval timed out, so nothing was sent. Your money hasn't moved.", next: .tryAgain) }
+        let signature = try key.signature(for: hash)
+        guard key.publicKey.isValidSignature(signature, for: hash) else { throw Refused(what: "The secure chip's approval didn't check out, so ZeroFee didn't use it. Your money hasn't moved.") }
+        out.append(signature)
+      }
+      return out
     }.value
+  }
+
+  /** One Face ID's unlock: live from Face ID's yes until its deadline, unless ended first (the last signature, a
+   *  refusal, the background). Ending it invalidates the context, once. */
+  final class Unlock: @unchecked Sendable {
+    private let lock = NSLock()
+    private let context: LAContext
+    private var deadline: Date?
+    private var ended = false
+    init(context: LAContext) { self.context = context }
+    func start(seconds: TimeInterval) { lock.withLock { deadline = Date().addingTimeInterval(seconds) } }
+    func live() -> Bool { lock.withLock { !ended && (deadline.map { Date() < $0 } ?? false) } }
+    func end() {
+      let first: Bool = lock.withLock { defer { ended = true }; return !ended }
+      if first { context.invalidate() }
+    }
   }
 }
 
@@ -228,6 +279,7 @@ final class ApprovalPass {
   /** Face ID (biometrics only, the faces enrolled when the key was made). True = approved. */
   func confirm() async -> Bool {
     let context = LAContext()
+    context.touchIDAuthenticationAllowableReuseDuration = 0
     defer { context.invalidate() }
     context.localizedFallbackTitle = "" // no passcode button: this is Face ID or "Not now"
     #if targetEnvironment(simulator)
@@ -289,6 +341,9 @@ extension Host {
       case "key.sign":
         // Only through the native sheet, with transaction bytes it checks and hashes itself (S1.6).
         return await signOnSheet(p)
+      case "key.signSet":
+        // One sheet, one Face ID, 1 to 4 transactions it checks and hashes itself, signed back to back (D3, the audit's R3)
+        return await signSetOnSheet(p)
       case "key.signAlertsProof":
         // The one message besides a transaction: the relay's email-alerts proof, built natively (AlertsProof).
         return await signAlertsProof(p)

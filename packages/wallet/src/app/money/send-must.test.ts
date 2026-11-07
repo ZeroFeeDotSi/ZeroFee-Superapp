@@ -75,8 +75,9 @@ test("MUST 1: the person's No is theirs, by name: what happened, where the money
 
 test("MUST 1: a No on the Safe's sheet after the private balance's part went is never said as nothing sent (control: a No with nothing gone stays a No)", () => {
   const safe = readFileSync(new URL("../../safe-send.ts", import.meta.url), "utf8");
-  assert.match(safe, /if \(out\.length && e instanceof ProblemError\) throw new ProblemError\(\{ \.\.\.e\.problem, \.\.\.\(\/\\\.declined\$\/\.test\(e\.problem\.code\) \? \{ code: "ledger\.send\.part-went", whatHappened: "Only the part from your private balance was sent\. Activity shows it\." \} : \{\}\),/);
-  assert.match(safe, /if \(two\.declined \|\| !two\.signedData\) throw new ProblemError\(walletProblems\.declined\(\)\);/, "control: nothing gone, the No as before");
+  assert.match(safe, /if \(out\.length\) throw new PartWent\(pocketPartWent\(e instanceof ProblemError \? e\.problem : walletProblems\.unexpectedMoney\(/, "safe-send-part-went.test.ts runs it");
+  // one Face ID (6 Nov): leg 2 may come back held for the Safe's one sheet (pair) instead of signed; neither: the No as before
+  assert.match(safe, /if \(two\.declined \|\| \(!two\.signedData && !two\.pair\)\) throw new ProblemError\(walletProblems\.declined\(\)\);/, "control: nothing gone, the No as before");
   assert.ok(readFileSync(new URL("../../../errors.md", import.meta.url), "utf8").includes("| `ledger.send.part-went` |"));
 });
 
@@ -94,7 +95,7 @@ test("MUST 3: Send's Job created carries the time left, from the route's measure
   assert.equal(sendSec({ row: "sol", toNear: false }), LEG_SEC.safeToChain + LEG_SEC.chainIn, "a wallet's coins come into NEAR first");
   assert.equal(MEASURED_SEC.safeToNear, 30, "control: Move's own times unchanged");
   const t0 = 1_000_000;
-  assert.deepEqual([receiptLeft(t0 + 30_000, t0), receiptLeft(t0 + 60_000, t0), receiptLeft(t0 + 150_000, t0)], ["About 30 s left.", "About 1 min left.", "About 3 min left."], "the receipt's words (JobMade TimeLeft)");
+  assert.deepEqual([receiptLeft(t0 + 30_000, t0), receiptLeft(t0 + 60_000, t0), receiptLeft(t0 + 150_000, t0)], ["About 30 seconds left.", "About 1 min left.", "About 3 min left."], "the receipt's words (JobMade TimeLeft)");
   clear();
   const before = Date.now();
   await runJob({ tasks, title: "Send $1.00", safe: false, money: ["row:sol"], etaSec: 60, call: async () => ({ ok: {} }), declined: () => false, made: () => {} });
@@ -110,11 +111,10 @@ test("MUST 3: Send's Job created carries the time left, from the route's measure
   assert.match(src("./JobMade.tsx"), /setInterval\(\(\) => setNow\(Date\.now\(\)\), 1000\)/, "counted down each second (TimeLeft)");
 });
 
-test("MUST 4: Add's words never say a kept address is new or for one Add (control: Change wallet still says it gives a new one; a used-up address says so)", () => {
+test("MUST 4: Add's words never say a kept address is new or for one Add, used up, or Change wallet (owner's Bugs:, 6 Nov)", () => {
   const all = Object.values(ADD_WORDS).flatMap((w) => (typeof w === "function" ? [String((w as (...a: string[]) => unknown)("SOL wallet", "safe"))] : [String(w)]));
   for (const w of all) assert.doesNotMatch(w, /for this Add only|only once|A new address, for/i, w);
   assert.equal(ADD_WORDS.forYou, "Only for you. To be paid by someone else, tap Ask someone to pay you.");
-  assert.equal(ADD_WORDS.oneTime("SOL wallet"), "Money sent here lands in your SOL wallet. Send at least the amount shown with the QR.");
-  assert.match(ADD_WORDS.changeLines("SOL wallet")[0], /You get a new address/, "control: Change wallet tells the truth about the new one");
-  assert.match(ADD_WORDS.done, /used up\. Tap Change wallet/, "control");
+  for (const w of all) assert.doesNotMatch(w, /used up|Change wallet/i, w);
+  assert.match("This address is used up. Tap Change wallet for a new one.", /used up|Change wallet/i, "control: the old line is caught");
 });

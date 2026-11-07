@@ -5,8 +5,10 @@ import { onDemoPage } from "@zerofee/shell-api/release.ts";
 // Add says so in one line; it never falls back to an old public address. Home's Send (E3 and E4, every Send private
 // through NEAR; no plain send is left) is behind the same flag: off, one line and Close, nothing asked of the core.
 
-/** The build's own flag (Vite puts VITE_* in import.meta.env at build time); no flag, a test or the phone's core: off. */
-export const homeProof = (env: Record<string, unknown> | undefined = (import.meta as { env?: Record<string, unknown> }).env, sim: boolean = onDemoPage()): boolean => env?.VITE_HOME_PROOF === "1" || sim; // Sim (sample money, no real route to test) is always open
+/** The build's own flag (Vite puts VITE_* in import.meta.env at build time); no flag, a test or the phone's core: off.
+ *  The default reads the one flag inline (import.meta.env?.VITE_HOME_PROOF), so Vite writes its literal: never the whole
+ *  env object, which would put every VITE_* value of the build in the bundle. */
+export const homeProof = (env: Record<string, unknown> | undefined = { VITE_HOME_PROOF: import.meta.env?.VITE_HOME_PROOF }, sim: boolean = onDemoPage()): boolean => env?.VITE_HOME_PROOF === "1" || sim; // Sim (sample money, no real route to test) is always open
 
 /** Add's one line while the route is off. */
 export const HOME_PROOF_OFF = "Add opens after its first real test.";

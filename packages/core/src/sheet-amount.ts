@@ -8,7 +8,9 @@ import type { PlainWords } from "./signer.ts";
 export function amountLine(w: Pick<PlainWords, "amount" | "amountSaid" | "lines">): string | null {
   if (!w.amount) return null;
   if (w.amountSaid !== true) return w.amount;
-  const dollars = w.amount.split(" (")[0]!.trim();
+  // a priced coin's Amount is "about $30.00 (6.7731 NEAR)": its dollars are the same figure a line says (QA's ledger
+  // re-walk, 6 Nov: a NEAR Send's fill sheet said it twice), the "about" is the price's, never a different sum
+  const dollars = w.amount.split(" (")[0]!.trim().replace(/^about /, "");
   const said = /^\$[\d,]+\.\d{2}$/.test(dollars) && w.lines.some((l) => l.includes(`· ${dollars}`) || l.includes(` ${dollars} `));
   return said ? null : w.amount;
 }

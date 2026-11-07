@@ -63,3 +63,45 @@ test("control: a decorative pseudo is not a hit box, and a 5 pt reach is not eno
   assert.ok(reach(32, { y: 5, x: 0 }) < 44, "32 + 2 × 5 = 42 fails");
   assert.ok(reach(38, { y: 3, x: 0 }) == 44 && reach(38, { y: 2, x: 0 }) < 44);
 });
+
+// the copy review's item 12 (6 Nov; fix/trade-list-coin, 7 Nov): every tap target on Home's rows, Trade's list and the coin page is at
+// least 44 pt, measured from the CSS each screen ships: the drawn height (the last min-height or height), plus the reach of
+// an inert ::before/::after hit box over and under it; a width pinned where the target is a word ("Copy").
+const pkg = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
+const wallet = pkg("wallet/src/app/wallet.css"), trade = pkg("trade/src/app/trade.css"), discover = pkg("trade/src/app/discover.css"), coinpage = pkg("trade/src/app/coinpage.css");
+/** How tall and wide a target taps, from its CSS alone: null for a side the CSS doesn't size. */
+export function tapBox(src: string, sel: string): { h: number | null; w: number | null } {
+  const b = blocks(src, sel);
+  const hs = [lastPx(b, "min-height"), lastPx(b, "height")].filter((n): n is number => n !== null);
+  const ws = [lastPx(b, "min-width"), lastPx(b, "width")].filter((n): n is number => n !== null);
+  const pseudo = hitInset(blocks(src, `${sel}::after`)) ?? hitInset(blocks(src, `${sel}::before`));
+  return { h: hs.length ? Math.max(...hs) + 2 * (pseudo?.y ?? 0) : null, w: ws.length ? Math.max(...ws) + 2 * (pseudo?.x ?? 0) : null };
+}
+const NAMED: [screen: string, src: string, sel: string, side: "h" | "hw"][] = [
+  ["Home, a coin row", wallet, ".wl-row.wl-coin", "h"],
+  ["Home, Show all", wallet, ".wl-more", "h"],
+  ["Home, the Safe row's Buy (32 to the eye)", wallet, ".wl-buy", "h"],
+  ["Home, a Hot wallet's Add", wallet, ".wl-hw-add", "hw"],
+  ["Coin page, a range (1H … ALL) and the candles switch", trade, ".tr-ranges button", "hw"],
+  ["Coin page, Copy (its address)", coinpage, ".cp .cp-addr .tr-copy", "hw"],
+  ["Trade list, a wallet chip", discover, ".dc-tabs button", "h"],
+  ["Trade list, a list pill (Hot, New, 5m …)", discover, ".dc-wins button", "hw"],
+  ["Trade list, Move", discover, ".dc-move", "h"],
+  ["Trade list, Settings", discover, ".dc-gear", "hw"],
+];
+test("the copy review's item 12: every named target on Home, Trade's list and the coin page taps at 44 pt or more", () => {
+  for (const [screen, src, sel, side] of NAMED) {
+    const t = tapBox(src, sel);
+    assert.ok(t.h !== null && t.h >= 44, `${screen} (${sel}): ${t.h} tall`);
+    if (side === "hw") assert.ok(t.w !== null && t.w >= 44, `${screen} (${sel}): ${t.w} wide`);
+  }
+});
+test("control: without the fixes, the Safe row's Buy taps at 32 and Copy unsized (the measure fails them)", () => {
+  const oldWallet = wallet.slice(0, wallet.indexOf("/* 53, 6 Nov, item 12"));
+  assert.ok(oldWallet.length < wallet.length, "the fix's block is there to cut");
+  assert.equal(tapBox(oldWallet, ".wl-buy").h, 32);
+  const oldCopy = coinpage.replace(".tr-copy { min-height: 44px; min-width: 44px;", ".tr-copy { min-height: 44px; min-width: 0;");
+  assert.notEqual(oldCopy, coinpage, "the fix is there to undo");
+  assert.ok((tapBox(oldCopy, ".cp .cp-addr .tr-copy").w ?? 0) < 44, "min-width 0: not sized to 44");
+  assert.equal(tapBox(".x { height: 32px; } .x::after { content: \"\"; position: absolute; inset: -4px 0; }", ".x").h, 40, "a 4 pt reach is short");
+});

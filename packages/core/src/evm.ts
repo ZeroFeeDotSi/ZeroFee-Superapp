@@ -352,8 +352,9 @@ export interface EvmChain {
   /** An address as each of the two nodes has it now: its count of sent transactions (latest and pending) and its balance;
    *  null for a node that didn't answer. The core's proof that a move in was never paid (float-moves.ts). */
   account?(chain: EvmWalletChain, address: string): Promise<({ latest: number; pending: number; balance: bigint } | null)[]>;
-  /** A sent transaction's receipt as each of the two nodes has it: "ok", "failed", or null (not yet, or no answer). */
-  receipt(chain: EvmWalletChain, hash: string): Promise<("ok" | "failed" | null)[]>;
+  /** A sent transaction's receipt as each of the two nodes has it: "ok", "failed", null (the node answered: no receipt)
+   *  or "unread" (the node didn't answer: never an absence, the audit's MUST 7 Nov). */
+  receipt(chain: EvmWalletChain, hash: string): Promise<("ok" | "failed" | null | "unread")[]>;
   /** One read for a site (D29 wallet mode): one node, the other if it fails. Reads decide nothing. */
   read(chain: EvmWalletChain, method: string, params: unknown[]): Promise<unknown>;
   /** The fee tier of the coin's deepest v3 pool against the wrapped native coin (the most of it held), on two nodes;
@@ -450,6 +451,9 @@ const agreed = (xs: bigint[]) => {
 
 /** A node answered with a JSON-RPC error (it was reached and said no), as against no answer at all. */
 class NodeRefused extends Error {}
+
+/** A node that didn't answer a receipt read (receipt): kept apart from its answer "no receipt" (null). */
+const UNREAD = Symbol("unread");
 
 export class RpcEvmChain implements EvmChain {
   private readonly nodes: Record<EvmWalletChain, string[]>;
@@ -606,11 +610,12 @@ export class RpcEvmChain implements EvmChain {
     });
   }
 
-  async receipt(chain: EvmWalletChain, hash: string): Promise<("ok" | "failed" | null)[]> {
-    const answers = await this.both(chain, (u) => this.rpc(u, "eth_getTransactionReceipt", [hash]));
+  async receipt(chain: EvmWalletChain, hash: string): Promise<("ok" | "failed" | null | "unread")[]> {
+    // a node that failed is "unread" (both() gives null for it), never "no receipt" (the audit's MUST, 7 Nov)
+    const answers = (await this.both(chain, async (u) => ({ r: await this.rpc(u, "eth_getTransactionReceipt", [hash]) }))).map((x) => (x === null ? UNREAD : x.r));
     // A receipt counts only for the hash asked, in a block (security review, 2 Nov): any other object is "not yet".
     const ours = (a: any) => a && typeof a.status === "string" && typeof a.transactionHash === "string" && a.transactionHash.toLowerCase() === hash.toLowerCase() && typeof a.blockHash === "string";
-    return answers.map((a) => (ours(a) ? (a.status === "0x1" ? "ok" : "failed") : null));
+    return answers.map((a) => (a === UNREAD ? "unread" : ours(a) ? (a.status === "0x1" ? "ok" : "failed") : null));
   }
 
   async read(chain: EvmWalletChain, method: string, params: unknown[]): Promise<unknown> {

@@ -26,9 +26,10 @@ export const LEG_MIN_USD = 2;
 /** Between two chains' wallets (E5, review M1): the least that still arrives, by the core's own floors. */
 export { PAIR_MIN_USD } from "@zerofee/core/float-floors";
 import { pickSafeCoin, withPrivate, type SpendingActivity } from "@zerofee/core/spending";
+import { intentsKept } from "@zerofee/core/zero-fee";
 import { LEG_SEC } from "@zerofee/shell-api/job-steps.ts";
-import { fillStepUsd } from "@zerofee/core/private-route";
-import { HOME_LEG_MIN_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, leastHome, leastIn } from "@zerofee/core/float-floors";
+import { moveSplitUsd } from "@zerofee/core/move-plan";
+import { HOME_LEG_MIN_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, leastHome, leastIn, planLeastUsd, walletLegLeastUsd } from "@zerofee/core/float-floors";
 /** A leg between two chains' wallets: a move in to the NEAR wallet, then a move out (E5). */
 export const pairLeg = (l: { from: Place; to: Place }): boolean => chainPlace(l.from) && chainPlace(l.to);
 /** The least this leg can be, by the core's own floors after its fees (UI's AgentZero walk, 3 Nov: a $2 leg passed Face
@@ -89,7 +90,8 @@ export function safeCoinMost(coins: readonly SafeCoinRow[], fill = true): number
  * Private; a Safe that can't cover the step fills exactly what is short. `need`: what the Safe's side pays the wallets;
  * `fill`: what leaves the Safe for it (0: Private pays it all). Null: no Safe leg, the fill closed, or no coin pays.
  */
-export function fillOf(legs: readonly Leg[], coins: readonly SafeCoinRow[], fill = true): { need: number; fill: number } | null {
+export interface PageFill { need: number; fill: number; /** each wallet the Safe's side pays, as the core's plan splits it (moveSplitUsd) */ parts?: { to: Place; usd: number; fromPrivate: number; viaFill: number }[] }
+export function fillOf(legs: readonly Leg[], coins: readonly SafeCoinRow[], fill = true): PageFill | null {
   // the fill closed: nothing fills Private (the most is Private's own: safeCoinMost)
   if (!fill) return null;
   const need = cents(sum(legs.filter((l) => safeSide(l.from) && !safeSide(l.to)).map((l) => l.usd)));
@@ -99,11 +101,18 @@ export function fillOf(legs: readonly Leg[], coins: readonly SafeCoinRow[], fill
   const pick = pickSafeCoin(withPrivate(safe, priv), need);
   if (!pick) return null;
   const mine = (c: SafeCoinRow) => (pick.coin.tokenId === "near" ? c.tokenId === "nep141:wrap.near" : c.tokenId === pick.coin.tokenId);
-  const short = cents(need - sum(priv.filter(mine).map((c) => Number(c.usd) || 0)));
-  if (short <= 0.004) return { need, fill: 0 };
-  const step = fillStepUsd(short);
+  // J2-1 (the audit's MUST 1, 8 Nov: the page showed Safe -$40 / Private -$15.63, a split the core doesn't run): the core's own
+  // split (move-plan.ts moveSplit, as subwallets.movePlan and the Sim's privateNeed run it), each wallet one part in the
+  // order the legs name them, Private's share of the paying coin, the Safe's own row of it as what it can cover. It folds
+  // Private's share into the one fill while the buffer allows (the Safe $60.00, Private +$4.37), so page and sheet show
+  // ONE split
+  const share = cents(sum(priv.filter(mine).map((c) => Number(c.usd) || 0)));
+  const to: Place[] = [];
+  for (const l of legs) if (safeSide(l.from) && !safeSide(l.to) && !to.includes(l.to)) to.push(l.to);
+  const per = to.map((w) => cents(sum(legs.filter((l) => safeSide(l.from) && l.to === w).map((l) => l.usd))));
   const own = safe.find((c) => c.tokenId === pick.coin.tokenId);
-  return { need, fill: own && step <= (Number(own.usd) || 0) + 0.004 ? step : short };
+  const split = moveSplitUsd(per, share, { safeHas: Number(own?.usd) || 0 });
+  return { need, fill: split.fill, parts: split.parts.map((p) => ({ to: to[p.part]!, usd: per[p.part]!, fromPrivate: p.fromPrivate, viaFill: p.viaFill })) };
 }
 
 /**
@@ -131,10 +140,21 @@ export function safeSigns(legs: readonly Leg[], coins: readonly SafeCoinRow[] | 
  * own legs. `extra`: what of the fill stays in Private (said once, fillLine); `privateUsd`: Private's change (minus: it
  * pays; plus: it keeps more than it paid).
  */
-export function fillLegs(legs: readonly Leg[], f: { need: number; fill: number } | null): { legs: Leg[]; extra: number; privateUsd: number } {
+export function fillLegs(legs: readonly Leg[], f: PageFill | null): { legs: Leg[]; extra: number; privateUsd: number } {
   const side = legs.filter((l) => safeSide(l.from) && !safeSide(l.to));
   const paid = cents(sum(legs.filter((l) => l.from === "private").map((l) => l.usd)));
   if (!f || !side.length) return { legs: [...legs], extra: 0, privateUsd: -paid };
+  // the core's split (fillOf): each wallet's Safe leg is what the one fill pays of it, Private's what it pays from its own
+  // share; what the fill brings over the parts it pays stays in Private (`extra`), Private's change the fill less the need
+  if (f.parts && f.fill > 0) {
+    const out: Leg[] = legs.filter((l) => !(safeSide(l.from) && !safeSide(l.to)));
+    for (const p of f.parts) {
+      if (p.viaFill >= 0.005) out.push({ from: "safe", to: p.to, usd: p.viaFill });
+      if (p.fromPrivate >= 0.005) out.push({ from: "private", to: p.to, usd: p.fromPrivate });
+    }
+    const via = cents(sum(f.parts.map((p) => p.viaFill)));
+    return { legs: out, extra: cents(f.fill - via), privateUsd: cents(f.fill - f.need) };
+  }
   const to: Place[] = [];
   for (const l of side) if (!to.includes(l.to)) to.push(l.to);
   const per = to.map((w) => ({ w, usd: cents(sum(side.filter((l) => l.to === w).map((l) => l.usd))) }));
@@ -323,6 +343,8 @@ export function legsOf(now: readonly PlaceNow[], s: Split, pairs = true): Leg[] 
 }
 
 /** One line per leg, as the sliders move: "SOL → Safe $100", "Safe → ETH (RH) $40.50". */
+/** A leg in a job row's sentence (the copy review's ruling, 6 Nov: no arrow glyph in words, two decimals on money): "$3.00 from your SOL wallet to BNB". */
+export const legWords = (l: Leg): string => `${money2(l.usd)} from ${WHERE[l.from]} to ${l.to === "safe" ? "your Safe" : PLACE_NAME[l.to]}`;
 export const legLine = (l: Leg): string => `${PLACE_NAME[l.from]} → ${PLACE_NAME[l.to]} ${usdShort(l.usd)}`;
 /** A figure typed on a place's row (finding 17: "$6", "6.5", "1,200"): its dollars, or null for anything else. */
 export function typedUsd(text: string): number | null {
@@ -391,6 +413,8 @@ export const usdShort = (x: number): string => {
 export const MOVE_WORDS = {
   title: "Move",
   head: "Where your money sits",
+  // the big total's label (the UI reviewer, 6 Nov, row 7 a): it is every place together, not Home's one figure
+  all: "All your wallets",
   // finding 17: a figure can be typed too, and the one line says so (it still starts "Drag a slider": the walks wait on it)
   untouched: "Drag a slider, or tap an amount to type it.",
   typed: (where: string) => `Dollars in ${where}`,
@@ -441,10 +465,18 @@ export const MOVE_WORDS = {
   // Sim re-check (5 Nov): one amount said once; the legs say what each place pays, this only what stays
   fill: (fill: string, stays: string) => `Your Safe sends ${fill}. ${stays} stays in Private.`,
   safeKeepsCoin: (usd: string) => `${usd} in other coins stays in your Safe. One coin per move.`,
-  safeKeepsCap: (usd: string, cap: string) => `${usd} stays in your Safe. Your wallets can hold ${cap} in all.`,
+  // the row's own figure (the UI reviewer, 6 Nov, row 8 a): one figure on the Safe's row, the reason after it (provisional)
+  safeStaysCoin: (usd: string) => `${usd} stays in your Safe. One coin per move.`,
+  // J2-5 (copy review, 8 Nov): the cap is the person's own rule. It is changed on the NEAR wallet's top-up ("holds up to · Change",
+  // Spending.tsx CapSheet), not in Protection, so the line names no place it isn't
+  safeKeepsCap: (usd: string, cap: string) => `${usd} stays in your Safe. Your rule: wallets hold up to ${cap} in all.`,
   short: (from: string, to: string, least: string) => `${from} → ${to} needs at least ${least}.`,
   leave: (place: string) => `Leave ${place === "Safe" ? "your Safe" : place} as it is`,
   closeOk: "It keeps going if you close this.",
+  // the floor's one summary line (the UI reviewer, 6 Nov, item 4): the plan's total, to the places by name
+  moves: (usd: string, to: string) => `Moves ${usd} to ${to}.`,
+  // a source the plan moved by itself (row 8 b): said once, with the plan's own figure
+  also: (parts: string) => `Also moves ${parts}.`,
   done: "Done",
 } as const;
 
@@ -464,9 +496,9 @@ export function leastOf(l: Leg): number {
   const chainFrom = chainPlace(l.from);
   const chainTo = chainPlace(l.to);
   if (l.to === "safe") return l.from === "near" ? leastHome(Math.max(0, l.usd - 0.01)) : leastHome(leastIn(l.usd * 0.99));
-  if (safeSide(l.from)) return chainTo ? (l.usd * 0.99) / 1.03 : l.usd * 0.99;
-  if (chainFrom && chainTo) return leastIn(l.usd * 0.99) / 1.03;
-  return chainFrom ? leastIn(l.usd * 0.99) : l.usd * 0.99;
+  // the Safe's side to a wallet: the floors less that chain's network fee (the audit's MUST, 8 Nov: NETWORK_FEE_USD)
+  if (safeSide(l.from)) return planLeastUsd(l.usd, l.to === "private" ? "near" : l.to);
+  return walletLegLeastUsd(l.usd, chainFrom, chainTo);
 }
 export const WHERE: Record<Place, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 /** "$26.10 leaves your SOL wallet. At least $24.01 reaches your Safe. Fees at most $2.09." (several places: "leaves" and
@@ -493,6 +525,77 @@ export function costLine(legs: readonly Leg[]): string | null {
   const { leaves, least, fees, from, to } = costFacts(legs);
   const $ = money2;
   return `${$(leaves)} leaves${from.length === 1 ? ` ${WHERE[from[0]!]}` : ""}. At least ${$(least)} ${to.length === 1 ? `reaches ${WHERE[to[0]!]}` : "arrives"}. Fees at most ${$(fees)}.`;
+}
+
+/** The floor's fee block (the UI reviewer's ruling, 6 Nov; 83 and 53 on T-B): who gets the fee, one line on every state, so
+ *  the floor never changes shape. The fee's figure is said once, on the plan's Fees row (row 8 d), never in the floor, so
+ *  "keep this" would follow the summary's figure, not a fee: always the no-figure line. */
+export function moveFee(_legs: readonly Leg[], _blocked: boolean): { kept: string } {
+  return { kept: intentsKept(false) };
+}
+
+/** Places by the app's names, as one Move's end: "your Safe", "your SOL wallet", "your SOL and ETH (RH) wallets", "your
+ *  SOL, ETH (RH) and NEAR wallets"; the Safe and wallets together, "your Safe and your SOL wallet". */
+export function placesWords(to: readonly Place[]): string {
+  const u = PLACES.filter((p) => to.includes(p) && p !== "private");
+  const wallets = u.filter((p) => p !== "safe").map((p) => PLACE_NAME[p]);
+  const w = wallets.length === 0 ? "" : wallets.length === 1 ? `your ${wallets[0]} wallet` : `your ${wallets.slice(0, -1).join(", ")} and ${wallets.at(-1)} wallets`;
+  return u.includes("safe") ? (w ? `your Safe and ${w}` : "your Safe") : w;
+}
+
+/** The floor's one summary line (the UI reviewer, 6 Nov): what the plan moves in all (its "Leaves" row's own figure) and
+ *  where, by name. None for an empty plan or one that can't go. */
+export function moveSummary(legs: readonly Leg[], blocked: boolean): string | null {
+  if (blocked || !legs.length) return null;
+  const to = placesWords(legs.map((l) => l.to));
+  return to ? MOVE_WORDS.moves(money2(costFacts(legs).leaves), to) : null;
+}
+
+/** What each place gives in the plan as the ledger pays it (fillLegs): the Safe its whole fill (what stays in Private is
+ *  still the Safe's money leaving), Private and the wallets their legs. */
+function givesOf(pays: { legs: readonly Leg[]; extra: number }): Map<Place, number> {
+  const out = new Map<Place, number>();
+  for (const l of pays.legs) out.set(l.from, cents((out.get(l.from) ?? 0) + l.usd));
+  if (pays.extra >= 0.005) out.set("safe", cents((out.get("safe") ?? 0) + pays.extra));
+  return out;
+}
+
+/**
+ * The Safe's row, one figure (the UI reviewer, 6 Nov, row 8 a: the row said $5,119.15, its note "$4,951.70 stays"): what
+ * really stays in it after this plan, as the ledger pays it: today's figure, less its whole fill into Private (Check this's
+ * "From your Safe"), plus what comes home at the least the floors promise (homeCut, `cut`; the "Arrives" row's figure).
+ * The slider's own share is not it: Private pays first and the Safe fills by a whole step.
+ */
+export function safeAfter(start: Split, legs: readonly Leg[], pays: { legs: readonly Leg[]; extra: number }, cut = true): number {
+  const home = sum(legs.filter((l) => l.to === "safe").map((l) => l.usd));
+  return cents((start.safe ?? 0) - (givesOf(pays).get("safe") ?? 0) + home - (cut ? homeCut(legs) : 0));
+}
+
+/**
+ * What else the plan moves by itself (the UI reviewer, 6 Nov, row 8 b: Private's slider moved on its own; 83 on T-B, present
+ * tense before the tap): the plan logic stays, and one line says it with the plan's own figures, as the ledger pays them.
+ * Private by its row's own change (`privateUsd`): less, it gives; more, the Safe's fill leaves the rest there ("$28.00 to
+ * Private"). A person who set a source's figure: every other source that gives. One who set only where it goes: every source
+ * after the largest. Null: nothing else moves.
+ */
+export function alsoMoved(ops: readonly SetOp[], pays: { legs: readonly Leg[]; extra: number; privateUsd: number }): string | null {
+  const set = new Set(ops.filter((o) => o.by !== "leave").map((o) => o.place));
+  const g = givesOf(pays);
+  g.delete("private");
+  if (pays.privateUsd <= -0.005) g.set("private", cents(-pays.privateUsd));
+  const gives = [...g].filter(([, usd]) => usd >= 0.005).sort((a, b) => b[1] - a[1]);
+  // Private only ever gives: a figure set on it is a source set, whichever way its row ends
+  const auto = gives.some(([p]) => set.has(p)) || set.has("private") ? gives.filter(([p]) => !set.has(p)) : gives.slice(1);
+  const parts = auto.map(([p, usd]) => `${money2(usd)} from ${WHERE[p]}`);
+  if (pays.privateUsd >= 0.005 && !set.has("private")) parts.push(`${money2(pays.privateUsd)} to ${WHERE.private}`);
+  return parts.length ? MOVE_WORDS.also(parts.join(" and ")) : null;
+}
+
+/** What the Move sheet shows (rule 2, the UI reviewer's walk: "Moving…" sat 620 ms before Check this): the receipt once the
+ *  job is made; from the tap until then (the Safe's Check this on its way), the start face at once, never the sheet with
+ *  "Moving…" on its button; else the sheet. */
+export function moveFace(o: { made: boolean; busy: boolean; running: boolean }): "made" | "start" | "sheet" {
+  return o.made ? "made" : o.busy && !o.running ? "start" : "sheet";
 }
 
 /** The same figures as costLine, as the sheet's grouped rows (label left, figure right), the time last; `note` is the
@@ -615,10 +718,14 @@ export function moveBlock(legs: readonly Leg[], total: number, pairs = true, now
 
 /** What the Safe keeps at its slider's lowest, said on its row: one move takes one of its coins, inside the wallets'
  *  limit (spending.ts pickSafeCoin; phone test, 3 Nov: $2.15 stayed and nothing said why). */
-export function safeKeeps(now: readonly PlaceNow[], o: { coinUsd: number; roomUsd: number; capUsd: string }): string | null {
+/** `shownUsd` (the UI reviewer, 6 Nov, row 8 a): the Safe's row's own figure (safeAfter), so the row and its note say one
+ *  figure; then the reason only, never the least it keeps as a second figure. */
+export function safeKeeps(now: readonly PlaceNow[], o: { coinUsd: number; roomUsd: number; capUsd: string }, shownUsd?: number): string | null {
   const p = now.find((x) => x.place === "safe");
   if (!p || !(p.lo >= 0.01)) return null;
-  return o.roomUsd < o.coinUsd - 0.004 ? MOVE_WORDS.safeKeepsCap(usdShort(p.lo), usdShort(Number(o.capUsd) || 0)) : MOVE_WORDS.safeKeepsCoin(usdShort(p.lo));
+  const cap = o.roomUsd < o.coinUsd - 0.004;
+  if (shownUsd !== undefined) return cap ? MOVE_WORDS.safeKeepsCap(usdShort(shownUsd), usdShort(Number(o.capUsd) || 0)) : MOVE_WORDS.safeStaysCoin(usdShort(shownUsd));
+  return cap ? MOVE_WORDS.safeKeepsCap(usdShort(p.lo), usdShort(Number(o.capUsd) || 0)) : MOVE_WORDS.safeKeepsCoin(usdShort(p.lo));
 }
 
 /** The calls the legs make, in the order they go: the Safe's Approve first (a no stops everything), then each wallet →
@@ -711,4 +818,24 @@ export function madeState(runs: readonly Run[], legs: readonly Leg[], followed: 
   if (everyLanded(runs, followed)) return { state: "landed", etaSec: null };
   const moving = followed > 0 ? runs.filter((r) => r.state === "moving").map((r) => r.leg) : legs;
   return { state: "away", etaSec: moving.length ? Math.max(0, ...moving.map(legTime)) : null };
+}
+
+/** A refusal's next step on the floor's one button (move-run.ts refusedStep): `less` sets the source to what it can move,
+ *  `again` runs the Move again; neither: the tap only ends the line, the core's own label on it. */
+export interface MoveStep { label: string; less: boolean; again?: true }
+/**
+ * Move's floor (the UI reviewer's ruling, 6 Nov: the same floor shape as Swap's): line 1, the fee block, one button. Line 1 is a
+ * refusal while it stands; else why it can't go; else a line the sheet was told (a service, a slow read); else the privacy link.
+ * Pure, so each state is a test. A refusal ends once the plan can't go: never a lit Try again that does nothing (`go` stops at block).
+ */
+export function moveFloor(o: { line: string | null; step: MoveStep | null; block: string | null; said: string | null; down: boolean }): { line: "stopped" | "why" | "said" | "who"; text: string | null; tap: "go" | "again" | "less" | "clear"; label: string; off: boolean } {
+  const go = { tap: "go" as const, label: MOVE_WORDS.go, off: !!o.block || o.down };
+  if (o.line !== null && o.step && !o.block) {
+    const tap = o.step.less ? "less" as const : o.step.again ? "again" as const : "clear" as const;
+    return { line: "stopped", text: o.line, tap, label: o.step.label, off: tap === "again" && o.down };
+  }
+  if (o.line !== null && !o.step) return { line: "said", text: o.line, ...go };
+  if (o.block && o.block !== MOVE_WORDS.untouched) return { line: "why", text: o.block, ...go };
+  if (o.said) return { line: "said", text: o.said, ...go };
+  return { line: "who", text: null, ...go };
 }

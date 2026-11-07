@@ -20,7 +20,8 @@ import { faultOf, serviceProblem } from "./services.ts";
 import { readable, type Warning } from "./signer.ts";
 import type { DecodedAction, DecodedTx } from "./tx-decode.ts";
 import { readJson } from "./net.ts";
-import { LEG_WORDS, SEND_LEG_WORDS, splitLines } from "./private-route.ts";
+import { NEAR_STORAGE_MAX_YOCTO, STORAGE_DEPOSIT_MAX_YOCTO, WNEAR } from "./near-gate.ts";
+import { LEG_WORDS, SEND_LEG_WORDS, fillRows, moveAllLine, moveAllTitle, planOthers, quoted } from "./private-route.ts";
 
 export const INTENTS = {
   account: "intents.near",
@@ -86,10 +87,27 @@ export interface IntentsFacts {
   payee?: { recipient: string; recipientType: string };
   /** A Move's fill (TxRequest.moveFill): its sheet lists the legs. Private's leg (units of its coin) only from the core's
    *  own record of the pocket's share it signed for this Move (dev-signer privateLeg); absent, no Private line. */
-  moveFill?: { privateTokenId?: string; privateUnits?: string; payUnits?: string; payee?: string; payeeOwn?: boolean };
+  moveFill?: {
+    privateTokenId?: string; privateUnits?: string; payUnits?: string; payee?: string; payeeOwn?: boolean;
+    /** The payment's coin out (the core's own record, its signed destinationAsset): a Swap's title names it. */
+    payTokenId?: string;
+    /** The whole Move's parts as the call carried them (TxRequest.movePlan): legsBlock says them only once it finds its
+     *  own leg among them. */
+    plan?: string[];
+    /** The call says it is a Swap (TxRequest.moveSwap): titled so only when payTokenId is another coin. */
+    swap?: true;
+    /** A Move's one fill (the audit's ruling, 7 Nov): every part of the Move, from the core's own plan and what it signed or held
+     *  (subwallets privateLeg): the one sheet says them all (the copy review's layout, moveSheet). */
+    parts?: import("./private-route.ts").MoveLeg[];
+    /** The same Move's wallet parts the core kept for this very fill (subwallets privateLeg, move-plan.ts othersForSheet). */
+    others?: import("./private-route.ts").OtherPart[];
+    /** The one sheet's builder for `parts` (move-plan.ts moveFillBlock), handed in by the core's signer with them so the
+     *  plan's words load only with a Move's sheet (the speed budget, 7 Nov). Absent: the bytes' own words. */
+    sheet?: typeof import("./move-plan.ts").moveFillBlock;
+  };
   /** A Send's fill (TxRequest.sendFill): the payout joined to this move in, as the core read it from 1Click's signed
    *  quote (dev-signer sendPayout; checked against this move in by sendPayoutFits). */
-  sendFill?: SendPayout & { title: string; lines: string[]; gets: string; to: string; seen: string };
+  sendFill?: SendPayout & { title: string; lines: string[]; gets: string; to: string; seen: string; open?: boolean };
 }
 
 /** A Send's payout, as 1Click signed its quote, joined to the Safe's move into Private that pays for it (subwallets
@@ -450,17 +468,31 @@ export function paidAddresses(tx: DecodedTx): string[] {
  * subwallet.float.quoteAdd), never from an app's request, a page or the relay. A swap pays a quote 1Click signed whose
  * payout and refund are both this account; a move pays a signed confidential quote into one of the account's own wallets
  * (recipient = refundTo, the core's own list). Every step pays one of `targets` (the addresses the tag is bound to) or
- * only makes room for it there (storage_deposit) or wraps NEAR for it (near_deposit). Anything else (a send to an
+ * only makes room for it there (storage_deposit, once per target, bounded: targetStorage), or once for the account itself
+ * on wrap.near (ownWrapStorage), or wraps NEAR for it (near_deposit). Anything else (a send to an
  * unsigned or foreign address, a forged quote, a quote under another key) is refused here, before any sheet.
- * Returns how many payments it checked; the caller refuses a tagged request that pays nothing.
+ * Returns how many payments it checked; the caller refuses a tagged request that pays nothing. `stored`: the targets whose
+ * storage this request already made room for (one Set across the request's transactions, so once per target in all of it).
  */
-export function checkBoundIntent(tx: DecodedTx, facts: IntentsFacts, accountId: string, kind: IntentKind, targets: ReadonlySet<string>): number {
+export function checkBoundIntent(tx: DecodedTx, facts: IntentsFacts, accountId: string, kind: IntentKind, targets: ReadonlySet<string>, stored: Set<string> = new Set()): number {
   const changed = new ProblemError(securityProblems.intentChanged(kind));
-  let paid = 0;
+  let paid = 0, ownStorage = 0;
   for (const a of tx.actions) {
     const args = argsOf(a);
     if (a.kind !== "call" || !args) throw changed;
-    if (a.method === "storage_deposit" && tx.receiverId !== INTENTS.account && typeof args.account_id === "string" && targets.has(args.account_id)) continue;
+    // the audit's ruling (6 Nov, T-F): the one more step, the account's own storage on wrap.near, so the Safe's NEAR on its account
+    // can wrap and fill Private (moves.ts nearAsWnearTo). It pays no one but the account's own refundable storage. Once.
+    const self = ownWrapStorage(tx.receiverId, a, args, accountId);
+    if (self === "bad" || (self === "ok" && ++ownStorage > 1)) throw changed;
+    if (self === "ok") continue;
+    // the audit (6 Nov): the quote's deposit address's storage, bounded as the account's own: registration_only true, exact keys,
+    // at most STORAGE_DEPOSIT_MAX_YOCTO (0.01 NEAR), once per target. Without registration_only the excess would stay as 1Click's balance.
+    const room = targetStorage(tx.receiverId, a, args, targets);
+    if (room === "bad" || (room === "ok" && stored.has(args.account_id as string))) throw changed;
+    if (room === "ok") {
+      stored.add(args.account_id as string);
+      continue;
+    }
     if (a.method === "near_deposit" && tx.receiverId === "wrap.near") continue;
     const pays = tx.receiverId === INTENTS.account ? a.method === "mt_transfer" || a.method === "ft_withdraw" : a.method === "ft_transfer";
     if (!pays || args.msg != null || typeof args.receiver_id !== "string" || !targets.has(args.receiver_id)) throw changed;
@@ -475,6 +507,33 @@ export function checkBoundIntent(tx: DecodedTx, facts: IntentsFacts, accountId: 
     paid++;
   }
   return paid;
+}
+
+/**
+ * A storage_deposit for the signing account itself, under a Swap's or a Move's tag (the audit's ruling, 6 Nov): "ok" only on
+ * wrap.near, args exactly { account_id: the signer, registration_only: true }, attached at most wrap.near's storage
+ * (NEAR_STORAGE_MAX_YOCTO, 0.00125 NEAR). "bad": a storage_deposit for the signer that is anything else (another
+ * contract, more attached, registration_only missing or false, more args). "none": not a storage_deposit for the signer.
+ */
+export function ownWrapStorage(receiverId: string, a: DecodedAction, args: Record<string, unknown> | null, accountId: string): "ok" | "bad" | "none" {
+  if (a.kind !== "call" || a.method !== "storage_deposit" || !args || args.account_id !== accountId) return "none";
+  const keys = Object.keys(args).sort();
+  const exact = keys.length === 2 && keys[0] === "account_id" && keys[1] === "registration_only" && args.registration_only === true;
+  return receiverId === WNEAR && exact && a.depositYocto <= NEAR_STORAGE_MAX_YOCTO ? "ok" : "bad";
+}
+
+/**
+ * A storage_deposit for one of the tag's targets (the quote's deposit address), under a Swap's or a Move's tag (audit, 6 Nov):
+ * "ok" only on a coin contract (never intents.near), args exactly { account_id: the target, registration_only: true },
+ * attached at most STORAGE_DEPOSIT_MAX_YOCTO (0.01 NEAR, the wallet's own cap on a coin's min: 83, 6 Nov; registration_only
+ * refunds the rest). "bad": a storage_deposit for a target that is anything else.
+ * "none": not a storage_deposit for a target. Once per target is the caller's (checkBoundIntent `stored`).
+ */
+export function targetStorage(receiverId: string, a: DecodedAction, args: Record<string, unknown> | null, targets: ReadonlySet<string>): "ok" | "bad" | "none" {
+  if (a.kind !== "call" || a.method !== "storage_deposit" || !args || typeof args.account_id !== "string" || !targets.has(args.account_id)) return "none";
+  const keys = Object.keys(args).sort();
+  const exact = keys.length === 2 && keys[0] === "account_id" && keys[1] === "registration_only" && args.registration_only === true;
+  return receiverId !== INTENTS.account && exact && a.depositYocto <= STORAGE_DEPOSIT_MAX_YOCTO ? "ok" : "bad";
 }
 
 export function coin(tokenId: string, facts: IntentsFacts): { symbol: string; decimals: number } | null {
@@ -605,67 +664,112 @@ function intoOwnWords(own: string, quote: QuoteFacts, send: string, warnings: Wa
   // (send-fill.ts made the block, loaded only with a Send's fill; "They get" is this sheet's own money words)
   const sent = own === PRIVATE_POCKET ? facts.sendFill : undefined;
   if (sent) {
+    // the payout is 1Click's quote: one "about" per line, on the figure read as money (copy review, 7 Nov): the dollars when shown,
+    // "They get · 1.2345 SOL (about $247.50)"; else the coin figure itself
+    const coinGets = fourPlacesText(money(sent.destinationAsset, sent.amountOut, facts));
+    const theyGet = `${SEND_LEG_WORDS.gets} · ${sent.gets ? `${coinGets} (${quoted(sent.gets)})` : quoted(coinGets)}`;
     return {
       title: sent.title,
       titleFor: null,
       // the full address from the signed quote first, unfolded, then where it lands (the audit's D37 condition, the copy review's words), as
       // every outside sheet; then Private said once, the split, what they get
-      lines: [sent.to, sent.seen, PRIVATE_SAID, `${SEND_LEG_WORDS.gets} · ${fourPlacesText(money(sent.destinationAsset, sent.amountOut, facts))}${sent.gets ? ` (${sent.gets})` : ""}`, ...sent.lines, LEG_WORDS.seen, `If it can't, the money comes back to ${PRIVATE_POCKET}`, ...(sent.lines.includes(SEND_LEG_WORDS.kept) ? [] : [PRIVATE_RECEIPT])],
+      // a public payee (the copy review's ruling, 6 Nov): headline, To, They get, the split with its one line, the fees, and one public
+      // line ("Public on NEAR: anyone can see the Safe's part."), nothing else; Private is explained where it is first met
+      lines: sent.open
+        ? [sent.to, sent.seen, theyGet, ...sent.lines]
+        : [sent.to, sent.seen, PRIVATE_SAID, theyGet, ...sent.lines, LEG_WORDS.seen, `If it can't, the money comes back to ${PRIVATE_POCKET}`, ...(sent.lines.includes(SEND_LEG_WORDS.kept) ? [] : [PRIVATE_RECEIPT])],
       warnings: [...warnings, promise],
       effects,
+      // QA's ledger re-walk (6 Nov, b/12: the amount three times): "Your Safe sends · $30.00" is the bytes' amountIn, so
+      // the sheet draws no "Amount:" line over it; sheet-amount.ts still draws it unless a line says those dollars (audit)
+      amountSaid: true as const,
+      // NEAR on the account wrapped for it: its set-up folds into one line (words.ts prepFold, T-F)
+      folds: true as const,
     };
   }
-  // a Move's legs to one wallet under this one approval (QA, 5 Nov; the design session's ruling): the block,
-  // and the title names its Together figure, no source ("Move $5.00 to Private")
+  // a Move's leg to one wallet under this one approval (QA, 5 Nov; the copy review's words, 7 Nov): the block,
+  // and the title names the leg's figure and its wallet ("Move $148.25 to your SOL wallet"), or the Swap
+  // NEAR, never wNEAR, anywhere on this sheet (the copy review's (c), 7 Nov): wrap.near's coin is the Safe's NEAR one for one
   const legs = legsBlock(quote, facts);
+  const near = (t: string) => t.replace(/\bwNEAR\b/g, "NEAR");
+  const wraps = nep141Contract(quote.originAsset) === "wrap.near";
+  const said = (t: string) => (wraps ? near(t) : t);
   return {
-    title: legs ? legs.title : `Move ${about(quote.destinationAsset, quote.minAmountOut, facts)} to your private balance`,
-    titleFor: legs ? null : same ? (money: string) => `Move ${money} to your private balance` : null,
+    title: said(legs ? legs.title : `Move ${about(quote.destinationAsset, quote.minAmountOut, facts)} to your private balance`),
+    titleFor: legs ? null : same ? (money: string) => said(`Move ${money} to your private balance`) : null,
     // the legs right under the title, never folded away (the ruling, the audit and the copy review, 5 Nov); then Private said once (the
     // pair-private walk, 5 Nov; words by the design session), and the receipt line: who moves it, and that ZeroFee takes
     // no fee of its own
-    lines: [...(legs ? [...legs.lines, LEG_WORDS.seen] : []), PRIVATE_SAID, send, `At least ${out} lands in ${PRIVATE_POCKET}. The swap service promises it.`, `If it can't, the money comes back to ${PRIVATE_POCKET}`, "It pays only when you hold Send or Pay.", PRIVATE_RECEIPT],
+    // "Anyone can see the Safe's part." whenever the Safe signs a leg, whatever stays in Private (the audit's MUST, 7 Nov)
+    lines: [...(legs ? [...legs.lines, LEG_WORDS.seen] : []), PRIVATE_SAID, send, `At least ${out} lands in ${PRIVATE_POCKET}. The swap service promises it.`, `If it can't, the money comes back to ${PRIVATE_POCKET}`, "It pays only when you hold Send or Pay.", PRIVATE_RECEIPT].map(said),
     warnings: [...warnings, promise],
     effects,
     // the block says the Safe's figure (its bytes' amountIn): the sheet draws no "Amount:" line over it (QA's Sim re-check
     // 4: "Amount: $40.00" over "Together · $50.00"); one amount, said once
     ...(legs ? { amountSaid: true as const } : {}),
+    // NEAR on the account wrapped for it: its set-up folds into one line (words.ts prepFold, T-F)
+    folds: true as const,
   };
 }
 
-/** The fill sheet's legs block (QA's MUST, 5 Nov: only what the core signed or read itself), as the audit and the copy review ruled
- *  it (5 Nov): the title is the Move's own figure and its wallet, "Move $30.00 to your SOL wallet", then "From Private ·
- *  $12.50", "From your Safe · $20.00", "Stays in Private · $2.50", "Together · $30.00", which add up. The Safe's figure is
- *  the signed bytes' own (the quote's amountIn, which checkIntents ties to them), the only Safe figure on the sheet;
- *  the Move's figure is the core's own record of the pocket's share (moveFill.privateUnits) plus what the payment out of
- *  Private pays (moveFill.payUnits, 1Click's signed amountIn), in the same coin; Private's line is that figure less the
- *  Safe's (splitLines: what Private really pays), what stays the Safe's less the Move's. A dollar coin is said to the cent (rounded down), any other as its coin amount.
- *  Private's line not known: the title and "Your Safe adds $20.00 to Private first." alone. The wallet is named only when
- *  the core's ownPayee said it is the person's own (moveFill.payeeOwn) and its own list names it; else, or with no
- *  record, the title is the bytes' own ("Move $20.00 to Private"). Null: not a Move's fill, or a coin the core can't name. */
+/** The fill sheet's legs block (QA's MUST, 5 Nov: only what the core signed or read itself; the copy review's
+ *  words, 7 Nov): the title is the leg's own figure and its wallet, "Move $148.25 to your SOL wallet" (a Swap: "Swap
+ *  $150.00 of USDC for SOL"); on a Move of more parts, one line for the whole of it, "$148.25 from your Safe, $12.75 from
+ *  Private. $161.00 in all."; then "Your SOL wallet gets · $148.25", "From your Safe · $150.00", "Stays in Private · $1.75"
+ *  and its why line (private-route.ts fillRows), never "Together". The Safe's figure is the signed bytes' own (the quote's
+ *  amountIn, which checkIntents ties to them), the only Safe figure on the sheet; the leg's figure is the core's own record
+ *  of the pocket's share (moveFill.privateUnits) plus what the payment out of Private pays (moveFill.payUnits, 1Click's
+ *  signed amountIn), in the same coin. The other parts are the call's plan (moveFill.plan), said only once the core finds
+ *  this very leg in it. A dollar coin is said to the cent (rounded down), any other as its coin amount. No payment on
+ *  record, or a wallet ownPayee didn't pass or the core's list doesn't name: the bytes' own words, "Move $20.00 to
+ *  Private" and "Your Safe adds $20.00 to Private first.". Null: not a Move's fill, or a coin the core can't name. */
 function legsBlock(quote: QuoteFacts, facts: Facts): { lines: string[]; title: string } | null {
   const m = facts.moveFill;
   if (!m || !isUnits(quote.amountIn)) return null;
   const c = coin(quote.originAsset, facts);
   if (!c) return null;
-  // a dollar coin in whole cents (each figure rounded down, Together the others' sum, so the lines always add up); any
-  // other coin in its own units
+  // a dollar coin in whole cents (each figure rounded down); any other coin in its own units
   const dollar = /^USD[CT]$/i.test(c.symbol) && c.decimals >= 2;
   const unit = (u: bigint) => (dollar ? u / 10n ** BigInt(c.decimals - 2) : u);
   const say = (v: bigint): string => (dollar ? `$${(v / 100n).toLocaleString("en-US")}.${String(v % 100n).padStart(2, "0")}` : fourPlacesText(money(quote.originAsset, v.toString(), facts)));
   const safe = unit(BigInt(quote.amountIn));
   const mine = m.privateTokenId === quote.originAsset;
-  const priv = mine && m.privateUnits && isUnits(m.privateUnits) ? unit(BigInt(m.privateUnits)) : 0n;
-  const pay = mine && m.payUnits && isUnits(m.payUnits) ? unit(BigInt(m.payUnits)) : null;
+  const privRaw = mine && m.privateUnits && isUnits(m.privateUnits) ? BigInt(m.privateUnits) : 0n;
+  const payRaw = mine && m.payUnits && isUnits(m.payUnits) ? BigInt(m.payUnits) : null;
   const named = m.payee && m.payeeOwn === true ? facts.ownWallets?.get(m.payee) : undefined;
   const alone = { lines: [LEG_WORDS.adds(say(safe))], title: `Move ${say(safe)} to Private` };
-  if (pay === null || pay <= 0n) return alone;
-  const typed = priv + pay, stays = priv + safe - typed;
+  // what the fill brings (the audit's MUST for A++, 7 Nov; the Send's rule, send-fill.ts): its signed amountOut; none, or one
+  // above what went in: the bytes' amountIn. A quote's figure: said "about" (the copy review's one rule, 7 Nov; quoted)
+  const min = isUnits(quote.minAmountOut) ? BigInt(quote.minAmountOut) : null;
+  const sent = BigInt(quote.amountIn);
+  const outRaw = isUnits(quote.amountOut) && BigInt(quote.amountOut) <= sent ? BigInt(quote.amountOut) : sent;
+  // a Move's ONE fill (the audit's ruling, 7 Nov; the copy review's layout): every part from the core's own plan, as signed or held. Each
+  // wallet must be on the core's own list; the parts the fill pays never more than the bytes bring in
+  if (m.parts?.length) {
+    return (m.sheet && m.sheet({ parts: m.parts, own: facts.ownWallets, sameCoin: m.privateTokenId === quote.originAsset, unit, say, safe, sent, brought: unit(outRaw), ...(dollar && m.others?.length ? { others: m.others } : {}), swap: m.swap === true, origin: quote.originAsset, symbolOf: (t) => coin(t, facts)?.symbol, swapOf: dollar ? ` of ${c.symbol}` : "", coinSay: (t, units) => (coin(t, facts) ? fourPlacesText(money(t, units, facts)) : undefined), ...(dollar ? { dollar: true } : {}) })) || alone;
+  }
+  if (payRaw === null || payRaw <= 0n) return alone;
+  const priv = unit(privRaw), pay = unit(payRaw), typed = priv + pay;
   // the Safe bringing less than the payment pays: not a sum the core can stand behind, the bytes' own words
-  if (stays < 0n) return alone;
-  const title = named ? `Move ${say(typed)} to ${named}` : alone.title;
-  if (priv <= 0n) return { lines: alone.lines, title };
-  return { lines: splitLines(typed, safe, say), title };
+  if (safe < pay) return alone;
+  // the wallet not on the core's own list (or ownPayee didn't pass): no wallet named, the bytes' own words
+  if (!named) return alone;
+  // a Swap (the copy review's (c), 7 Nov): the call says so, and the core holds it to its own record: the payment pays out another coin
+  // than the Safe's (its signed destinationAsset), one the core names. Else, as a Move
+  const outSymbol = m.swap === true && m.payTokenId && m.payTokenId !== quote.originAsset ? coin(m.payTokenId, facts)?.symbol : undefined;
+  // a dollar coin says its coin after the dollars ("Swap $150.00 of USDC for SOL"); any other is already its coin figure
+  const title = outSymbol ? `Swap ${say(typed)}${dollar ? ` of ${c.symbol}` : ""} for ${outSymbol}` : `Move ${say(typed)} to ${named}`;
+  // the whole Move (the copy review's (a), 7 Nov): the call carries its plan, each part in units of this coin; the core finds this very
+  // leg in it (the payment's signed amountIn is the asked share of a part less the pocket's own share: safe-send's
+  // askedShare over the move in's signed minimum and amountIn), else no line. One part: no line
+  const isLeg = (part: bigint) => min !== null && part > privRaw && (part - privRaw >= sent ? min : (min * (part - privRaw)) / sent) === payRaw;
+  const others = planOthers(m.plan, isLeg);
+  const all = others ? moveAllLine(typed, safe, others.map(unit), say) : null;
+  // J4 (7 Nov): a Move of more parts is never titled by this leg's figure: the Safe's share and the whole Move
+  const whole = others ? moveAllTitle(typed, safe, others.map(unit), say) : null;
+  // what stays in Private (the audit's MUST for A++, 7 Nov; the Send's rule, send-fill.ts): what the fill brings (above) less
+  // this leg, the one part this fill pays: a quote's figure, said "about" (the copy review's one rule, fillRows)
+  return { lines: [...(all ? [all] : []), ...fillRows(typed, safe, named, say, { brought: unit(outRaw) })], title: whole ?? title };
 }
 
 /** At most 4 decimal places in a sheet's coin figures (format.ts, its one home: the Sim's sheet reads it too). */

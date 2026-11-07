@@ -7,8 +7,9 @@
 import type { Bridge } from "@zerofee/core/bridge";
 import type { SpendingActivity } from "@zerofee/core/spending";
 import type { Chain, Movement, Token } from "../types.ts";
-import { chainName, describe, ownRowOf, type OwnRows } from "./format.ts";
+import { amountOf, chainName, describe, ownRowOf, sendFrom, type OwnRows } from "./format.ts";
 import { shortId } from "./money/send-words.ts";
+import { paidFrom } from "./money/paid-from.ts";
 import { activityRows } from "./activity-rows.ts";
 import { unfoldLegs } from "@zerofee/core/spending-fold";
 import { isUsdStable } from "@zerofee/pay/tokens";
@@ -57,13 +58,15 @@ export function ledgerRow(m: Movement, tokens: Map<string, Token>, chains: Chain
   const { title, details } = (({ title, detail }) => ({ title, details: detail }))(describe(m, tokens, chains, mine));
   const coin = movementSymbol(m, tokens);
   const hidden = m.private === true || m.kind === "private" || m.id.startsWith("hidden-row:");
-  const own = m.private ? "Private balance" : m.kind === "swap" && m.source === "private" ? "NEAR wallet" : "Safe";
+  // where the money LEFT, by the same rule as its row and its job (format.ts sendFrom; the audit's MUST, 7 Nov: a Safe Send
+  // was "Private balance" here), never m.private, which says only that it went through NEAR Confidential
+  const own = m.private ? LEFT_FROM[sendFrom(m)] ?? "" : m.kind === "swap" && m.source === "private" ? "NEAR wallet" : "Safe";
   let from = own, to = "", way: StatementRow["way"] = 0;
   if (m.kind === "deposit") { from = m.from ? chainName(chains, m.from) : ""; to = m.into && m.into !== "safe" ? WALLET[m.into]! : "Safe"; way = 1; }
   // a send or pay into the person's own row (a Swap from Hidden) moved money between their own places: not "went out"
   else if ((m.kind === "withdraw" || m.kind === "transfer" || m.kind === "pay") && ownRowOf(m, mine)) to = `${ownRowOf(m, mine)!.replace(/^y/, "Y")} (${m.to})`; // where it went, whole (review L3)
   else if (m.kind === "withdraw" || m.kind === "transfer" || m.kind === "pay") { to = m.to ?? ""; way = -1; }
-  else if (m.kind === "private") [from, to] = m.from === "private" ? ["Private balance", "Safe"] : m.from === "oldWords" ? ["Old wallets", m.into === "near" ? "NEAR wallet" : "Private balance"] : ["Safe", "Private balance"];
+  else if (m.kind === "private") [from, to] = m.from === "private" ? ["Private", "Safe"] : m.from === "oldWords" ? ["Old wallets", m.into === "near" ? "NEAR wallet" : "Private"] : ["Safe", "Private"];
   // crawl F6: a site wallet's Take out came from that wallet, never "From NEAR wallet"
   else if (m.kind === "trading") [from, to] = m.from === "trading" ? [m.site ? `Your ${m.site} wallet` : "NEAR wallet", "Safe"] : ["Safe", "NEAR wallet"];
   else if (m.kind === "convert") to = `Safe, as ${tokens.get(m.to ?? "")?.symbol ?? "another coin"}`;
@@ -79,15 +82,38 @@ const SPENDING_STATUS: Record<SpendingActivity["status"], string> = { "waiting-f
 
 /** E5's wallets by name, for a statement's From and To. */
 const WALLET: Record<string, string> = { sol: "SOL wallet", hood: "ETH (RH) wallet", bsc: "BNB wallet", near: "NEAR wallet" };
+/** sendFrom's place as a statement names it. */
+const LEFT_FROM: Record<string, string> = { safe: "Safe", private: "Private", ...WALLET };
+
+/** The wallets a move from the Safe went to, by name, in the app's order ("SOL wallet and ETH (RH) wallet"): the ones its
+ *  money reached, so a part that missed (Private's `missed`) is not named while another part landed; every part missed,
+ *  where it was going. Null: no wallet named (it stays in the NEAR wallet). */
+export function goesWords(s: Pick<SpendingActivity, "goesTo" | "missed">): string | null {
+  const all = s.goesTo ?? [];
+  const reached = all.filter((c) => !(s.missed ?? []).includes(c));
+  const names = (reached.length ? reached : all).map((c) => WALLET[c]).filter((n): n is string => !!n);
+  return names.length === 0 ? null : names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
 
 /** A Spending row's two ends, by name: a move between the person's own wallets (E5) names both. */
+/** Where money coming home left from (the Activity walk, 6 Nov, item 8: "Move $29.00 to your Safe" said "From / NEAR wallet"
+ *  while its steps said "Left your SOL wallet"): the wallets its legs came back from, else its own network's; the NEAR
+ *  wallet only when that is where it was. */
+export function homeFrom(s: Pick<SpendingActivity, "network" | "legs">): string {
+  const nets = [...new Set([...(s.legs ?? []).map((l) => l.network), s.network].filter((c): c is NonNullable<typeof c> => !!c && !!WALLET[c]))];
+  const names = nets.map((c) => WALLET[c]!);
+  return names.length === 0 ? "NEAR wallet" : names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
 function spendingEnds(s: SpendingActivity): { from: string; to: string } {
   const toTrading = s.kind === "top-up" || s.kind === "ready";
   const move = s.kind === "move" && s.network && s.to;
-  // a move or swap from the Safe on to one wallet (D137, goesTo) ends in that wallet, never "NEAR wallet", the way through
-  // (Sim test: a swap into SOL said "To / NEAR wallet"); several: each is its own leg's page
-  const onTo = toTrading && s.goesTo?.length === 1 ? WALLET[s.goesTo[0]!] : undefined;
-  return { from: move ? WALLET[s.network!]! : toTrading ? "Safe" : "NEAR wallet", to: move ? WALLET[s.to!]! : s.site ? `Your ${s.siteName ?? s.site} wallet` : onTo ?? (toTrading ? "NEAR wallet" : "Safe") };
+  // a move or swap from the Safe on to its wallets (D137, goesTo) ends in them, never "NEAR wallet", the way through
+  // (Sim test: a swap into SOL said "To / NEAR wallet"; the UI reviewer, 6 Nov, line 26: a SOL and ETH (RH)
+  // Move said "To / NEAR wallet"): goesWords
+  const onTo = toTrading ? goesWords(s) ?? undefined : undefined;
+  // a Swap or Move Private paid whole (J3, the audit's MUST 1, 7 Nov: D143, no Safe signature) came from Private, never "Safe"
+  return { from: move ? WALLET[s.network!]! : toTrading ? (paidFrom(s)[0] === "private" ? "Private" : "Safe") : homeFrom(s), to: move ? WALLET[s.to!]! : s.site ? `Your ${s.siteName ?? s.site} wallet` : onTo ?? (toTrading ? "NEAR wallet" : "Safe") };
 }
 
 function spendingRow(s: SpendingActivity): StatementRow {
@@ -118,8 +144,20 @@ const feeFact = (usd: string | undefined): Fact | null => (usd !== undefined && 
 export function movementFacts(m: Movement, tokens: Map<string, Token>, chains: Chain[], mine?: OwnRows): Fact[] {
   const r = ledgerRow(m, tokens, chains, mine);
   if (!r) return [];
-  return [endFact("From", r.from), endFact("To", r.to), feeFact(m.feeUsd)].filter((f): f is Fact => !!f);
+  return [endFact("From", r.from), endFact("To", r.to), keptFact(m, tokens), feeFact(m.feeUsd)].filter((f): f is Fact => !!f);
 }
+/** The Safe's Send that sent more than was paid (the audit's SHOULD, 7 Nov: the Safe's $30.00 against $25.00 paid): what the
+ *  movement's own record says stayed in Private (its `kept`, the same coin), never a sum made here. A dollar coin's figure
+ *  is its dollars; any other coin's is the coin. Only while it goes or once it's paid: a Send that didn't pay has it all
+ *  in Private, and its own line says so. */
+function keptFact(m: Movement, tokens: Map<string, Token>): Fact | null {
+  if (!m.kept || !/^\d+(\.\d+)?$/.test(m.kept) || !(Number(m.kept) > 0) || sendFrom(m) !== "safe" || !m.private || !(m.status === "done" || m.status === "moving")) return null;
+  const coin = tokens.get(m.from === "near" ? "nep141:wrap.near" : m.from ?? "");
+  const value = coin && isUsdStable(coin.symbol) ? `$${Number(m.kept).toFixed(2)}` : coin ? `${amountOf(m.kept, coin.symbol, coin.decimals, 0)} ${coin.symbol}` : "";
+  return value ? { label: KEPT_LABEL, value } : null;
+}
+/** The Check this sheet's own words for the share that stays (core's Send sheet: "Stays in Private · about $5.00"). */
+export const KEPT_LABEL = "Stays in Private";
 
 /** A Spending row's page lines: its two ends (the engine's record keeps no fee). */
 export function spendingFacts(s: SpendingActivity): Fact[] {

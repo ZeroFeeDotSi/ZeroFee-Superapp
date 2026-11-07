@@ -15,8 +15,6 @@ export interface Login {
   by: "robot" | "you";
 }
 
-export const LOGINS_ON_PHONE_ONLY = "In the iPhone app";
-
 export const LOGINS_UNAVAILABLE: Problem = {
   code: "logins.unavailable",
   whatHappened: "Passwords are kept in the phone's secure chip.",

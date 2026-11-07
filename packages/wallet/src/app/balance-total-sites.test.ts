@@ -33,7 +33,7 @@ test("the balance answer counts the site wallets, as Home does (control: without
 test("while the wallets aren't read, the figure is partial and screens wait for the whole one; control: read, it's whole", async () => {
   const { readBalanceParts } = await import("./BalanceTotal.ts");
   const unread = { call: async (m: string) => (m === "spending.status" ? { ok: { ...spending, loaded: false } } : (bridgeWith(sites) as { call: (m: string) => Promise<unknown> }).call(m)), on: () => () => {} } as never;
-  assert.deepEqual(await readBalanceParts(unread), { usd: "0.00", partial: true }, "the Safe alone, marked partial");
+  assert.deepEqual(await readBalanceParts(unread), { usd: "0.00", partial: true, safeUsd: "0.00", privateUsd: "0.00", hotUsd: null }, "the Safe alone, marked partial");
   assert.equal((await readBalanceParts(bridgeWith(sites)))!.partial, false);
   // control (test, 5 Nov, preview 2w6ijfoh6: the Sim's answer had no figure): a wallet Home shows as "updating" leaves
   // the figure whole, as Home's own is; only Spending not read at all waits
@@ -41,7 +41,7 @@ test("while the wallets aren't read, the figure is partial and screens wait for 
   assert.equal((await readBalanceParts(bridgeWith(updating)))!.partial, false);
   const { readFileSync } = await import("node:fs");
   const src = readFileSync(new URL("./BalanceTotal.ts", import.meta.url), "utf8");
-  assert.match(src, /if \(t\.partial && n < PARTIAL_READS\) timer = setTimeout\(\(\) => read\(n \+ 1\), PARTIAL_READ_MS\);\s*else setTotal\(t\.usd\);/, "useBalanceTotal reads again while partial");
+  assert.match(src, /if \(t\.partial && n < PARTIAL_READS\) timer = setTimeout\(\(\) => read\(n \+ 1\), PARTIAL_READ_MS\);\s*else setTotal\(t\);/, "useBalanceTotal reads again while partial");
   const sim = readFileSync(new URL("../../../../apps/web/src/agentzero/sim-chat.ts", import.meta.url), "utf8");
   assert.match(sim, /if \(t && !t\.partial\) return t\.usd;/, "the Sim's balance answer gives only the whole figure");
 });

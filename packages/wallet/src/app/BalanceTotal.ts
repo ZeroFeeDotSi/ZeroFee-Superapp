@@ -8,6 +8,7 @@
 // `active`: read again each time the app comes on screen (a trade in Trade moves the total without telling the ledger).
 import { useEffect, useState } from "react";
 import type { Bridge } from "@zerofee/core/bridge";
+import type { BalanceParts } from "./balance-parts.ts";
 
 /** The same total, read once: null when the balances can't be read (the Sim's AgentZero sample answer, sim-chat.ts).
  *  The wallets' part is Home's own (home-cache.ts viewOf: tradingUsd, with every site wallet and NEAR coin): QA
@@ -20,14 +21,19 @@ export async function readBalanceTotal(bridge: Bridge): Promise<string | null> {
  *  so a screen waits for the whole figure (QA 5 Nov: the Sim's set-up said $5,288.01, the Safe alone, while
  *  Home opened on $5,510.55). Null when the balances can't be read. Its reads and sum (balance-parts.ts, with AgentZero's
  *  own wallet as Home's row: QA 5 Nov) load on the first ask, never in Home's first load. */
-export const readBalanceParts = (bridge: Bridge): Promise<{ usd: string; partial: boolean } | null> => import("./balance-parts.ts").then((m) => m.readBalanceParts(bridge));
+export const readBalanceParts = (bridge: Bridge): Promise<BalanceParts | null> => import("./balance-parts.ts").then((m) => m.readBalanceParts(bridge));
 
 /** While a part is missing, read again this often, at most PARTIAL_READS times; then the figure as it is. */
 export const PARTIAL_READ_MS = 1_000;
 export const PARTIAL_READS = 20;
 
 export function useBalanceTotal(bridge: Bridge, active = true): string | null {
-  const [total, setTotal] = useState<string | null>(null);
+  return useBalanceParts(bridge, active)?.usd ?? null;
+}
+
+/** The same figure with its parts (A2-3: set-up names Private inside the total, "Safe $5,254.15 · Private $33.86"). */
+export function useBalanceParts(bridge: Bridge, active = true): BalanceParts | null {
+  const [total, setTotal] = useState<BalanceParts | null>(null);
   const [tick, setTick] = useState(0);
   useEffect(() => bridge.on("ledger.balancesChanged", () => setTick((t) => t + 1)), [bridge]);
   useEffect(() => {
@@ -38,7 +44,7 @@ export function useBalanceTotal(bridge: Bridge, active = true): string | null {
       if (!live || t === null) return;
       // a figure missing the wallets is never shown as the total: read again until it is whole (or after 20 s, as it is)
       if (t.partial && n < PARTIAL_READS) timer = setTimeout(() => read(n + 1), PARTIAL_READ_MS);
-      else setTotal(t.usd);
+      else setTotal(t);
     });
     read(0);
     return () => {

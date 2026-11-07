@@ -22,7 +22,7 @@ const SimChat = lazy(() => import("./SimChat.tsx").then((m) => ({ default: m.Sim
 const LiveChat = lazy(() => import("./LiveChat.tsx").then((m) => ({ default: m.LiveChat })));
 /** Where the live chat runs: every build but the public one's Real mode (its Safe isn't on the web), and in the public
  *  build the web wallet (W7) and the Chrome extension. Read inline, so the bundler folds it. */
-const liveHere = (): boolean => (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_PUBLIC !== "1" || (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_TARGET === "extension" || webWallet();
+const liveHere = (): boolean => import.meta.env?.VITE_ZEROFEE_PUBLIC !== "1" || import.meta.env?.VITE_ZEROFEE_TARGET === "extension" || webWallet();
 
 /** The public web build's Real mode (UI, 3 Nov): the live chat stays out of that build until D152's per-reply payment
  *  lands, so a real account there gets one plain line, never the sample chat on real money. */
@@ -32,7 +32,7 @@ function WebSoon() {
 }
 
 // D157: never in the Chrome extension (no Sim at all; read inline so the Sim chat and its sample money don't ship)
-const SAMPLE = !((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_TARGET === "extension" && (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_EXTENSION_CHECK !== "1") && "page" in MODE && MODE.page === "demo";
+const SAMPLE = !(import.meta.env?.VITE_ZEROFEE_TARGET === "extension" && import.meta.env?.VITE_ZEROFEE_EXTENSION_CHECK !== "1") && "page" in MODE && MODE.page === "demo";
 
 type Menu = { menu: boolean; onMenu: (open: boolean) => void; onJobs: () => void; onMood: (m: MarkMood) => void };
 

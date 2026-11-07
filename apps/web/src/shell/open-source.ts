@@ -30,6 +30,15 @@ export function noticeMeta(n: Notice): string {
   return [n.version ? `Version ${n.version}` : null, n.licence ? `Licence ${n.licence}` : "No licence stated by the package"].filter(Boolean).join(" · ");
 }
 
+/** the copy review's S6 (7 Nov): a package's name as a person reads it, never a raw scoped id: "@babel/runtime" is "runtime (babel)";
+ *  a plain name stays itself. The exact id stays in its licence text. */
+export function plainName(name: string): string {
+  const m = /^@([^/]+)\/(.+)$/.exec(name);
+  return m ? `${m[2]} (${m[1]})` : name;
+}
+/** The one row the package list folds under (the copy review's S6). */
+export const licencesLabel = (n: number): string => `Licences (${n})`;
+
 /** Opens a page in the shell's browser sheet, as ZeroFee itself (the wallet's own screens). */
 export function openInBrowserSheet(bridge: Bridge, url: string) {
   return forApps(bridge, "wallet").call("device.openUrl", { url, mode: "sheet" });

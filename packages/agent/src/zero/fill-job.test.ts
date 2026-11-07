@@ -49,7 +49,7 @@ function tasksHere(): { tasks: Tasks; rows: () => { id: string; title: string; s
 test("the funding page's Add on a real account is the real fill, a job at the tap (the entry: its button, marked with its amount)", async () => {
   assert.match(app, /data-agentzero-fill=\{String\(Math\.round\(choice \* 1e6\)\)\} onClick=\{\(e\) => void fillOwn\(choice, e\.nativeEvent\)\}>\{ADD_BUTTON\}/);
   // one funding receipt for both paths (main's az-fund-made sheet): the fill says its own source, the NEAR wallet
-  assert.match(app, /const f = fillFundJob\(usd\);\n\s*const end = await fillJob\(\{ bridge, tasks, usd, tap, key: [^\n]*made: \(\) => \{ setSheet\(null\); setFunded\(\{ \.\.\.f\.said, endsAt: Date\.now\(\) \+ f\.job\.etaSec \* 1000 \}\); \} \}\);/);
+  assert.match(app, /const f = fillFundJob\(usd\);\n\s*const end = await fillJob\(\{ bridge, tasks, usd, tap, key: [^\n]*made: \(\) => \{ setSheet\(null\); setFunded\(\{ \.\.\.f\.said, startAt: Date\.now\(\), endsAt: Date\.now\(\) \+ f\.job\.etaSec \* 1000 \}\); \} \}\);/);
   assert.match(app, /data-testid="az-fund-made"[^]*?\{JOB_WORDS\.created\}[^]*?data-testid="az-fund-from">\{funded\.from\}/);
   assert.doesNotMatch(app, /kind: "filled"|ag-fill-made/, "control: no second receipt sheet");
   const { fillFundJob, FILL_FROM } = await import("../app/fund-words.ts");

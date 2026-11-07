@@ -136,3 +136,76 @@ test("02g, F2: set-up, the Recovery tab and Protection say the rules-change wait
   assert.equal(ruleChangeWaitWords(0, D), "48 hours");
   assert.match(changeRuleWords([{ upToUsd: null, level: "faceid", waitSeconds: 0 }], D, w), /waits 48 hours\./);
 });
+
+// the copy review's S5 (7 Nov): the new device's wait says its time in words, never "2d 0h", and its end as "9 Nov, 1:21 am".
+// Pure: each date is built from a local `now`, never the clock. Failed on main (leftWords and endsShort did not exist;
+// the hero was formatLeft's "2d 0h").
+test("the wait's hero in words and its end day-first", async () => {
+  const { endsShort, leftWords } = await import("./countdown.ts");
+  const H = 3600e3, D = 24 * H;
+  assert.equal(leftWords(2 * D), "2 days left");
+  assert.equal(leftWords(D + 4 * H + 59 * 60e3), "1 day 4 hours left", "whole units, never rounded up");
+  assert.equal(leftWords(5 * H + 30 * 60e3), "5 hours left");
+  assert.equal(leftWords(60e3), "1 minute left");
+  assert.equal(leftWords(9e3), "9 seconds left");
+  assert.doesNotMatch(leftWords(2 * D), /\dd \d+h/);
+  const now = new Date(2000, 0, 7, 12, 0);
+  assert.equal(endsShort(new Date(2000, 0, 9, 1, 21).toISOString(), now), "9 Jan, 1:21 am");
+  assert.equal(endsShort(new Date(2000, 0, 7, 23, 5).toISOString(), now), "11:05 pm", "today: the time alone");
+  assert.equal(endsShort("not a date", now), null);
+  const src = (await import("node:fs")).readFileSync(new URL("./Recovery.tsx", import.meta.url), "utf8");
+  assert.match(src, /\{ready \? "Ready" : leftWords\(left\)\}/);
+  assert.match(src, />Skip ahead \(sample only\)</);
+});
+
+// the copy review (7 Nov, B11): every wait the app counts down says its time in words, never "1d 23h": the old phone's Recovery line,
+// "Someone is moving your account", the banner, the Waiting screen, the held row and the laptop's list. One function
+// (waitWords): in a sentence the time alone ("Finishes in 1 day 23 hours unless you stop it."), standing by itself
+// with "left". Failed on af059735d (waitWords did not exist; useCountdown's text was formatLeft's "1d 23h").
+test("one function words every countdown: a table of units, in a sentence and standing alone", async () => {
+  const { waitWords, leftWords } = await import("./countdown.ts");
+  const S = 1e3, M = 60e3, H = 3600e3, D = 24 * H;
+  const table: [number, string][] = [
+    [D + 23 * H + 59 * M, "1 day 23 hours"],
+    [2 * D, "2 days"],
+    [D + H, "1 day 1 hour"],
+    [23 * H + 58 * M, "23 hours"],
+    [H, "1 hour"],
+    [4 * M + 5 * S, "4 minutes"],
+    [M, "1 minute"],
+    [9 * S, "9 seconds"],
+    [1 * S, "1 second"],
+    [0, "0 seconds"],
+  ];
+  for (const [ms, words] of table) {
+    assert.equal(waitWords(ms), words, words);
+    assert.equal(waitWords(ms, true), `${words} left`, words);
+    assert.equal(leftWords(ms), `${words} left`, "leftWords is waitWords alone");
+    assert.doesNotMatch(waitWords(ms), /\d[dhms]\b/, "never the short units");
+  }
+  const fs = await import("node:fs");
+  const read = (rel: string) => fs.readFileSync(new URL(rel, import.meta.url), "utf8");
+  const countdown = read("./countdown.ts");
+  assert.match(countdown, /return \{ left, text: waitWords\(left\), alone: waitWords\(left, true\) \};/);
+  assert.doesNotMatch(countdown, /formatLeft|`\$\{d\}d \$\{h\}h`/, "fails before: the ticking \"1d 23h\"");
+  // standing alone: "Someone is moving your account"'s hero, the Waiting hero, Security's held row
+  assert.match(read("./Recovery.tsx"), /const \{ alone \} = useCountdown\(count\.untilIso\);[\s\S]*?rc-count rc-count--words" style=\{\{ fontWeight: 200 \}\}>\{alone\}</);
+  assert.match(read("../shell/WaitingView.tsx"), /\{ready \? \(item\.change \? "Finish it" : "Ready"\) : alone\}/);
+  assert.match(read("../apps/security/SecurityApp.tsx"), /"Waiting" : "Ready"\) : alone\}<\/span>/);
+  // in a sentence (the old phone's Recovery line, the banner): the count's own before/after words around `text`
+  const { oldPhoneCount } = await import("./recovery-words.ts");
+  const c = oldPhoneCount({ readyAtIso: new Date(2000, 0, 9).toISOString() } as never, undefined, new Date(2000, 0, 7).getTime());
+  // the copy review (7 Nov): one sentence form, "Finishes in 1 day 23 hours unless you stop it." (was "It finishes in")
+  assert.equal(`${c.before}${waitWords(D + 23 * H)}${c.after}`, "Finishes in 1 day 23 hours unless you stop it.");
+  // "Someone is moving your account": the figure alone, never with a sentence of the same time (was "until it finishes")
+  const was = read("./Recovery.tsx");
+  const wasThisYou = was.slice(was.indexOf("export function WasThisYou"), was.indexOf("export function", was.indexOf("export function WasThisYou") + 10));
+  assert.doesNotMatch(wasThisYou, /until it finishes|Finishes in|c\.before|count\.before/);
+  assert.match(wasThisYou, /\{pending\.needsSecondDevice && !pending\.approved && <p className="zf-small">Your second device has to say yes\.<\/p>\}/);
+  // the held row's figure at 390 (copy review): a 96 px tabular column on one line, the name takes the squeeze, never an ellipsis
+  const css = read("../apps/security/security.css");
+  assert.match(css, /\.sec-held-row \{ grid-template-columns: 30px minmax\(0, 1fr\) minmax\(96px, max-content\); \}/);
+  assert.match(css, /\.sec-held-row \.v \{ min-width: 96px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; \}/);
+  assert.doesNotMatch(css.slice(css.indexOf(".sec-held-row")), /^\.sec-held-row[^{]*\{[^}]*ellipsis/m);
+  assert.match(read("../apps/security/SecurityApp.tsx"), /className=\{`zf-row sec-rowbtn sec-held-row\$\{/);
+});

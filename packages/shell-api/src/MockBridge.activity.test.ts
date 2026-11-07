@@ -35,7 +35,7 @@ test("demo: a $10 Swap from your private balance into the SOL row is recorded as
   assert.ok(Math.abs(Number(m.amount) - 10) < 0.01, m.amount);
   assert.equal(m.to, ROW, "who got it, from this phone's own record");
   const own = ownRows([{ role: "chain", network: "sol", address: ROW }]);
-  assert.deepEqual(words(m, tokens, [], own), { title: "Moving to your SOL wallet", detail: `${Number(m.amount)} USDC from your private balance · on its way to your SOL wallet` });
+  assert.deepEqual(words(m, tokens, [], own), { title: "Moving to your SOL wallet", detail: "From Private · on its way to your SOL wallet" });
   const row = ledgerRow({ ...m, status: "done" }, tokens, [], own)!;
   assert.deepEqual([row.coin, row.dollars, row.way], ["USDC", Number(m.amount).toFixed(2), 0]);
   // the same move as Activity lists it, read back
@@ -50,7 +50,7 @@ test("demo: a Hidden send to bob.near names bob.near; a plain pay across two coi
   const paid = await mock.call<Movement>("ledger.pay", { quoteId: q.ok.id, confidential: true });
   assert.ok("ok" in paid);
   assert.equal(paid.ok.to, "bob.near");
-  assert.match(words({ ...paid.ok, status: "done" }, tokens, []).detail, /^5 USDC from your private balance · to bob\.near$/);
+  assert.match(words({ ...paid.ok, status: "done" }, tokens, []).detail, /^From Private · to bob\.near$/);
   // plain, USDC paying for SOL: the USDC that left (the quote's in-amount), never the SOL out-figure
   const out = (3 / Number(sol.priceUsd)).toFixed(8);
   const p2 = await mock.call<{ id: string; amountIn: string }>("ledger.quotePay", { fromTokenId: USDC_NEAR_ID, toTokenId: sol.assetId, to: { kind: "chain", chain: "sol", address: ROW }, amountOut: out });

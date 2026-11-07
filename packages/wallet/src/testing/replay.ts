@@ -175,15 +175,20 @@ export interface CoreOptions {
 }
 
 /** A stand-in for forApps(core, "wallet"): account.state and device.store.*, nothing else. */
-export function fakeCore(o: CoreOptions = {}): Bridge & { store: Map<string, string>; signed: TxRequest[]; privatePays: Record<string, unknown>[]; privateIns: Record<string, unknown>[]; privateHomes: Record<string, unknown>[]; asked: Record<string, unknown>[]; emit(event: string, payload: unknown): void } {
+export function fakeCore(o: CoreOptions = {}): Bridge & { store: Map<string, string>; signed: TxRequest[]; requests: TxRequest[]; privatePays: Record<string, unknown>[]; privateIns: Record<string, unknown>[]; movePlans: Record<string, unknown>[]; privateHomes: Record<string, unknown>[]; asked: Record<string, unknown>[]; emit(event: string, payload: unknown): void } {
   const store = new Map<string, string>();
   const signed: TxRequest[] = [];
+  /** Every tx.request as asked: one per sheet. A request of separate steps (TxRequest.apart) is one here and each of its
+   *  steps one in `signed`, as the core signs them (one sheet, one Face ID, a tx per step). */
+  const requests: TxRequest[] = [];
   /** What subwallet.float.quoteAdd was asked (the Add's quotes), in order. */
   const asked: Record<string, unknown>[] = [];
   /** What subwallet.privatePay was asked to sign (the pocket's transfers). */
   const privatePays: Record<string, unknown>[] = [];
   /** What subwallet.private.quoteIn was asked (the moves into Private), in order. */
   const privateIns: Record<string, unknown>[] = [];
+  /** What subwallet.movePlan was asked (a Move's plan, the audit's one fill), in order. */
+  const movePlans: Record<string, unknown>[] = [];
   /** What subwallet.private.home was asked (the moves out of Private), in order. */
   const privateHomes: Record<string, unknown>[] = [];
   const handlers = new Map<string, Set<(p: unknown) => void>>();
@@ -191,8 +196,10 @@ export function fakeCore(o: CoreOptions = {}): Bridge & { store: Map<string, str
   return {
     store,
     signed,
+    requests,
     privatePays,
     privateIns,
+    movePlans,
     privateHomes,
     asked,
     emit: (event, payload) => handlers.get(event)?.forEach((h) => h(payload)),
@@ -202,10 +209,21 @@ export function fakeCore(o: CoreOptions = {}): Bridge & { store: Map<string, str
         const answer = o.sign ?? "done";
         if (answer === "declined") return ok({ status: "declined" } satisfies TxOutcome);
         if (typeof answer === "object") return ok({ status: "problem", problem: answer } satisfies TxOutcome);
-        signed.push(p.request as TxRequest);
+        const r = p.request as TxRequest;
+        requests.push(r);
+        // separate steps: the core signs a tx per step and sends them in order (dev-signer.ts); a hold on the first leaves
+        // the rest unsent
+        const { then, apart, ...first } = r;
+        const parts: TxRequest[] = apart && then?.length ? [{ ...first, receiverId: r.receiverId, actions: r.actions }, ...then.map((t) => ({ ...first, receiverId: t.receiverId, actions: t.actions }))] : [r];
+        const urls: string[] = [];
+        for (const [i, part] of parts.entries()) {
+          signed.push(part);
+          const txHash = `tx${signed.length}`;
+          urls.push(`https://nearblocks.io/txns/${txHash}`);
+          if (answer === "waiting") return ok({ status: "waiting", txHash, explorerUrl: urls.at(-1)!, id: `held-${signed.length}`, readyAtIso: "2026-10-26T09:00:00.000Z", needsSecondDevice: false, ...(parts.length > 1 ? { explorerUrls: urls, unsent: parts.length - 1 - i } : {}) } satisfies TxOutcome);
+        }
         const txHash = `tx${signed.length}`;
-        if (answer === "waiting") return ok({ status: "waiting", txHash, explorerUrl: `https://nearblocks.io/txns/${txHash}`, id: `held-${signed.length}`, readyAtIso: "2026-10-26T09:00:00.000Z", needsSecondDevice: false } satisfies TxOutcome);
-        return ok({ status: "done", txHash, explorerUrl: `https://nearblocks.io/txns/${txHash}` } satisfies TxOutcome);
+        return ok({ status: "done", txHash, explorerUrl: urls.at(-1)!, ...(parts.length > 1 ? { explorerUrls: urls } : {}) } satisfies TxOutcome);
       }
       if (method === "account.state") {
         const stage = o.stage ?? "ready";
@@ -215,6 +233,18 @@ export function fakeCore(o: CoreOptions = {}): Bridge & { store: Map<string, str
       if (method === "tx.describe" && o.describe) {
         if ("code" in o.describe) return { problem: o.describe };
         return ok({ title: "", lines: [], warnings: [], effect: [], protection: o.describe } satisfies PlainWords);
+      }
+      if (method === "subwallet.movePlan") {
+        // as the core does (subwallets.ts movePlan): its own split of the Move (private-route moveSplit)
+        if (p.app !== undefined && p.app !== "wallet") return refuse("security.request.not-allowed");
+        movePlans.push(p);
+        const { fillStepUsd } = await import("@zerofee/core/private-route");
+        const { moveSplit } = await import("@zerofee/core/move-plan");
+        const scale = 10 ** Number(p.decimals), px = Number(p.price);
+        const usd = (u: bigint) => (Number(u) / scale) * px;
+        const step = (u: bigint) => { const v = BigInt(Math.ceil((fillStepUsd(usd(u)) / px) * scale)); return v > u ? v : u; };
+        const r = moveSplit((p.parts as { units: string }[]).map((x) => BigInt(x.units)), BigInt(String(p.share)), { ...(p.whole === true ? { whole: true } : {}), ...(typeof p.safeHas === "string" ? { safeHas: BigInt(p.safeHas) } : {}), step, usd });
+        return ok({ fill: r.fill.toString(), parts: r.parts.map((x) => ({ fromPrivate: x.fromPrivate.toString(), viaFill: x.viaFill.toString(), at: x.at })) });
       }
       if (method === "subwallet.privatePay") {
         privatePays.push(p);
@@ -276,6 +306,10 @@ export interface Holdings {
   account?: Record<string, string>;
   nearYocto?: bigint;
   storageBytes?: bigint;
+  /** The coin contracts this account has no storage on (storage_balance_of: null); every other one, set up. */
+  unregistered?: string[];
+  /** wrap.near's storage_balance_of fails for this account (a node that didn't answer). */
+  storageReadFails?: boolean;
 }
 
 /** A mainnet FakeChain whose intents.near and coin contracts answer from `holdings`, for the account `accountId`.
@@ -296,7 +330,11 @@ export function fakeNear(accountId: string, h: Holdings, others: Record<string, 
   for (const contract of ["wrap.near", "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", "usdt.tether-token.near"]) {
     chain.contract(contract, "code", {
       ft_balance_of: (a) => all[String(a.account_id)]?.account?.[`nep141:${contract}`] ?? "0",
-      storage_balance_of: (a) => (all[String(a.account_id)] ? { total: "1250000000000000000000", available: "0" } : null),
+      storage_balance_of: (a) => {
+        const h = all[String(a.account_id)];
+        if (h?.storageReadFails) throw new Error("the node didn't answer");
+        return h && !h.unregistered?.includes(contract) ? { total: "1250000000000000000000", available: "0" } : null;
+      },
       storage_balance_bounds: () => ({ min: "1250000000000000000000", max: "1250000000000000000000" }),
     });
   }

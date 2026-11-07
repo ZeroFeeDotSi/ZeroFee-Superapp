@@ -168,13 +168,16 @@ test("the core asks for room at the tap: topped up, signed once more (control: n
   assert.equal(c.signs(), 1, "control");
 });
 
-test("never landed: Rhea refused (nothing moved), less than the least, or the Rhea balance never shows it (pending, never a verdict) (control above)", async () => {
+test("never landed: Rhea refused (nothing moved), or the Rhea balance never shows it (pending, never a verdict); a success under the least is unproven, never refused (the audit's MUST, 7 Nov) (control above)", async () => {
   const refused = world({ answer: () => ({ status: { Failure: { ActionError: {} } }, receipts_outcome: [] }) });
   const e1 = createRheaEngine(refused.d);
   await assert.rejects(e1.settle!(await e1.prepare("buy", COIN, { usd: 2 }), "k"), (e: ProblemError) => e.problem.code === "trade.near.rhea-refunded" && e.problem.money.state === "safe");
+  // pin changed (the audit's MUST, 7 Nov): a SUCCESS that reads under the least was "refunded"; Ref panics under it, so the read
+  // is wrong, not the trade: done on the node's word, "about" the quote's figure, decided by the balance
   const less = world({ answer: () => ({ status: { SuccessValue: b64(JSON.stringify("5")) }, receipts_outcome: [] }) });
   const e2 = createRheaEngine(less.d);
-  await assert.rejects(e2.settle!(await e2.prepare("buy", COIN, { usd: 2 }), "k"), (e: ProblemError) => e.problem.code === "trade.near.rhea-refunded");
+  const r2 = await e2.settle!(await e2.prepare("buy", COIN, { usd: 2 }), "k");
+  assert.ok(!("declined" in r2) && r2.again?.about === true, "unproven, never refused");
   const lag = world({ balanceLags: true, ms: { node: 50 } });
   const e3 = createRheaEngine(lag.d);
   const p3 = await e3.prepare("buy", COIN, { usd: 2 });
@@ -210,4 +213,98 @@ test("speed: tap → landed on mainnet-measured latencies (node trip 84 ms, the 
   const ot = old.clock.t;
   await oe.settle!(op, "k");
   assert.ok(old.clock.t - ot > 2_000, "control: the earlier shape's wait");
+});
+
+// ---- the audit's MUST (7 Nov): a one-call swap's SuccessValue that can't be read (or reads under the least) told the person
+// "Rhea refused it" while the swap went: the next tap would buy twice
+function unreadable(o: { value: string; failedReceipt?: boolean; gate?: Promise<void> }) {
+  const ans = (st: State) => {
+    const a = (st as State & { asked?: { side: string; coin: string; amountIn: string } }).asked;
+    if (a && !(st as State & { swapped?: boolean }).swapped) {
+      (st as State & { swapped?: boolean }).swapped = true;
+      st.inside.set(WNEAR, (st.inside.get(WNEAR) ?? 0n) - BigInt(a.amountIn));
+      if (!o.failedReceipt) st.inside.set(a.coin, (st.inside.get(a.coin) ?? 0n) + NEAR);
+    }
+    return { status: { SuccessValue: b64(o.value) }, receipts_outcome: [{ block_hash: "B100", outcome: { executor_id: REF, status: o.failedReceipt ? { Failure: {} } : { SuccessValue: "" }, logs: [] } }] };
+  };
+  const w = world({ answer: ans });
+  const base = w.d.rpc, call = w.d.call;
+  w.d.call = (async (method: string, p: Record<string, unknown>) => {
+    if (method === "subwallet.near.rheaSwap") (w.st as State & { asked?: unknown }).asked = p.ask;
+    return call(method, p);
+  }) as typeof w.d.call;
+  const node = async (method: string, params: any): Promise<any> => {
+    if (method === "tx") { if (params.wait_until === "FINAL") await o.gate; return ans(w.st); }
+    if (method === "block" && params.block_id === "B100") return { header: { height: 100 } };
+    if (method === "block" && params.finality === "final") return { header: { height: 101 } };
+    return base(method, params);
+  };
+  w.d.rpc = node; w.d.rpc2 = node;
+  return w;
+}
+
+test("the audit's MUST: an unreadable SuccessValue at the tap is done on the node's word and checking, never refused; FINAL with the balance at its block books it at the chain's figure (control: a Failure receipt is still refused)", async () => {
+  const { createTradeService } = await import("../service.ts");
+  const { forApps } = await import("@zerofee/core/bridge");
+  const { createMockBridge } = await import("@zerofee/shell-api/MockBridge.ts");
+  let open!: () => void;
+  const w = unreadable({ value: "not json", gate: new Promise<void>((r) => (open = r)) });
+  const e = createRheaEngine(w.d);
+  const clock = { t: 1_700_000_000_000 };
+  const svc = createTradeService({ bridge: forApps(createMockBridge({ latencyMs: 0, settleMs: 5 }), "trade"), engineFor: () => e, nativeUsd: async () => 4, meta: async () => ({ symbol: "BLACKDRAGON", decimals: 24 }), chains: ["near"], now: () => clock.t, sleep: async (ms) => { clock.t += ms; await new Promise((r) => setImmediate(r)); } });
+  const rec = await svc.trade(await svc.quote("buy", "near", COIN, { usd: 2 }));
+  assert.deepEqual([rec.status, rec.verifying, rec.problem], ["done", true, undefined], "done on the node's word, still checking, never refused");
+  assert.ok(rec.fill?.estimated, "its figure is about the quote's");
+  assert.equal((await svc.positions()).length, 0, "nothing booked on the node's word");
+  open();
+  await svc.checked();
+  const [after] = await svc.activity();
+  assert.deepEqual([after!.verifying, after!.fill?.got, after!.fill?.estimated], [undefined, String(NEAR), undefined], "the balance at its block gave the figure");
+  assert.equal((await svc.positions())[0]?.raw, String(NEAR), "booked once, at the chain's figure");
+  // after a restart: the kept again asks the same, and the fill given gets the figure
+  const later = unreadable({ value: "not json" });
+  later.st.inside.set(COIN, NEAR);                                    // the coin in its Rhea account at the trade's block
+  const e2 = createRheaEngine(later.d);
+  const fill = { txHash: "h1", got: "1", spent: "1", fee: "0", estimated: true };
+  assert.equal(await e2.finalAgain!({ hash: "h1", signerId: WALLET, ask: { side: "buy", coin: COIN, poolId: 4276, amountIn: "1", minOut: "970000000000000000000000" }, fast: true, about: true, before: "0" }, "1", fill), true);
+  assert.equal(fill.got, String(NEAR));
+  // pin changed (the audit's MUST, 7 Nov): a rise under the least at its block, on a success the chain reported, is can't tell
+  // (was false): our read is off, never the trade
+  later.st.inside.set(COIN, 5n);
+  assert.equal(await e2.finalAgain!({ hash: "h1", signerId: WALLET, ask: { side: "buy", coin: COIN, poolId: 4276, amountIn: "1", minOut: "970000000000000000000000" }, fast: true, about: true, before: "0" }, "1", { ...fill }), undefined, "a rise under the least: can't tell, never false");
+  // a SUCCESS under the least: unproven at the tap too, never refused
+  const low = createRheaEngine(unreadable({ value: JSON.stringify("5") }).d);
+  const r = await low.settle!(await low.prepare("buy", COIN, { usd: 2 }), "k");
+  assert.ok(!("declined" in r) && r.again?.about === true && (await r.verify) === true && r.fill.got === String(NEAR), "under the least: decided by the balance, never refused");
+  // control: a Failure receipt is still refused
+  const bad = createRheaEngine(unreadable({ value: JSON.stringify(String(NEAR)), failedReceipt: true }).d);
+  await assert.rejects(bad.settle!(await bad.prepare("buy", COIN, { usd: 2 }), "k"), (x: ProblemError) => x.problem.code === "trade.near.rhea-refunded");
+});
+
+test("the audit's MUST: an unreadable success with a balance rise under the least at its block is can't tell, never false, live and after a restart (control: a FINAL that shows Failure is false)", async () => {
+  const about = { hash: "h1", signerId: WALLET, ask: { side: "buy" as const, coin: COIN, poolId: 4276, amountIn: "1", minOut: "970000000000000000000000" }, fast: true as const, about: true as const, before: "0" };
+  // live: the swap went (SuccessValue, no Failure receipt), but only 5 shows at its block
+  const live = unreadable({ value: "not json" });
+  const base = live.d.call;
+  live.d.call = (async (m: string, p: Record<string, unknown>) => { const r = await base(m, p); if (m === "subwallet.near.rheaSwap") live.st.inside.set(COIN, 5n - NEAR); return r; }) as typeof live.d.call;
+  const e = createRheaEngine(live.d);
+  const r = await e.settle!(await e.prepare("buy", COIN, { usd: 2 }), "k");
+  assert.ok(!("declined" in r) && r.again?.about === true);
+  assert.equal(await (r as { verify: Promise<boolean | undefined> }).verify, undefined, "live: can't tell, never false");
+  assert.ok((r as { fill: { estimated?: boolean } }).fill.estimated, "its figure stays about");
+  // after a restart: the same
+  const later = unreadable({ value: "not json" });
+  later.st.inside.set(COIN, 5n);
+  const fill = { txHash: "h1", got: "1", spent: "1", fee: "0", estimated: true };
+  assert.equal(await createRheaEngine(later.d).finalAgain!(about, "1", fill), undefined, "after a restart: can't tell, never false");
+  assert.equal(fill.estimated, true);
+  // control: a FINAL that itself shows the failure is false, live and after a restart
+  const failed = unreadable({ value: "not json" });
+  const node = failed.d.rpc2;
+  const turned = async (m: string, p: any) => (m === "tx" && p.wait_until === "FINAL" ? { status: { Failure: { ActionError: {} } }, receipts_outcome: [] } : node(m, p));
+  failed.d.rpc2 = turned;
+  const ef = createRheaEngine(failed.d);
+  const rf = await ef.settle!(await ef.prepare("buy", COIN, { usd: 2 }), "k");
+  assert.equal(await (rf as { verify: Promise<boolean | undefined> }).verify, false, "control: FINAL shows Failure");
+  assert.equal(await ef.finalAgain!(about, "1", { ...fill }), false, "control: after a restart too");
 });

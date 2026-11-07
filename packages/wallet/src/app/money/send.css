@@ -167,7 +167,7 @@
 :root[data-theme="dark"] .wl-send2__floor > .wl-hold:not(:disabled) { background-image: linear-gradient(90deg, rgba(0, 0, 0, .16) 50%, transparent 50%), var(--lit); }
 .wl-send2__floor > .wl-hold.is-holding:not(:disabled) { background-position: 0 0, 0 0; transition: background-position 600ms linear; }
 /* the line right above the button (errors sit right above their button) */
-.wl-send2__floor > :is(.wl-send2__why, .zf-money__line) { margin: 0; padding: 0 16px; text-align: left; }
+.wl-send2__floor > :is(.wl-send2__why, .zf-money__line) { margin: 0; padding: 0 16px; background: none; box-shadow: none; border-radius: 0; text-align: center; }
 @media (prefers-reduced-motion: reduce) { .wl-send2__floor > .wl-hold.is-holding:not(:disabled) { transition: none; } }
 .wl-send2__card .wl-send2__addr { margin: -8px 0 0; padding: 0 16px 12px 60px; }
 .wl-send2__route { margin: 0 16px; font: 400 13px/18px var(--font); color: var(--mute); }
@@ -240,3 +240,13 @@
    with a16: the To field itself shows the address short, the whole of it a tap away.) */
 .wl-chip { position: relative; }
 .wl-chip::before { content: ""; position: absolute; inset: -6px 0; }
+/* J2-5 (audit, 8 Nov): where the rest of Home's figure is, under the coin's line in the From list; wraps, never clipped */
+.wl-pick__opt .wl-pick__why { grid-column: 2; color: var(--mute); white-space: normal; }
+
+/* the copy review's J2-3 (8 Nov, MUST): every chip a 44 pt tap ($5 / $25 / $50 / Max and the network chips, 32 before), and the keypad's
+   keys never under 56 pt: the form above them scrolls (.wl-send2__scroll), the keys never squeeze ("0" touching the line) */
+.wl-chip, .wl-send2__nets .wl-chip, .wl-send2__chips .zf-chip { height: 44px; min-height: 44px; border-radius: 22px; }
+.wl-send2 .zf-keypad, .wl-send2:has(.wl-send2__nets) .zf-keypad { flex: none; min-height: 224px; grid-auto-rows: 56px; overflow: visible; }
+.wl-send2 .zf-keypad button, .wl-send2:has(.wl-send2__nets) .zf-keypad button { height: 56px; min-height: 56px; }
+/* the chosen chip scrolled into view stops clear of the right-edge fade (its 24 px), never under it */
+.wl-send2__nets .wl-chips { scroll-padding-inline: 24px; }

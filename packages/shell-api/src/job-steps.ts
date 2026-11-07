@@ -141,9 +141,16 @@ export function markStep(key: string, state: string): void {
 /** The time LEFT on every job (product decision, 5 Nov; QA's Jobs hunt B3: rows only counted the time spent),
  *  from the protocol's own estimate (a quote's seconds, or the route's measured time): never a made-up number; none, said
  *  so. Words: the copywriter, 5 Nov ("any moment" is never said, VOICE.md). */
-export const TIME_WORDS = { none: "No time estimate", receiptNone: "This job has no time estimate.", almost: "Almost there.", slow: "Slower than usual.", /** the copy review's rule (5 Nov): a job that landed before its estimate */ early: "Landed early." } as const;
+export const TIME_WORDS = { none: "No time estimate", receiptNone: "This job has no time estimate.", almost: "Almost there.", slow: "Slower than usual.", /** the copy review's words (7 Nov, item 3): a job that landed in under a second */ underSecond: "Done in under a second." } as const;
+/** How long a landed job took, said on its receipt (copy review, 7 Nov: never "Landed early."): "Done in under a second.", else
+ *  "Done in 12 seconds." or "Done in 3 min." (provisional). `ms`: from the receipt's start to its landing. */
+export function doneIn(ms: number): string {
+  return Number.isFinite(ms) && ms < 1000 ? TIME_WORDS.underSecond : `Done in ${receiptWords(secs(Number.isFinite(ms) ? ms : 0))}.`;
+}
 const secs = (ms: number) => Math.max(1, Math.ceil(ms / 1000));
 const inWords = (s: number) => (s < 60 ? `${s} s` : `${Math.ceil(s / 60)} min`);
+/** The receipt's own spelling (the copy review's J5, 7 Nov: "About 30 seconds left."): seconds in words, minutes as "min". */
+const receiptWords = (s: number) => (s < 60 ? `${s} second${s === 1 ? "" : "s"}` : `${Math.ceil(s / 60)} min`);
 /** A going job's row: "12 s left", "3 min left"; none, "No time estimate". Past its estimate it never blames the
  *  estimate (QA's Sim walk, 5 Nov: "30 s longer than shown"): "Almost there." while it has run under twice the
  *  estimate (`startMs`: when it began), then "Slower than usual." (the copy review's ruling: full stops, no figure). No start known:
@@ -154,23 +161,55 @@ export function timeLeft(endsAt: number | undefined, now: number, startMs?: numb
   const slow = typeof startMs === "number" && Number.isFinite(startMs) && endsAt > startMs && now - startMs > 2 * (endsAt - startMs);
   return slow ? TIME_WORDS.slow : TIME_WORDS.almost;
 }
-/** The receipt's line under "Job created.": "About 4 min left.", or that there is no estimate. `landedAt`: when the job
- *  landed (landedOf): before its estimate, "Landed early." (the copy review's one rule for every receipt, 5 Nov: never a frozen "About 4
- *  min left" over money already there); after it, the past-estimate words as they stood then. */
+/** The receipt's time line: "About 4 min left.", or that there is no estimate. `landedAt`: when the job landed, as the
+ *  rows' own reads ended it (landedOf): how long it took, from `startMs` (doneIn: "Done in under a second."), early or
+ *  late alike (copy review, 7 Nov: never "Landed early.", never a frozen "About 4 min left" over money already there); with no
+ *  start known, the past-estimate words as they stood then. */
 export function receiptLeft(endsAt: number | undefined, now: number, startMs?: number, landedAt?: number): string {
-  if (!(typeof endsAt === "number" && Number.isFinite(endsAt))) return TIME_WORDS.receiptNone;
   const landed = typeof landedAt === "number" && Number.isFinite(landedAt) ? landedAt : undefined;
-  if (landed !== undefined && landed <= endsAt) return TIME_WORDS.early;
+  const started = typeof startMs === "number" && Number.isFinite(startMs) ? startMs : undefined;
+  if (landed !== undefined && started !== undefined) return doneIn(landed - started);
+  if (!(typeof endsAt === "number" && Number.isFinite(endsAt))) return TIME_WORDS.receiptNone;
   const at = landed ?? now;
-  return endsAt > at ? `About ${inWords(secs(endsAt - at))} left.` : timeLeft(endsAt, at, startMs);
+  return endsAt > at ? `About ${receiptWords(secs(endsAt - at))} left.` : timeLeft(endsAt, at, startMs);
 }
-/** A receipt's job landed (TimeLeft): the rows made since the receipt opened (`since`, a little before: the tap's own row
- *  can be stamped first), all ended done; when the last of them did. A job's starting row ("job:", ended when its real
- *  rows take over) never counts; nothing made yet, one still going or one that stopped: undefined (not landed). */
-export function landedOf(list: readonly { id: string; state: string; startedAt: number; endedAt?: number }[], since: number): number | undefined {
-  const mine = list.filter((t) => !t.id.startsWith("job:") && t.startedAt >= since - LANDED_SLACK_MS);
+/** The rows a receipt follows (QA's finding, made a MUST by QA, 7 Nov): `own` given, this job's own
+ *  rows only (job-start.ts jobRows: its starting row and the ids it was made with), whenever they started, so another
+ *  job on other money started within the slack never lends this receipt its stop words or its landing. With no `own`
+ *  (a receipt that knows no job id), the fallback: the rows started since the receipt opened (`since`, a little before:
+ *  the tap's own row can be stamped first). */
+export function receiptRows<T extends { id: string; startedAt: number }>(list: readonly T[], since: number, own?: (id: string) => boolean): T[] {
+  return list.filter(own ? (t) => own(t.id) : (t) => t.startedAt >= since - LANDED_SLACK_MS);
+}
+/** A receipt's job landed (TimeLeft): its rows (receiptRows), all ended done; when the last of them did. A job's starting
+ *  row ("job:", ended when its real rows take over) never counts; nothing made yet, one still going or one that
+ *  stopped: undefined (not landed). */
+export function landedOf(list: readonly { id: string; state: string; startedAt: number; endedAt?: number }[], since: number, own?: (id: string) => boolean): number | undefined {
+  const mine = receiptRows(list, since, own).filter((t) => !t.id.startsWith("job:"));
   if (!mine.length || !mine.every((t) => t.state === "done" && typeof t.endedAt === "number")) return undefined;
   return Math.max(...mine.map((t) => t.endedAt!));
 }
+/** The receipt's job as its rows say (QA's MUST, 7 Nov: never the past tense before a chain read says landed):
+ *  a row of it stopped or failed: "stopped" with that row's own words ("unsure" when they say the money may be in either
+ *  place, private-route unsureIn); every row ended done: "landed"; else "going". The tap's starting row counts only when
+ *  it stopped (a refusal before the core answered). `own`: this job's rows (receiptRows); none, the time window. */
+export type ReceiptState = { state: "going" } | { state: "landed"; at: number } | { state: "stopped" | "unsure"; words?: string };
+export function receiptStateOf(list: readonly { id: string; state: string; startedAt: number; endedAt?: number; detail?: string }[], since: number, own?: (id: string) => boolean): ReceiptState {
+  const mine = receiptRows(list, since, own);
+  const stop = mine.find((t) => t.state === "failed" || t.state === "stopped");
+  if (stop) return { state: /either in .+ or still with /.test(stop.detail ?? "") ? "unsure" : "stopped", ...(stop.detail ? { words: stop.detail } : {}) };
+  const at = landedOf(list, since, own);
+  return at !== undefined ? { state: "landed", at } : { state: "going" };
+}
 /** How far before the receipt opened its job's own row may be stamped (made at the tap, the receipt a frame later). */
 export const LANDED_SLACK_MS = 5_000;
+
+/** A card's step words never repeat a figure its title already shows (the copy review's grade of M4, 7 Nov: the Now card read "Move
+ *  $119.33 to your SOL and NEAR wallets / Through NEAR Confidential · about $119.33"): a " · $X" or " · about $X" part
+ *  whose figure is in the title goes; any other part stays. Every card line (TaskCentre goingLine, Home's rowLine). Pure. */
+export function cardStep(label: string, title?: string): string {
+  if (!title) return label;
+  const [head, ...rest] = label.split(" · ");
+  const kept = rest.filter((seg) => { const m = /^(?:about )?(\$[\d,]+\.\d{2})\.?$/.exec(seg.trim()); return !(m && title.includes(m[1]!)); });
+  return [head, ...kept].join(" · ");
+}

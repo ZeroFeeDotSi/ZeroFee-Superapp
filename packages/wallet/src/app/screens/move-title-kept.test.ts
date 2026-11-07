@@ -8,6 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createMockBridge } from "@zerofee/shell-api/MockBridge.ts";
+import { simClock } from "@zerofee/shell-api/testing/sim-clock.ts";
 import { ProblemError } from "@zerofee/core/problem";
 import { createSpendingService, type SpendingActivity } from "@zerofee/core/spending";
 import { createTaskStore } from "@zerofee/shell-api/tasks.ts";
@@ -19,13 +20,15 @@ import { moveTrack, rowTitle, taskOf, withCarry, type Folded } from "../money/li
 import { activityRows, nameOf, usdOf } from "../activity-rows.ts";
 
 const here = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
-const settle = () => new Promise((r) => setTimeout(r, 40));
 
 /** The real engine (trade float-core) under the real core Spending, on the Sim's bridge; `px.sol` is the live price the
  *  engine and the Sim read each round. `fromPrivate`: the real app's Move (runtime.ts: paid from Private, NEAR
  *  Confidential). */
 async function engine(px: { sol: number }, fromPrivate: boolean) {
-  const mock = createMockBridge({ latencyMs: 0, settleMs: 5, float: { moveMs: 10, priceUsd: (c) => (c === "sol" ? px.sol : c === "hood" ? 3000 : 600) } });
+  const clock = simClock();
+  const mock = clock.watch(createMockBridge({ latencyMs: 0, settleMs: 5, timers: clock.timers, float: { moveMs: 10, timers: clock.timers, priceUsd: (c) => (c === "sol" ? px.sol : c === "hood" ? 3000 : 600) } }));
+  /** A round's 40 ms of the test's own time: the engine's calls answered, then the Sim's steps due by then land in order. */
+  const settle = async () => { await clock.quiet(); await clock.advance(40); };
   const call: CoreFloatDeps["call"] = async (method, params) => {
     const r = await mock.call<any>(method, params); if ("problem" in r) throw new ProblemError(r.problem);
     return r.ok;
@@ -47,8 +50,12 @@ let n = 0;
  *  core was asked (the tap's job is made before it). */
 function moveIo(e: Awaited<ReturnType<typeof engine>>, atCall: Map<string, string | undefined>) {
   const tasks = createTaskStore();
+  // one Face ID (6 Nov): the Safe's job is made on the core's job.signed, its signature before anything is sent and before
+  // its answer; this engine has no sheet, so the test says it as the core does, as the call starts
+  let signed: ((jobKey?: string) => void) | undefined;
   const io: MoveRunIo = {
-    call: (m, p) => { const key = (p as { key?: string }).key; if (m === "spending.topUp" && key) atCall.set(key, carried(`move:mv-${key}`)?.usd); return e.svc.call(m, p) as never; },
+    call: (m, p) => { const key = (p as { key?: string }).key; if (m === "spending.topUp" && key) { signed?.(key); atCall.set(key, carried(`move:mv-${key}`)?.usd); } return e.svc.call(m, p) as never; },
+    onSigned: (fn) => { signed = fn; return () => { signed = undefined; }; },
     tasks: tasks.forApp("wallet"), keyFor: () => `move-title-${(n++).toString().padStart(10, "0")}`, onApproval: () => () => {}, asks: false,
     say: () => {}, asking: () => {}, made: () => {}, refused: () => {}, declined: () => {},
   };
@@ -72,7 +79,7 @@ test("a Move from the Safe to the SOL wallet, paid from Private as the real app 
   const legs: Leg[] = [{ from: "safe", to: "sol", usd: 5.01 }];
   const ran = await runMove(legs, planOf(legs), io);
   assert.ok(ran?.followed.length, "the Move was made");
-  assert.deepEqual([...atCall.values()], ["$5.01"], "the tap's job carries its dollars to the core's row before the core answers (main: only once it had)");
+  assert.deepEqual([...atCall.values()], ["$5.01"], "the job, made on the Safe's signature, carries its dollars to the core's row before the core answers (main: only once it had)");
   px.sol = 171;
   let r: SpendingActivity | undefined;
   for (let i = 0; i < 12; i++) {

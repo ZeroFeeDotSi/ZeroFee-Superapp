@@ -269,7 +269,7 @@ export async function signUp(relayBase: string, fetchFn: Fetch): Promise<string 
  * (speed-budget.test.ts checks no chunk names it).
  */
 const testLaneHeader = (): Record<string, string> => {
-  if ((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZF_TEST_LANE !== "1") return {};
+  if (import.meta.env?.VITE_ZF_TEST_LANE !== "1") return {};
   try {
     const t = globalThis.localStorage?.getItem("zf.test.token");
     return t ? { "x-zf-test-token": t } : {};
@@ -315,7 +315,7 @@ export async function readJob(words: string, o: ReadOptions): Promise<ReadResult
   if (routine) return { reading: routine, fault: null, paidBy: null };
   // the person's own key only in a developer build (chat/own-key.ts), read inline so every other build drops this path
   // and the Anthropic SDK with it (the public build's deploy-app.sh refuses x-api-key and api.anthropic.com)
-  const own = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_AGENTZERO_OWN_KEY === "1" && (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_PUBLIC !== "1" ? o.ownKey?.trim() || null : null;
+  const own = import.meta.env?.VITE_AGENTZERO_OWN_KEY === "1" && import.meta.env?.VITE_ZEROFEE_PUBLIC !== "1" ? o.ownKey?.trim() || null : null;
   if (own) {
     // F1: straight to Anthropic from this device. ZeroFee's server is not asked at all.
     try {

@@ -2,6 +2,7 @@
 // account's own read. Reading, checking and writing the copy, starting every Home read, holding a big drop until a
 // second read agrees, and filling Home's view from the copy. Never sent anywhere: Wallet's own device.store, sealed to
 // the chip on the phone.
+import { earlyEpoch } from "./home-stale.ts";
 import type { Bridge } from "@zerofee/core/bridge";
 import type { SpendingStatus, SpendingWallet } from "@zerofee/core/spending";
 import type { Balance, Chain, Movement, PrivatePocket, Token } from "../types.ts";
@@ -195,20 +196,30 @@ export function steadyReads(state: Map<string, Steady>, f: FreshReads, cache: Ho
 
 // ---- every Home read at once ----
 
-const early = new WeakMap<Bridge, { at: number; reads: HomeReads }>();
+const early = new WeakMap<Bridge, { at: number; reads: HomeReads; changed: boolean; off: () => void; epoch: number }>();
+export { staleEarly } from "./home-stale.ts";
 /** How long reads started early stay good for the Home that opens next. */
 export const EARLY_FOR_MS = 10_000;
 
-/** Started as the account opens (before Home's first render): Home takes them instead of asking again. */
+/** Started as the account opens (before Home's first render): Home takes them instead of asking again. The money
+ *  changing before Home opens (the core's ledger.balancesChanged) makes them stale: the copy review's A2-3 (8 Nov), the Sim made the
+ *  sites' wallets during set-up, after these reads, and Home's Hot said $172.54 without them while set-up said
+ *  $5,515.49 with them. */
 export function kickEarly(bridge: Bridge, now = Date.now()): void {
-  if (!early.has(bridge)) early.set(bridge, { at: now, reads: startHomeReads(bridge) });
+  if (early.has(bridge)) return;
+  const e = { at: now, reads: startHomeReads(bridge), changed: false, off: () => {}, epoch: earlyEpoch() };
+  e.off = bridge.on("ledger.balancesChanged", () => { e.changed = true; });
+  early.set(bridge, e);
 }
 
-/** The reads started early, once, while they are recent; else new ones. */
+/** The reads started early, once, while they are recent and nothing changed since; else new ones. */
 export function takeHomeReads(bridge: Bridge, now = Date.now()): HomeReads {
   const e = early.get(bridge);
   early.delete(bridge);
-  return e && now - e.at <= EARLY_FOR_MS ? e.reads : startHomeReads(bridge);
+  e?.off();
+  // stale: the core said the money changed, or the page made a wallet since (home-stale.ts staleEarly: the real core's
+  // subwallet.create announces nothing Home hears)
+  return e && !e.changed && e.epoch === earlyEpoch() && now - e.at <= EARLY_FOR_MS ? e.reads : startHomeReads(bridge);
 }
 
 /** The total of a view, once every part is read (else null: never a total short by a part). */

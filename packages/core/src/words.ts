@@ -367,7 +367,8 @@ const SWAP_SERVICE = "the swap service";
 /**
  * A wNEAR payment to the swap service with its set-up steps (a UI test, 4 Nov: "Let your account hold wNEAR, and 3
  * more steps", the swap service's one-time account by its id): the payment is the sheet, and the set-up one line. Only
- * this exact shape folds: one step the core read as its own swap or move (`bare`, an ft_transfer at the coin's contract),
+ * this exact shape folds: one step the core read as its own swap or move (`bare`, or `folds`: a fill into Private; an
+ * ft_transfer at the coin's contract),
  * and besides it only the coin's storage for the account itself or for that step's receiver, and NEAR wrapped there that
  * is exactly the amount the step pays. Anything else keeps every step's own lines. Returns the payment step's index and
  * the NEAR the storage costs.
@@ -377,9 +378,10 @@ const MOST_SETUP_YOCTO = 10n ** 22n;
 
 function prepFold(tx: DecodedTx, parts: readonly Described[]): { main: number; setupYocto: bigint } | null {
   if (parts.length < 2 || !WRAP_CONTRACTS.has(tx.receiverId)) return null;
-  const main = parts.findIndex((p) => p.bare);
+  const isMain = (p: Described) => p.bare === true || p.folds === true;
+  const main = parts.findIndex(isMain);
   const pay = tx.actions[main];
-  if (main < 0 || parts.filter((p) => p.bare).length !== 1 || pay?.kind !== "call" || pay.method !== "ft_transfer") return null;
+  if (main < 0 || parts.filter(isMain).length !== 1 || pay?.kind !== "call" || pay.method !== "ft_transfer") return null;
   const payArgs = jsonArgs(pay);
   const paid = unitsOf(payArgs.amount);
   if (paid === null || typeof payArgs.receiver_id !== "string") return null;
@@ -498,4 +500,55 @@ export function plainWordsMany(groups: { tx: DecodedTx; ctx: WordsContext }[], o
     ...(base.network !== "mainnet" ? { testNetwork: true as const } : {}),
     ...(hint ? { hint } : {}),
   };
+}
+
+/** the copy review's words for separate steps on one sheet (fix/safe-steps-one-faceid, 7 Nov), exact. */
+export const APART_WORDS = {
+  allow: (usd: string, symbol: string) => `1. Your Safe lets NEAR Intents take ${usd} in ${symbol}.`,
+  send: "2. Your Safe sends it.",
+  only: "Step 2 runs only if step 1 worked.",
+  fee: (usd: string) => `Fee · ${usd}. A small NEAR deposit comes back to your Safe later.`,
+  /** no NEAR price: the fee in NEAR (provisional, to 53) */
+  feeNear: (near: string) => `Fee · at most ${near} NEAR. A small NEAR deposit comes back to your Safe later.`,
+  after: "Your Safe after",
+} as const;
+
+const callArgs = (a: DecodedAction): Record<string, unknown> => {
+  if (a.kind !== "call") return {};
+  try {
+    return a.args.length ? JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(a.args)) ?? {} : {};
+  } catch {
+    return {};
+  }
+};
+
+/**
+ * Separate steps (TxRequest.apart) on ONE sheet. The Safe's own two steps, room for a coin at a deposit address and then
+ * paying that address exactly (convert.ts fundingSteps: storage_deposit, then ft_transfer or NEAR Intents' ft_withdraw),
+ * say the copy review's words: each step on one line, the rule between them, the fee in dollars, the Safe's coin after, no NEAR row,
+ * no "Wallet says:", never an account id. Any other set says every step as a chain does (plainWordsMany), without the
+ * asking app's line. The title stays the steps' own (the person's action as the headline follows B2's plan).
+ */
+export function plainWordsApart(groups: { tx: DecodedTx; ctx: WordsContext }[], outer: DecodedTx, base: WordsContext): PlainWords {
+  const { hint: _app, ...general } = plainWordsMany(groups, outer, base);
+  const [one, two] = groups;
+  const first = one && one.tx.actions.length === 1 ? one.tx.actions[0]! : null;
+  const room = groups.length === 2 && first?.kind === "call" && first.method === "storage_deposit" ? first : null;
+  const pay = two && two.tx.actions.length === 1 ? two.tx.actions[0]! : null;
+  if (!room || !pay || pay.kind !== "call") return general;
+  const at = callArgs(room).account_id;
+  const p = callArgs(pay);
+  const coin = one!.tx.receiverId;
+  const paysIt = typeof at === "string" && p.receiver_id === at && ((pay.method === "ft_transfer" && two!.tx.receiverId === coin) || (pay.method === "ft_withdraw" && two!.tx.receiverId === INTENTS.account && p.token === coin));
+  const paid = paysIt ? paidIn(pay, two!.tx, { ...two!.ctx, nearUsd: two!.ctx.nearUsd ?? base.nearUsd }) : null;
+  if (!paid || paid.usd === null || !paid.coin) return general;
+  const symbol = paid.coin.slice(paid.coin.indexOf(" ") + 1);
+  const feeYocto = maxFeeYocto(outer, base.gasPriceYocto);
+  const price = base.nearUsd && base.nearUsd > 0 ? base.nearUsd : null;
+  const fee = price === null ? APART_WORDS.feeNear(formatNear(feeYocto)) : APART_WORDS.fee(feeUsd(feeYocto, price));
+  // the Safe's coin after, from the coin's own effect row (worst case); the NEAR row goes (copy review)
+  // a dollar coin in dollars to the cent, rounded down as the row is (two decimals on money)
+  const cents = (v: string) => { const x = Number(v.replace(/,/g, "")); return Number.isFinite(x) ? `$${(Math.floor(x * 100 + 1e-6) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null; };
+  const after = general.effect.filter((e) => e.token === symbol).map((e) => ({ token: APART_WORDS.after, before: "", after: paid.dollar && cents(e.after) ? `${cents(e.after)} in ${symbol}` : `${e.after} ${symbol}` }));
+  return { ...general, lines: [APART_WORDS.allow(dollarWords(paid.usd, paid.exact), symbol), APART_WORDS.send, APART_WORDS.only, fee], effect: after };
 }

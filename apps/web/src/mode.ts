@@ -23,9 +23,9 @@ export type Mode = { page: Page; mainnet: boolean } | { refused: string };
 export const MAINNET_REFUSAL = "Mainnet runs only the real app.";
 
 /** Is this the public release build? Set at build time only (never by the address). */
-export const PUBLIC_BUILD: boolean = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_PUBLIC === "1";
+export const PUBLIC_BUILD: boolean = import.meta.env?.VITE_ZEROFEE_PUBLIC === "1";
 /** Is this the second-device build (the laptop page's own site)? Set at build time only (never by the address). */
-export const SECOND_DEVICE_BUILD: boolean = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_TARGET === "second-device";
+export const SECOND_DEVICE_BUILD: boolean = import.meta.env?.VITE_ZEROFEE_TARGET === "second-device";
 /**
  * D157: the ZeroFee Chrome extension's build (VITE_ZEROFEE_TARGET=extension, apps/extension/vite.app.config.ts): the app in
  * the extension's own page, Real only (mainnet), whatever the address says. Sim stays the website: no Sim | Real switch,
@@ -33,7 +33,7 @@ export const SECOND_DEVICE_BUILD: boolean = (import.meta as { env?: Record<strin
  * (apps/extension/vite.app.config.ts refuses VITE_ZEROFEE_EXTENSION_CHECK, and its no-Sim gate fails a build holding any
  * Sim module).
  */
-export const EXTENSION_BUILD: boolean = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_TARGET === "extension";
+export const EXTENSION_BUILD: boolean = import.meta.env?.VITE_ZEROFEE_TARGET === "extension";
 /**
  * The second device's one fixed public address (H13). QA's ruling under product decision, 5 Nov (on
  * QA's MUST): its OWN origin, laptop.zerofee.si, not zerofee.si/laptop (that origin is the website's: any
@@ -47,7 +47,7 @@ export const secondDeviceSite = (raw: string | undefined): string => {
   const v = raw?.trim().toLowerCase() ?? "";
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(v) ? v : "laptop.zerofee.si";
 };
-export const SECOND_DEVICE_SITE = secondDeviceSite((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_SECOND_DEVICE_SITE);
+export const SECOND_DEVICE_SITE = secondDeviceSite(import.meta.env?.VITE_SECOND_DEVICE_SITE);
 /** The laptop page's path in the real app's build (D54). */
 export const LAPTOP_PATH = "/laptop";
 const isLaptopPath = (path: string) => path.replace(/\/+$/, "") === LAPTOP_PATH;

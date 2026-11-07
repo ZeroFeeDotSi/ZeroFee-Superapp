@@ -303,6 +303,9 @@ export function createEvmEngine(o: EvmEngineOptions): EvmEngine {
       lost.set(hash, first);
       return c.now() - first > DROPPED_EXPIRE_MS ? "expired" : "pending";
     },
+    /** The live re-check of an unconfirmed trade (types.ts): status() itself, two nodes' receipts and the nonce (a receipt
+     *  is history, never a short cache). Read only: nothing is sent again. */
+    recheck: (hash, step) => engine.status(hash, step),
 
     /** Speed (3 Nov): the first node with a mined receipt of status 1 says it landed; status() stays the two-node verdict. */
     async landed(hash): Promise<"landed" | "pending"> {

@@ -136,7 +136,8 @@ test("D137 (the test iPhone: $26 shown going, $19.35 arrived): before the tap Mo
   assert.equal(costLine([{ from: "sol", to: "safe", usd: 26.1 }]), "$26.10 leaves your SOL wallet. At least $24.10 reaches your Safe. Fees at most $2.00.");
   // the floors themselves: 1Click's promise into the NEAR wallet at least leastIn(99 %), then home at least 98 %
   assert.equal(leastOf({ from: "sol", to: "safe", usd: 26.1 }), leastHome(leastIn(26.1 * 0.99)));
-  assert.match(costLine([{ from: "safe", to: "sol", usd: 10 }])!, /^\$10\.00 leaves your Safe\. At least \$9\.6\d reaches your SOL wallet\. Fees at most \$0\.3\d\.$/);
+  // the audit's MUST (8 Nov): the bound is the percentage part plus the SOL leg's network fee (float-floors NETWORK_FEE_USD, $0.30)
+  assert.equal(costLine([{ from: "safe", to: "sol", usd: 10 }]), "$10.00 leaves your Safe. At least $9.31 reaches your SOL wallet. Fees at most $0.69.");
   assert.match(costLine([{ from: "safe", to: "sol", usd: 10 }, { from: "hood", to: "sol", usd: 5 }])!, /^\$15\.00 leaves\. At least \$[\d.]+ reaches your SOL wallet\. Fees at most \$[\d.]+\.$/, "from several places to one: where it ends, named");
   assert.match(costLine([{ from: "safe", to: "sol", usd: 10 }, { from: "safe", to: "hood", usd: 5 }])!, /^\$15\.00 leaves your Safe\. At least \$[\d.]+ arrives\. Fees at most \$[\d.]+\.$/, "from one place to several: arrives alone");
   assert.equal(costLine([]), null);
@@ -236,7 +237,7 @@ test("phone test (3 Nov): all to SOL from a $11.45 Safe ($9.30 USDC) and a $1.38
   assert.equal(moveBlock(legs, totalOf(now)), null, "Move works");
   assert.equal(s.near, 1.38, "NEAR stays as it is");
   assert.equal(safeKeeps(now, { coinUsd: 9.3, roomUsd: 500, capUsd: "500.00" }), "$2.15 in other coins stays in your Safe. One coin per move.");
-  assert.equal(safeKeeps(now, { coinUsd: 9.3, roomUsd: 9.3 - 2, capUsd: "20.00" }), "$2.15 stays in your Safe. Your wallets can hold $20 in all.", "the wallets' limit, when that is what keeps it");
+  assert.equal(safeKeeps(now, { coinUsd: 9.3, roomUsd: 9.3 - 2, capUsd: "20.00" }), "$2.15 stays in your Safe. Your rule: wallets hold up to $20 in all.", "the wallets' limit, when that is what keeps it");
   // control: the split the shot showed (NEAR → SOL $1.33) is named once, and one tap leaves NEAR as it is, the Safe's leg still there
   const shot = { ...today(now), safe: 2.15, near: 0.05, sol: 11.39 };
   const shotLegs = legsOf(now, shot);

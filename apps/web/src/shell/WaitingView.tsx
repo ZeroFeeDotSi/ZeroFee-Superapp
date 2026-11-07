@@ -45,7 +45,7 @@ export function WaitingView({ bridge, held, onClose, onOpen }: { bridge: Bridge;
   const [look, setLook] = useState(0);
   // Back and Escape leave as Done does, on every face of this screen (grade 01d, Q3: the ended screen trapped the person).
   useBack(onClose);
-  const { left, text } = useCountdown(item?.readyAtIso ?? new Date(0).toISOString());
+  const { left, alone } = useCountdown(item?.readyAtIso ?? new Date(0).toISOString());
   // One name for the second device: "laptop" when every one the account has is a laptop, else "second device" (grade
   // 1 Nov, item 7). Read once; until it answers, the general name.
   const [device, setDevice] = useState("second device");
@@ -211,7 +211,7 @@ export function WaitingView({ bridge, held, onClose, onOpen }: { bridge: Bridge;
       <div className="rc-center zf-enter">
         <Mark size={96} mode={ready ? "still" : "loading"} />
         <div className="zf-label" style={{ marginTop: 32 }}>{item.needsSecondDevice ? `Waiting for your ${device}` : saidYes ? `Your ${device} said yes` : ready && item.change ? "Not finished" : "Waiting"}</div>
-        {!forDevice && <div className="zf-display rc-count">{ready ? (item.change ? "Finish it" : "Ready") : text}</div>}
+        {!forDevice && <div className={`zf-display rc-count${ready ? "" : " rc-count--words"}`}>{ready ? (item.change ? "Finish it" : "Ready") : alone}</div>}
         {!ready && endsAt && <p className="zf-small" style={{ marginTop: 2 }}>Ends {endsAt}</p>}
         <h1 id="held-title" className="zf-title" style={{ marginTop: 18, ...(item.warning ? { color: "var(--alert)" } : {}) }}>{item.title}</h1>
         {item.warning && <p className="zf-body" style={{ marginTop: 8, color: "var(--alert)" }}>{item.warning}</p>}

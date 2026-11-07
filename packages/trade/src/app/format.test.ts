@@ -12,8 +12,8 @@ test("dollars: cents for everyday sums, compact for big ones, a real minus sign"
   assert.equal(usd(-3.2), "−$3.20");
 });
 
-test("coin prices keep four significant digits however small, never 2.1e-5", () => {
-  assert.equal(price(0.00002134), "$0.00002134");
+test("coin prices: up to six decimals under $1 (T2-3, the copy review's walk), never 2.1e-5", () => {
+  assert.equal(price(0.00002134), "$0.000021");
   assert.equal(price(8.37), "$8.37");
   assert.equal(price(0.8214), "$0.8214");
   assert.equal(price(2416.1), "$2,416.10");
@@ -21,7 +21,8 @@ test("coin prices keep four significant digits however small, never 2.1e-5", () 
   assert.equal(price(70.204), "$70.20");
   assert.equal(price(150), "$150.00");
   assert.equal(price(3.1416), "$3.1416");
-  assert.doesNotMatch(price(0.000000001234), /e/);
+  assert.doesNotMatch(price(0.000000001234), /\de[-+]?\d/);
+  assert.equal(price(0.000000001234), "under $0.000001");
 });
 
 test("changes: dollars next to percent, signed both ways", () => {
@@ -92,7 +93,8 @@ test("QA's Sim walk (5 Nov): a compact figure is never a thousands comma AND a s
   assert.deepEqual([58_000, 153_447.46, 3_135.82, 18.4e6, 1.613e12, 980.4, 999_960].map(rowUsd), ["$58K", "$153.4K", "$3.1K", "$18.4M", "$1.61T", "$980", "$1.00M"]);
   for (const n of [1e3, 5e4, 9.9e5, 1e6, 8.5e8, 1.6e12]) assert.doesNotMatch(rowUsd(n), /,/, `${n}: a row never has a comma`);
   const discover = readFileSync(new URL("./screens/Discover.tsx", import.meta.url), "utf8");
-  assert.match(discover, /const capWords = \(n: number\): string => rowUsd\(n\);/, "Trade's lists and Trenches use the row form");
+  // fix/trade-list-coin: the row's worth moved to coin-words.ts rowLines (beside the symbol), still the row form
+  assert.match(readFileSync(new URL("./coin-words.ts", import.meta.url), "utf8"), /\? rowUsd\(r\.marketCapUsd\) : null/, "Trade's lists and Trenches use the row form");
   assert.doesNotMatch(discover, /compactUsd/, "control: no page form in a list row");
   for (const n of [1e3, 5e4, 9.9e5, 1e6, 8.5e8]) assert.doesNotMatch(compactUsd(n), /,.*[KMBT]$|K$/, `${n}: no K, no comma beside a suffix`);
   for (const n of [1e9, 9.99e9, 1.5e11, 9.999e11, 1e12, 1.613e12, 4.2e13]) assert.doesNotMatch(compactUsd(n), /,.*[BT]$/, `${n}: no comma beside a suffix`);
@@ -109,19 +111,16 @@ test("a NEAR trade's route says NEAR Intents on screen, never 1Click; the data k
   assert.match(engine, /route: "1Click"/, "the data value stays 1Click");
 });
 
-test("the copy review (5 Nov): a list row's tiny price in the compact trading form, \"$0.0₈88\" for $0.000000008808 (BLACKDRA… got its room back); $0.0009 \"$0.0₃9\"; 10+ zeros in several subscript digits; controls: $0.0012 and up as price()", async () => {
+test("T2-3 (the copy review's walk, 8 Nov; was the subscript form of 5 Nov): a list row's tiny price is price()'s six decimals, \"under $0.000001\" below that; controls: $0.001 and up as before", async () => {
   const { listPrice, price } = await import("./format.ts");
-  assert.equal(listPrice(0.000000008808), "$0.0₈88");
-  assert.equal(listPrice(0.0009), "$0.0₃9", "a trailing zero dropped, the same rule");
-  assert.equal(listPrice(0.00098765), "$0.0₃98", "cut toward zero, never rounded up to $0.001");
-  assert.equal(listPrice(0.0000000000123), "$0.0₁₀12", "10 zeros: two subscript digits");
-  assert.equal(listPrice(0.000000000000045), "$0.0₁₃45");
-  for (const n of [0.000000008808, 0.0009, 0.0000000000123]) assert.ok(listPrice(n).length <= 9, listPrice(n));
-  // controls: $0.001 and up, and nothing, read as before
-  for (const n of [0.0012, 0.001, 0.5, 8.37, 2416.1, 0]) assert.equal(listPrice(n), price(n), String(n));
+  assert.equal(listPrice(0.000057), "$0.000057");
+  assert.equal(listPrice(0.0007), "$0.0007", "trailing zeros dropped");
+  assert.equal(listPrice(0.00098765), "$0.000987", "cut toward zero, never rounded up");
+  assert.equal(listPrice(0.000000008808), "under $0.000001");
+  assert.equal(listPrice(0.000001), "$0.000001", "the floor itself is a price");
+  for (const n of [0.000000008808, 0.0009, 0.0000000000123, 0.000057]) assert.doesNotMatch(listPrice(n), /[\u2080-\u2089]|\de[-+]?\d/, listPrice(n));
+  for (const n of [0.0012, 0.001, 0.5, 8.37, 2416.1, 0, 0.000057]) assert.equal(listPrice(n), price(n), String(n));
   assert.equal(listPrice(0.0012), "$0.0012");
-  // the list rows use listPrice; price() keeps the full figure
-  assert.equal(price(0.000000008808), "$0.000000008808");
   const { readFileSync } = await import("node:fs");
   const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
   assert.match(src("./screens/Discover.tsx"), /listPrice\(r\.priceUsd\)/, "Trade's list rows");
@@ -129,15 +128,13 @@ test("the copy review (5 Nov): a list row's tiny price in the compact trading fo
   assert.match(src("./screens/Home.tsx"), /listPrice\(r\.priceUsd\)/, "Trade Home's coin rows");
 });
 
-test("the copy review's Sim re-walk (5 Nov): the coin page's headline price is the list's form, one formatter for tiny prices (was \"$0.000004469\" by \"$0.0₅44\" in the New list); control: $0.001 and up read as before", async () => {
+test("the copy review's Sim re-walk (5 Nov): the coin page's headline price is the list's form, one formatter for tiny prices; T2-3: six decimals, no subscript", async () => {
   const { listPrice, price } = await import("./format.ts");
   const { readFileSync } = await import("node:fs");
   const page = readFileSync(new URL("./screens/CoinPage.tsx", import.meta.url), "utf8");
   const head = page.slice(page.indexOf('<div className="tr-price">'), page.indexOf("</div>", page.indexOf('<div className="tr-price">')));
-  assert.match(head, /\{scrub \? listPrice\(scrub\.c\) : px !== undefined \? listPrice\(px\) :/, "fails before: price(scrub.c), price(px)");
-  assert.doesNotMatch(head, /\bprice\(/, "never the long form in the headline");
-  assert.equal(listPrice(0.000004469), "$0.0₅44");
-  assert.equal(price(0.000004469), "$0.000004469", "control: the old headline's figure");
+  assert.match(head, /\{scrub \? listPrice\(scrub\.c\) : px !== undefined \? listPrice\(px\) :/);
+  assert.equal(listPrice(0.000004469), "$0.000004");
   assert.equal(listPrice(8.37), price(8.37), "control: a dollar-size price is the same either way");
 });
 

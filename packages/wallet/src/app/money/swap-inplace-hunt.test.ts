@@ -253,7 +253,7 @@ test("audit MUST 2: only a true refund or 1Click's own no says the money is back
   const { ends, tasks } = endsOf();
   const failed = { call: async (m: string) => (m === "subwallet.float.swap" ? { ok: { id: "fm-f", status: "failed" } } : { ok: {} }) } as unknown as Bridge;
   await runInplaceJob({ bridge: failed, tasks, rowId: "swap:f", route: { kind: "inplace", source: "private", side: "buy", coin: ZEC }, units: "1", q: Q, key: "f", tapMs: 0 });
-  assert.deepEqual(ends, [["swap:f", "failed", "NEAR Intents didn't finish this swap. Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet's balance first."]]);
+  assert.deepEqual(ends, [["swap:f", "failed", "NEAR Intents didn't finish this swap. Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet first."]]);
   const tracked = inplaceTrack({ id: "r", kind: "swap", title: "x", wallets: ["near"], startMs: 0, steps: [] } as never, { state: "failed", end: { ok: false, line: INPLACE_WORDS.failed, whole: true } }, 1);
   assert.equal(endLine(tracked), INPLACE_WORDS.failed, "the whole line: no \"The swap didn't finish.\" before it");
   for (const w of ["failed", "checking", "lost", "unread"] as const) {
@@ -326,7 +326,7 @@ test("real-tap proof, 6 Nov: the sheet's end is exactly the job's own line, on a
   assert.equal((await sheetOf({ id: "fm-r", status: "failed", reason: NOT_TAKEN_REASON })).line, NOT_TAKEN_REASON);
   // the copy review's FAILED sheet: the headline is its title and step; the row still says the whole end
   const failed = await sheetOf({ id: "fm-r", status: "failed" });
-  assert.equal(failed.line, "Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet's balance first.");
+  assert.equal(failed.line, "Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet first.");
   assert.equal(failed.row, INPLACE_WORDS.failed);
 });
 
@@ -416,10 +416,10 @@ test("the copy review's words (6 Nov): the tap's screen, the failed and refunded
   assert.equal(inplaceTitle(10, "USDC", "ZEC"), "Swap $10.00 of USDC for ZEC");
   const X = readFileSync(new URL("./InplaceSwap.tsx", import.meta.url), "utf8"), T = readFileSync(new URL("./LiveTrack.tsx", import.meta.url), "utf8");
   assert.match(X, /bar: SWAP_WORDS\.title, made: true/);
-  assert.match(T, /t\.made && !t\.end \? `\$\{JOB_WORDS\.created\} \$\{rowTitle\(t\)\}` : rowTitle\(t\)/);
-  assert.match(T, /title=\{t\.bar \?\? rowTitle\(t\)/);
-  // one end, said once: no status line ("Stopped") under its own title
-  assert.match(T, /\{!\(t\.end && !t\.end\.ok && t\.end\.head\) && <p className="lv-tracker__status"/);
+  assert.match(T, /t\.made && !t\.end \? `\$\{JOB_WORDS\.created\} \$\{f\.what\}` : f\.what/);   // f.what: the title, a Send's figure said once (J2-4)
+  assert.match(T, /<Sheet title=\{f\.bar\}/);
+  // one end, said once: no status line ("Stopped") under its own title (the copy review's Part 2: the bar is the one title)
+  assert.doesNotMatch(T, /lv-tracker__status/);
   const start = { id: "swap:home-swap-a", kind: "swap" as const, title: "Swap $10.00 of USDC for ZEC", wallets: ["near"], startMs: 0, steps: [], bar: "Swap", made: true as const };
   const sheet = async (m: object) => {
     let t = start as Parameters<typeof line>[0];
@@ -432,7 +432,7 @@ test("the copy review's words (6 Nov): the tap's screen, the failed and refunded
   const failed = await sheet({ id: "fm-a", status: "failed" });
   for (const t of [failed.t, failed.home]) {
     assert.equal(rowTitle(t), "Swap didn't finish");
-    assert.equal(line(t), "Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet's balance first.");
+    assert.equal(line(t), "Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet first.");
     assert.deepEqual(t.steps.map((s) => [s.label, s.state]), [["NEAR Intents didn't finish it", "failed"]]);
     assert.doesNotMatch(JSON.stringify(t), /Stopped|stopped/);
     assert.equal(t.next, undefined, "no NEAR wallet page to open: Close only");
@@ -486,7 +486,8 @@ test("last copy notes (6 Nov): a refund's title says the money came back, every 
   // the tracker's one line joins them with a dot, so no stop before it
   assert.equal(oneLine("NEAR Intents is swapping it. · 8 s left"), "NEAR Intents is swapping it · 8 s left");
   assert.equal(oneLine("Done in 2 s"), "Done in 2 s", "control");
-  assert.match(readFileSync(new URL("./LiveTrack.tsx", import.meta.url), "utf8"), /\{!t\.end \? oneLine\(rowLine\(t, now\)\) :/);
+  // the page shows the time left alone under the money line (the copy review's Part 2); Home's row keeps oneLine
+  assert.match(readFileSync(new URL("./LiveTrack.tsx", import.meta.url), "utf8"), /const left = f\.state === "going" \? rowParts\(t, now\)\.time : undefined;/);
   // a job kept by a build before the stop is still this job's: a reload finds it
   const ends: string[] = [];
   const kept = { update: () => true, end: (id: string) => (ends.push(id), true) } as never;
@@ -575,7 +576,8 @@ test("copy review, 6 Nov: a true refund wears the neutral \"back\" face on its s
   // the screen uses them, and the mark draws it without red
   const T = readFileSync(new URL("./LiveTrack.tsx", import.meta.url), "utf8");
   assert.match(T, /if \(t\.end\) return endFace\(t\.end\);/);
-  assert.match(T, /<ReceiptMark state=\{trackMark\(t\)\}/);
+  // the page has no mark now (the copy review's Part 2: no mark-with-badge); a true refund's face is no --bad dot (job-face.ts)
+  assert.match(readFileSync(new URL("./job-face.ts", import.meta.url), "utf8"), /bad: stopped && !t\.end\?\.back,/);
   const R = readFileSync(new URL("../../../../design/src/Receipt.tsx", import.meta.url), "utf8");
   assert.match(R, /state === "back" \? BACK : state === "refused" \? CROSS : TICK/);
   const css = readFileSync(new URL("../../../../design/src/receipt.css", import.meta.url), "utf8");

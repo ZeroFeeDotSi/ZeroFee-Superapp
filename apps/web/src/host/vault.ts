@@ -10,7 +10,7 @@
 // Honest label: a seed kept here (Agent's, an imported laptop key) is a SOFTWARE key. It is read back into JavaScript to sign, like in the web demo.
 // The Keychain keeps it off backups and other phones; it does not keep it out of this page's memory.
 import { mlDsaKeyHandle, mlDsaPublicKeyBytes } from "@zerofee/core/key-handle";
-import { signatureIsValid, type AccountKey, type DeviceKeys, type SheetRequest } from "@zerofee/core/device-key";
+import { setSignatures, signatureIsValid, type AccountKey, type DeviceKeys, type SheetRequest, type SheetSetRequest } from "@zerofee/core/device-key";
 import { ProblemError, type Problem } from "@zerofee/core/problem";
 import { serialize } from "@zerofee/core/tx-build";
 import { sheetSummary } from "@zerofee/core/sheet-summary";
@@ -115,6 +115,14 @@ export class HostKey implements AccountKey {
     const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as BufferSource));
     if (!signatureIsValid(hash, signature, this.publicKey)) throw new Error("The secure chip's approval didn't check out, so ZeroFee didn't use it. Your money hasn't moved.");
     return signature;
+  }
+
+  /** Separate steps of one action (TxRequest.apart): every tx to key.signSet, ONE sheet, ONE Face ID (Swift decodes each,
+   *  refuses more than 4). A signature per tx, each checked against its own hash, or none is used. Null = Not now. */
+  async signSetOnSheet({ id, words, txs, pairHash }: SheetSetRequest): Promise<Uint8Array[] | null> {
+    const r = await this.host.call<{ signatures?: unknown; pairHash?: unknown; declined?: true }>("key.signSet", { id, words, txs: txs.map((t) => ({ bytes: toB64(t.bytes), summary: t.summary })), ...(pairHash ? { pairHash } : {}) });
+    if ("problem" in r) throw new Error(r.problem.whatHappened);
+    return setSignatures(txs, r.ok, this.publicKey, pairHash);
   }
 
   /** The relay's email-alerts proof: Swift builds and shows it (AlertsProof), the chip signs. Checked by the core. */

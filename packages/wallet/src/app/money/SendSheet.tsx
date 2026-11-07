@@ -18,6 +18,7 @@ import { sheetsHeard } from "@zerofee/shell-api/approval-answered.ts";
 import { sendSec } from "@zerofee/shell-api/job-steps.ts";
 import { mark } from "@zerofee/design/tap.ts";
 import { JobReceipt } from "./JobMade.tsx";
+import { sendWords } from "./receipt-said.ts";
 import { ActSend } from "../icons.tsx";
 import type { AppId } from "@zerofee/shell-api/app-module.ts";
 import { sayWent } from "@zerofee/shell-api/money.ts";
@@ -27,6 +28,7 @@ import { PayProvider, usePay } from "@zerofee/pay/app/runtime.tsx";
 import type { Prefill } from "@zerofee/pay/app/links.ts";
 import { LANDS_AS, NEAR_PAYOUT_CLOSED, nearLandsAs } from "../../send-to.ts";
 import { declinedLine, nearPayoutLine } from "./send-said.ts";
+import { saidOnSheet, sendEndsHere } from "./swap-refused.ts";
 import type { Balance, Movement } from "../../types.ts";
 import { PAID_KINDS, PAID_READ, type Paid as WasPaid } from "../../send-reach.ts";
 import { SendForm, type SendAsk } from "./SendForm.tsx";
@@ -40,6 +42,7 @@ import { buzz } from "./hold.ts";
 import { SEND_PROOF_OFF, homeProof } from "./home-proof.ts";
 import { SHEET_NEEDS, sheetLineOf, useServices } from "../services.ts";
 import { useWallet } from "../runtime.tsx";
+import { sendHeadline } from "./send-cap.ts";
 import "@zerofee/pay/app/pay.css";
 // The guard (packages/agent's judge, unitGuard, obfuscated) loads as the sheet opens, never in Home's first load; Hold
 // stays off until it is here, so no send can go before the guard (QA 3 Nov).
@@ -163,6 +166,10 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
   const [asking, setAsking] = useState(false);
   /** The success moment: the amount flying into the check mark, then the sheet closes (SENT_MS). */
   const [flying, setFlying] = useState<string | null>(null);
+  /** The job its receipt follows (runJob's made): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [flyingJob, setFlyingJob] = useState<string | null>(null);
+  /** The receipt's line, from the job's own title (copy review, 7 Nov): "Sending $25.00 to bob.near.", "Sent …" once landed. */
+  const [sentSaid, setSentSaid] = useState<{ going: string; landed: string } | null>(null);
   /** The job's time left under "Job created." (sendSec: the route's measured legs). */
   const [etaSec, setEtaSec] = useState<number | undefined>(undefined);
 
@@ -199,6 +206,10 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
   // B28 + bug 8: a service that failed is one line on this sheet, never the shell's Problem screen; Hold waits (and the
   // line says "waits") only when it is down on two sources or the phone is offline: the line and the button agree
   const [line, setLine] = useState<string | null>(null);
+  /** The line is a refusal that can be tried again (saidOnSheet: never a maybe-sent one): its words for the one button. Any other line ends it. */
+  const [stopped, setStopped] = useState<{ line: string; label: string } | null>(null);
+  const again = stopped && line === stopped.line ? stopped.label : null;
+  const edited = () => { setLine(null); setStopped(null); };
   const services = useServices(shell.bridge, SHEET_NEEDS.send, "Send");
   const problem = async (p: Problem) => {
     const said = sheetLineOf(p);
@@ -288,19 +299,23 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
     if (fromSafe) sayWent("Getting it ready…", "busy");
     mark("tap");
     const shown = a.usd !== null ? `$${a.usd.toFixed(2)}` : a.exactOut ? `${a.exactOut.amount} ${a.exactOut.symbol}` : `${a.amountIn} ${a.source.symbol}`;
+    // its own key (the audit's MUST, 7 Nov): the Safe's sheet for it says approval.asked and job.signed with this key, never another's
+    const key = `home-send-${Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("")}`;
     const eta = sendSec({ row: a.source.row, toNear: payee.kind === "ledger" || a.network === "near" });
     setEtaSec(eta);
     const end = await runJob<Movement | Movement[]>({
-      tasks: shell.tasks, title: `Send ${said}`, ...(a.usd !== null ? { usd: `$${a.usd.toFixed(2)}` } : {}), safe: fromSafe, onAnswer: true, etaSec: eta,
+      key, tasks: shell.tasks, title: `Send ${said}`, ...(a.usd !== null ? { usd: `$${a.usd.toFixed(2)}` } : {}), safe: fromSafe, onAnswer: true, etaSec: eta,
+      // the Getting-ready sheet says the typed figure alone; the bound one only adds "from your Safe" (copy review, 6 Nov)
+      ...(fromSafe ? { headline: sendHeadline(shown) } : {}),
       // QA's MUST (Sim test): a wallet's Send to someone else asks every time (QA's ruling), on
       // the shell's own sheet: asked first, "Job created." on its yes; from the Safe, runJob's default (its sheet, if ours)
       ...(a.source.row ? { asks: sheetsHeard("hot") } : {}),
       money: a.source.row ? [`row:${a.source.row}`] : ["safe", "private"],
       call: () => (a.source.row
         ? shell.bridge.call<Movement>("ledger.hiddenFromRow", { chain: a.source.row, ...(a.source.coin ? { coin: a.source.coin } : {}), to: payee, toTokenId, ...amount, ...upTo, ...(a.note ? { label: a.note } : {}) })
-        : shell.bridge.call<Movement[]>("ledger.sendFromSafe", { tokenId: a.source.tokenId, to: payee, toTokenId, ...amount, ...upTo, ...(a.source.privateOnly ? {} : { fill: true }), ...(a.note ? { label: a.note } : {}) })).catch(() => ({ problem: payProblems.quoteFailed() })),
+        : shell.bridge.call<Movement[]>("ledger.sendFromSafe", { tokenId: a.source.tokenId, to: payee, toTokenId, ...amount, ...upTo, ...(a.source.privateOnly ? {} : { fill: true }), ...(a.note ? { label: a.note } : {}), job: key })).catch(() => ({ problem: payProblems.quoteFailed() })),
       declined: (r) => "problem" in r && /declined$/.test(r.problem.code),
-      made: () => { sayWent(""); setAsking(false); setBusy(false); buzz(shell.bridge, "success"); setFlying(shown); },
+      made: (j) => { sayWent(""); setAsking(false); setBusy(false); buzz(shell.bridge, "success"); setSentSaid(sendWords(said)); setFlying(shown); setFlyingJob(j.id); },
       asking: setAsking,
     });
     setBusy(false);
@@ -320,6 +335,18 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
     if ("refused" in end) {
       paying.current = null;
       mark("refused");
+      // money may already have left (a part went, or it can't be read): never this form's lit Send, whose tap would pay again (the audit's MUST, 6 Nov)
+      if (sendEndsHere(end.refused)) {
+        setStopped(null);
+        setLine(null);
+        setFlying(null);
+        const next = await shell.showProblem(end.refused);
+        onClose(false);
+        if (next.kind === "open") shell.openApp("wallet", next.screen);
+        return;
+      }
+      // a refusal that can be tried again is said in its own words (saidOnSheet: no service, so no sheetLineOf below); `again` holds only while that line stands
+      setStopped(saidOnSheet(end.refused) ? { line: end.refused.whatHappened, label: end.refused.next.label } : null);
       // a payout to a NEAR account NEAR Intents didn't take: by name, with the wallet the money is still in (rule 8)
       if (end.refused.code === NEAR_PAYOUT_CLOSED) return setLine(nearPayoutLine(shown, a.source.place));
       // S1 (rule 8): short of money says how much, in dollars, where (the From row's own name) and what to tap
@@ -405,13 +432,13 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
         )}
         {warn && !line && (!flying || warn.kept) && <p className="zf-small" role="status" data-testid="send-guard-warn">{warn.text}</p>}
         {flying ? (
-          // the job is made: the receipt, away ("Job created."), until the person closes it
-          <JobReceipt amount={flying} icon={<ActSend />} testid="send-sent" etaSec={etaSec} onDone={madeDone} />
+          // the job is made: the receipt, away ("Job created." and who got it), until the person closes it
+          <JobReceipt amount={flying} icon={<ActSend />} testid="send-sent" etaSec={etaSec} said={sentSaid?.going} landedSaid={sentSaid?.landed} job={flyingJob} onDone={madeDone} />
         ) : (
           <div className="wl-send">
             {reqLine && <p className="zf-small">{reqLine}</p>}
             <SendForm key={formKey} prefill={prefill} sources={sources} reading={rowsRead === "failed" ? "failed" : !rowsRead || (!balancesRead && home.balances === null)}
-              start={startSource(wallet, sources, coin)} history={history} {...(refill ? { typed: refill } : typed && formKey === 0 ? { typed } : {})} busy={busy} waits={waits} blocked={stop} notYet={guard ? null : guardFailed ? GUARD_FAILED_WHY : GETTING_READY} said={line ?? services.line}
+              start={startSource(wallet, sources, coin)} history={history} {...(refill ? { typed: refill } : typed && formKey === 0 ? { typed } : {})} busy={busy} waits={waits} blocked={stop} notYet={guard ? null : guardFailed ? GUARD_FAILED_WHY : GETTING_READY} said={line ?? services.line} again={again} onEdit={edited}
               onSend={(x) => void send(x)} onSwap={(s) => { onClose(false); if (s.swap) shell.openMoney({ kind: "swap", wallet: s.swap }); }} onBack={(s) => { onClose(false); if (s.back) shell.openMoney({ kind: "siteback", wallet: s.back.wallet, name: s.back.name }); }} feeOf={(a) => (a.source.row ? shell.bridge.call<{ inUsd: string; outUsd: string } | null>("ledger.sendFee", { chain: a.source.row, ...(a.source.coin ? { coin: a.source.coin } : {}), to: payeeOf(a), toTokenId: LANDS_AS[a.network].tokenId, amountIn: a.amountIn }).then((r) => ("ok" in r ? r.ok : null), () => null) : Promise.resolve(null))} onWho={knowWho} onScan={() => setScanning(true)} onAddMoney={() => onAddMoney("sol")} {...(onMove ? { onMove } : {})}
               onLink={onLink} ownWallets={ownChain} pickCoin={pickCoin}
               {...(SAFE_SEND_OPEN ? {} : { fillShut: { usd: privateFigure({ available: home.pocket?.available ?? true, ready: home.pocket?.ready ?? pocket.length > 0, rows: pocket }), onTopUp: () => { onClose(false); shell.openApp("wallet", "private/add"); } } })}

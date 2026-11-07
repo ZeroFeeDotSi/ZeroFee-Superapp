@@ -2,6 +2,7 @@
 // preview, which carry the shell's "Sample data" marker). Quotes come from the live market price; nothing is signed or
 // sent; a trade "confirms" about 0.4 s after it is sent. The real engines are sol/chain.ts and evm/.
 import { TradeError } from "./errors.ts";
+import { isSampleTrap } from "./market/demo-traps.ts";
 import { usdToRaw } from "./slippage.ts";
 import type { Amount, ChainEngine, ChainId, CoinMeta, Fill, Prepared, Side, TxStatus } from "./types.ts";
 
@@ -18,6 +19,32 @@ const NATIVE: Record<ChainId, { decimals: number; start: bigint }> = { sol: { de
 /** Each chain's sample wallet's opening money (smallest units). ?demo hands it to the shell's MockBridge (its float's
  *  `opening`), so the core's own balances say it too, and the engines read it through `moved` (`seeded`). */
 export const SAMPLE_OPENING: Record<"sol" | "bsc" | "hood", string> = { sol: NATIVE.sol.start.toString(), bsc: NATIVE.bsc.start.toString(), hood: NATIVE.hood.start.toString() };
+
+/**
+ * The Sim's slow chain, for walks only (QA and 83, 7 Nov: the "not confirmed yet" card, its end on landing and
+ * its proven expiry could not be reached, as every sample trade confirms in 0.4 s). "late": the tap's wait never hears it
+ * (the card shows after GIVE_UP_MS), and the live re-check finds it landed SIM_RESOLVE_MS after its send. "absent": the
+ * same, then the re-check proves it never landed (expired). Only in a build made with VITE_SIM_TRADE_MODES=1, where the
+ * walk sets localStorage "zf.sim.trade"; in every other build (the phone's, the public site's, the Sim's) SIM_MODES is
+ * false, so the switch is never read (demo-modes.test.ts), and the reader and its key are not in the bundle at all: the
+ * flag is read as Vite's own literal and the reader is chosen at module level (the audit's MUST, 7 Nov; CRAWL.md's grep of a
+ * normal build finds neither the key nor the flag's name).
+ */
+export type SimTradeMode = "late" | "absent";
+// Vite puts a literal here at build time; under node (tests) there is no env, so it is off
+export const SIM_MODES: boolean = import.meta.env?.VITE_SIM_TRADE_MODES === "1";
+/** From the send: past the tap's wait (GIVE_UP_MS, 75 s), so the card shows first and a live round or two find it pending. */
+export const SIM_RESOLVE_MS = 100_000;
+/** The walk's switch, read on every look (so a walk can turn it on or off in one page). Exported for its test only. */
+export function readSimTradeMode(): SimTradeMode | undefined {
+  try {
+    const v = (globalThis as { localStorage?: Storage }).localStorage?.getItem("zf.sim.trade");
+    return v === "late" || v === "absent" ? v : undefined;
+  } catch { return undefined; }
+}
+/** The switch as the engine reads it: the reader in a SIM_MODES build, nothing in every other (chosen here, at module
+ *  level, so a normal build drops the reader and its key). */
+export const simTradeMode: () => SimTradeMode | undefined = SIM_MODES ? readSimTradeMode : () => undefined;
 
 /** Each sample wallet's money, for as long as the page lives (as MockBridge keeps its own): every engine made for the same
  *  wallet reads and moves the same balances, so a Trade screen opened again, or the shell's reader, never sees a fresh start. */
@@ -54,8 +81,9 @@ export function keepSampleWallets(store: { getItem(key: string): string | null; 
  *  (the robot's route for "gas is funded inside the confirm"). */
 /** `seeded`: the shell's MockBridge holds the opening money (SAMPLE_OPENING) and `moved` reads it, so this engine starts
  *  from nothing of its own: one ledger, never the opening counted twice. */
-export function createDemoEngine(o: { chain: ChainId; owner: string; nativeUsd(): Promise<number>; meta(coin: string): Promise<CoinMeta | undefined>; now?(): number; moved?(): Promise<bigint>; empty?: boolean; noGas?: boolean; seeded?: boolean }): ChainEngine {
+export function createDemoEngine(o: { chain: ChainId; owner: string; nativeUsd(): Promise<number>; meta(coin: string): Promise<CoinMeta | undefined>; now?(): number; moved?(): Promise<bigint>; empty?: boolean; noGas?: boolean; seeded?: boolean; mode?(): SimTradeMode | undefined }): ChainEngine {
   const now = o.now ?? Date.now;
+  const mode = o.mode ?? (() => simTradeMode());
   const nd = NATIVE[o.chain].decimals;
   const key = `${o.chain}:${o.owner.toLowerCase()}`;
   const w = WALLETS.get(key) ?? WALLETS.set(key, { native: o.empty || o.seeded ? 0n : NATIVE[o.chain].start, held: new Map(), sent: new Map(), n: 0 }).get(key)!;
@@ -66,6 +94,9 @@ export function createDemoEngine(o: { chain: ChainId; owner: string; nativeUsd()
   return {
     chain: o.chain, owner: o.owner,
     async prepare(side: Side, coin: string, amount: Amount): Promise<Prepared> {
+      // a sample coin no one can sell back is refused at the quote, as the real engines' sell-back test does (the audit's note, 8 Nov:
+      // the Sim's row Buy bought NOSELL; on chain the quote refuses it)
+      if (side === "buy" && isSampleTrap(o.chain, coin)) throw new TradeError("unsellable", "This coin can't be sold back right now");
       const [meta, px, native] = await Promise.all([o.meta(coin), o.nativeUsd(), have()]);
       if (!meta?.priceUsd || !(px > 0)) throw new TradeError("unavailable", "No price for this coin yet");
       const d = meta.decimals ?? 6;
@@ -103,7 +134,16 @@ export function createDemoEngine(o: { chain: ChainId; owner: string; nativeUsd()
     async status(hash): Promise<TxStatus> {
       const s = [...sent.entries()].find(([h]) => h === hash)?.[1];
       if (!s) { sent.set(hash, { p: undefined as never, at: now() }); return "pending"; }
+      if (mode()) return "pending";                                           // the Sim's slow chain: the tap's wait hears nothing
       return now() - s.at >= 400 ? "confirmed" : "pending";                    // about a Solana confirmation
+    },
+    // the live re-check (types.ts): as status(), or the Sim's slow chain's end once SIM_RESOLVE_MS has passed
+    async recheck(hash): Promise<TxStatus> {
+      const m = mode(), s = sent.get(hash);
+      if (!m) return this.status(hash);
+      if (!s) return "unknown";
+      if (now() - s.at < SIM_RESOLVE_MS) return "pending";
+      return m === "late" ? "confirmed" : "expired";
     },
     async fill(p, hash): Promise<Fill> {
       const q = p.quote;

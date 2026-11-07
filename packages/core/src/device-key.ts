@@ -9,6 +9,7 @@
 import { generateSigner, signerFromSeed, verifyHash, type MlDsa65PublicKey, type MlDsa65Signer } from "@fastnear/ml-dsa-65";
 import type { PlainWords } from "./signer.ts";
 import type { SheetSummary } from "./sheet-summary.ts";
+import { sha256 } from "@noble/hashes/sha2.js";
 
 /**
  * What a key with its own sheet is handed for one signature: the exact unsigned transaction bytes (it hashes them
@@ -20,6 +21,22 @@ export interface SheetRequest {
   bytes: Uint8Array;
   /** The receiver and steps the bytes must say (sheet-summary.ts): the native sheet decodes the bytes and refuses otherwise. */
   summary: SheetSummary;
+  /** The Send's leg 2 held for this one sheet (send-words HeldPair: sha256 of its payload, hex), shown with it. Not the
+   *  binding: the core releases leg 2 by leg 1's own paid address (the bytes it signed) and its OWN pair.hash, never by
+   *  what comes back (dev-signer releasePair). The phone's echo is only an extra check that a mismatch refuses. */
+  pairHash?: string;
+}
+
+/**
+ * Several transactions of ONE action (TxRequest.apart: steps an account can't chain), for ONE sheet and ONE Face ID: each
+ * tx's exact bytes and the receiver and steps they must say. The native sheet decodes and checks each, shows every one,
+ * and signs them back to back under that one unlock (key.signSet, ChipKey.signMany); more than four are refused.
+ */
+export interface SheetSetRequest {
+  id: string;
+  words: PlainWords;
+  txs: { bytes: Uint8Array; summary: SheetSummary }[];
+  pairHash?: string;
 }
 
 export interface AccountKey {
@@ -36,6 +53,9 @@ export interface AccountKey {
    * only sha256(`bytes`). Null = the person said Not now. When present, the core signs through this and never signHash.
    */
   signOnSheet?(request: SheetRequest): Promise<Uint8Array | null>;
+  /** Every tx of one action on ONE sheet under ONE Face ID (SheetSetRequest): a signature per tx, in order. Null = Not now.
+   *  A sheet key without it can't sign several steps at once: the core refuses them, never splits them into sheets. */
+  signSetOnSheet?(request: SheetSetRequest): Promise<Uint8Array[] | null>;
   /**
    * A key that signs only on its own sheet (the phone's chip) signs the relay's email-alerts proof this way only: the
    * native side builds the four-line message and the NEP-413 bytes itself, its recipient its own relay's host, shows
@@ -105,6 +125,21 @@ export class SoftwareKey implements AccountKey {
 export function signatureIsValid(hash: Uint8Array, signature: Uint8Array, publicKey: string): boolean {
   if (!publicKey.startsWith("ml-dsa-65:")) return false;
   return verifyHash({ hash, signature, publicKey: publicKey as MlDsa65PublicKey });
+}
+
+/** The phone's answer to key.signSet for separate steps (SheetSetRequest), checked before anything uses it: Not now is
+ *  null; otherwise exactly one base64 signature per tx, each valid over sha256 of its own tx's bytes, and the pair's hash
+ *  echoed exactly. Anything else throws and none is used. Shared by the isolated core (apps/ios/core/entry.ts) and the
+ *  page's host key (apps/web/src/host/vault.ts). */
+export function setSignatures(txs: readonly { bytes: Uint8Array }[], answer: { signatures?: unknown; pairHash?: unknown; declined?: unknown }, publicKey: string, pairHash?: string): Uint8Array[] | null {
+  if (answer.declined === true) return null;
+  const sigs = answer.signatures;
+  const unmatched = "What the phone signed didn't match what you approved, so ZeroFee didn't use it. Your money hasn't moved.";
+  if (!Array.isArray(sigs) || sigs.length !== txs.length || sigs.some((s) => typeof s !== "string")) throw new Error(unmatched);
+  if (pairHash !== undefined && answer.pairHash !== pairHash) throw new Error(unmatched);
+  const out = (sigs as string[]).map((s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
+  if (out.some((sig, i) => !signatureIsValid(sha256(txs[i]!.bytes), sig, publicKey))) throw new Error("The chip's signature didn't check out, so it wasn't used.");
+  return out;
 }
 
 /**

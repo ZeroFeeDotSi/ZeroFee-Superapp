@@ -26,6 +26,12 @@ export function buyLabel(value: string, symbol: string): string {
   return isPositive(value) ? `Buy $${value} of ${symbol}` : "Choose an amount";
 }
 
+/** The lit button's words on a buy (the copy review's final words, 7 Nov, T4): "Buy $25.00", two decimals, the coin named once (in the
+ *  title). The task and Activity keep buyLabel's "Buy $25 of DOPE", which names the coin. */
+export function buyButtonLabel(value: string): string {
+  return isPositive(value) ? `Buy $${withCommas(Number(value).toFixed(2))}` : "Choose an amount";
+}
+
 /** How long a new amount waits before it is quoted: at once, unless a key was just typed (the next key may follow). */
 export function quoteDelayMs(instant: boolean): number {
   return instant ? 0 : 250;

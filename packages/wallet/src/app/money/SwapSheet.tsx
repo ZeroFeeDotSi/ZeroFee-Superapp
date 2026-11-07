@@ -21,22 +21,27 @@ import { sayWent, type HomeWallet } from "@zerofee/shell-api/money.ts";
 import { HOME_PROOF } from "@zerofee/core/home-proof";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { runJob } from "@zerofee/shell-api/job-run.ts";
+import { receiptPaidLine } from "./paid-from.ts";
 import { mark } from "@zerofee/design/tap.ts";
 import { followSwap } from "./swap-follow.ts";
 import { nameSwap } from "@zerofee/shell-api/job-carry.ts";
 import { JobReceipt } from "./JobMade.tsx";
+import { swappedLine, swappingLine } from "./receipt-said.ts";
 import { ActSwap } from "../icons.tsx";
 import type { Balance, Token } from "../../types.ts";
-import { trimCents, typedUsd } from "../hub.ts";
+import { typedUsd } from "../hub.ts";
 import { useWallet } from "../runtime.tsx";
 import { useMoveProblem } from "../screens/Spending.tsx";
 import { dollars } from "../format.ts";
 import { SHEET_NEEDS, useServices } from "../services.ts";
-import { SWAP_COIN, coinFigure, routeSec, feeHigh, floorOf, SWAP_MIN_USD, SWAP_WORDS, arrivesWith, backLine, coinName, feesLine, paidLine, type SwapPrice, privateLine, getsFor, mostOn, payFor, paysHere, routeOf, saidOnSheet, swapBlock, swapFloor, swapKey, swapSub, type PayHere, type SwapPlace, type SwapRoute, swapStays, SWAP_PLACES } from "./swap-corridor.ts";
+import { SWAP_COIN, coinFigure, routeSec, feeHigh, floorOf, SWAP_MIN_USD, SWAP_WORDS, arrivesWith, backLine, coinName, feesLine, paidLine, type SwapPrice, privateLine, getsFor, mostOn, payFor, paysHere, routeOf, saidOnSheet, swapBlock, swapFloor, swapKey, swapSub, type PayHere, type SwapPlace, type SwapRoute, swapStays, swapMoney, SWAP_PLACES } from "./swap-corridor.ts";
 import { MOVE_WORDS, safeSigns } from "../screens/move-split.ts";
 import { SAFE_FILL_OPEN } from "@zerofee/core/safe-fill-open";
 import { CoinPicker } from "./CoinPicker.tsx";
-import { stoppedLine } from "./swap-refused.ts";
+import { endHere, sendEndsHere, stoppedLine } from "./swap-refused.ts";
+import { coverLine, swapCover, swapRefusal } from "./swap-cover.ts";
+import { TOP_UP_PRIVATE } from "./send-cap.ts";
+import type { SafeCoin } from "@zerofee/core/spending";
 import { CoinSwap } from "./CoinSwap.tsx";
 import { InplaceSwap } from "./InplaceSwap.tsx";
 import { nearCash, nearHeldRows, type InplaceHeld } from "./swap-inplace.ts";
@@ -58,7 +63,8 @@ export const swapRows = (balances: readonly Balance[] | null, coin: SwapCoin): B
 export const workingLine = (etaSeconds?: number) => (etaSeconds ? `The swap service is working on it · about ${etaSeconds} s` : "The swap service is working on it");
 
 /** `$8.22` → "Swap $8.22 of NEAR for USDC". */
-export const swapWords = (usd: string, from: string, to = "USDC") => `Swap $${trimCents(Number(usd).toFixed(2))} of ${from} for ${to}`;
+/** the copy review (6 Nov): money always to two decimals, "Swap $150.00 of USDC for SOL", on the Getting-ready sheet and the job alike. */
+export const swapWords = (usd: string, from: string, to = "USDC") => `Swap $${Number(usd).toFixed(2)} of ${from} for ${to}`;
 
 /** A refusal while pricing, in the sheet's words (review M3): never the core's inner words or a service's raw text. */
 export function plainLine(p: { code: string; whatHappened: string }): string {
@@ -91,7 +97,8 @@ export function askOf(r: SwapRoute, usd: number, key: string, all = false): { me
 }
 
 export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose, onDone, onHeld, onOpen }: { status: SpendingStatus; /** the read still on its way, named (MoneyHost: the sheet opened on what was known) */ slowLine?: string | null; safeUsd: string | null; balances: readonly Balance[] | null; wallet?: HomeWallet; /** filled in by the app that opened it, read once: You pay, You get, the dollars */ prefill?: { from?: SwapPlace; to?: SwapPlace; usd?: string }; onClose: () => void; onDone: (line: string, follow?: { id: string; words: string; etaSeconds?: number }) => void; onHeld: (h: Held) => void; onOpen: (next: NextStep) => void }) {
-  const { bridge, tasks } = useShell();
+  const shell = useShell();
+  const { bridge, tasks } = shell;
   const { tokens, pocket, earning } = useWallet();
   // audit H1: what the Safe's USDC really sends, by the core's own rule (safeSends); the band not read yet: nothing promised
   const band = useFaceIdBand(bridge);
@@ -120,6 +127,10 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   const [preset, setPreset] = useState(!!prefill?.usd);
   const amount = Number(typedUsd(usd) ?? 0);
   const block = swapBlock({ route, usd: amount, most });
+  // T-F (6 Nov): whether the Safe covers what Private is short of, by the core's own rule (swap-cover.ts); Private short
+  // with no cover is said before the tap in the sub-line slot, the button off, never refused after it
+  const cover = route?.kind === "topup" && !block ? swapCover({ coin: route.coin, usd: amount, safe: balances as readonly SafeCoin[] | null, pocket: pocket ? (pocket.available ? pocket.rows as readonly SafeCoin[] : []) : null, fillOpen: SAFE_FILL_OPEN }) : null;
+  const short = coverLine(cover);
   // the route's least, said once while the amount is picked; nothing under it is offered (QA, 5 Nov)
   const floor = floorOf(route);
   // a press with no amount yet says "Pick an amount." (until the dollars change)
@@ -159,8 +170,14 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   // bell's pulse; the core's answer ends the row, never this sheet. A No makes nothing: the sheet as it was.
   const jobTasks = useShell().tasks;
   const [made, setMade] = useState<string | null>(null);
+  // J3 (copy review, 7 Nov): Private paying the Safe's Swap whole (no Face ID by design, D143) says so on the receipt (W1)
+  const [paidLine, setPaidLine] = useState<string | null>(null);
+  /** The job its receipt follows (runJob's made): its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [madeJob, setMadeJob] = useState<string | null>(null);
+  /** The receipt's first line (copy review, 7 Nov): "$25.00 swapped: about 0.2419 SOL is in your SOL wallet.", the tap's own figures. */
+  const [madeSaid, setMadeSaid] = useState<{ going: string; landed: string } | null>(null);
   const go = async () => {
-    if (!pay || !get || !route || busy || block) return;                    // one hold, one swap
+    if (!pay || !get || !route || busy || block || short) return;           // one hold, one swap
     mark("tap");
     setBusy(true); setLine(null); setStopped(null);
     const words = swapWords(String(amount), SWAP_COIN[pay.place].label, SWAP_COIN[get].label);
@@ -177,11 +194,17 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
     // D143: only the Safe's routes ask (its Approve, Face ID); a wallet's swap is made at once
     if (safe) sayWent("Getting it ready…", "busy");
     const a = askOf(route, amount, keyFor(`${pay.place} ${get} ${amount}`), amount >= most - 0.004 && !pay.place.startsWith("safe"));
+    // the receipt says W1 only once the job's own record shows Private paid it (the copy review's J2-4: never on the fill rule's guess)
+    setPaidLine(null);
     const end = await runJob<SpendingActivity | { declined: true }>({
-      tasks: jobTasks, title: words, usd: said, etaSec: routeSec(route), safe, money: safe || signs === false ? ["safe"] : [`row:${pay.place}`],
+      tasks: jobTasks, title: words, usd: said, etaSec: routeSec(route), safe, ...(signs === false ? { fromPrivate: true } : {}), money: swapMoney(safe, signs, pay.place),
       call: () => bridge.call<SpendingActivity | { declined: true }>(a.method, a.params),
       declined: (r) => "ok" in r && "declined" in r.ok,
-      made: () => { sayWent(""); setMade(said); setBusy(false); },
+      made: (j) => { sayWent(""); setMadeJob(j.id); setMadeSaid({ going: swappingLine(said, SWAP_COIN[pay.place].label, SWAP_COIN[get].label), landed: swappedLine(said, lands, SWAP_COIN[get].where) }); setMade(said); setBusy(false); },
+      // the audit's (B): the Safe asked after all, so the receipt never says "From Private, so no Face ID."
+      safeAsked: () => setPaidLine(null),
+      // its key (the call's), which the core names with approval.asked when the Safe's sheet comes for it (the audit's MUST)
+      ...(typeof a.params.key === "string" ? { key: a.params.key } : {}),
     });
     sayWent("");
     setBusy(false);
@@ -189,10 +212,12 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
     // the build's trace of S2 (5 Nov): refused after "Job created." showed, the receipt stayed over the refusal. Now the
     // receipt goes (the refusal says what failed, where the money is, the next tap). Train 10's runJob decides the row:
     // a refusal before the Safe's yes takes the tap's job away (nothing was asked of it); after, the row ends stopped
-    if ("refused" in end) { mark("refused"); setMade(null); return void (saidOnSheet(end.refused) ? setStopped(end.refused) : problem(end.refused, onUsd)); }
+    // Private short after the tap (refused before anything is signed): the reviewer's "Not enough in Private." screen (swapRefusal)
+    if ("refused" in end) { mark("refused"); setMade(null); return void (sendEndsHere(end.refused) ? endHere(shell, end.refused, onClose) : saidOnSheet(end.refused) ? setStopped(end.refused) : problem(swapRefusal(end.refused), onUsd)); }
     // refused after the job existed: its row ends stopped with why (runJob); the sheet says it too, never "Job created."
-    if ("problem" in end) { mark("refused"); setMade(null); return void (saidOnSheet(end.problem) ? setStopped(end.problem) : problem(end.problem, onUsd)); }
+    if ("problem" in end) { mark("refused"); setMade(null); return void (sendEndsHere(end.problem) ? endHere(shell, end.problem, onClose) : saidOnSheet(end.problem) ? setStopped(end.problem) : problem(swapRefusal(end.problem), onUsd)); }
     const ok = end.ok as SpendingActivity;
+    setPaidLine(receiptPaidLine(route.kind === "topup", signs, ok));
     // the row is this Swap's from its first read (QA's Sim crawl, 5 Nov: it read "Move" until Done)
     nameSwap(ok.id, words, lands);
     end.job.made([`move:${ok.id}`]);
@@ -239,9 +264,9 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
   const said = line ?? services.line ?? slowLine ?? null;
   const refused = stopped && !busy && !block ? stoppedLine(stopped) : null;
   const on = swapFloor({ again: refused ? stopped!.next.label : null, block, tried, said: !!said, priceDown: price.late || !!price.said });
-  const stays = !block ? swapStays(route, amount, sends) : null;
+  const stays = !block ? swapStays(route, amount, sends, undefined, cover) : null;
   const nothing = !!route && most < 0.01;
-  const sub = swapSub({ back, arrives: route && !block ? arrivesWith(route, get!, amount, priceOf(get!, status, tokens), price.cost) : null, part: nothing ? SWAP_WORDS.none : pay?.part ?? null });
+  const sub = swapSub({ short, back, arrives: route && !block ? arrivesWith(route, get!, amount, priceOf(get!, status, tokens), price.cost) : null, part: nothing ? SWAP_WORDS.none : pay?.part ?? null });
   const list = (which: "pay" | "get") => (
     <CoinPicker bridge={bridge} title={which === "pay" ? SWAP_WORDS.pay : SWAP_WORDS.get} start={(which === "pay" ? payPick : getPick ?? payPick)?.chain ?? (PLACE_CHAIN[pay?.place ?? "near"] ?? "near")}
       places={which === "pay" ? [...placeRows("pay"), ...sites] : placeRows("get")} {...(which === "pay" ? { nearHeld } : {})} search={which === "get"} why={coinWhy(which)} onPick={(c) => picked(which, c)} onClose={() => setPicking(null)} />
@@ -255,7 +280,7 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
     <MoneySheet title={SWAP_WORDS.title} away={made === null && busy && (route?.kind === "topup" || route?.kind === "safe")} onClose={made !== null ? finish : onClose}>
       {/* the job is made: the same sheet becomes the receipt, away ("Job created."), until the person closes it (test, 5 Nov:
           a sheet of its own slid in again from the bottom) */}
-      {made !== null ? <JobReceipt amount={made} icon={<ActSwap />} testid="swap-made" etaSec={route ? routeSec(route) : undefined} onDone={finish} /> : coinTrade && payPick && getPick ? ("kind" in coinTrade && coinTrade.kind === "trade" ? (
+      {made !== null ? <JobReceipt amount={made} icon={<ActSwap />} testid="swap-made" etaSec={route ? routeSec(route) : undefined} said={madeSaid?.going} landedSaid={madeSaid?.landed} paidLine={paidLine} job={madeJob} onDone={finish} /> : coinTrade && payPick && getPick ? ("kind" in coinTrade && coinTrade.kind === "trade" ? (
         <CoinSwap bridge={bridge} tasks={tasks} pay={payPick} get={getPick} chain={coinTrade.chain} payAddress={coinTrade.pay} getAddress={coinTrade.get}
           most={coinPay ? coinPay.heldUsd ?? 0 : pay?.most ?? 0} onPickPay={() => setPicking("pay")} onPickGet={() => setPicking("get")} onTrack={setTrack} />
       ) : "kind" in coinTrade && coinTrade.kind === "inplace" ? (
@@ -303,7 +328,7 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
                 <button type="button" className="zf-chip wl-swap-all" onClick={() => { setPreset(true); onUsd(most.toFixed(2)); }} disabled={most < floor.usd} aria-label={`Max, $${most.toFixed(2)}`}>{SWAP_WORDS.max}</button>
               </div>
               {/* the one sub-line slot: its height is kept, so a line coming or going moves nothing */}
-              <div className="wl-swap2__sub" data-testid="swap-sub">{sub && <p className="zf-small" data-testid={sub.id}>{sub.text}</p>}</div>
+              <div className="wl-swap2__sub" data-testid="swap-sub">{sub && <p className="zf-small" data-testid={sub.id}>{sub.text}{sub.id === "swap-short" && <> <button type="button" className="zf-link" onClick={() => { onClose(); shell.openApp("wallet", "private/add"); }} data-testid="swap-top-up">{TOP_UP_PRIVATE}</button></>}</p>}</div>
               <Keypad value={padBase(usd || "0", preset)} decimals={2} onChange={(v) => { setPreset(false); onUsd(v === "0" ? "" : v); }} />
             </div>
             <div className="wl-swap2__floor">
@@ -324,7 +349,7 @@ export function SwapSheet({ status, slowLine, balances, wallet, prefill, onClose
               )}
               {/* the tap IS the swap (product decision, 5 Nov: no hold, no confirm); the Safe's routes still ask Face ID on its own
                   sheet. One button: after a refusal it reads Try again and asks again; never a second grey one */}
-              <button type="button" className={`zf-btn wl-sheet-go${on.tap === "swap" && block === SWAP_WORDS.amount ? " is-idle" : ""}`} data-testid="swap-go" disabled={busy || (on.tap === "swap" && (nothing || services.down || (!!block && block !== SWAP_WORDS.amount)))}
+              <button type="button" className={`zf-btn wl-sheet-go${on.tap === "swap" && block === SWAP_WORDS.amount ? " is-idle" : ""}`} data-testid="swap-go" disabled={busy || (on.tap === "swap" && (nothing || !!short || services.down || (!!block && block !== SWAP_WORDS.amount)))}
                 onClick={(e) => { if (on.tap === "price") return price.again(); if (on.tap === "swap" && block === SWAP_WORDS.amount) return setTried(true); tapBurst(e.currentTarget, () => void bridge.call("device.haptic", { kind: "tap" }).catch(() => undefined)); void go(); }}>{on.label}</button>
             </div>
           </div>

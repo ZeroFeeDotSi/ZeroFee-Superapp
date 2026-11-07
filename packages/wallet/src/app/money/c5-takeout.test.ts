@@ -5,8 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { LEG_SEC } from "@zerofee/shell-api/job-steps.ts";
-import { splitLines } from "@zerofee/core/private-route";
-import { costRows, fillLegs, fillOf, homeCut, type Leg, type SafeCoinRow } from "../screens/move-split.ts";
+import { fillRows } from "@zerofee/core/private-route";
+import { costRows, fillLegs, fillOf, homeCut, safeAfter, type Leg, type SafeCoinRow } from "../screens/move-split.ts";
 import { BACK_WORDS, TAKE_OUT_ETA_SEC, takeOutJob } from "./site-back.ts";
 import { FUND_JOB_WORDS, fundJob } from "../../../../agent/src/app/fund-words.ts";
 
@@ -18,22 +18,23 @@ test("item 4: Move above Private (crawl K: Private $5 USDC + $8.86 in NEAR, SOL 
   // the sliders' legs as the crawl had them: Safe → SOL $21.14, Private → SOL $8.86
   const legs: Leg[] = [{ from: "safe", to: "sol", usd: 21.14 }, { from: "private", to: "sol", usd: 8.86 }];
   const f = fillOf(legs, coins)!;
-  assert.deepEqual(f, { need: 30, fill: 30 });
+  // J2-1 (audit, 8 Nov): the core's own split (moveSplit): Private's $5 folds into one $40 fill, the Safe pays the $30 whole
+  assert.deepEqual(f, { need: 30, fill: 40, parts: [{ to: "sol", usd: 30, fromPrivate: 0, viaFill: 30 }] });
   const pays = fillLegs(legs, f);
   assert.deepEqual(pays.legs, [{ from: "safe", to: "sol", usd: 30 }], "the Move sheet: Safe → SOL $30, nothing from Private");
-  assert.equal(pays.privateUsd, 0, "Private's row stays $13.86, as it does after landing (its USDC: +$30 fill, -$30 paid)");
+  assert.equal(pays.privateUsd, 10, "Private's row rises $10, as it does after landing (its USDC: +$40 fill, -$30 paid)");
   // the Check sheet's block, as the Sim (MockBridge wordsFor) and the core (intents.ts legsBlock) draw it
-  const lines = splitLines(3000n, BigInt(Math.round(f.fill * 100)), $c);
-  assert.deepEqual(lines, ["From your Safe · $30.00", "Together · $30.00"], "never \"From Private · $5.00 … Stays in Private · $5.00\"");
+  const lines = fillRows(3000n, BigInt(Math.round(f.fill * 100)), "your SOL wallet", $c);
+  assert.deepEqual(lines, ["Your SOL wallet gets · $30.00", "From your Safe · $40.00", "Private keeps the rest · about $10.00", "Fee · $0.00"], "never \"From Private · $5.00 … Stays in Private · $5.00\"");
   const safeLine = Number(lines.find((l) => l.startsWith("From your Safe"))!.split("$")[1]);
-  assert.equal(safeLine, pays.legs.find((l) => l.from === "safe")!.usd, "the two sheets say the same Safe figure");
-  // control: Private holds $20 USDC, so it pays $10 of its own and the Safe fills $20 (fillStepUsd of $10.30 short)
+  assert.equal(safeLine, pays.legs.find((l) => l.from === "safe")!.usd + pays.extra, "the two sheets say the same Safe figure (its leg and what it leaves in Private)");
+  // control: Private holds $20 USDC; the core still folds it (its $20 plus the step's $10 stay under the buffer)
   const more = coins.map((c) => (c.held === "private" && c.symbol === "USDC" ? { ...c, amount: "20", usd: "20" } : c));
   const g = fillOf(legs, more)!;
   const pays2 = fillLegs(legs, g);
-  assert.deepEqual(pays2.legs, [{ from: "safe", to: "sol", usd: 20 }, { from: "private", to: "sol", usd: 10 }]);
-  assert.equal(pays2.privateUsd, -10);
-  assert.deepEqual(splitLines(3000n, 2000n, $c), ["From Private · $10.00", "From your Safe · $20.00", "Together · $30.00"]);
+  assert.deepEqual(pays2.legs, [{ from: "safe", to: "sol", usd: 30 }]);
+  assert.equal(pays2.privateUsd, 10);
+  assert.deepEqual(fillRows(3000n, 2000n, "your SOL wallet", $c), ["Your SOL wallet gets · $30.00", "From your Safe · $20.00", "From Private · $10.00", "Fee · $0.00"]);
 });
 
 test("item 5: a Take out says one arrival figure before the tap: the Safe's row is the \"Arrives\" row's least, never the gross $20 (control: a Move out of the Safe cuts nothing)", () => {
@@ -46,7 +47,9 @@ test("item 5: a Take out says one arrival figure before the tap: the Safe's row 
   assert.ok(arrives < 20 && arrives > 18);
   assert.equal(homeCut([{ from: "safe", to: "sol", usd: 20 }]), 0, "control: nothing comes home, nothing cut");
   const sheet = readFileSync(new URL("../screens/MoveSheet.tsx", import.meta.url), "utf8");
-  assert.match(sheet, /x\.place === "safe" && !running \? Math\.round\(\(said\(split\) - homeCut\(legs\)\) \* 100\) \/ 100/);
+  // pin changed (T-B, row 8 a): the Safe's row is safeAfter (homeCut before the tap, as before; its whole fill out too)
+  assert.match(sheet, /x\.place === "safe" \? safeShown : said\(split\)/);
+  assert.equal(safeAfter({ safe: 5288.01 }, home, fillLegs(home, null)), safeShown, "the same arrival figure");
   // the time said is the route's measured leg (SOL wallet into NEAR, 79-112 s on mainnet), the one the job counts down
   assert.equal(TAKE_OUT_ETA_SEC, LEG_SEC.chainIn);
 });
@@ -60,7 +63,7 @@ test("item 7: a site's Take out is a job at the tap: its row's title, dollars an
   assert.ok(go.indexOf("setMade(`$${picked.toFixed(2)}`);") < call, "the receipt is drawn in the tap's turn");
   assert.match(go, /job\.failed\(r\.line \|\| BACK_WORDS\.stillThere\(name\)\);/, "a refusal ends the row, the sheet comes back");
   assert.match(go, /job\.made\(went\.map\(\(x\) => `\$\{BACK_ID\}\$\{x\.id\}`\)\);/, "the Take out's own rows take over");
-  assert.match(src, /data-testid="takeout-made"[^]*?\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{TAKE_OUT_ETA_SEC\} watch \/>/);
+  assert.match(src, /data-testid="takeout-made"[^]*?\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{TAKE_OUT_ETA_SEC\} watch job=\{madeJob\} \/>/);
   assert.doesNotMatch(go, /Taking it out…/);
 });
 

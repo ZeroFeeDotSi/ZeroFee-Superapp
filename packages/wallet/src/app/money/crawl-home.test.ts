@@ -17,7 +17,8 @@ const row = (o: Partial<SpendingActivity>): SpendingActivity => ({ id: "mv-1", k
 const mv = (o: Partial<Movement>): Movement => ({ id: "s1", kind: "pay", status: "moving", amount: "5000000", startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], to: "alice.near", private: true, ...o });
 
 test("rule 8 (081): a Move paid from Private that came back names NEAR Confidential, the wallet, the figure back in Private, and offers Try again (lit) then Open Private", () => {
-  const t = moveTrack(row({ status: "failed", note: "NEAR Confidential sent it back. Your money is in Private." }))!;
+  // the row as Spending gives it: the part that came back (`missed`) and its own dollars (audit, 6 Nov: Try again's figure)
+  const t = moveTrack(row({ status: "failed", note: "NEAR Confidential sent it back. Your money is in Private.", missed: ["sol"], missedUsd: "14.00" }))!;
   assert.equal(endLine(t), "NEAR Confidential didn't pay your SOL wallet. The $14.00 is back in Private.");
   assert.deepEqual(t.next, [{ label: "Try again", go: { kind: "move", to: "sol", usd: "14.00" } }, { label: "Open Private", go: { kind: "private" } }]);
   // control: the old line, twice named, no figure, and no tap
@@ -43,9 +44,9 @@ test("rule 8 (083): a Send that came back says who didn't pay, the figure and wh
   assert.doesNotMatch(endLine(priv)!, /where it left from|Through NEAR Confidential didn't finish/);
   // the tracker draws the taps and LiveHome follows them to Move, Private's screen and Send
   const live = readFileSync(new URL("./LiveTrack.tsx", import.meta.url), "utf8");
-  assert.match(live, /t\.next\?\.map\(\(n, i\) => <button key=\{n\.label\}/);
+  assert.match(live, /f\.choices\.map\(\(n, i\) => <button key=\{n\.label\}/);
   assert.match(live, /if \(go\.kind === "private"\) shell\.openApp\("wallet", "private"\);/);
-  assert.match(live, /shell\.openMoney\(\{ kind: "move", from: "safe", to: go\.to as HomeWallet/);
+  assert.match(live, /shell\.openMoney\(\{ kind: "move", from: \(go\.from \?\? "safe"\) as HomeWallet, to: go\.to as HomeWallet/);
   const app = readFileSync(new URL("../WalletApp.tsx", import.meta.url), "utf8");
   assert.match(app, /if \(t === "private" && privateOpen\(\)\) return \{ kind: "private" \};/, "Private's screen is on this base, reached by its request");
 });
@@ -69,7 +70,7 @@ test("rule 11 (a test run): a job's page lists every step its row shows, ticked 
   assert.deepEqual(page.steps.map((s) => !!s.ended), t.steps.map((s) => s.state === "done"), "a step reads done only where the job's reads ticked it");
   assert.deepEqual(withTrackSteps(spendingPage(r), null), spendingPage(r), "control: no track, the page as it was");
   const activity = readFileSync(new URL("../screens/Activity.tsx", import.meta.url), "utf8");
-  assert.match(activity, /page: withTrackSteps\(spendingPage\(s, activity\), Steps\?\.moveTrack\(s\)\)/);
+  assert.match(activity, /page: withTrackSteps\(spendingPage\(s, activity\), Steps \? joinTracks\(\[\{ \.\.\.s, status: s\.own \?\? s\.status \}, \.\.\.\(s\.parts \?\? \[\]\)\]\.map\(\(x\) => Steps\.moveTrack\(x\)\)\) : undefined\)/);
 });
 
 test("Sim test: a row's tick agrees with its line: never 'On its way' beside a tick (control: done in every wallet is ticked)", () => {

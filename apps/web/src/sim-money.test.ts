@@ -47,8 +47,8 @@ test("one figure per Move (QA's MUST, Sim test: typed $30, sheet \"$31 leaves\")
   assert.equal(costRows(legs)!.note, null, "no rounding note: the round-up is gone");
   // Private holds $20 of USDC: $10 short, the Safe tops it up by a whole step, said as its own line
   const coins = [{ tokenId: USDC, symbol: "USDC", amount: "500", usd: "500" }, { tokenId: USDC, symbol: "USDC", amount: "20", usd: "20", held: "private" as const }];
-  // the $20 step is all paid on: the legs say it (Safe → SOL $20, Private → SOL $10), no second figure (Sim re-check)
-  assert.equal(fillLine(legs, coins), null);
-  assert.deepEqual(fillLegs(legs, fillOf(legs, coins)).legs, [{ from: "safe", to: "sol", usd: 20 }, { from: "private", to: "sol", usd: 10 }]);
+  // J2-1 (audit, 8 Nov): the core's own split folds Private's $20 into one $40 fill: Safe → SOL $30, $10 stays, said once
+  assert.equal(fillLine(legs, coins), "Your Safe sends $40.00. $10.00 stays in Private.");
+  assert.deepEqual(fillLegs(legs, fillOf(legs, coins)).legs, [{ from: "safe", to: "sol", usd: 30 }]);
   assert.equal(fillLine(legs, [{ tokenId: USDC, symbol: "USDC", amount: "500", usd: "500" }, { tokenId: USDC, symbol: "USDC", amount: "40", usd: "40", held: "private" as const }]), null, "control: Private covers it, no step");
 });

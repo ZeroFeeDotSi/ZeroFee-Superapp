@@ -222,7 +222,7 @@ export function Protection({ bridge, network, accountId = "", hasSecondDevice, r
 
 /** The held change's one line: when its wait ends, or that it is ready to finish. */
 export function pendingWords(p: { readyAtIso: string; ready: boolean; needsSecondDevice: boolean }, now = new Date()): string {
-  if (p.needsSecondDevice) return "It needs your second device's yes. Tap to see it.";
+  if (p.needsSecondDevice) return "Your second device has to say yes. Tap to see it.";
   if (p.ready || Date.parse(p.readyAtIso) <= now.getTime()) return "Tap to finish it.";
   const ends = endsWords(p.readyAtIso, now);
   return ends ? `Its wait ends ${ends}. Tap to see it, or cancel it.` : "Tap to see it, or cancel it.";

@@ -41,3 +41,32 @@ export const SAFE_LEG_MIN_USD = Math.ceil(((2 * MAX_OVER) / 0.99) * 100) / 100;
  * under $2 (a $2.00 leg brought about $1.97, and its move home was refused in the NEAR wallet): $2.59.
  */
 export const HOME_LEG_MIN_USD = Math.ceil(((2 * MAX_OVER + FEE_ROOM_USD) / 0.99) * 100) / 100;
+
+/**
+ * The plan's bound for a leg from the Safe or Private to a wallet, before any quote (the Move page's "Arrives at least",
+ * move-split.ts leastOf): the Add brings at least 99 % of it, a leg on to a chain's wallet keeps 3 % for its fee, and
+ * each leg pays its chain's fixed network fee (NETWORK_FEE_USD; the audit's MUST, 8 Nov: the bound, not the noise). The Check-this sheet holds leg 2's signed quote to it (the audit's
+ * ruling (c), 8 Nov): a quote that promises less, or costs more than the plan's "at most", heads COSTS_MORE_HEAD.
+ */
+export const planLeastUsd = (usd: number, chain: WalletChain): number => Math.max(0, (chain === "near" ? usd * 0.99 : (usd * 0.99) / MAX_OVER) - NETWORK_FEE_USD[chain]);
+/** A wallet's chain, as the plan and the sheets name them. */
+export type WalletChain = "sol" | "hood" | "bsc" | "near";
+/**
+ * Each leg's fixed network fee on to a wallet's chain (the audit's MUST, 8 Nov: the plan's bound is the percentage part plus
+ * it, so a quote that pays it is inside the bound): the ONE table the plan's "at least" / "at most" (planLeastUsd) and the
+ * Sim's quotes (MockBridge simSwapCost) read. The NEAR wallet has none (the move lands inside NEAR Intents).
+ */
+export const NETWORK_FEE_USD: Readonly<Record<WalletChain, number>> = { sol: 0.3, hood: 0.3, bsc: 0.3, near: 0 };
+/** A Home name for a wallet ("your SOL wallet") to its chain; null for any other. */
+const CHAIN_OF_NAME: Readonly<Record<string, WalletChain>> = { "your SOL wallet": "sol", "your ETH (RH) wallet": "hood", "your BNB wallet": "bsc", "your NEAR wallet": "near" };
+export const walletChainOf = (wallet: string): WalletChain | null => CHAIN_OF_NAME[wallet.replace(/^Your /, "your ")] ?? null;
+/**
+ * The least a wallet's part to another wallet brings, by the core's own floors (move-split.ts leastOf; its move in brings
+ * at least leastIn(99 % of it), a move out on to a chain keeps 3 % for its fee): the plan's figure, said "at least about"
+ * on a sheet that has no signed quote for it yet (the audit's SHOULD, 8 Nov).
+ */
+export const walletLegLeastUsd = (usd: number, fromChain: boolean, toChain: boolean): number =>
+  fromChain && toChain ? leastIn(usd * 0.99) / MAX_OVER : fromChain ? leastIn(usd * 0.99) : usd * 0.99;
+/** The head of a Check-this whose signed quote breaks the plan's bound (the audit's ruling (c); provisional words, to 53). The
+ *  approval sheet re-arms Approve on it (apps/web approval-arm.ts). */
+export const COSTS_MORE_HEAD = "Costs more than the plan said.";

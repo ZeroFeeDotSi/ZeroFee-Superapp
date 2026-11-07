@@ -3,7 +3,7 @@
 // 1Click: every address and figure on the sheet comes from the core's own checked quote (subwallet.add.quote).
 // Swap's and Receive's coin lists live here too (swapCoins, receiveChains): their own rules, unchanged.
 import { shortTime, weekdayName } from "@zerofee/core/clock";
-import { ADD_OPEN, COIN_SHOWN_DECIMALS, type AddAddress, type AddChain, type AddTo } from "@zerofee/core/add-outside";
+import { ADD_OPEN, ADD_USED, COIN_SHOWN_DECIMALS, type AddAddress, type AddChain, type AddTo } from "@zerofee/core/add-outside";
 import type { Token } from "../../types.ts";
 import { spanWords } from "@zerofee/core/time-words";
 
@@ -58,6 +58,23 @@ export function addFits(a: unknown, chain: AddChain, to: AddTo, nowMs: number): 
   return x as AddAddress;
 }
 
+/**
+ * What a row does with the core's answer for its key (owner's Bugs:, 6 Nov: every row read "used up" on his phone). An
+ * address that fits: shown. The core's ADD_USED (money reached it, or its shown day ran out): a NEW address with the same
+ * meaning at once, never "used up" as a resting state (V1 has fixed wallets: this is a fresh 1Click quote for the same
+ * row, not a wallet rotation). `fresh`: the key was made by such a renewal and has shown nothing yet; the core calling
+ * it used too is said as a failure, never asked again in a loop. Any other refusal: its own words.
+ */
+export type AddStep = { show: AddAddress } | { renew: true } | { why: string };
+export function addStep(r: { ok: unknown } | { problem: { code?: unknown; whatHappened?: unknown; more?: unknown } }, chain: AddChain, to: AddTo, nowMs: number, fresh: boolean): AddStep {
+  if ("ok" in r) {
+    const ok = addFits(r.ok, chain, to, nowMs);
+    return ok ? { show: ok } : { why: ADD_WORDS.noAddress };
+  }
+  if (r.problem.code === ADD_USED) return fresh ? { why: ADD_WORDS.noAddress } : { renew: true };
+  return { why: problemLine(r.problem) ?? ADD_WORDS.noAddress };
+}
+
 /** The words of the sheet (copy F: short, a five-year-old can read; "ETH (RH)"; no "Hidden", no "Private"). */
 /** How often a shown address is checked with the core (works once, review H1): money reaching it swaps it within this. */
 export const ADD_RECHECK_MS = 20_000;
@@ -75,26 +92,24 @@ export const ADD_WORDS = {
   // the QR sheet's two quiet lines: the one coin it takes and its least; then its end (and, for the Safe, its USDC)
   only: (symbol: string, network: string, least: string) => `Send only ${symbol} on ${network}, at least ${least} ${symbol}.`,
   // review M3: the Safe is credited on its own NEAR account, so the line promises no privacy it can't give
-  until: (t: string, to: AddTo) => `${to === "safe" ? "Lands in your Safe as USDC. " : ""}Works until ${t}.`,
+  until: (t: string, to: AddTo) => `${to === "safe" ? "Lands in your Safe as USDC. " : ""}Until ${t}.`,
   asking: "Getting a new address…",
-  /** A row's sub-line (HOME-VISUAL §3.8): what a tap does, and while its address is being made. It says the address is
-   *  one-time (finding 39: the Safe's row read as a lasting address a friend could pay later). */
-  tapCopy: "One-time address · tap to copy",
-  /** After a tap: the copy's first and last group, to check (finding 44: "Copied" showed no address). */
-  copiedEnds: (ends: string) => `Copied ${ends}`,
+  /** The row's second line in the Sim (the copy review's row spec, 6 Nov): its made-up address, never shown as a real one. */
+  sampleRow: "Sample address",
+  /** A row's two lines (the audit's MUST + the copy review's words, 6 Nov: money sent as another coin, on another chain or under the least
+   *  can go astray, so the row and its Copy always carry the rule): the coin, its chain and its least; then its end. */
+  rowOnly: (symbol: string, network: string, least: string) => `Only ${symbol} on ${network}, at least ${least} ${symbol}.`,
+  rowUntil: (when: string) => `Until ${when}.`,
+  /** Copy's flash (copy review, 6 Nov): in place of the end's line for 2.5 s; the rule line keeps its words, lit. */
+  rowCopied: "Copied.",
+  /** A row with no address to copy (its ask failed): the QR button asks again. */
+  tapQr: "Tap QR for a new address.",
+  /** The Copy button's name (the copy review's row spec, 6 Nov). */
+  copyAddress: "Copy address",
   /** The QR sheet: who it is for (finding 39). */
-  // QA's lap (5 Nov): "only once" said the opposite of the kept address (row 16: it stays until
-  // Change wallet); used up, the row says so itself (`done`)
   forYou: "Only for you. To be paid by someone else, tap Ask someone to pay you.",
   /** The sample page's made-up address (finding 56). */
   sample: "Sample address. It's made up, so don't send money to it.",
-  sampleRow: "Sample address · tap to copy",
-  /** Under a row with its address (QA's crawl, 4 Nov: the copied address isn't the wallet's own, so a person
-   *  comparing it with Settings was lost). It points to the QR's least, never a figure (D138: the least lives on the QR
-   *  sheet alone), so it stays true (S2, 4 Nov: 1Click's FLEX_INPUT takes any deposit at or above its least; anything
-   *  under it goes to the NEAR wallet). The Copywriter's words. */
-  // QA's lap (5 Nov): "A new address, for this Add only" said the opposite of the kept address
-  oneTime: (wallet: string) => `Money sent here lands in your ${wallet}. Send at least the amount shown with the QR.`,
   getting: "Getting it…",
   noAddress: "NEAR Intents gave no address. Nothing was sent.",
   retry: "Try again",
@@ -107,17 +122,6 @@ export const ADD_WORDS = {
   qr: "Show QR code",
   ask: "Ask someone to pay you",
   close: "Close",
-  // Change wallet (row 16, 4 Nov): the address stays until the person changes it; pending the Copywriter / the copy review
-  change: "Change wallet",
-  /** The Change wallet sheet's title, and its three plain lines: what happens, your money stays where it is, what to tap. */
-  changeTitle: "Change wallet?",
-  changeLines: (name: string) => [`You get a new address for your ${name}.`, "Your money stays where it is. Money sent to the old address still comes to you.", "Tap Change wallet for the new address, or Keep this one."] as const,
-  changeSure: "Are you sure? You get a new address. Money sent to this one still comes to you.",
-  changeYes: "Change wallet",
-  changeNo: "Keep this one",
-  /** The core can't take more money at this address (money reached it, or its time ran out): it stays shown as it was,
-   *  never swapped by itself; Change wallet gives a new one. */
-  done: "This address is used up. Tap Change wallet for a new one.",
 } as const;
 
 /** The wallets Home's tabs open Add from (Home's onAdd(wallet)). */
@@ -161,8 +165,8 @@ export const cardKeys = (store: Pick<Storage, "getItem"> | undefined): CardKeys 
     return {};
   }
 };
-/** The card's key for this wallet now (row 16, 4 Nov): the kept one, whatever its age or whether money reached its
- *  address, until the person taps Change wallet and says yes (changeCardKey); a new one only when none is kept. Never a
+/** The card's key for this wallet now (row 16, 4 Nov): the kept one, whatever its age, until the core says its
+ *  address can take no more (ADD_USED) and the row renews it (changeCardKey); a new one only when none is kept. Never a
  *  new address on reopen or reload. `used` is no longer read (kept for its callers). */
 export function cardKey(store: Pick<Storage, "getItem" | "setItem"> | undefined, chain: CardSlot, _used: ReadonlySet<string> = new Set(), nowMs: number = Date.now()): string {
   const had = cardKeys(store)[chain];
@@ -171,8 +175,8 @@ export function cardKey(store: Pick<Storage, "getItem" | "setItem"> | undefined,
   keepCardKey(store, chain, key, nowMs + 3_600_000);
   return key;
 }
-/** Change wallet, after the person's yes (row 16): a new key for this wallet, kept at once (a reload after the yes never
- *  brings the old address back). The old address isn't forgotten by the core: money sent to it still lands. */
+/** A row's renewal (addStep's renew: the core said its address can take no more): a new key for this wallet, kept at once
+ *  (a reload never brings the old address back). The old address isn't forgotten by the core: money sent to it still lands. */
 export function changeCardKey(store: Pick<Storage, "getItem" | "setItem"> | undefined, chain: CardSlot, nowMs: number = Date.now()): string {
   const key = chain.startsWith("safe-") ? addKey(chain.slice(5) as AddChain, "safe") : addKey(chain as AddChain, "wallet");
   keepCardKey(store, chain, key, nowMs + 3_600_000);
@@ -194,6 +198,42 @@ export function problemLine(p: { whatHappened?: unknown; more?: unknown } | null
   if (more) return more.slice(0, 200);
   const what = typeof p?.whatHappened === "string" ? p.whatHappened.trim() : "";
   return what ? what.slice(0, 200) : null;
+}
+
+/** A row's least (copy review, 6 Nov): rounded UP to two significant figures, never down (0.0293 → "0.03", 0.00151 → "0.0016"),
+ *  so sending exactly the figure shown is never under what the address takes. Plain digits, no exponent. */
+export function leastTwoFigures(units: string, decimals: number): string {
+  if (!/^\d+$/.test(units) || BigInt(units) === 0n) return "0";
+  const n = BigInt(units).toString();
+  const scale = n.length > 2 ? 10n ** BigInt(n.length - 2) : 1n;
+  const up = ((BigInt(n) + scale - 1n) / scale) * scale;
+  const s = up.toString().padStart(decimals + 1, "0");
+  const whole = s.slice(0, s.length - decimals), frac = decimals ? s.slice(s.length - decimals).replace(/0+$/, "") : "";
+  return frac ? `${whole}.${frac}` : whole;
+}
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** A row's end (copy review, 6 Nov): "7 Nov", the phone's own time; never "tomorrow", never "PM". */
+export function untilDate(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const h = d.getHours() % 12 || 12;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${h}:${String(d.getMinutes()).padStart(2, "0")} ${d.getHours() < 12 ? "am" : "pm"}`;
+}
+/** What a row says about its address (the audit's MUST): its rule (the coin, chain and least) and its end. */
+export function addRule(a: Pick<AddAddress, "minAmountIn" | "decimals" | "untilIso">, row: Pick<AddRow, "symbol" | "network">): { only: string; until: string } {
+  const least = leastTwoFigures(a.minAmountIn, a.decimals);
+  return { only: ADD_WORDS.rowOnly(row.symbol, row.network, least), until: ADD_WORDS.rowUntil(untilDate(a.untilIso)) };
+}
+
+/** A row line's phrases (the copy review's grid, 6 Nov): the line may wrap only at its commas, so "at least 0.03 SOL." and "10:37 pm."
+ *  each stay whole, never an orphan unit. The row draws each phrase in its own nowrap span, a plain space between. */
+export function rulePhrases(line: string): string[] {
+  return line.split(/(?<=,) +/).filter((p) => p.length > 0);
+}
+/** The QR sheet's two lines (QA, 6 Nov): the row's own least (leastTwoFigures) and end (untilDate), so the row and its
+ *  sheet never say two figures or two times for one address. */
+export function qrLines(a: Pick<AddAddress, "minAmountIn" | "decimals" | "untilIso">, row: Pick<AddRow, "symbol" | "network">, to: AddTo): { only: string; until: string } {
+  return { only: ADD_WORDS.only(row.symbol, row.network, leastTwoFigures(a.minAmountIn, a.decimals)), until: ADD_WORDS.until(untilDate(a.untilIso), to) };
 }
 
 /** "4:15 PM" today; "4:15 PM tomorrow"; "Thu 4:15 PM" on another day. */

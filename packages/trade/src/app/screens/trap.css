@@ -3,3 +3,8 @@
 .cp-trap { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--down); }
 .cp-trap-mark { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--down); color: var(--bg, #fff); font-size: 12px; font-weight: 700; }
 .cp-change--trap, .cp-change--trap * { color: var(--mute, var(--ink-3)) !important; }
+/* T2-5 (the copy review's walk, 8 Nov): the trap coin's one block, head then body, under the name; the only word about it on the page */
+.cp-trap--block { align-items: flex-start; }
+.cp-trap--block .cp-trap-mark { margin-top: 1px; }
+.cp-trap-head { display: block; font-weight: 600; }
+.cp-trap-body { display: block; margin-top: 2px; font-weight: 400; color: var(--ink); }

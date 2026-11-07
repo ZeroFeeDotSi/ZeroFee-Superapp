@@ -5,6 +5,7 @@
 import { DEFAULT_PROTECTION } from "@zerofee/core/protection-bands";
 import { waitName } from "../apps/security/rules.ts";
 import { threadOf, type Thread } from "../shell/thread.ts";
+import { THREAD_LABELS } from "../shell/thread.ts";
 
 const limit = `$${DEFAULT_PROTECTION.faceIdUpToUsd}`;
 const wait = waitName(DEFAULT_PROTECTION.waitSeconds.mainnet);
@@ -24,4 +25,19 @@ export const DEMO_MONEY_IN = {
  *  this screen, so Protected is ticked with it. */
 export function demoMoneyThread(total: string | null): Thread {
   return threadOf({ stage: "ready", wordsDone: true, moneyIn: total !== null, protection: true, secondDevice: false });
+}
+
+/** the copy review's A2-3 (8 Nov): this is set-up's 4th screen and it is about the money, so the bar reads "Step 4 of 5 · Money in"
+ *  (it said "Second device" over "Your sample money is in"). The segments stay the thread's own: three done, the 4th lit. */
+export function demoMoneySteps(t: Thread): Thread["steps"] {
+  return t.steps.map((s) => (s.state === "now" ? { ...s, label: THREAD_LABELS.money } : s));
+}
+
+/** A2-3: the one total's parts under it, as Home's pills say them, Private named inside the Safe (the copy review's words, 8 Nov):
+ *  "Safe $5,288.01, Private $33.86 of it · Hot $227.48". "Safe" is Home's Safe figure, never another. Private empty: not
+ *  named. Hot not read: no line (the figure above waits for it). `money`: the app's dollars ("$5,288.01"). */
+export function demoMoneyParts(p: { safeUsd: string; privateUsd: string; hotUsd: string | null }, money: (usd: string) => string): string | null {
+  if (p.hotUsd === null) return null;
+  const priv = Number(p.privateUsd) || 0;
+  return `Safe ${money(p.safeUsd)}${priv >= 0.01 ? `, Private ${money(p.privateUsd)} of it` : ""} · Hot ${money(p.hotUsd)}`;
 }

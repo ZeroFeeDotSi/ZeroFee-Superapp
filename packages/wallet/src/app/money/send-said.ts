@@ -41,3 +41,14 @@ export const declinedLine = (amount: string, place: string): string => `Nothing 
  *  answer, read 5 Nov with dry quotes: "Quoting for this pair is not available" for every payout to a NEAR account, from
  *  any coin, while a payout to Solana quoted). Nothing was asked or signed. Rule 8, the protocol by name. */
 export const nearPayoutLine = (amount: string, place: string): string => `NEAR Intents said no to this payout, so nothing was sent. The ${amount} is still in ${place}. Try again in a few minutes.`;
+
+/**
+ * Send's floor, Swap's pattern (QA, 6 Nov: "make the three sheets one pattern"). `again`: the button's words for a refusal
+ * that can be tried again (saidOnSheet decides, per Problem: never one that may already have sent). It reads so only while
+ * the form could send; the tap is the form's own Send, the same ask. Otherwise the form's reason goes first, so no lit Try
+ * again ever does nothing.
+ */
+export function sendFloor(o: { label: string; again: string | null; said: string | null; why: string | null; ready: boolean }): { label: string; line: "said" | "why" | null } {
+  if (o.again && !o.ready && o.why) return { label: o.label, line: "why" };
+  return { label: o.again && o.ready ? o.again : o.label, line: o.said ? "said" : o.why ? "why" : null };
+}

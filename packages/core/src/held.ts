@@ -273,7 +273,7 @@ export async function heldRequests(chain: Chain, accountId: string, price: numbe
       // Release 9: the release goes on the account's list first; it runs with the second device's yes, or after the
       // backup words' fallback wait. The same known-or-unknown check as an upgrade's.
       const u = ownAccountCall("upgrade", change.AllowRelease)!;
-      words = u.warnings ? u : { title: "Let your account's rules update", lines: [u.lines[0]!, "It needs your second device's yes, or the backup words' longer wait. Then the update itself can run."] };
+      words = u.warnings ? u : { title: "Let your account's rules update", lines: [u.lines[0]!, "Your second device has to say yes. Without it, your backup words work after the longer wait."] };
     } else {
       const [kind, args] = Object.entries(change)[0] ?? [];
       const method = { SetProtection: "set_protection", AddSecondDevice: "add_second_device", RemoveKey: "remove_key", SetRecoveryKey: "set_recovery_key", Upgrade: "upgrade" }[String(kind)];

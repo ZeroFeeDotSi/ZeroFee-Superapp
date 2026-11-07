@@ -58,6 +58,12 @@ export const QUANTUM_WORDS = {
   fix: "Fix",
   headOn: "Your Safe is quantum-safe",
   lineOn: "Its keys use the new standard made to resist quantum computers.",
+  /** the copy review's S1 (7 Nov): the title says "Quantum-safe" once; the On state's headline folds into this one body line. */
+  bodyOn: "Your Safe's keys are built to resist the computers of the future.",
+  /** the copy review's S1: on the web, a row whose key lives only on the iPhone (this device, AgentZero): never a tick. */
+  onIphone: "On iPhone",
+  /** the copy review's S1: the backup words' row on the web (ticked only when the words were checked). */
+  wordsDown: "Written down",
   lineOld: "Its other keys use the new standard made to resist quantum computers. An old key can be broken by future computers.",
   notYet: "Not yet",
   oldRow: "An older kind of key",
@@ -100,6 +106,26 @@ export const otherKeyLine = (k: Pick<AccountKeyInfo, "handle" | "access">, rules
 
 const fixOf = (k: AccountKeyInfo): OldFix =>
   k.role === "recovery" ? "new-words" : k.role === "second-device" ? "pair-again" : k.role === "device" ? (k.current ? "none" : "other-device") : "remove";
+
+/** A row as the sheet draws it: its words on the right (or none) and whether it is ticked. */
+export interface QuantumRowShown { id: QuantumRowId; label: string; line?: string; value: string | null; tick: boolean }
+/**
+ * What the sheet SAYS for each row (the audit's MUST and the copy review's S1, 7 Nov). It never changes what quantumOf decides (on, old,
+ * bypass); only the claims. On the phone: a tick for a key that is on the account and is ML-DSA-65, else "Not yet", and
+ * "In its secure chip" under this phone when its key is the chip's. On the web (`web`: not inside the iPhone app) nothing
+ * here is the phone's: this device and AgentZero read "On iPhone" with no tick and no chip line, whatever kind the key
+ * reports (the Sim's sample key says "secure-chip"); the backup words read "Written down", ticked only when the words
+ * were checked (`wordsChecked`, as Health check reads it), and "Not yet" while no words key is on the account.
+ */
+export function quantumRowsShown(rows: readonly QuantumRow[], web: boolean, wordsChecked: boolean | null = null): QuantumRowShown[] {
+  return rows.map((r): QuantumRowShown => {
+    const base = { id: r.id, label: r.label };
+    if (!web) return { ...base, ...(r.line ? { line: r.line } : {}), value: r.safe ? null : QUANTUM_WORDS.notYet, tick: r.safe };
+    if (r.id === "phone" || r.id === "agent") return { ...base, value: QUANTUM_WORDS.onIphone, tick: false };
+    if (r.id === "words") return r.safe ? { ...base, value: QUANTUM_WORDS.wordsDown, tick: wordsChecked === true } : { ...base, value: QUANTUM_WORDS.notYet, tick: false };
+    return { ...base, value: r.safe ? null : QUANTUM_WORDS.notYet, tick: r.safe };
+  });
+}
 
 /** The card and the sheet, from the key list. `phoneWord`: "This phone" on the phone, "This device" elsewhere. */
 /** `rules`: the account contract is on the account (AccountInfo.rules). */

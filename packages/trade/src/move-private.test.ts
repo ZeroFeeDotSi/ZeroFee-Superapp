@@ -136,11 +136,12 @@ test("the fill open: the Safe fills Private first by a whole step over what was 
   const safe0 = await s.safe();
   const r = await a.svc.call<SpendingActivity>("spending.topUp", { usd: 20, legs: [{ network: "sol", usd: 20 }], key: KEY });
   assert.ok("ok" in r, JSON.stringify(r));
-  // short $17: the fill is a whole $10 step over $17 and its 3 % gap: $20, never the $17 or the $20 payout's figure less Private's
+  // Private's $3 folds (the audit's R2, the ledger's foldsWhole; the Sim's mirror, 7 Nov): the fill is a whole $10 step over the
+  // $20 and its 3 % gap, $30, never the $17 short or the $20 payout's figure; Private's $3 stays with the extra
   const fill = Math.round((safe0 - (await s.safe())) * 100) / 100;
-  assert.equal(fill, 20);
+  assert.equal(fill, 30);
   assert.notEqual(fill, 17);
-  assert.equal(await s.pocket(), 3, "Private keeps the extra: $3 + $20 - $20");
+  assert.equal(await s.pocket(), 13, "Private keeps its $3 and the extra: $3 + $30 - $20");
   assert.equal(r.ok.fill, "doing");
   const paid = (await s.movements()).find((m) => m.id.startsWith("safe-send:"))!;
   assert.equal(paid.amount, "20.00");

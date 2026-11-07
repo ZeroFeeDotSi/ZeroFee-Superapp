@@ -12,10 +12,11 @@ const pos = (o: Partial<Position>): Position => ({ chain: "sol", coin: "BONKmint
 test("a coin bought here: its value, then dollars and percent since you bought (up and down)", () => {
   const up = coinRowWords(pos({ valueUsd: 41.2 }));
   assert.equal(up.value, "$41.20");
-  assert.match(up.since, /^\+\$6\.10\s\+17\.4% since you bought$/, "format.ts's own change(): dollars, then percent");
+  // the copy review's final words (7 Nov, T5; fix/trade-list-coin): the sign in words (was "+$6.10 +17.4% since you bought")
+  assert.equal(up.since, "Up $6.10 (17.4%)");
   const down = coinRowWords(pos({ valueUsd: 30 }));
   assert.equal(down.value, "$30.00");
-  assert.match(down.since, /^−\$5\.10\s−14\.5% since you bought$/);
+  assert.equal(down.since, "Down $5.10 (14.5%)");
 });
 
 test("never a made-up number: no record of the buy says so; a price that can't be read is —, never $0 or NaN (control: a priced coin with a cost has a result)", () => {
@@ -23,7 +24,7 @@ test("never a made-up number: no record of the buy says so; a price that can't b
   for (const valueUsd of [undefined, NaN, Infinity]) assert.deepEqual(coinRowWords(pos({ valueUsd })), { value: "—", since: NO_PRICE }, String(valueUsd));
   const all = JSON.stringify([coinRowWords(pos({ valueUsd: NaN })), coinRowWords(pos({ costUsd: 0 }))]);
   assert.doesNotMatch(all, /NaN|undefined|\$0\.00|Infinity/);
-  assert.match(coinRowWords(pos({ valueUsd: 36 })).since, /since you bought/, "control");
+  assert.match(coinRowWords(pos({ valueUsd: 36 })).since, /^Up \$0\.90/, "control");
 });
 
 test("which coins show: held on that chain, above zero, most valuable first, unpriced last (control: another chain's coin is not here)", () => {
@@ -64,7 +65,7 @@ test("review L2: a negative, huge or infinite value is unpriced; an infinite cos
   for (const valueUsd of [-5, 1e13]) assert.deepEqual(coinRowWords(pos({ valueUsd })), { value: "—", since: NO_PRICE }, String(valueUsd));
   assert.equal(coinRowWords(pos({ valueUsd: 10, costUsd: Infinity })).since, NO_RECORD);
   assert.equal(coinRowWords(pos({ valueUsd: 10, costUsd: NaN })).since, NO_RECORD);
-  assert.match(coinRowWords(pos({ valueUsd: 10 })).since, /since you bought/, "control");
+  assert.match(coinRowWords(pos({ valueUsd: 10 })).since, /^Down \$25\.10/, "control");
 });
 
 test("second review: a huge or near-zero cost never shows exponent form; usd() of NaN or Infinity is — (control: a sane cost has a percent)", async () => {
@@ -91,7 +92,7 @@ test("landing 2: the coin page says the same as its row, from the position's own
   const p = pos({ raw: "100000000", decimals: 5, costUsd: 35.1 });
   const page = coinPageSince(p, 0.0412) as { label: string; text: string };
   assert.equal(page.label, "Since you bought");
-  assert.equal(`${page.text} since you bought`, coinRowWords(pos({ valueUsd: 41.2, costUsd: 35.1 })).since, "control: one source of words");
+  assert.equal(page.text, coinRowWords(pos({ valueUsd: 41.2, costUsd: 35.1 })).since, "control: one source of words");
   assert.equal(coinPageSince(undefined, 0.0412), null, "review 2 M1: still loading, no line (never a false \"no record\")");
   assert.deepEqual(coinPageSince(null, 0.0412), { note: NO_RECORD }, "Trade has no record of it");
   // real-tap proof, 6 Nov, G05: a NEAR coin is bought in Home's swap, never in Trade: no record says nothing about when
@@ -112,7 +113,7 @@ test("review 2: a scam coin's price can't inflate the total, a near-zero cost is
   const real = pos({ coin: "r", valueUsd: 41.2, costUsd: 35.1 });
   assert.match(chainTotalLine("Solana", [real, pos({ coin: "scam", valueUsd: 9e11, costUsd: 1 })])!, /^Solana coins \$41\.20 · \+\$6\.10 since you bought$/, "M3: $900B is no holding");
   assert.equal(coinRowWords(pos({ valueUsd: 25, costUsd: 1e-9 })).since, NO_RECORD, "M3: a cost under a cent");
-  assert.match(coinRowWords(pos({ valueUsd: 0.1 + 0.2, costUsd: 0.3 })).since, /^\+\$0\.00\s/, "L4: noise reads +$0.00");
+  assert.equal(coinRowWords(pos({ valueUsd: 0.1 + 0.2, costUsd: 0.3 })).since, "No change", "L4: noise reads as no change (fix/trade-list-coin; was +$0.00)");
   assert.match(chainTotalLine("Solana", [real, pos({ coin: "g", valueUsd: 990, costUsd: 0 })])!, /· \+\$6\.10 on coins bought here$/, "L5");
   assert.match(chainTotalLine("Solana", [real])!, /since you bought$/, "control: all bought here");
 });

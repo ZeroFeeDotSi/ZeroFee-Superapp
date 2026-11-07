@@ -135,11 +135,11 @@ export function changeRuleWords(held: readonly Band[], recoveryDelaySeconds: num
   if (wait <= 0) return `Every change here needs ${needs}.`;
   return `Every change here needs ${needs} and waits ${ruleChangeWaitWords(strictestWait(held), recoveryDelaySeconds)}. So you can stop one you didn't make.`;
 }
-/** Protection's one line about changing the rules (round 3, UI-SIMPLICITY-RULES 2, 10): the wait alone, e.g. "Changing
- *  these rules waits 3 days."; with no wait, the full sentence (it is short then). `waits`: the full one goes one tap down. */
+/** Protection's one line about changing the rules (round 3, UI-SIMPLICITY-RULES 2, 10): the wait alone, e.g. "A change
+ *  to these rules takes 3 days." (the copy review's S5); with no wait, the full sentence (it is short then). `waits`: the full one goes one tap down. */
 export function changeRuleLine(held: readonly Band[], recoveryDelaySeconds: number, w: ApprovalWords = approvalWords()): { line: string; waits: boolean } {
   if (ruleChangeWait(strictestWait(held), recoveryDelaySeconds) <= 0) return { line: changeRuleWords(held, recoveryDelaySeconds, w), waits: false };
-  return { line: `Changing these rules waits ${ruleChangeWaitWords(strictestWait(held), recoveryDelaySeconds)}.`, waits: true };
+  return { line: `A change to these rules takes ${ruleChangeWaitWords(strictestWait(held), recoveryDelaySeconds)}.`, waits: true };
 }
 export const rangeWords = (bands: Band[], i: number) => {
   const lo = i === 0 ? 0 : bands[i - 1].upToUsd ?? 0;

@@ -110,6 +110,11 @@ export interface MoveRow { id: string; kind: MoveKind; chain?: FloatChain; usd: 
   /** Paid from Private (float-private.ts, NEAR Confidential): each leg one payment to its wallet, by the ledger's
    *  movements (a "safe-send:" one fills Private from the Safe first); `ends`, each movement's end once heard. */
   priv?: { parts: { wallet: string; chain: FloatChain | "near"; usd: number; ids: string[]; ends?: Record<string, string>; stopped?: string;
+    /** It stopped with its money unknown (the ledger's private-move.ts): no Try again on its row, only Activity. */
+    unsure?: true;
+    /** Each unpaid payment's money state, as its Problem said it (send-job.ts: "on-the-way" while leg 1 hasn't arrived):
+     *  its words say on its way to Private, never back in Private (audit, 6 Nov). */
+    money?: Record<string, string>;
     /** the audit (5 Nov): the wallet's own coin before it was paid (its native units, read at the tap) and the least the payout's
      *  quote promises (its minAmountOut: the quoted out less slippage): Done only when a read shows the balance up by at
      *  least `minOut` over `base` (float-private chainShown). */
@@ -152,6 +157,9 @@ export function policyOf(split: Split, totalUsd: number, base: FloatPolicy = DEF
 
 /** A move in words: move-words.ts (Trade's own screens load it). */
 /** What a float the core couldn't read says (audit F-1): never $0, never "empty". */
+/** A row paid from Private holding a part whose money is on its way to Private (float-private partEnd's hold): read
+ *  again, ended or not, until the ledger says the money is there (audit, 6 Nov: the hold had no end). Pure: a table test. */
+export const heldRow = (r: Pick<MoveRow, "priv">): boolean => (r.priv?.parts ?? []).some((p) => p.ids.some((id) => p.money?.[id] === "on-the-way"));
 export const UNREAD_WORDS = "Your NEAR wallet didn't load right now";
 
 // ---- the sample: ?demo and the screens' tests. No network, no keys; time is injected. ----

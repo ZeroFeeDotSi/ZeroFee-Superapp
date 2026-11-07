@@ -23,7 +23,7 @@ test("the least is the core's own floors chained: a row's move in (leastIn), the
   // Hidden: each coin home as itself, held by the core to 98 % (pocket-moves.ts), a cent under its rounded figure; never
   // "comes back whole" (QA, 3 Nov; control: the old sheet said that and counted Hidden as $0 of the least)
   assert.equal(takeOutLeast([{ from: "hidden", name: "Hidden", usd: 30, all: true }]), 29.39);
-  assert.deepEqual(takeOutLines([{ from: "hidden", name: "Hidden", usd: 30, all: true }]), ["About $30.00 leaves your private balance.", "At least $29.39 reaches your Safe.", "The swap service's fees come out on the way."]);
+  assert.deepEqual(takeOutLines([{ from: "hidden", name: "Hidden", usd: 30, all: true }]), ["About $30.00 leaves Private.", "At least $29.39 reaches your Safe.", "The swap service's fees come out on the way."]);
   assert.equal(takeOutLeast([{ from: "sol", name: "SOL", usd: 20, all: false }, { from: "hidden", name: "Hidden", usd: 23.86, all: true }]), Math.floor((18.35 + 23.37) * 100 + 1e-9) / 100);
 });
 
@@ -61,7 +61,8 @@ test("the core holds its moves to the same floors the sheet reads (one source: f
 test("Move's sliders say the least that reaches the Safe from the core's own floors, before the tap, never \"About $20.00\" (control: the old words are gone)", () => {
   const sheet = readFileSync(new URL("./MoveSheet.tsx", import.meta.url), "utf8");
   const split = readFileSync(new URL("./move-split.ts", import.meta.url), "utf8");
-  assert.match(split, /import \{ HOME_LEG_MIN_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, leastHome, leastIn \} from "@zerofee\/core\/float-floors";/);
+  // the audit's ruling (c), 8 Nov: the Safe's side's bound (planLeastUsd) is the core's too, the one the Check-this holds its quotes to
+  assert.match(split, /import \{ HOME_LEG_MIN_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, leastHome, leastIn, planLeastUsd, walletLegLeastUsd \} from "@zerofee\/core\/float-floors";/);
   assert.match(sheet, /const cost = costLine\(legs\);/);   // one figure per Move: what was typed leaves (QA test)
   // REVAMP P0 (3 Nov): the same figures as one grouped block, its sentence (costLine) what a screen reader hears
   assert.match(sheet, /const costed = costRows\(legs\);/);

@@ -14,7 +14,7 @@ test("a filled buy: sent, bought, each with its time, the fill time on the last;
   assert.equal(c.title, "Bought DOPE");
   assert.equal(c.result, "$1.00 · done in under a second · PumpSwap");
   assert.deepEqual(states(c), ["done", "done"]);
-  assert.deepEqual(c.steps.map((s) => s.label), ["Sent to Solana", "Bought"], "UX audit 4 Nov: no step for a sheet nobody saw");
+  assert.deepEqual(c.steps.map((s) => s.label), ["Paid from your SOL wallet", "Landed in your SOL wallet"], "UX audit 4 Nov: no step for a sheet nobody saw; T2-6: a buy pays from its wallet, by name; the copy review: never the title again");
   assert.deepEqual(c.steps.map((s) => s.at), [1_300, 1_700]);
   assert.equal(c.steps[1]!.note, "done in under a second");
   assert.equal(c.badge, "Done");
@@ -40,7 +40,8 @@ test("a trade that didn't go stops where it stopped, and says what moved", () =>
   assert.deepEqual(states(reverted), ["done", "stopped"]);
   assert.equal(reverted.steps[1]!.note, "The price moved too far · only the network fee was spent");
   const expired = tradeCard(rec({ status: "expired", hashes: [], sentAt: undefined }));
-  assert.match(expired.result, /nothing moved$/);
+  // the copy review's words (7 Nov): an expiry's reason says where the money is (unconfirmed-words.test.ts holds the table)
+  assert.equal(expired.result, "Solana didn't confirm it in time, so nothing was traded. Your money is in your SOL wallet.");
 });
 
 const mv = (o: Partial<MoveRow>): MoveRow => ({ id: "m1", kind: "out", chain: "sol", usd: 9.55, status: "moving", where: "in-flight", at: 5_000, etaSec: 40, ...o });

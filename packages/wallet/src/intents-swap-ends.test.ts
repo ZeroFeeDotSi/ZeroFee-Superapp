@@ -166,7 +166,7 @@ test("B3: a move the core no longer knows (it lets go of a move after a week) en
   const end = r.jobs.get("swap:fm-gone");
   assert.equal(end.status, "problem");
   assert.match(end.problem.whatHappened, /more than a week old/);
-  assert.equal(problemLine(end.problem), "This swap is more than a week old, so ZeroFee can't read how it ended. Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet's balance first.");
+  assert.equal(problemLine(end.problem), "This swap is more than a week old, so ZeroFee can't read how it ended. Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet first.");
   assert.doesNotMatch(problemLine(end.problem), /\b(safe|lost|waiting for you)\b/i, "we can't know: neither safe nor lost, and no promise");
   assert.match(readFileSync(new URL("../../shell-api/src/ProblemView.tsx", import.meta.url), "utf8"), /case "unsure": return `Your money is \$\{m\.where\}\. \$\{m\.check\}`;/, "the Problem page says the same");
   assert.equal(end.problem.money.state, "unsure", "never a money line saying nothing moved");
@@ -277,7 +277,7 @@ test("a NEAR wallet swap 1Click failed says where to look, never that the money 
   await r.tick(2);
   const end = r.jobs.get("swap:fm-failed");
   assert.equal(end.status, "problem");
-  assert.equal(problemLine(end.problem), "NEAR Intents didn't finish this swap. Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet's balance first.");
+  assert.equal(problemLine(end.problem), "NEAR Intents didn't finish this swap. Your money is either in your NEAR wallet or still with NEAR Intents. Check your NEAR wallet first.");
   assert.doesNotMatch(`${problemLine(end.problem)} ${end.problem.more ?? ""}`, /\b(is back|coming back|Safe|waiting for you)\b/);
   assert.equal(whereNow(end, ""), "check your NEAR wallet");
   const refunded = rig({ moveAnswer: () => ({ ok: { status: "refunded" } }) });

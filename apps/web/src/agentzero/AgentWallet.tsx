@@ -96,6 +96,8 @@ export function FillSheet({ w, amount, other: otherFirst = false, onClose, onDon
   const [busy, setBusy] = useState(false);
   // after a fill went through: AgentZero's USDC before it (the line waits for the balance it reads, never before + amount)
   const [done, setDone] = useState<number | null>(null);
+  /** The fill's job (runJob's made): its receipt follows its own rows, never another job's (the audit's finding, 7 Nov). */
+  const [fillJob, setFillJob] = useState<string | null>(null);
   const [late, setLate] = useState(false);
   useEffect(() => {
     if (done === null) return;
@@ -116,7 +118,7 @@ export function FillSheet({ w, amount, other: otherFirst = false, onClose, onDon
     const before = w.walletUsd ?? 0;
     // the job is made (bug report, 5 Nov): "Job created." here at once; the core's answer ends its row, never this sheet
     let made = false;
-    const r = await w.fund(usd, tap, () => { made = true; mark("away"); setBusy(false); setDone(before); });
+    const r = await w.fund(usd, tap, (j) => { made = true; setFillJob(j); mark("away"); setBusy(false); setDone(before); });
     setBusy(false);
     if ("line" in r) { mark("refused"); return made ? undefined : setLine(r.line); }
     if ("declined" in r) return setDone(null);
@@ -136,7 +138,7 @@ export function FillSheet({ w, amount, other: otherFirst = false, onClose, onDon
           </div>
                 <p className="zf-receipt__amount">{limit(usd)}</p>
                 <p className="zf-receipt__head">{JOB_WORDS.created}</p>
-                <TimeLeft etaSec={LEG_SEC.nearToSafe} watch />
+                <TimeLeft etaSec={LEG_SEC.nearToSafe} watch job={fillJob} />
                 {late && FILL_LATE.map((l) => <p key={l} className="zf-small azw-quiet">{l}</p>)}
               </div>
             )}

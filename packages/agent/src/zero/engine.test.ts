@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Bridge, BridgeResult } from "@zerofee/core/bridge";
 import { AGENT_PRIVATE_ROUTE } from "@zerofee/core/agent-route";
-import { emitJobDone, JOB_DONE_EVENT, type JobDoneKind, KEYS, ON_ITS_WAY_MS, personTap, PRIVATE_OFF_LINE, TOP_UP_OFF_LINE, UNKNOWN_LINE, paidLine, requestUsd, zeroEngine, zeroState } from "./engine.ts";
+import { emitJobDone, JOB_DONE_EVENT, type JobDoneKind, KEYS, ON_ITS_WAY_MS, personTap, PRIVATE_OFF_LINE, TOP_UP_OFF_LINE, UNKNOWN_LINE, unknownEnd, paidLine, requestUsd, zeroEngine, zeroState } from "./engine.ts";
 import type { Job } from "./jobs.ts";
 import { zeroBudget } from "./budget.ts";
 import { USDC_ID } from "../agent-pay.ts";
@@ -624,4 +624,16 @@ test("a chat refusal is one refused receipt on the chained log, kept on the devi
   const again = engineOf(w);
   await again.refresh();
   assert.equal(again.snapshot().receipts.length, 1);
+});
+
+test("a plain throw in the core's spend: 'not sure it went', never 'Didn't move', and Pay isn't offered again (audit, 6 Nov; control: a real refusal stays 'Didn't move')", async () => {
+  const unknown = { code: "security.unexpected.money", whatHappened: "ZeroFee hit a problem on its side. Check Activity before you try again.", money: { state: "unsure" }, next: { kind: "open", label: "See what happened", screen: "activity" } };
+  const w = world({ spend: () => ({ problem: unknown }) } as never);
+  const e = engineOf(w);
+  assert.deepEqual(await payOf(e, { requestId: "m6", to: "kim.near", usd: 5 }, TAP), { kind: "unknown", line: UNKNOWN_LINE });
+  assert.equal(e.snapshot().receipts[0]!.title, UNKNOWN_LINE);
+  assert.equal(JSON.parse(w.store.get(KEYS.requests)!).m6.state, "unknown");
+  assert.equal(unknownEnd({ code: "ledger.unexpected.money" }), true);
+  assert.equal(unknownEnd({ code: "security.request.not-allowed" }), false, "control");
+  assert.equal(unknownEnd(undefined), false, "control");
 });

@@ -7,11 +7,13 @@ import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { intentsUrl, type TxProof } from "@zerofee/core/tx-proof";
 import { PROOF_LINE, proofLine } from "@zerofee/core/proof-line";
-import { PROOF_WORDS as W, type ProofEnd, type ProofPage, dayTime } from "../proof.ts";
+import { PROOF_WORDS as W, type ProofEnd, type ProofPage, dayTime, headFinished, headLine, stepLine } from "../proof.ts";
 import type { Fact } from "../statement.ts";
 import { copyText } from "../copy-text.ts";
+import { untilDate } from "../money/add-coins.ts";
 
-const when = (iso: string | undefined) => (iso && Number.isFinite(Date.parse(iso)) ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
+// J2 (copy review, 7 Nov): the app's one date form, "7 Nov" (add-coins untilDate), never the browser's "Nov 7, 1:22 AM"
+const when = (iso: string | undefined) => (iso && Number.isFinite(Date.parse(iso)) ? untilDate(iso) : "");
 
 export interface DetailProps {
   title: string;
@@ -55,7 +57,7 @@ export function ActivityDetail({ title, line, usd, atIso, page, onClose, onBack,
           <h2 className="wl-detail__title">{title}</h2>
           {dayFirst
             ? <>{line && <p className="wl-detail__sub">{line}</p>}{atIso && <p className="wl-detail__sub">{dayTime(atIso)}</p>}</>
-            : <p className="wl-detail__sub">{[line, when(atIso)].filter(Boolean).join(" · ")}</p>}
+            : <p className="wl-detail__sub">{headLine(line, when(atIso))}</p>}
         </div>
         {onProblem && <button className="zf-btn" onClick={onProblem}>{W.problem}</button>}
         {ways.map((w, i) => <button key={w.label} className={i === 0 ? "zf-btn" : "zf-btn zf-btn--quiet"} onClick={w.run} data-testid="detail-way">{w.label}</button>)}
@@ -72,16 +74,17 @@ export function ActivityDetail({ title, line, usd, atIso, page, onClose, onBack,
         {payee && <div className="wl-rows"><button className="wl-row wl-row-2 wl-pick" onClick={() => copy(payee)}><div><div className="t">Paid to</div><div className="d">{copied === payee ? `${W.copied} ${payee}` : payee}</div></div></button></div>}
         <div className="wl-rows" data-testid="proof-ends">
           {end(W.started, page.started, "s")}
-          {page.finished ? end(W.finished, page.finished, "f") : page.ended === null ? null : <div className="wl-row wl-row-2"><div><div className="t">{page.ended?.label ?? W.finished}</div><div className="d">{page.ended?.line ?? (page.done ? W.doneNoLink : W.notYet)}</div>{page.ended?.check && <div className="d" data-testid="detail-check">{page.ended.check}</div>}</div></div>}
+          {page.finished ? (headFinished(page) ? end(W.finished, page.finished, "f") : null) : page.ended === null ? null : <div className="wl-row wl-row-2"><div><div className="t">{page.ended?.label ?? W.finished}</div><div className="d">{page.ended?.line ?? (page.done ? W.doneNoLink : W.notYet)}</div>{page.ended?.check && <div className="d" data-testid="detail-check">{page.ended.check}</div>}</div></div>}
         </div>
         {(page.steps.length > 1 || (page.stepsShown && page.steps.length > 0)) && (
           <>
             <h3 className="zf-small wl-detail__head">{W.steps}</h3>
             {page.steps.map((s, i) => (
               <div className="wl-rows" key={i} data-testid="proof-step">
-                <div className="wl-row wl-row-2"><div><div className="t">{s.label}</div><div className="d">{[s.usd ? `$${s.usd}` : "", dayFirst && s.atIso ? dayTime(s.atIso) : when(s.atIso)].filter(Boolean).join(" · ")}</div></div></div>
+                <div className="wl-row wl-row-2"><div><div className="t">{s.label}</div><div className="d" data-testid="proof-step-line">{stepLine(s, dayFirst && s.atIso ? dayTime(s.atIso) : when(s.atIso))}</div></div></div>
                 {end(W.started, s.start, `s${i}`)}
-                {s.end ? end(W.finished, s.end, `f${i}`) : s.ended && <div className="wl-row wl-row-2" data-testid="proof-step-done"><div><div className="t">{W.finished}</div><div className="d">{W.doneNoLink}</div></div></div>}
+                {/* a step that ended with no landing to show says Done on its own line (stepLine), never a "Finished / Done." row each */}
+                {s.end && end(W.finished, s.end, `f${i}`)}
               </div>
             ))}
           </>
@@ -92,13 +95,25 @@ export function ActivityDetail({ title, line, usd, atIso, page, onClose, onBack,
   );
 }
 
+/** J2: a job page's proof (the job face, LiveTracker): the transaction that set it off and the one that landed it, each
+ *  with View or Copy proof, the same lines as this page's; a private step says it has no public record. */
+export function JobProof({ page }: { page: Pick<ProofPage, "started" | "finished"> & Partial<Pick<ProofPage, "steps">> }) {
+  const { openApp } = useShell();
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = (text: string) => void copyText(text).then((ok) => { if (!ok) return; setCopied(text); setTimeout(() => setCopied((c) => (c === text ? null : c)), 1500); });
+  // the copy review (7 Nov): no "Started" / "Finished" label: the step line above carries its one word; the proof line is its date
+  const line = (key: string, e: ProofEnd | undefined, at: string | undefined) => (!e || "private" in e ? null : <TxLine key={key} label={when(at)} tx={e.tx} copied={copied === e.tx.hash} onCopy={() => copy(e.tx.hash)} onView={e.tx.url ? () => openApp("browser", undefined, e.tx.url!) : undefined} />);
+  const lines = [line("start", page.started, page.steps?.[0]?.atIso), line("end", page.finished, page.steps?.at(-1)?.atIso)].filter(Boolean);
+  return lines.length ? <div className="wl-rows lv-job__proof" data-testid="job-proof">{lines}</div> : null;
+}
+
 /** One transaction: what it was and its network ("On NEAR"), then View where its network has an explorer people know,
  *  else "Copy proof". Never its id on screen (QA, 5 Nov: "D6po1b…Z1x4" graded C). */
 function TxLine({ label, tx, copied, onCopy, onView }: { label: string; tx: TxProof; copied: boolean; onCopy: () => void; onView?: (() => void) | undefined }) {
   const line = proofLine(tx.chain, !!onView);
   return (
     <div className="wl-row wl-row-2" data-testid="proof-tx">
-      <div><div className="t">{label}</div>{line && <div className="d">{line}</div>}</div>
+      <div>{label && <div className="t">{label}</div>}{line && <div className="d">{line}</div>}</div>
       <div className="r">
         {onView
           ? <button className="zf-link" onClick={onView}>{W.view}</button>

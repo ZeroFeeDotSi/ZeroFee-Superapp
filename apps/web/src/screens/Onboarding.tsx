@@ -71,7 +71,7 @@ export function Welcome({ onCreate, onRestore, onSample, onMoving, onGuard, othe
         {/* J2 (O4): the honest time, said before anything starts. */}
         <p className="zf-small">{SETUP_TIME}</p>
         {/* Dead ends row 16: a spare phone, or a guardian's, says yes for an account with no account of its own. */}
-        {onGuard && <button className="zf-link" style={{ fontSize: 13 }} onClick={onGuard} data-testid="welcome-guard">Be a second phone or a guardian</button>}
+        {onGuard && <button className="zf-link" style={{ fontSize: 13 }} onClick={onGuard} data-testid="welcome-guard">Approve for someone else</button>}
         {onSample &&<button className="zf-link" style={{ fontSize: 13 }} onClick={onSample}>Look around with sample money</button>}
         {other && <button className="zf-link" style={{ fontSize: 13 }} onClick={other.go}>{other.label}</button>}
       </div>

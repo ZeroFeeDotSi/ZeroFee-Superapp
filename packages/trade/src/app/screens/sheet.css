@@ -56,8 +56,13 @@
 /* what you hold now, one hairline row, then the next step (review 12, the approved panel 4) */
 .tm-held { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; width: 100%; margin-top: 24px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; animation: zf-rise var(--dur-base) 0ms var(--ease-out) both; }
 .tm-held-t { display: grid; gap: 2px; font: 500 15px/1.2 var(--font); }
-.tm-held-t small { font: 400 12.5px/1.2 var(--font); color: var(--mute); font-variant-numeric: tabular-nums; }
-.tm-held-v { font: 500 15px/1.2 var(--font); font-variant-numeric: tabular-nums; }
+/* T2-6: the label mute over its value, "You now hold" / "7,505 DOPE · $24.85" */
+.tm-held-t { font-variant-numeric: tabular-nums; }
+.tm-held-t small { font: 400 12.5px/1.2 var(--font); color: var(--mute); }
+/* the copy review (8 Nov): "if sold now" names the figure's meaning; too long for the row, it wraps whole, mute */
+.tm-held-if { white-space: nowrap; color: var(--mute); }
+/* QA QA's SHOULD: the line naming the gap under a figure, mute, as the sheets' .tp-gap */
+.tm-gap { margin: 8px 0 0; text-align: center; color: var(--mute); }
 .tm-floor { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 22px; animation: zf-rise var(--dur-base) 0ms var(--ease-out) both; }
 .tm-floor .zf-btn { margin-top: 0; }
 .tm-btn1 { grid-column: 1 / -1; order: -1; }
@@ -106,6 +111,10 @@
 .tp-chips.zf-me__chips { display: grid; justify-content: stretch; margin-top: 16px; gap: 0; }
 .tp-chips.zf-me__chips button, .tp-chips.zf-me__chips button.on { min-width: 0; height: auto; padding: 0; font: 600 15px/20px var(--font-money, var(--font)); font-variant-numeric: tabular-nums; text-shadow: none; } /* the design track's face: money (THEME.md) */
 .tp-chips.zf-me__chips button.on { color: var(--ink); }
+/* T2-1 (the copy review's walk, 8 Nov): every chip a 44 px tap, Buy's "$5 $25 $50 Max" and Sell's "25% 50% All" (they were 38): the
+   track grows to hold them, its thumb inset as before */
+.tp-chips.zf-me__chips { height: auto; }
+.tp-chips.zf-me__chips button { min-height: 44px; }
 .tp-pad { margin-top: 16px; padding-top: 0; }
 .tp-pad .zf-keypad button { height: auto; font-size: 28px; }
 .tp-floor { margin-top: 12px; }
@@ -118,7 +127,7 @@
 .tm-lens { box-shadow: inset 0 0 0 1px var(--line), var(--plinth); }
 .tm-amt { font: 500 56px/60px var(--font-money, var(--font)); letter-spacing: -.04em; font-feature-settings: "tnum" 1; color: var(--ink); }
 /* the receipt's proof (Moment.tsx, webd-money2 test, 4 Nov): the short tx id, Copy and View, centred under the result */
-.tm-proof { display: flex; justify-content: center; align-items: center; gap: 14px; margin: 12px 0 0; color: var(--mute); }
+.tm-proof { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--mute); }
 .tm-proof__id { font-variant-numeric: tabular-nums; }
 /* audit 5 Nov: the receipt's proof is one quiet line, its link the line's own size (it was 17 px beside 13 px words) */
 .tm-proof, .tm-proof .zf-link { font: 400 13.5px/1.3 var(--font); }
@@ -130,3 +139,7 @@
 .tp-get { min-height: 44px; }
 /* NEAR on NEAR's public servers while ZeroFee's server isn't answering: one calm line under the amount's, never a banner */
 .tp-switched { max-width: 320px; margin: 6px auto 0; text-align: center; }
+/* a buy's wallet with nothing in it: the refusal under the coin, centred, its one button at the foot (copy review, 7 Nov) */
+.tp-empty { margin: 20px auto auto; max-width: 320px; text-align: center; display: grid; gap: 6px; }
+/* the audit's SHOULD, the copy review's words (8 Nov): the quote's distance from the market price, one mute line under the figure's line */
+.tp-gap { margin: 2px 0 0; text-align: center; color: var(--mute); }

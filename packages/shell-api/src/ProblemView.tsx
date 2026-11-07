@@ -6,6 +6,7 @@ import type { Problem } from "@zerofee/core/problem";
 import { useBack } from "@zerofee/design/back.ts";
 import { Back, Close } from "@zerofee/design/icons.tsx";
 import { More } from "@zerofee/design/More.tsx";
+import { machineText, refusalFace } from "./refusal-face.ts";
 
 const moneyWords = (m: Problem["money"]): string | null => {
   switch (m.state) {
@@ -26,11 +27,10 @@ export function moreParts(more: string): { text: string; url: string | null } {
   return { text, url: m[0] };
 }
 
-/** Machine text (UI-SIMPLICITY-RULES rule 3): a coin id, raw units, a 0x… id, a 64-hex hash, a number over 12 digits. A
- *  Problem's extra line holding any of it is never on the screen itself: it sits behind "Details for ZeroFee" (VOICE §1.6:
- *  the one place a code may go, for a bug report). J3 C1: "near on near" reached the judges' demo. */
-const MACHINE = [/\bnep\d{3}:/, /\.omft\.near/, /units of/, /0x[0-9a-fA-F]{40,}/, /\b[0-9a-fA-F]{64}\b/, /\d{13,}/];
-export const machineText = (s: string): boolean => MACHINE.some((re) => re.test(s));
+/** Machine text (refusal-face.ts): a Problem's extra line holding any is never on the screen itself, it sits behind
+ *  "Details for ZeroFee" (VOICE §1.6: the one place a code may go, for a bug report). J3 C1: "near on near" reached the
+ *  judges' demo. */
+export { machineText };
 
 /** The only address next2 may navigate to: a path on this same app ("/?demo"). No scheme, no host, no "//", no backslash or control characters. */
 export function safeNext2Url(url: unknown): string | null {
@@ -48,8 +48,10 @@ export function safeNext2Url(url: unknown): string | null {
  * browser Back all run it. `close`: it is a popup over an app (D135): the way out is Close (✕) in the top corner, no title.
  */
 export function ProblemView({ problem, onNext, onOpen, onNext2, onBack, close = false }: { problem: Problem; onNext: () => void; onOpen?: (screen: string) => void; onNext2?: () => void; onBack?: () => void; close?: boolean }) {
-  const money = moneyWords(problem.money);
-  const more = problem.more ? moreParts(problem.more) : null;
+  // a wallet's refusal (copy review, 7 Nov): its own reason as the head, the money fact as the body
+  const face = refusalFace(problem);
+  const money = face ? face.body || null : moneyWords(problem.money);
+  const more = problem.more && (!face || machineText(problem.more)) ? moreParts(problem.more) : null;
   const next = problem.next;
   const n2 = problem.next2;
   const n2Url = n2?.kind === "url" ? safeNext2Url(n2.url) : null;
@@ -60,7 +62,7 @@ export function ProblemView({ problem, onNext, onOpen, onNext2, onBack, close = 
       {onBack && <BackArrow onBack={onBack} close={close} />}
       <div className="zf-fill" />
       <div className="zf-enter" style={{ display: "grid", gap: 14, textAlign: "center" }}>
-        <h1 className="zf-title">{problem.whatHappened}</h1>
+        <h1 className="zf-title">{face?.head ?? problem.whatHappened}</h1>
         {money && <p className="zf-body">{money}</p>}
         {more?.text && !machineText(more.text) && <p className="zf-small">{more.text}</p>}
         {more?.text && machineText(more.text) && <More label="Details for ZeroFee" lines={[more.text]} />}

@@ -10,11 +10,48 @@ import type { SolDeps } from "./context.ts";
 import { createSolEngine, type SolEngine } from "./engine.ts";
 import { ataOf, PROGRAM, userVolumeAccumulator } from "./keys.ts";
 import { createSolRpc, MAX_ACCOUNTS_PER_READ, readsAfter, type NodeAnswer } from "./rpc.ts";
+import { isSolProxy } from "@zerofee/core/sol-proxy";
 import { buildTx, decodeTx, transfer } from "./tx.ts";
 
 export interface SolChain extends ChainEngine { readonly engine: SolEngine }
 
 const okValues = (a: NodeAnswer[]) => a.filter((x): x is NodeAnswer & { ok: true } => x.ok).map((x) => x.value);
+const landedStatus = (v: any): boolean => !!v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized");
+/** Two nodes' statuses: "confirmed" or "failed" only when two agree; null: no verdict from these answers. */
+export function statusVerdict(vals: readonly any[]): "confirmed" | "failed" | null {
+  const landed = vals.filter(landedStatus);
+  if (landed.filter((v) => !v.err).length >= 2) return "confirmed";
+  if (landed.filter((v) => v.err).length >= 2) return "failed";
+  return null;
+}
+/** How far back this wallet's own signature list is read, to prove a trade never landed. */
+export const SIGNATURES_BACK = 1000;
+/** A landing's block time may sit this far before the trade's own start (clocks differ). */
+export const SINCE_SKEW_MS = 120_000;
+/** The nodes that index a wallet's signatures for a keyless caller (core solana.ts SOL_INDEXED_NODES, checked 3 Nov). */
+export const SOL_INDEXED = ["https://public.rpc.solanavibestation.com"];
+/** A node whose signature list counts: the relay (its paid node) or one that indexes; never a pruned public node. */
+const indexes = (node: string | undefined): boolean => !!node && (isSolProxy(node) || SOL_INDEXED.includes(node));
+/** The nodes whose own block height (their answer in `heights`) is past `lastValid`: an indexer that has caught up. */
+export const caughtUp = (heights: readonly NodeAnswer[], lastValid: number) => (node: string | undefined): boolean =>
+  heights.some((x) => x.ok && x.node === node && Number((x as { value: unknown }).value) > lastValid);
+/**
+ * Does this wallet's signature list prove `hash` never landed? Only an indexing node's answer counts, only from a node
+ * that has caught up past the trade's last valid height (`fresh`: the audit's MUST, a lagging indexer leaves a landed trade
+ * out), and only one that reaches back before the trade: shorter than SIGNATURES_BACK (the wallet's whole history) or its
+ * oldest entry before `since` (less the skew). Any such list naming it: no proof. None that counts: no proof.
+ */
+export function listProvesAbsent(answers: readonly NodeAnswer[], hash: string, since: number | undefined, fresh: (node: string | undefined) => boolean): boolean {
+  const named = answers.some((x) => x.ok && Array.isArray((x as { value: unknown }).value) && (x as { value: any[] }).value.some((e) => e?.signature === hash));
+  if (named) return false;
+  const lists = answers.filter((x) => x.ok && indexes(x.node) && fresh(x.node) && Array.isArray((x as { value: unknown }).value)).map((x) => (x as { value: any[] }).value);
+  if (!lists.length) return false;
+  return lists.some((l) => {
+    if (l.length < SIGNATURES_BACK) return true;
+    const oldest = l[l.length - 1]?.blockTime;
+    return since !== undefined && typeof oldest === "number" && oldest * 1000 < since - SINCE_SKEW_MS;
+  });
+}
 /** How long this wallet's last landed trade's slot holds its reads, and the core's test runs, to state at or after it
  *  (as the core's SOL_SLOT_MS): by then every node is long past it. */
 export const FRESH_SLOT_MS = 90_000;
@@ -57,6 +94,31 @@ export function createSolChain(o: Omit<SolDeps, "rpc"> & { rpc?: SolDeps["rpc"];
     if (!sig || sig.every((b) => b === 0)) throw new TradeError("unavailable", "The transaction isn't signed");
     return base58(sig);
   };
+  /**
+   * the audit's MUST (7 Nov, double pay): getSignatureStatuses without history searches only the cluster's recent status cache
+   * (about two minutes), so a trade looked at later (the app reopened) read null on both nodes even when it had landed,
+   * and was said "expired: nothing was traded" with Try again. Past its height, "expired" now needs BOTH: two nodes'
+   * full history without it (history:true), and this wallet's own signature list, from a node that indexes it (the
+   * relay's paid door or SOL_INDEXED), reaching back before the trade, without it. A pruned node's null alone, an error,
+   * a list that doesn't reach back, or two answers that differ: "pending" (said unconfirmed, checked again, never Try again).
+   */
+  const provenAbsent = async (hash: string, lastValid: number, since?: number, twoPast = false): Promise<TxStatus> => {
+    // the audit's MUST (7 Nov): this runs just past the trade's last valid height, when an indexer may still lag: an indexing
+    // node's list counts only if that SAME node's own height, read before its list, is past the last valid height
+    const [hist, heights] = await Promise.all([
+      nodes.askNodes("getSignatureStatuses", [[hash], { searchTransactionHistory: true }], 2),
+      nodes.askNodes("getBlockHeight", [{ commitment: "confirmed" }], 4),
+    ]);
+    const sigs = await nodes.askNodes("getSignaturesForAddress", [owner, { limit: SIGNATURES_BACK, commitment: "confirmed" }], 4);
+    const hv = okValues(hist).map((v) => v?.value?.[0] ?? null);
+    if (hv.length < 2) return "unknown";
+    const verdict = statusVerdict(hv);
+    if (verdict) { if (verdict === "confirmed") for (const v of hv) if (landedStatus(v)) noteSlot(v); return verdict; }
+    if (!hv.every((v) => v === null)) return "pending";
+    // the live re-check (recheck) comes here with no status() gate before it: two nodes past the last valid height, as there
+    if (twoPast && okValues(heights).filter((h) => Number(h) > lastValid).length < 2) return "pending";
+    return listProvesAbsent(sigs, hash, since, caughtUp(heights, lastValid)) ? "expired" : "pending";
+  };
   return {
     chain: "sol", owner, engine,
     async prepare(side, coin, amount, opts) { seen.add(coin); return engine.prepare(side, coin, amount, opts); },
@@ -74,18 +136,24 @@ export function createSolChain(o: Omit<SolDeps, "rpc"> & { rpc?: SolDeps["rpc"];
       if (await viaRelay) return hash;
       throw new TradeError("node", `No Solana node took the transaction: ${a.map((x) => (x.ok ? "" : x.error)).join("; ")}`);
     },
-    async status(hash, step?: TxStep): Promise<TxStatus> {
+    async status(hash, step?: TxStep, since?: number): Promise<TxStatus> {
+      // speed (Trade's 1 s bar): the first ask is the recent status cache only, as landed() is; history only on the branch below
       const a = await nodes.askNodes("getSignatureStatuses", [[hash], { searchTransactionHistory: false }], 2);
       const vals = okValues(a).map((v) => v?.value?.[0] ?? null);
-      const landed = vals.filter((v) => v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized"));
-      if (landed.filter((v) => !v.err).length >= 2) { for (const v of landed) noteSlot(v); return "confirmed"; }
-      if (landed.filter((v) => v.err).length >= 2) return "failed";
+      const verdict = statusVerdict(vals);
+      if (verdict) { if (verdict === "confirmed") for (const v of vals) if (landedStatus(v)) noteSlot(v); return verdict; }
       if (vals.length >= 2 && vals.every((v) => v === null) && step?.lastValidBlockHeight !== undefined) {
         // both nodes say "never seen": it has expired only once both are past its last valid block height
         const h = okValues(await nodes.askNodes("getBlockHeight", [{ commitment: "confirmed" }], 2)).map(Number);
-        if (h.length >= 2 && h.every((x) => x > step.lastValidBlockHeight!)) return "expired";
+        if (h.length >= 2 && h.every((x) => x > step.lastValidBlockHeight!)) return provenAbsent(hash, step.lastValidBlockHeight, since);
       }
       return vals.length ? "pending" : "unknown";
+    },
+    /** The live re-check of an unconfirmed trade (types.ts): status()'s history branch alone, the same proof (two full
+     *  histories, two nodes past its last valid height, a caught-up indexer's list without it). No cache read, no send. */
+    async recheck(hash, step?: TxStep, since?: number): Promise<TxStatus> {
+      if (step?.lastValidBlockHeight === undefined) return "unknown";
+      return provenAbsent(hash, step.lastValidBlockHeight, since, true);
     },
     /** Speed (3 Nov): the first node that has it `confirmed` with no error says it landed, without waiting for the other
      *  (a confirmed status means a supermajority of the cluster voted on its block). status() stays the two-node verdict. */

@@ -40,8 +40,8 @@ test("item 4: Settings shows a 64-hex address short (Copy keeps it whole); a nam
   assert.equal(shortAddress(hex), "aaaaaa…cdef");
   assert.equal(shortAddress("zf-sample000001.testnet"), "zf-sample000001.testnet", "control: the phone's named account");
   assert.equal(shortAddress("A".repeat(64)), "A".repeat(64), "control: not NEAR's lower-case hex");
-  assert.match(settings, /<span className="set__id-text">\{shortAddress\(accountId\)\}<\/span>/);
-  assert.match(settings, /await navigator\.clipboard\.writeText\(accountId\);/, "Copy copies all of it");
+  // the copy review's S3 (7 Nov): Settings has no account card ("Your account · Change" led back to itself); the address is on Details
+  assert.doesNotMatch(settings, /set__acct|set__id-text|Label this account/);
   assert.equal(accountNameShown(null, true), "Your NEAR account");
   assert.equal(accountNameShown(null), "Your account", "control: the app's word");
   assert.equal(accountNameShown("Main", true), "Main");
@@ -60,7 +60,7 @@ test("item 7: Passwords sits in its own card, not inside Colors", () => {
   assert.ok(colors.length > 0);
   assert.doesNotMatch(colors, /Passwords|LOGINS_ON_PHONE_ONLY|MoreRows/, "the Colors card holds the colors only");
   const more = settings.slice(settings.indexOf("set__sec set__more"), settings.indexOf("{bridge && ("));
-  assert.match(more, /<span>Passwords<\/span><span>\{LOGINS_ON_PHONE_ONLY\}<\/span>/);
+  assert.match(more, /<span><span>Passwords<\/span><small>\{WEB_PASSWORDS_LINE\}<\/small><\/span><span>\{ON_IPHONE\}<\/span>/);
   assert.match(more, /<MoreRows onOpenSource=/);
 });
 
@@ -87,7 +87,9 @@ test("restore crawl (4 Nov): Terms never says open-source while the code isn't p
 
 test("restore crawl (4 Nov): on the web wallet Settings has no Passwords row that offers nothing: it opens its On iPhone page (bug report, 5 Nov late; control: elsewhere without the Keychain it says the phone has it)", () => {
   const panel = read("./shell/SettingsPanel.tsx");
-  assert.match(panel, /\) : webWallet\(\) \? \(\n\s+\/\/ the web wallet: never a row that offers nothing[^\n]*\n\s+<button className="set__row set__row--btn set__row--two set__row--val" onClick=\{\(\) => setPasswordsOnIphone\(true\)\}><span><span>Passwords<\/span><small>\{WEB_PASSWORDS_LINE\}<\/small><\/span><span>\{ON_IPHONE\}<\/span><\/button>\n\s+\) : \(\n\s+<div className="set__row"><span>Passwords<\/span><span>\{LOGINS_ON_PHONE_ONLY\}<\/span><\/div>/);
+  // the copy review's #7 (7 Nov): every browser (the Sim too) gets the row that opens its On iPhone page; no dead "In the iPhone app" row
+  assert.match(panel, /\) : \(\n\s+\/\/ any browser[^\n]*\n\s+<button className="set__row set__row--btn set__row--two set__row--val" onClick=\{\(\) => setPasswordsOnIphone\(true\)\}><span><span>Passwords<\/span><small>\{WEB_PASSWORDS_LINE\}<\/small><\/span><span>\{ON_IPHONE\}<\/span><\/button>\n\s+\)\}/);
+  assert.doesNotMatch(panel, /LOGINS_ON_PHONE_ONLY/);
   assert.match(panel, /if \(passwordsOnIphone\) return <Suspense fallback=\{null\}><OnIphoneSheet page=\{ON_IPHONE_PAGES\.passwords\} codeUrl=\{import\.meta\.env\.VITE_CODE_URL\} onClose=\{\(\) => setPasswordsOnIphone\(false\)\} \/><\/Suspense>;/, "the row opens its page");
   assert.match(panel, /\{logins \? \(\n\s+<button className="set__row set__row--btn" onClick=\{\(\) => setPasswords\(true\)\}><span>Passwords<\/span>/, "control: the phone's row");
 });

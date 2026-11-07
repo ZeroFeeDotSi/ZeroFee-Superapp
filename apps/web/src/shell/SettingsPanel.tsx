@@ -7,7 +7,7 @@ import { Back, Close } from "@zerofee/design/icons.tsx";
 import { useBack } from "@zerofee/design/back.ts";
 import { MAINNET, SIM, WEB_MODES, switchWebMode } from "../mode.ts";
 import { iosHost } from "../host/ios.ts";
-import { loginsClient, LOGINS_ON_PHONE_ONLY, type LoginsClient } from "../host/logins.ts";
+import { loginsClient, type LoginsClient } from "../host/logins.ts";
 import { PasswordsScreen } from "./PasswordsScreen.tsx";
 import { FaceIdRow } from "./FaceIdRow.tsx";
 import { QUICK_BUY_CHOICES, QUICK_BUY_DEFAULT, readQuickBuy, writeQuickBuy } from "@zerofee/trade/app/screens/quick-buy.ts";
@@ -15,7 +15,7 @@ import { QUICK_BUY_CHOICES, QUICK_BUY_DEFAULT, readQuickBuy, writeQuickBuy } fro
 const OpenSourceScreen = lazy(() => import("./OpenSourceScreen.tsx").then((m) => ({ default: m.OpenSourceScreen })));
 import { forApps, type Bridge } from "@zerofee/core/bridge";
 import { ConnectedSiteRows, useConnections } from "@zerofee/browser/app/SiteRows.tsx";
-import { ACCOUNT_NAME_KEY, ACCOUNT_NAME_MAX, DISCONNECT_SITES, MONEY_LABEL, accountNameShown, cleanAccountName, footerWords, forgetWords, moneyLine, shortAddress } from "./settings-words.ts";
+import { DISCONNECT_SITES, MONEY_LABEL, footerWords, forgetWords, moneyLine } from "./settings-words.ts";
 import { onPhone } from "@zerofee/shell-api/approval-words.ts";
 import { PUBLIC_RELEASE } from "@zerofee/shell-api/release.ts";
 import "@zerofee/design/sheet.css";
@@ -51,7 +51,7 @@ const NO_SITES: Bridge = { call: async () => ({ ok: [] as never }), on: () => ()
 
 /** `onStartOver` (the web demo): back to the first screen, set up again. `onBack`: opened from Home's Your account sheet,
  *  ‹ (and Escape) go back there; ✕ closes (k-security crawl, 4 Nov: Close landed on Home). */
-export function SettingsPanel({ accountId, onClose, onBack: backTo, onStartOver, logins = loginsClient(iosHost()), bridge }: { accountId: string; onClose: () => void; onBack?: () => void; onStartOver?: () => void; logins?: LoginsClient | null; bridge?: Bridge }) {
+export function SettingsPanel({ onClose, onBack: backTo, onStartOver, logins = loginsClient(iosHost()), bridge }: { accountId: string; onClose: () => void; onBack?: () => void; onStartOver?: () => void; logins?: LoginsClient | null; bridge?: Bridge }) {
   // ‹ closes Settings, then goes where it was opened from
   const onBack = backTo && (() => { onClose(); backTo(); });
   useBack(onBack ?? onClose);
@@ -65,34 +65,11 @@ export function SettingsPanel({ accountId, onClose, onBack: backTo, onStartOver,
   // Reset this iPhone (product decision, 2 Nov): deleting the app keeps the key in the chip; this is the full reset.
   const [reset, setReset] = useState<"ask" | "busy" | "not-done" | null>(null);
   const [openSource, setOpenSource] = useState(false);
-  // The account's name, kept on this device (the shell's own store); the raw id is an address, never shown as a name.
-  // Made once per bridge: a new one each render re-ran every hook keyed on it, for ever (grade 01c, P1).
-  const store = useMemo(() => (bridge ? forApps(bridge, "wallet") : null), [bridge]);
   const browser = useMemo(() => (bridge ? forApps(bridge, "browser") : NO_SITES), [bridge]);
   // Quick buy amount, kept in Trade's own slot (quick-buy.ts), so Settings writes it as Trade
   const trade = useMemo(() => (bridge ? forApps(bridge, "trade") : null), [bridge]);
   const [quick, setQuick] = useState(QUICK_BUY_DEFAULT);
   useEffect(() => { if (trade) void readQuickBuy(trade).then(setQuick); }, [trade]);
-  const [name, setName] = useState<string | null>(null);
-  const [naming, setNaming] = useState(false);
-  // The account's own address under its name, tap to copy (product decision, 2 Nov: on mainnet Settings didn't say which account
-  // this is, so he couldn't tell us): the name stays the person's; the address is what the network calls it.
-  const [copied, setCopied] = useState(false);
-  const copyId = async () => {
-    try {
-      await navigator.clipboard.writeText(accountId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      setCopied(false);
-    }
-  };
-  useEffect(() => {
-    let live = true;
-    if (!store) return;
-    void store.call<{ value: string | null }>("device.store.get", { key: ACCOUNT_NAME_KEY }).then((r) => live && "ok" in r && setName(r.ok.value));
-    return () => { live = false; };
-  }, [store]);
   const sites = useConnections(browser, !!bridge);
   if (passwords && logins) return <PasswordsScreen client={logins} onClose={() => setPasswords(false)} />;
   if (passwordsOnIphone) return <Suspense fallback={null}><OnIphoneSheet page={ON_IPHONE_PAGES.passwords} codeUrl={import.meta.env.VITE_CODE_URL} onClose={() => setPasswordsOnIphone(false)} /></Suspense>;
@@ -100,12 +77,6 @@ export function SettingsPanel({ accountId, onClose, onBack: backTo, onStartOver,
   const pick = (t: Theme) => {
     setTheme(t);
     applyTheme(t);
-  };
-  const keepName = (typed: string) => {
-    const clean = cleanAccountName(typed);
-    setName(clean || null);
-    setNaming(false);
-    void store?.call("device.store.set", { key: ACCOUNT_NAME_KEY, value: clean || null });
   };
   const forgetAll = async () => {
     for (const c of sites.list ?? []) await sites.disconnect(c.host);
@@ -186,20 +157,8 @@ export function SettingsPanel({ accountId, onClose, onBack: backTo, onStartOver,
         {/* the design review §4.9: one page of grouped sections. Each section is a header, one inset card and, where it
             helps, a footer; a destructive action stands alone at the end. R2: the account is the first card (Apple's
             account row): its name, its address under it, and the Copy chip. */}
-        <div className="zf-group set__acct">
-        {naming ? (
-          <input className="set__name" autoFocus maxLength={ACCOUNT_NAME_MAX} defaultValue={name ?? ""} placeholder="Label this account" aria-label="Account label"
-            onBlur={(e) => keepName(e.currentTarget.value)} onKeyDown={(e) => { if (e.key === "Enter") keepName(e.currentTarget.value); if (e.key === "Escape") setNaming(false); }} />
-        ) : (
-          <button className="set__name set__name--btn" onClick={() => setNaming(true)} aria-label="Account label, tap to change">{accountNameShown(name, webWallet())}</button>
-        )}
-        {accountId && (
-          <button className="set__id" onClick={() => void copyId()} aria-label="Your account's address, tap to copy">
-            <span className="set__id-text">{shortAddress(accountId)}</span>
-            <span className="set__id-copy zf-chip">{copied ? "Copied" : "Copy"}</span>
-          </button>
-        )}
-        </div>
+        {/* the copy review's S3 (7 Nov): no "Your account · Change" card here: Settings opens from Your account, so it led back to
+            itself. The Safe's address and its Copy are on Details. */}
         {/* The public web build's two modes (product decision, 3 Nov): Sim or Real; a switch starts the page again in the other */}
         {WEB_MODES && !onPhone() && (
           <section className="set__sec">
@@ -237,18 +196,16 @@ export function SettingsPanel({ accountId, onClose, onBack: backTo, onStartOver,
           <div className="zf-group">
             {logins ? (
               <button className="set__row set__row--btn" onClick={() => setPasswords(true)}><span>Passwords</span><span /></button>
-            ) : webWallet() ? (
-              // the web wallet: never a row that offers nothing (restore crawl, 4 Nov): it opens what Passwords is on iPhone
-              <button className="set__row set__row--btn set__row--two set__row--val" onClick={() => setPasswordsOnIphone(true)}><span><span>Passwords</span><small>{WEB_PASSWORDS_LINE}</small></span><span>{ON_IPHONE}</span></button>
             ) : (
-              <div className="set__row"><span>Passwords</span><span>{LOGINS_ON_PHONE_ONLY}</span></div>
+              // any browser (the Sim too, the copy review's #7, 7 Nov): never a row that offers nothing; it opens what Passwords is on iPhone
+              <button className="set__row set__row--btn set__row--two set__row--val" onClick={() => setPasswordsOnIphone(true)}><span><span>Passwords</span><small>{WEB_PASSWORDS_LINE}</small></span><span>{ON_IPHONE}</span></button>
             )}
             <MoreRows onOpenSource={() => setOpenSource(true)} />
           </div>
         </section>
         {bridge && (
           <section className="set__sec">
-            <h2 className="zf-label set__h">Sites</h2>
+            <h2 className="zf-label set__h">Site wallets</h2>
             <div className="zf-group set__sites">
               <ConnectedSiteRows bridge={browser} />
               {!!sites.list?.length && <button className="set__row set__row--btn" onClick={() => setForget(true)}><span>{DISCONNECT_SITES}</span><span /></button>}
@@ -275,7 +232,7 @@ export function SettingsPanel({ accountId, onClose, onBack: backTo, onStartOver,
             </div>
           </section>
         )}
-        <p className="zf-small set__foot">{footerWords(MAINNET, PUBLIC_RELEASE)}</p>
+        <p className="zf-small set__foot">{footerWords(MAINNET, PUBLIC_RELEASE, SIM)}</p>
       </aside>
     </div>
   );

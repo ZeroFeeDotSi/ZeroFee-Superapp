@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ProblemError } from "@zerofee/core/problem";
+import { securityProblems } from "@zerofee/core/security-problems";
 import { createJobRunner, GAS_TOPUP_MIN_USD, gasTopUps, KEY_FORMAT, randomJobId, type Job, type JobDeps, type MoveAnswer } from "./float-jobs.ts";
 
 /** A core that dedupes by key, like Security's: a repeat key returns the same move, never a second one. */
@@ -81,6 +82,20 @@ test("one move per chain at a time; other chains go alongside", async () => {
   await r.tick();
   await r.tick();
   assert.deepEqual(c.made, ["job-000000000001", "job-000000000003", "job-000000000002"], "Robinhood's second move goes once the first is done");
+});
+
+test("the audit's MUST (6 Nov): a Problem that leaves the money unknown (a plain throw inside float.out, security.unexpected.money) is never 'stayed': it stays asked and the next round asks again with the same key (control: a real refusal is stayed)", async () => {
+  const c = core();
+  let boom = true;
+  const x = deps(c, { out: async (a) => { const m = c.mk("out", a.key); if (boom) { boom = false; throw new ProblemError(securityProblems.unexpectedMoney("float.out", new Error("boom"))); } return m; } });
+  const r = createJobRunner(x.d);
+  await r.plan([{ kind: "out", chain: "sol", usd: 40, at: 0 }], () => undefined);
+  await r.tick();
+  const [j] = await r.list();
+  assert.deepEqual([j!.state, j!.stayed ?? false], ["asked", false], "never 'Nothing moved': its money is unknown");
+  await r.tick();
+  assert.deepEqual(c.made, ["job-000000000001"], "one move in all, asked again with the same key");
+  assert.deepEqual((await r.list()).map((x) => [x.state, x.moveId]), [["moving", "m1"]]);
 });
 
 test("a refusal (the fee guard, a minimum) leaves the money where it was, said in words; a refund says it came back", async () => {

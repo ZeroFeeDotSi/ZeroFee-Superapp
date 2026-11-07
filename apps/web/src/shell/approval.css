@@ -6,8 +6,10 @@
   position: absolute; inset: 0; height: 100%; box-sizing: border-box;
   display: flex; flex-direction: column; background: var(--bg);
   padding: calc(var(--zf-top, env(safe-area-inset-top, 0px)) + 14px) 0 calc(env(safe-area-inset-bottom, 0px) + 22px);
-  animation: appr-rise var(--dur-sheet) var(--ease-out) both;
 }
+/* the copy review's MUST (6 Nov): the sheet is an opaque --bg from its first frame, so nothing of the page under it ever shows through
+   (a-send-02: the form's keypad under "Check this"); only its content rises in. */
+.approval__sheet > * { animation: appr-rise var(--dur-sheet) var(--ease-out) both; }
 .approval__grab { flex: none; height: 8px; }  /* D135: a full screen has nothing to grab; the space stays */
 /* Every word breaks rather than runs off the edge: a long address or an unbroken `With: {…}` wraps. */
 .approval__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding: 0 var(--gutter); overflow-wrap: anywhere; word-break: break-word; }
@@ -39,7 +41,7 @@
 .approval__demo { font-size: 12px; color: var(--mute); text-align: center; margin: 6px 0 0; }
 @keyframes appr-rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes appr-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .approval__sheet, .approval__scrim { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .approval__sheet > *, .approval__scrim { animation: none; } }
 
 /* The web demo's simulated Face ID moment (ApprovalSheet.tsx): the phone's own glyph, then a tick, about a second. */
 .approval__faceid {
@@ -61,7 +63,6 @@
    filled card on the 16 radius, each row 16/500 tabular on the right, .5 hairlines inside. The title is the v2 title (28/500,
    tracked). A warning is its own soft alert-tinted block, never a red line lost among grey ones. The sheet rises on the
    glide spring like every sheet; Approve's arming line and the guard are untouched. */
-.approval__sheet { animation: appr-rise var(--dur-sheet) var(--ease-out) both; }
 .approval__title { font-size: var(--fs-title, 28px); font-weight: 500; letter-spacing: var(--tr-title, -.022em); line-height: 1.2; margin: 12px 0 8px; }
 .approval__amount { font-size: 17px; font-weight: 500; }
 .approval__line { color: var(--ink-2); }
@@ -95,8 +96,10 @@
    spaces), 15 px ink, wrapping freely, never ellipsised; the line saying where it lands quiet under it; tap to copy */
 .approval__to { margin: 6px 0 2px; }
 .approval__to-cap { display: block; font-size: 12px; line-height: 16px; color: var(--mute); }
-.approval__addr { display: block; width: 100%; margin: 2px 0 6px; padding: 0; border: 0; background: none; text-align: left; color: var(--ink); font: inherit; font-family: var(--zf-mono, ui-monospace, "SF Mono", Menlo, monospace); font-size: 15px; line-height: 22px; font-variant-numeric: tabular-nums; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; cursor: pointer; }
-.approval__addr-copied { font-family: var(--font); color: var(--mute); }
+.approval__addr { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; width: 100%; margin: 2px 0 6px; padding: 0; border: 0; background: none; text-align: left; color: var(--ink); font: inherit; font-family: var(--zf-mono, ui-monospace, "SF Mono", Menlo, monospace); font-size: 15px; line-height: 22px; font-variant-numeric: tabular-nums; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; cursor: pointer; }
+.approval__addr-text { min-width: 0; }
+.approval__addr-copy { flex: none; font: 600 15px/20px var(--font); color: var(--ink); }
 .approval__lands { color: var(--mute); }
 /* a Send fill sheet's first leg, what they get (the UI lead's ruling, 5 Nov): ink; the Safe's and Private's legs quiet */
 .approval__line.approval__lead { color: var(--ink); }
+.approval__kv span.approval__checking { color: var(--mute); }  /* over .approval__kv span:last-child's --ink (copy review: Checking in --mute) */

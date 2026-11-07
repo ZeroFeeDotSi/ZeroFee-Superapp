@@ -44,6 +44,7 @@ import type { ActivityItem } from "@zerofee/core/activity";
 import { securityProblems } from "@zerofee/core/security-problems";
 import { closedSince } from "@zerofee/core/money-closed";
 import { READS } from "@zerofee/core/read-deadline";
+import { movesNothing, readsOnly } from "@zerofee/core/money-calls";
 import type { DaoRole, NearProfile } from "@zerofee/core/chat-reads";
 /** ZeroFee Chat's NEAR reads, loaded when Chat first asks (never in Home's first load: apps/web speed-budget.test.ts). */
 const chatReads = () => import("@zerofee/core/chat-reads");
@@ -54,12 +55,12 @@ import { BridgeRefused, QuoteRefused, createApis, type Apis, type QuoteRequest, 
 import type { Fault, Service, ServiceHealth, ServiceStatus } from "@zerofee/core/services";
 import { Catalogue, NATIVE_NEAR, NEAR_DECIMALS, WRAPPED_NEAR, routeOf } from "./catalogue.ts";
 import { CONVERT_ROUTES, convertRequest, fundingSteps, originAsset, routeFor, type ConvertRoute, type Routes } from "./convert.ts";
-import { WRAP_STORAGE_YOCTO } from "./moves.ts";
+import { WRAP_STORAGE_YOCTO, wrapRegistered } from "./moves.ts";
 import { createReadCall, type ReadCall, type CallResult } from "./receipts.ts";
 import { ACCOUNT_ID, planSend, type SendPlan } from "./send.ts";
 import { EVM_CHAINS, validAddress, validReceiveAddress } from "./addresses.ts";
 import { PRIVATE_KIND, type Balance, type DepositAddress, type Movement, type PayQuote, type Payee, type PrivatePocket, type Quote, type RecipientInfo, type StartNetwork, type StartQuote } from "./types.ts";
-import { walletProblems } from "./wallet-problems.ts";
+import { failedProblem, refundPlace, walletProblems } from "./wallet-problems.ts";
 import { quoteDeadline } from "@zerofee/core/quote-deadline";
 
 /** A move out of Private as the core keeps it (subwallet.private.home / move). */
@@ -225,8 +226,7 @@ const NO_CODE = "11111111111111111111111111111111";
  * shape, and the core's own tally before it quotes a move in (what the pocket holds, recent moves in, and this one).
  */
 const PRIVATE_CAP_USD = 10_000;
-/** Security F2 / D34: the card wallet (subwallet kind "pay", Gnosis) holds at most this many dollars, at the catalogue's price. */
-const CARD_CAP_USD = 250;
+/** Security F2 / D34: the card wallet's cap (CARD_CAP_USD) is card-cap.ts's, loaded with a payment to a chain address. */
 
 /** Where a far-chain transaction can be looked at, for the networks with an explorer people know. */
 const EXPLORERS: Record<string, string> = {
@@ -237,6 +237,20 @@ const EXPLORERS: Record<string, string> = {
 
 /** An app that may call the ledger; the shell's own calls (no caller) count as Wallet's. */
 export type Caller = Exclude<Requester, "security">;
+/** Who gets several steps the account can't chain on ONE sheet (TxRequest.apart): ZeroFee's own Safe screens only, the
+ *  core's APART_FROM (dev-signer.ts). Any other caller: one sheet per step, as before. */
+export const APART_CALLERS: readonly Caller[] = ["wallet", "trade"];
+/** One approval for the whole plan where the account can chain steps (D14). Where it can't, ZeroFee's own Safe screens
+ *  still ask ONE approval: the steps as separate transactions on one sheet, one Face ID (TxRequest.apart, the audit's c, 7 Nov);
+ *  any other caller one approval per step, as before. */
+export function approvalsFor(steps: TxRequest[], canChain: boolean, caller?: string): TxRequest[] {
+  // R3 (audit, 6 Nov): at most four steps on an action's one sheet; more are refused, never split into more sheets
+  if (steps.length > 4) throw new ProblemError(walletProblems.tooManySteps());
+  if (steps.length < 2) return steps;
+  const one = { ...steps[steps.length - 1], receiverId: steps[0].receiverId, actions: steps[0].actions, then: steps.slice(1).map(({ receiverId, actions }) => ({ receiverId, actions })) };
+  if (canChain) return [one];
+  return caller !== undefined && (APART_CALLERS as readonly string[]).includes(caller) ? [{ ...one, apart: true as const }] : steps;
+}
 /** D146: the apps Spending's engine may sign a Top up for (core spending.ts CALLERS, Trade's own aside). */
 const SPENDING_FOR: ReadonlySet<string> = new Set(["wallet", "browser", "social", "chat", "agent"]);
 const CALLERS: readonly Caller[] = ["wallet", "pay", "trade", "extension", "browser", "social", "agent", "earn", "chat"];
@@ -989,15 +1003,11 @@ export function createLedgerService(d: LedgerDeps): Bridge {
     return { plan, accountId, cat, canChain: account?.codeHash === ACCOUNT_POLICY.codeHashBase58 };
   }
 
-  /** One approval for the whole plan where the account can chain steps (D14); otherwise one approval per step. */
-  const approvals = (steps: TxRequest[], canChain: boolean): TxRequest[] =>
-    canChain && steps.length > 1 && steps.length <= 4
-      ? [{ ...steps[steps.length - 1], receiverId: steps[0].receiverId, actions: steps[0].actions, then: steps.slice(1).map(({ receiverId, actions }) => ({ receiverId, actions })) }]
-      : steps;
+  const approvals = approvalsFor;
 
   /** Ask the core to sign each step in turn; a "no" or a Problem stops it. The movement is kept on the device. */
   async function execute(plan: SendPlan, kind: Movement["kind"], label: string | undefined, cat: Catalogue, canChain: boolean, me: string, caller: Caller, since?: number): Promise<Movement> {
-    const signed = await signAll(approvals(plan.steps, canChain), caller, since);
+    const signed = await signAll(approvals(plan.steps, canChain, caller), caller, since);
     const at = iso();
     const movement: Movement = {
       id: `${kind}:${signed.txHash}`,
@@ -1068,7 +1078,8 @@ export function createLedgerService(d: LedgerDeps): Bridge {
   async function landed(m: Movement, txHash: string, f: Follow): Promise<Movement> {
     const ended = ending(m, f.call ? await readBack(txHash, f) : { kind: "ran" }, f);
     const now = ended ?? { ...m, status: "moving" as const };
-    await remember(now);
+    // the send went: a write that fails here is never "Nothing moved" and a second go (audit, 6 Nov); the moving row comes back
+    try { await remember(now); } catch (e) { if (e instanceof ProblemError) throw e; }
     emit("ledger.balancesChanged", {});
     if (ended) await onward(ended, txHash, f);
     else readAgain(now, txHash, f);
@@ -1117,7 +1128,7 @@ export function createLedgerService(d: LedgerDeps): Bridge {
     }
     // Kept before this version (no `next`): nothing to follow it with, so the balance tells.
     if (!f?.next) return remember({ ...base, status: "problem", problem: walletProblems.holdUnknown() });
-    if (f.unsent) return remember({ ...base, status: "problem", problem: walletProblems.holdPartSent() });
+    if (f.unsent) return remember({ ...base, status: "problem", problem: walletProblems.holdPartSent(m.kind) });
     await landed(base, txHash, f);
   }
   own.on<{ id: string; ended: string; txHash?: string; explorerUrl?: string }>("account.waiting.ended", (e) => void settle(e.id, e.ended, e.txHash, e.explorerUrl).catch(() => {}));
@@ -1128,19 +1139,23 @@ export function createLedgerService(d: LedgerDeps): Bridge {
    */
   async function signAll(requests: TxRequest[], caller: Caller, since?: number): Promise<{ txHash: string; explorerUrls: string[]; hold?: Movement["held"]; unsent?: number }> {
     // the money sheet that asked was closed while this got ready (phone test, 3 Nov): no Approve, no Face ID, as a
-    // No; checked before the first request only, so nothing ever stops half-way once one is signed
+    // No; checked before the first request only, so nothing ever stops half-way once one is signed. Every Safe action
+    // passes its `since` now (bug report, 6 Nov: a Send's Safe sheet came after its money sheet was closed)
     if (since !== undefined && closedSince(since)) throw new ProblemError(walletProblems.declined());
     const explorerUrls: string[] = [];
     let txHash = "";
-    for (const request of requests) {
+    for (const [i, asked] of requests.entries()) {
+      // more of this action's signatures come after this one: the core says job.signed only for the last (bug)
+      const request: TxRequest = i < requests.length - 1 ? { ...asked, more: true } : asked;
       const r = await bridgeFor(caller).call<TxOutcome>("tx.request", { request });
       if ("problem" in r) throw new ProblemError(r.problem);
       const outcome = r.ok;
       if (outcome.status === "declined") throw new ProblemError(walletProblems.declined());
       if (outcome.status === "problem") throw new ProblemError(outcome.problem);
-      explorerUrls.push(outcome.explorerUrl);
+      // separate steps on one sheet (TxRequest.apart): every one the core sent, and the ones a hold left unsent
+      explorerUrls.push(...(outcome.explorerUrls ?? [outcome.explorerUrl]));
       txHash = outcome.txHash;
-      if (outcome.status === "waiting") return { txHash, explorerUrls, hold: { id: outcome.id, readyAtIso: outcome.readyAtIso, needsSecondDevice: outcome.needsSecondDevice }, unsent: requests.length - 1 - requests.indexOf(request) };
+      if (outcome.status === "waiting") return { txHash, explorerUrls, hold: { id: outcome.id, readyAtIso: outcome.readyAtIso, needsSecondDevice: outcome.needsSecondDevice }, unsent: requests.length - 1 - i + (outcome.unsent ?? 0) };
     }
     return { txHash, explorerUrls };
   }
@@ -1221,6 +1236,8 @@ export function createLedgerService(d: LedgerDeps): Bridge {
     convertQuotes.delete(quote.id);
     let registered = true;
     let storageYocto = WRAP_STORAGE_YOCTO;
+    const wraps = plan.route === "near-account" && quote.from === NATIVE_NEAR;
+    const meP = wraps ? wrapRegistered((c, m, a) => d.chain.view(c, m, a, plan.block), plan.accountId) : Promise.resolve(false);
     if (plan.route !== "intents" && plan.contract) {
       const [balance, bounds] = await Promise.all([
         d.chain.view(plan.contract, "storage_balance_of", { account_id: depositAddress }, plan.block),
@@ -1230,9 +1247,10 @@ export function createLedgerService(d: LedgerDeps): Bridge {
       const min = (bounds as { min?: unknown } | null)?.min;
       if (typeof min === "string" && /^\d+$/.test(min)) storageYocto = min;
     }
+    const meRegistered = await meP;
     const why = `Convert ${quote.amountIn} ${quote.from === NATIVE_NEAR ? "NEAR" : plan.fromCoin.symbol} to ${plan.toCoin.symbol}`;
-    const steps = fundingSteps(plan.route, { tokenId: quote.from, units: plan.units, depositAddress, registered, storageYocto, me: plan.accountId, why });
-    const signed = await signAll(approvals(steps, plan.canChain), caller, since);
+    const steps = fundingSteps(plan.route, { tokenId: quote.from, units: plan.units, depositAddress, registered, storageYocto, me: plan.accountId, meRegistered, why });
+    const signed = await signAll(approvals(steps, plan.canChain, caller), caller, since);
     const at = iso();
     const movement: Movement = {
       id: `convert:${signed.txHash}`,
@@ -1291,11 +1309,10 @@ export function createLedgerService(d: LedgerDeps): Bridge {
       };
       if (status === "SUCCESS") return end({ status: "done", problem: undefined, ...(m.kind === "swap" ? await swapGot(m, s?.swapDetails?.amountOut) : {}) });
       if (status === "REFUNDED") return end({ status: "refunded", problem: undefined });
-      // a Top up's refund goes to Spending's cash (the Add quote's refundTo), never the Safe's balance: its own words
-      if (status === "FAILED") return end({ status: "problem", problem: m.kind === "trading" ? walletProblems.topUpFailed(m.depositAddress ?? depositAddress) : walletProblems.convertFailed() });
+      if (status === "FAILED") return end({ status: "problem", problem: failedProblem(m, m.depositAddress ?? depositAddress) });
       if (!stuckSaid && (status === "PENDING_DEPOSIT" || status === "") && now() - Date.parse(m.startedAtIso) > CONVERT_STUCK_MS) {
         stuckSaid = true;
-        await remember({ ...m, updatedAtIso: iso(), problem: walletProblems.convertStuck() });
+        await remember({ ...m, updatedAtIso: iso(), problem: walletProblems.convertStuck(refundPlace(m)) });
       }
     }, d.trackMs ?? 10_000);
     (timer as unknown as { unref?: () => void }).unref?.();
@@ -1385,31 +1402,8 @@ export function createLedgerService(d: LedgerDeps): Bridge {
    * holds over $250 is refused here, before anything is read for a plan or signed. Priced from the catalogue, as the
    * Private cap is. What the wallet holds, or a price, can't be read: refused too (never a guess).
    */
-  async function cardCap(to: Payee, tokenId: string, amount: string): Promise<void> {
-    if (to.kind !== "chain") return;
-    const listed = await own.call<{ id?: unknown; kind?: unknown; address?: unknown }[]>("subwallet.list", { kind: "pay" });
-    const same = (a: string) => a.trim().toLowerCase() === to.address.trim().toLowerCase();
-    const card = "ok" in listed && Array.isArray(listed.ok) ? listed.ok.find((w) => w?.kind === "pay" && typeof w.id === "string" && typeof w.address === "string" && same(w.address)) : undefined;
-    if (!card) return;
-    // a cap in dollars is checked at a price read now, never one kept on the device (B28)
-    const cat = await catalogue({ live: true });
-    const incoming = cat.coin(tokenId);
-    const adding = incoming ? Number(usdOf(amount, incoming.priceUsd) ?? NaN) : NaN;
-    const read = await own.call<{ token?: unknown; decimals?: unknown; amount?: unknown }[]>("subwallet.balances", { id: card.id });
-    if (!Number.isFinite(adding) || !("ok" in read) || !Array.isArray(read.ok)) throw new ProblemError(walletProblems.quoteUnavailable("Gnosis or NEAR Intents didn't answer, so your card wallet isn't read. Nothing moved."));
-    let held = 0;
-    for (const row of read.ok) {
-      const raw = typeof row?.amount === "string" && /^\d+$/.test(row.amount) ? BigInt(row.amount) : null;
-      if (raw === null || typeof row.decimals !== "number") throw new ProblemError(walletProblems.quoteUnavailable("Gnosis didn't answer, so your card wallet isn't read. Nothing moved."));
-      if (raw === 0n) continue;
-      const token = String(row.token).toLowerCase();
-      const coin = [...cat.tokens()].find((t) => t.chain === "gnosis" && (token === "native" ? t.contract === null && t.symbol.toUpperCase() === "XDAI" : t.contract?.toLowerCase() === token));
-      const usd = coin ? Number(usdOf(fromUnits(raw, row.decimals), coin.priceUsd) ?? NaN) : NaN;
-      if (!Number.isFinite(usd)) throw new ProblemError(walletProblems.quoteUnavailable("A coin in the card wallet has no price."));
-      held += usd;
-    }
-    if (held + adding > CARD_CAP_USD + 1e-9) throw new ProblemError(walletProblems.cardCap(CARD_CAP_USD, held.toFixed(2), Math.max(0, CARD_CAP_USD - held).toFixed(2)));
-  }
+  // the card wallet's cap (B28), loaded only with a payment to a chain address (the speed budget, 7 Nov: off Home's first load)
+  const cardCap = async (to: Payee, tokenId: string, amount: string): Promise<void> => (await import("./card-cap.ts")).cardCap({ own, catalogue }, to, tokenId, amount);
 
   async function withdraw(p: Record<string, unknown>, caller: Caller): Promise<Movement> {
     const since = Date.now();
@@ -1448,7 +1442,7 @@ export function createLedgerService(d: LedgerDeps): Bridge {
     // Paying in a different coin needs 1Click's route, which waits for the test mainnet proof.
     if (fromTokenId !== toTokenId) throw new ProblemError(walletProblems.quoteUnavailable("Paying in a different coin isn't open yet."));
     const { plan, accountId, cat, canChain } = await prepare(fromTokenId, amountOut, to, undefined, why.pay(amountOut, payeeText(to)), undefined, caller);
-    const asks = approvals(plan.steps, canChain);
+    const asks = approvals(plan.steps, canChain, caller);
     const { protection, fee: feeMost, amount: amountSaid } = await protectionFor(asks, caller);
     const fee = fromUnits(plan.fee, plan.decimals);
     const chainName = to.kind === "chain" ? cat.network(to.chain)?.name ?? to.chain : "";
@@ -1574,7 +1568,7 @@ export function createLedgerService(d: LedgerDeps): Bridge {
   // (send-job.ts). Their code loads with the first Send, or with Activity's first read when a Send is still saved on this
   // device (a restart), never in Home's first load.
   let jobsCode: Promise<import("./send-job.ts").SendJobs> | null = null;
-  const sendJobs = () => (jobsCode ??= import("./send-job.ts").then((m) => m.createSendJobs({ apis, relayed, remember, note, forget, loadMovements, emit, stored, store, serially, iso, now, trackMs: d.trackMs, ended: (id) => void sweepHome(id) })));
+  const sendJobs = () => (jobsCode ??= import("./send-job.ts").then((m) => m.createSendJobs({ apis, relayed, remember, note, forget, loadMovements, emit, stored, store, serially, iso, now, trackMs: d.trackMs, ended: (id) => void sweepHome(id), pairHand: (inDeposit, outDeposit) => core<{ handed: boolean }>("subwallet.pairHand", { inDeposit, ...(outDeposit ? { outDeposit } : {}) }), pairEnd: (inDeposit, outDeposit) => core("subwallet.pairEnd", { inDeposit, ...(outDeposit ? { outDeposit } : {}) }) })));
   /** What both of Home's Send paths are handed, once. */
   // (b): whether a NEAR account is set up on a coin's own contract, read on the nodes before a Send to it is priced
   const registered = async (contract: string, accountId: string): Promise<boolean> => (await d.chain.view(contract, "storage_balance_of", { account_id: accountId }, await d.chain.commonBlock())) !== null;
@@ -1592,7 +1586,7 @@ export function createLedgerService(d: LedgerDeps): Bridge {
   const safeSends = () =>
     (safeSendCode ??= import("./safe-send.ts").then((m) => m.createSafeSend({
       ...sendDeps(), routeOpen: () => routes.nearOrigin === true, privatePlan, payIntoPocket: payIntoPocket as never, originAsset,
-      followHeld: async (movementId, signer, unsent) => void (await followLater(movementId, { signer, to: "your private balance", next: { kind: "job" }, ...(unsent ? { unsent } : {}) })),
+      followHeld: async (movementId, signer, unsent) => void (await followLater(movementId, { signer, to: "Private", next: { kind: "job" }, ...(unsent ? { unsent } : {}) })),
     })));
   /** The payee is one of the person's own wallets, as the core lists them (never one the replaced backup words open): the
    *  only payee a Send's fill may still pay while SAFE_SEND_FILL_OPEN is shut. A list that can't be read: not own. */
@@ -1623,6 +1617,7 @@ export function createLedgerService(d: LedgerDeps): Bridge {
   let privateMoveCode: Promise<ReturnType<typeof import("./private-move.ts").createPrivateMove>> | null = null;
   const privateMoves = () => (privateMoveCode ??= import("./private-move.ts").then((m) => m.createPrivateMove({
     core, catalogue: () => catalogue(), sends: safeSends, originAsset, fillOpen, usdc: TRADING_USDC, stored, store, serially, loadMovements, resume: resumeSends, now, notForChild, spendingFor: SPENDING_FOR, trade: () => bridgeFor("trade"),
+    settleLate: async (id: string) => (await sendJobs()).settleLate(id),
   })));
   const moveFromPrivate = async (p: Record<string, unknown>, caller: Caller): Promise<unknown> => (await privateMoves()).moveFromPrivate(p, caller);
   const privateMoveStatus = async (p: Record<string, unknown>): Promise<unknown> => (await privateMoves()).privateMoveStatus(p);
@@ -1725,10 +1720,13 @@ export function createLedgerService(d: LedgerDeps): Bridge {
     await notForChild();
     if (!(await pocketOf()) || !d.privateQuotes) throw new ProblemError(walletProblems.privateUnavailable());
     const { rows } = await privatePocket();
+    const cat = await catalogue();
     // its code (private-pay.ts) loads with its first use, never in Home's first load (speed budget, 3 Nov)
     return (await import("./private-pay.ts")).fromPrivate(p, caller, {
       rows, status: pocketStatus, remember, emit, iso,
-      home: (tokenId, key) => bridgeFor(caller).call<PocketMove>("subwallet.private.home", { tokenId, amount: "all", key }),
+      // the rows' own decimals (privatePocket's toRow), so a sheet's `upTo` is read as the rows said it
+      decimals: (tokenId) => cat.coin(tokenId)?.decimals ?? 0,
+      home: (tokenId, key, amount) => bridgeFor(caller).call<PocketMove>("subwallet.private.home", { tokenId, amount, key }),
     });
   }
 
@@ -1790,7 +1788,7 @@ export function createLedgerService(d: LedgerDeps): Bridge {
       myAccount, pocketOf, privateQuotes: d.privateQuotes, routeOpen: () => routes.nearOrigin === true, catalogue, chain: d.chain, accountCoins: ACCOUNT_COINS, capUsd: PRIVATE_CAP_USD,
       spendable, notForChild, askPrivate, bridgeFor: bridgeFor as never, signAll: signAll as never, approvals, now, iso, quoteTtlMs: CONVERT_QUOTE_TTL_MS,
       finish: async (movement, signed, o) => {
-        const f: Follow = { signer: o.signer, to: "your private balance", next: { kind: "quote", depositAddress: o.depositAddress, sender: o.sender, via: relayed }, ...(signed.unsent ? { unsent: signed.unsent } : {}) };
+        const f: Follow = { signer: o.signer, to: "Private", next: { kind: "quote", depositAddress: o.depositAddress, sender: o.sender, via: relayed }, ...(signed.unsent ? { unsent: signed.unsent } : {}) };
         if (!signed.hold) return landed(movement, signed.txHash, f);
         await remember(movement);
         await followLater(movement.id, f);
@@ -1855,7 +1853,12 @@ export function createLedgerService(d: LedgerDeps): Bridge {
     if ("problem" in r) throw new ProblemError(r.problem);
     const q = checkAddQuote(r.ok, wanted, now());
     const contract = nep141Contract(paid)!;
-    const [balance, bounds] = await Promise.all([d.chain.view(contract, "storage_balance_of", { account_id: q.depositAddress }, block), d.chain.view(contract, "storage_balance_bounds", {}, block)]);
+    const [balance, bounds, meRegistered] = await Promise.all([
+      d.chain.view(contract, "storage_balance_of", { account_id: q.depositAddress }, block),
+      d.chain.view(contract, "storage_balance_bounds", {}, block),
+      // NEAR on the account: the Safe's own wrap.near storage step only when it isn't set up there (or unknown)
+      native ? wrapRegistered((c, m, a) => d.chain.view(c, m, a, block), accountId) : Promise.resolve(false),
+    ]);
     const min = (bounds as { min?: unknown } | null)?.min;
     const storageYocto = typeof min === "string" && /^\d+$/.test(min) ? min : WRAP_STORAGE_YOCTO;
     const why = `Move ${amount} ${coin.symbol} to your NEAR wallet`;
@@ -1863,8 +1866,8 @@ export function createLedgerService(d: LedgerDeps): Bridge {
     const route: ConvertRoute = native ? "near-account" : "near-ledger";
     // Home's Move: where it goes on from the NEAR wallet, the asking app's words on the sheet (never signed)
     const onward = typeof p.onward === "string" && p.onward.length <= 120 ? p.onward : undefined;
-    const steps = fundingSteps(route, { tokenId, units: wanted, depositAddress: q.depositAddress, registered: balance !== null, storageYocto, me: accountId, why }).map((s, i, all) => (onward && i === all.length - 1 ? { ...s, onward } : s));
-    const signed = await signAll(approvals(steps, account?.codeHash === ACCOUNT_POLICY.codeHashBase58), signer, since);
+    const steps = fundingSteps(route, { tokenId, units: wanted, depositAddress: q.depositAddress, registered: balance !== null, storageYocto, me: accountId, meRegistered, why }).map((s, i, all) => ({ ...(onward && i === all.length - 1 ? { ...s, onward } : s), ...(job ? { job } : {}) }));
+    const signed = await signAll(approvals(steps, account?.codeHash === ACCOUNT_POLICY.codeHashBase58, signer), signer, since);
     const at = iso();
     const movement: Movement = {
       id: `trading:${signed.txHash}`,
@@ -1969,6 +1972,9 @@ export function createLedgerService(d: LedgerDeps): Bridge {
     // Home's Sends are saved jobs: a restart follows each again to its own end. One with no job left (an older version
     // kept its payment in memory) is "It may have gone", never "nothing was paid" (security review H1).
     await resumeSends().catch(() => undefined);
+    // a Send's payment that ended slow, its money on its way to Private: leg 1 asked about again, so its row ends the same
+    // way a Move's part does (send-job settleLates, 83, 6 Nov); send-job's code loads only when there is one
+    if ((await loadMovements()).some((m) => m.status === "problem" && m.problem?.code === "ledger.send.slow")) await (await sendJobs()).settleLates().catch(() => undefined);
     // M5: once a run, what the pocket holds goes home to the Safe (no Send still needs it: sweepHome checks)
     if (!sweptAtStart) {
       sweptAtStart = true;
@@ -2165,7 +2171,7 @@ export function createLedgerService(d: LedgerDeps): Bridge {
         failedBy.delete(method);
         return { ok };
       } catch (e) {
-        const problem = asProblem(e);
+        const problem = asProblem(e, method);
         if (problem.service) {
           fail(problem.service, problem.fault ?? "down");
           failedBy.set(method, (failedBy.get(method) ?? new Set()).add(problem.service));
@@ -2237,13 +2243,15 @@ function depositMovement(dep: BridgeDeposit, cat: Catalogue, seenIso: string): M
 }
 
 /** The core's two-node Problems, in the ledger's own words; anything unexpected never leaks as a raw error. */
-export function asProblem(e: unknown): Problem {
+export function asProblem(e: unknown, method?: string): Problem {
   if (e instanceof ProblemError) {
     if (e.problem.code === "security.nodes.disagree") return walletProblems.nodesDisagree();
     if (e.problem.code === "security.nodes.unreachable") return walletProblems.nodesUnreachable(e.problem.fault ?? "down");
-    return e.problem;
+    // a read's plain throw inside a money call (its core read): "Nothing was sent" is only that read's
+    return !movesNothing(method) && readsOnly(e.problem) ? walletProblems.unexpectedMoney(e.problem.more ?? "") : e.problem;
   }
-  return walletProblems.unexpected(e instanceof Error ? e.message : String(e));
+  const detail = e instanceof Error ? e.message : String(e);
+  return movesNothing(method) ? walletProblems.unexpected(detail) : walletProblems.unexpectedMoney(detail);
 }
 
 function cleanMetadata(m: any): { symbol: string; decimals: number } | null {

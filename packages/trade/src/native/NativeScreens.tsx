@@ -40,7 +40,7 @@ import { SAFE_FILL_OPEN } from "@zerofee/core/safe-fill-open";
 import { NATIVE_WORDS, amountIn, askQuote, buyTitle, heldOf, privateHas, quoteLive, safeFills, resultOf, runSwap, sellStart, sellTitle, type HeldRow, type SafeQuote, type SwapRecord, type SwapView } from "./swap.ts";
 import { NATIVE_COPY as W } from "./words.ts";
 
-const RELAY = relayBase((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_RELAY);
+const RELAY = relayBase(import.meta.env?.VITE_ZEROFEE_RELAY);
 const logo = (r: Pick<NativeRow, "logo" | "gt"> | undefined, small = true) => logoVia(RELAY, r?.logo, small, r?.gt);
 const visible = () => typeof document === "undefined" || document.visibilityState === "visible";
 

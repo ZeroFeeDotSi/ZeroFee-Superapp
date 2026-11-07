@@ -745,14 +745,16 @@ const MARKET_TOOLS = new Set(["market_price", "market_trending", "quote_dry", "s
 export const toolLimit = (name: string): number => (MARKET_TOOLS.has(name) ? LIMITS.read : LIMITS.core);
 
 /** The person's own key: straight to Anthropic from this device. Its code (own-claude.ts: the Anthropic SDK, the key's
- *  header, Anthropic's address) is loaded only when a turn has a key, and the public web build leaves it out entirely:
- *  the flag is read inline, as Vite replaces it, so the build drops the import and everything behind it (the public
- *  site never holds a key; the funded-wallet relay path below needs none of it). */
+ *  header, Anthropic's address) is loaded only when a turn has a key, and only a build with the developer switch has it
+ *  at all (own-key.ts: VITE_AGENTZERO_OWN_KEY=1, never the public web): the flags are read inline, as Vite replaces
+ *  them, so every other build (the phone's, the Sim, the public site) drops the import and everything behind it (audit, 7 Nov:
+ *  the test phone bundle carried own-claude.ts, switched off). The funded-wallet relay path below needs none of it.
+ *  A test run (node: no import.meta.env, so no MODE) keeps the path, so a test can hand chatTurn a key. */
 type OwnClaude = typeof import("./own-claude.ts");
 let ownLoaded: OwnClaude | null = null;
 async function ownClaude(): Promise<OwnClaude> {
-  if ((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_PUBLIC !== "1") return (ownLoaded ??= await import("./own-claude.ts"));
-  throw new Error("An own Claude key isn't used on the public web.");
+  if (import.meta.env?.MODE === undefined || (import.meta.env?.VITE_AGENTZERO_OWN_KEY === "1" && import.meta.env?.VITE_ZEROFEE_PUBLIC !== "1")) return (ownLoaded ??= await import("./own-claude.ts"));
+  throw new Error("An own Claude key is only in a developer build.");
 }
 export const ownClientFor = async (key: string, anthropicFetch?: typeof fetch) => (await ownClaude()).ownClientFor(key, anthropicFetch);
 /** No key now (removed, or the free reading): the client and the key it held are dropped. */
@@ -938,8 +940,10 @@ export async function* chatTurn(history: ChatMessage[], words: string, o: ChatOp
     if (quick.sheet) yield { kind: "needs-you", why: "home", sheet: { kind: "home", ...quick.sheet } };
     return yield { kind: "done", history: [...history, { role: "user", content: said }, { role: "assistant", content: `ZeroFee said: ${quick.line}` }] };
   }
-  // the person's own key only where there is a key path at all: never in the public web build (read inline, so that build drops it)
-  const own = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_PUBLIC !== "1" ? o.ownKey?.trim() || null : null;
+  // the person's own key only where there is a key path at all: a developer build or a test run (ownClaude above; read
+  // inline, so every other build drops it). use-chat-turn.ts hands a key only when OWN_KEY_ON, so no build people get
+  // ever had a key here: this gate only lets those builds drop the code.
+  const own = import.meta.env?.MODE === undefined || (import.meta.env?.VITE_AGENTZERO_OWN_KEY === "1" && import.meta.env?.VITE_ZEROFEE_PUBLIC !== "1") ? o.ownKey?.trim() || null : null;
   const choice = claudeChoice({ model: o.model, effort: o.effort });
   if (!own) dropOwnClient();
   const doFetch = o.fetch ?? fetch;

@@ -23,8 +23,9 @@ export function cleanAccountName(typed: string | null | undefined): string {
 
 /** The footer, true per network (grade 01d Q5): the version on mainnet and in the demo; on the test network, that it
  *  moves test money (it does send it), never "nothing is sent". */
-export function footerWords(mainnet: boolean, webDemo = false): string {
-  return mainnet || webDemo ? "Version 0.1" : "Test network · test money";
+export function footerWords(mainnet: boolean, webDemo = false, sim = false): string {
+  // the copy review's S3 (7 Nov): the Sim's money is sample money, never "Test network"
+  return mainnet || webDemo ? "Version 0.1" : sim ? "Sample money" : "Test network · test money";
 }
 
 /** What the row and its sheet are called: what it does, sites lose sight of the wallet, never "Forget this device"

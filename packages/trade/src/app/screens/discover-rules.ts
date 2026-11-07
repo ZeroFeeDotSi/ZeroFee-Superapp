@@ -4,7 +4,8 @@ import { changeIn, type ListWindow } from "../movers.ts";
 
 export type Win = ListWindow | "new";
 /** The same six lists on every chain, so nothing moves under a finger ("Hot" is GeckoTerminal's trending order). */
-export const LISTS: [Win, string][] = [["trending", "Hot"], ["new", "New"], ["m5", "5m"], ["h1", "1h"], ["h6", "6h"], ["h24", "24h"]];
+// the copy review's final words (7 Nov, T3): the windows worded, as the coin page's chips are
+export const LISTS: [Win, string][] = [["trending", "Hot"], ["new", "New"], ["m5", "5 min"], ["h1", "1 hour"], ["h6", "6 hours"], ["h24", "24 hours"]];
 /** A coin up or down this much over the window shown may glow in its own colour… */
 export const HOT_PCT = 25;
 /** …and only the few that moved most do (ambient, never a wall of light). */

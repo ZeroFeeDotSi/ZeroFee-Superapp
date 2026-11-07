@@ -57,17 +57,17 @@ test("the Sim's fill sheet as every outside sheet (the audit's D37 condition, th
     return words as unknown as { lines: string[]; details?: { lines: string[] }[] };
   };
   const w = await sheetOf("25", true);
-  assert.deepEqual(w.lines.slice(0, 2), [`To ${STRANGER}`, "Public on Solana."], w.lines.join(" | "));
+  assert.deepEqual(w.lines.slice(0, 2), [`To ${STRANGER}`, "Public on Solana. Anyone can see the Safe's part on NEAR."], w.lines.join(" | ")); // the copy review (6 Nov): one public line
   // the UI lead's rulings (5 Nov), as the real core's sheet: what they get once (the coin, then the dollars), then what
   // the Safe sends, then what stays
-  assert.deepEqual(w.lines.filter((l) => /^(They get|Your Safe sends|From your Safe|Stays in Private|Together) · /.test(l)), ["They get · 0.2432 SOL ($24.75)", "Your Safe sends · $30.00", "Stays in Private · $5.00"], w.lines.join(" | "));
+  assert.deepEqual(w.lines.filter((l) => /^(They get|Your Safe sends|From your Safe|Private keeps the rest|Stays in Private|Together) · /.test(l)), ["They get · 0.2432 SOL (about $24.75)", "From your Safe · $30.00", "Private keeps the rest · about $5.00"], w.lines.join(" | "));
   assert.equal(w.lines.filter((l) => /They get/.test(l)).length, 1, `"They get" said exactly once: ${w.lines.join(" | ")}`);
   assert.ok(!w.lines.some((l) => l.includes("…")) && w.details === undefined, "no short form, no fold");
   const plain = await sheetOf("5", false);
   assert.equal(plain.lines[0], "To 13Qkxh…r6gjRK on Solana. Public on Solana.", "control: the plain Send's landed line");
 });
 
-test("the audit's ruling (5 Nov), the Sim as the real core: a fill whose payout coin the Sim can't name or price is refused BEFORE the sheet, never a dollars-only \"They get · $25.00\"; nothing leaves (control: a named, priced coin shows \"They get · <coin> ($25.00)\")", async () => {
+test("the audit's ruling (5 Nov), the Sim as the real core: a fill whose payout coin the Sim can't name or price is refused BEFORE the sheet, never a dollars-only \"They get · $25.00\"; nothing leaves (control: a named, priced coin shows \"They get · <coin> (about $25.00)\")", async () => {
   const mock = createMockBridge({ latencyMs: 0, settleMs: 5, hiddenStart: { usdc: "0", near: "0" } });
   const asked: unknown[] = [];
   mock.on<{ id: string }>("approval.needed", (e) => { asked.push(e); void mock.call("approval.answer", { id: e.id, approve: false }); });
@@ -83,5 +83,5 @@ test("the audit's ruling (5 Nov), the Sim as the real core: a fill whose payout 
   let lines: string[] = [];
   named.on<{ id: string; words: { lines: string[] } }>("approval.needed", (e) => { lines = e.words.lines; void named.call("approval.answer", { id: e.id, approve: false }); });
   await send(named, "25");
-  assert.match(lines.find((l) => l.startsWith("They get"))!, /^They get · \d[\d.]* SOL \(\$24\.75\)$/, lines.join(" | "));
+  assert.match(lines.find((l) => l.startsWith("They get"))!, /^They get · \d[\d.]* SOL \(about \$24\.75\)$/, lines.join(" | "));
 });

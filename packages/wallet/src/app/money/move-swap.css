@@ -139,7 +139,6 @@
    G3 hero (the total in T1, one T6 line), the 8 pt ribbon, then ONE inset card of places: icon, name and its new dollars
    once, "was $…" under the name only for a place that changes, the slider under them; a place nothing can move has no
    slider, just its line. Card and button edges on x = 16 (the grouped gutter). The privacy line is a disclosure row. */
-.zf-sheet__content:has(> .wl-mv-hero) { --gutter: 24px; padding-left: 24px; padding-right: 24px; }
 .wl-mv-hero { text-align: center; margin: 4px 0 20px; }
 .wl-mv-hero .wl-mv-total { margin: 0; font: 500 56px/60px var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.035em; font-variant-numeric: tabular-nums; color: var(--ink); }
 .wl-mv-lead { margin: 4px 0 0; min-height: 20px; font: 400 15px/20px var(--font); color: var(--mute); }
@@ -153,6 +152,9 @@
 .wl-mv-name .t { font: 400 17px/22px var(--font); color: var(--ink); }
 .wl-mv-name .wl-mv-now { font: 400 15px/20px var(--font); color: var(--mute); text-align: left; }
 .wl-mv-row .wl-mv-usd { font: 500 17px/22px var(--font); font-variant-numeric: tabular-nums; min-width: 0; color: var(--ink); }
+/* A2-3: what Move doesn't take (one-total.ts): a still row, its figure as the places' (no slider, no field) */
+.wl-mv-outside .wl-mv-outside__usd { font: 500 17px/22px var(--font); font-variant-numeric: tabular-nums; color: var(--ink); text-align: right; }
+.wl-mv-outside { padding-bottom: 12px; }
 /* finding 17: the figure is a field that reads as the figure, with a hairline under it that says it can be typed */
 .wl-mv-row .wl-mv-type { width: 9ch; padding: 0 0 1px; border: 0; border-bottom: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent); border-radius: 0; background: transparent; text-align: right; -webkit-appearance: none; appearance: none; }
 .wl-mv-row .wl-mv-type:focus { outline: none; box-shadow: none; border-bottom: 1px solid var(--ink); }  /* a-nav-5: the global inset ring is off here; the line under the figure is the cue */
@@ -176,13 +178,6 @@
 .wl-mv-who__q[aria-expanded="true"]::after { transform: rotate(-135deg) translateY(-2px); }
 .wl-mv-who .wl-mv-foot { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) { .wl-mv-who__q::after { transition: none; } }
-/* the line right above Move (why it can't go, or a leg that didn't go) rides the floor with it: on a long plan it never
-   scrolls away from the button it is about (errors sit right above their button) */
-.zf-sheet__content:has(> .wl-mv-hero) > :is(.wl-mv-why, .zf-money__line):has(+ .wl-sheet-go) { position: sticky; bottom: 74px; z-index: 1; margin: 0 0 24px; padding: 8px 16px; background: var(--bg); text-align: left; }
-/* QA's check of Move (6 Nov, the Swap ruling): the fee block now stands between that line and the button, so a refusal fell to the
-   long plan's end, off the first frame. It rides the floor over the fee block (wallet.css pins that at 64 + 62) */
-.zf-sheet__content:has(> .wl-mv-hero) > :is(.wl-mv-why, .zf-money__line):has(+ .zf-fee) { position: sticky; bottom: 126px; z-index: 2; margin: 0; padding: 8px 16px; background: var(--bg); box-shadow: none; border-radius: 0; text-align: left; }
-.zf-sheet__content:has(> .wl-mv-hero) > .zf-money__line:has(+ .wl-mv-why) { position: sticky; bottom: 174px; z-index: 2; margin: 0; padding: 8px 16px; background: var(--bg); box-shadow: none; border-radius: 0; text-align: left; }
 /* one progress device (the design review change 8): a leg's row says "On its way", then a drawn ✓ and "Done"; no fill bar */
 .zf-group .wl-mv-leg__fill { display: none; }
 .zf-group .wl-mv-leg.is-done .wl-mv-leg__s::before { content: ""; display: inline-block; width: 9px; height: 5px; margin: 0 7px 3px 1px; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); clip-path: inset(0 100% 0 0); animation: wl-mv-tick var(--dur-base) var(--ease-out) forwards; }
@@ -234,10 +229,13 @@
 .wl-swap2__line { min-height: 36px; padding: 0 16px; display: flex; flex-direction: column; justify-content: center; color: var(--ink-2); text-align: center; font: 400 13px/18px var(--font); }
 .wl-swap2__line > p { margin: 0; font: inherit; color: inherit; }
 .wl-swap2__line > .zf-money__line { padding: 0; background: none; box-shadow: none; }
-.wl-swap2__line > [role="alert"], .wl-swap2__line > [data-testid="swap-why"] { color: var(--ink); }
+.wl-swap2__line > [role="alert"], .wl-swap2__line > [data-testid="swap-why"], .wl-swap2__line > [data-testid="move-why"] { color: var(--ink); }
 /* "Who can see this?" as a link at the line's end; a 44 pt tap (13 over, 13 under), which the floor's air keeps off the keys */
 .wl-swap2__who { position: relative; display: inline; min-height: 0; padding: 0; border: 0; background: none; color: var(--ink); font: 500 13px/18px var(--font); text-decoration: underline; white-space: nowrap; cursor: pointer; }
 .wl-swap2__who::before { content: ""; position: absolute; inset: -13px 0; }
+/* T2-1 (the copy review's walk, 8 Nov): on the Move sheet "Who can see this?" is a real 44 px row, its text 15 px, 13 px over and under */
+.wl-mv2__who { display: block; width: 100%; min-height: 44px; padding: 13px 0; font: 500 15px/18px var(--font); }
+.wl-mv2__who::before { content: none; }
 .wl-swap2__floor > .zf-fee { min-height: 54px; }
 .wl-swap2__floor > .wl-sheet-go { flex: none; width: 100%; margin: 0; }
 /* a small phone (390 x 664): the dollars come down a step, as Send's, and the pickers and the floor sit tighter, so the keys stay on the first frame */
@@ -251,6 +249,24 @@
   .wl-swap2__scroll > .zf-keypad button::before { width: 30px; height: 30px; margin: -15px; }   /* a key's press disc stays inside its row: it can't make the box scroll */
 }
 .wl-swap2__floor > .wl-sheet-go:disabled:not(.is-busy), .wl-swap2__floor > .wl-sheet-go.is-idle { background: var(--fill); background-image: none; color: var(--mute); opacity: 1; box-shadow: inset 0 0 0 1px var(--line); }
+/* Move, the same floor (the UI reviewer's ruling, 6 Nov): its rows and plan are the box that scrolls; .wl-swap2__floor is the floor */
+.wl-mv2__scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: none; scrollbar-width: none; margin: -16px calc(-1 * var(--gutter, 24px)) 0; padding: 16px var(--gutter, 24px) 20px; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16px); mask-image: linear-gradient(to bottom, transparent, #000 16px); }
+.wl-mv2__scroll::-webkit-scrollbar { display: none; }
+/* QA (6 Nov): a knob was cut by the edge over it. A row going out of the box fades at both edges, never sliced; the plan's end clears the fade */
+.wl-mv2 > .wl-swap2__floor::before { height: 20px; }
+/* the big total's label, over it (row 7 a) */
+.wl-mv-hero .wl-mv-label { margin: 0; font: 400 13px/18px var(--font); color: var(--mute); }
+/* from the tap until the job is made: the start face, its line filling in 100 ms (rule 2) */
+.wl-mv-start__bar { display: block; width: 120px; height: 4px; margin: 16px auto 0; border-radius: 2px; background: var(--line); overflow: hidden; }
+.wl-mv-start__bar > span { display: block; height: 100%; background: var(--ink); transform-origin: left; animation: wl-mv-start var(--dur-fast) var(--ease-out) both; }
+@keyframes wl-mv-start { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .wl-mv-start__bar > span { animation: none; } }
+/* a small phone (390 x 664): the total comes down a step, so the third slider's knob is clear of the floor on the first frame */
+@media (max-height: 740px) {
+  .wl-mv2 .wl-mv-hero { margin: 0 0 8px; }
+  .wl-mv2 .wl-mv-hero .wl-mv-total { font-size: 44px; line-height: 48px; }
+  .wl-mv2 .wl-mv-lead { margin-top: 2px; }
+}
 /* Move's sliders: a 44 pt touch row (was 40) */
 .zf-sheet input[type="range"] { min-height: 44px; }
 /* "your Safe" under a coin's name is a line of its own: it starts with a capital ("Your Safe") */
@@ -262,3 +278,12 @@
 .wl-mv-private { --c: var(--ink); }
 .wl-mv-rows ~ .wl-mv-foot, .wl-mv-sum ~ .wl-mv-foot, .wl-mv-who .wl-mv-foot { text-align: center; color: var(--mute); font: 400 13px/18px var(--font); }
 .wl-mv-rows .wl-mv-hint { text-align: center; }
+
+/* the copy review's J2-3 (8 Nov, MUST): the amount chips ($10 / $25 / $50 / Max) a 44 pt tap; "Who can see this?" a 44 pt row of its
+   own (18 before: its hit box was a pseudo-element); the keypad's keys never under 56 pt, the form above them scrolls */
+.wl-swap-chips .zf-chip, .wl-swap-chips .zf-chip.wl-swap-all { height: 44px; min-height: 44px; border-radius: 22px; }
+.wl-swap2__who { display: inline-flex; align-items: center; min-height: 44px; vertical-align: middle; }
+.wl-swap2__who::before { content: none; }
+.wl-swap2__scroll > .zf-keypad { flex: none; min-height: 224px; grid-auto-rows: 56px; overflow: visible; }
+.wl-swap2__scroll > .zf-keypad button { height: 56px; min-height: 56px; }
+@media (max-height: 740px) { .wl-swap2__scroll > .zf-keypad button::before { width: 56px; height: 56px; margin: -28px; } .wl-swap2__scroll > .zf-keypad { overflow-clip-margin: 12px; } }

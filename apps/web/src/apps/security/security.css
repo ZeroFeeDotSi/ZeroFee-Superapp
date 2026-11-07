@@ -5,6 +5,11 @@
 .sec-other { margin-top: 18px; display: grid; gap: 6px; }
 .sec-handle { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
 .sec-remove { justify-self: start; padding: 6px 0; color: var(--ink); font-weight: 500; }
+/* the copy review (7 Nov): a held row's figure ("1 day 23 hours left") at 390: its column at least 96 px, tabular figures, on one
+   line; the name column takes the squeeze and wraps (two lines at most in practice), never an ellipsis */
+.sec-held-row { grid-template-columns: 30px minmax(0, 1fr) minmax(96px, max-content); }
+.sec-held-row .v { min-width: 96px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sec-held-row .t, .sec-held-row .d { overflow-wrap: break-word; white-space: normal; text-overflow: clip; overflow: visible; }
 .sec-rowbtn { appearance: none; background: none; border: 0; border-bottom: 1px solid var(--line); width: 100%; color: inherit; text-align: left; font: inherit; cursor: pointer; }
 .sec-other__actions { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .sec-act { justify-self: start; padding: 6px 0; color: var(--ink); font-weight: 500; }
@@ -26,7 +31,9 @@
 /* A row's steps: a quiet fold inside the row, no second hairline (the row's own line closes it). */
 .sec-act-more { margin-top: 2px; border-top: 0; }
 .sec-act-more > .zf-more__label { min-height: 36px; color: var(--mute); }
-.sec-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+/* the copy review (7 Nov, shot 04c): the lit floor button covered step 2's row; the list keeps the button's own height (56) under it */
+.sec-steps { margin: 0; padding: 0 0 56px; list-style: none; counter-reset: step; }
+.sec-steps__head { margin: 0 0 4px; }
 .sec-steps li { counter-increment: step; display: grid; grid-template-columns: 30px 1fr; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 15px; line-height: 1.4; }
 .sec-steps li::before { content: counter(step); font: var(--t-label); letter-spacing: .18em; color: var(--ink); padding-top: 2px; }
 .sec-act-row { padding: 14px 0; border-bottom: 1px solid var(--line); }
@@ -144,7 +151,6 @@
 .sec-alert-row .zf-btn { margin-top: 6px; }
 .sec-ask-row { margin: 22px 0 24px; display: grid; gap: 12px; }
 .sec-ask-row__label { text-align: center; margin: 0; }
-.sec-step-line { text-align: center; margin: 0 0 12px; }
 .sec-dev__acts .sec-act { justify-self: center; text-align: center; min-height: 44px; }
 
 /* ── R2 (4 Nov, the design review §4.9): Devices and Recovery on the grouped system ───────────────────────────────────

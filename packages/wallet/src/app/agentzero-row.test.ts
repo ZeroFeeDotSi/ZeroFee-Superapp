@@ -54,7 +54,7 @@ test("\"What's my balance?\" is Home's figure: readBalanceParts counts AgentZero
   const all = await readBalanceParts(withAz.b);
   assert.ok(withAz.asked.includes("account.agent.balance"));
   const home = balanceTotal([], [], [], null, tradingUsd(spending as never, [], [agentRow(FUNDED)!]).usd);
-  assert.deepEqual(all, { usd: home, partial: false });
+  assert.deepEqual(all && { usd: all.usd, partial: all.partial }, { usd: home, partial: false });
   assert.equal(home, "20.92");
   const none = await readBalanceParts(bridgeWith({ ok: null }).b);
   assert.equal(none!.usd, "18.93", "control");

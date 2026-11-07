@@ -12,3 +12,9 @@ export function pageRefusal(chain: ChainId, o: { mint?: BuyRefusal; freezeFlag?:
   if (chain === "sol") return o.mint ?? (o.freezeFlag ? "freezable" : undefined);
   return o.checks?.cantSell ? "unsellable" : undefined;
 }
+
+/** T2-5 (the copy review's walk, 8 Nov): the trap coin's one block on its page, head and body; no button but the bar's back. */
+export const trapWords = (symbol: string): { head: string; body: string } => ({
+  head: `ZeroFee won't buy ${symbol}.`,
+  body: "Recent buyers couldn't sell it, so your money could get stuck. Nothing was spent.",
+});

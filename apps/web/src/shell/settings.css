@@ -74,7 +74,7 @@ input.set__name::placeholder { color: var(--mute); }
 .set__row--two small { color: var(--mute); font: 400 15px/20px var(--font); }
 /* a two-line row with a value on its right (the web wallet's Passwords: "On iPhone") */
 .set__sec .set__row--two.set__row--val > span:first-child { display: grid; gap: 2px; padding: 10px 0; text-align: left; }
-.set__sec .set__row--two.set__row--val > span:last-child { display: block; padding: 0; color: var(--mute); font: 400 15px/20px var(--font); text-align: right; }
+.set__sec .set__row--two.set__row--val > span:last-child { display: block; padding: 0; color: var(--mute); font: 400 15px/20px var(--font); text-align: right; white-space: nowrap; }
 .set__sites:not(:has(.set__row, .zf-row)) { padding: 0 16px; background: none; }
 .set__sites:not(:has(.set__row, .zf-row)) > p { margin: 0; padding: 0; color: var(--mute); font: 400 13px/18px var(--font); }
 

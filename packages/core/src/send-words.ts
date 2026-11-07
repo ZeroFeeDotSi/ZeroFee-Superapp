@@ -72,16 +72,58 @@ export interface SendPayCore {
  * marked paid before it is signed so no second payment joins it). No sheet (D143): Wallet's Hold is the act.
  */
 export async function sendPay(c: SendPayCore, t: { tokenId: string; amount: string }, usd: string, inDeposit?: string): Promise<{ signedData: unknown }> {
+  await sendPayCheck(c, t, usd, inDeposit);
+  if (inDeposit !== undefined) await c.markPaid(inDeposit, SEND_GONE);
+  return { signedData: await c.sign() };
+}
+
+const SEND_GONE = "This send's move into your private balance wasn't priced here, or its price ran out. Nothing moved.";
+
+/** Every check sendPay makes before it signs (the one Face ID's pair, the audit's c1, 6 Nov: made before the sheet, nothing
+ *  signed, nothing marked paid). */
+export async function sendPayCheck(c: Omit<SendPayCore, "sign" | "markPaid">, t: { tokenId: string; amount: string }, usd: string, inDeposit?: string): Promise<void> {
   const now = Date.now();
-  const gone = "This send's move into your private balance wasn't priced here, or its price ran out. Nothing moved.";
   if (inDeposit !== undefined) {
     const kept = await c.keptThrough(inDeposit, now);
-    if (!kept) throw c.refused(gone);
+    if (!kept) throw c.refused(SEND_GONE);
     const q1 = await c.readQuote(inDeposit, kept.tag);
     const refusal = throughJoinRefusal(q1, c.pocket, t, now);
     if (refusal) throw c.refused(refusal);
   }
   if (!/^\d{1,12}(\.\d{1,18})?$/.test(usd)) throw c.refused("The swap service gave this payment no price, so it can't go. Nothing moved.");
-  if (inDeposit !== undefined) await c.markPaid(inDeposit, gone);
-  return { signedData: await c.sign() };
+}
+
+/** Leg 2 of a Send from the Safe, prepared and held for the Safe's one sheet (the audit's c1/R1, 6 Nov): in core memory only,
+ *  released once, after the chip's signatures of leg 1 check, and deleted on any end. `hash`: sha256 of its payload. */
+export interface HeldPair { inDeposit: string; hash: string; atMs: number; release: () => Promise<unknown> }
+/** A held pair is good for this long from its making (its quote's own time is shorter); past it, dropped unsigned. */
+export const PAIR_KEEP_MS = 10 * 60_000;
+/** Which pair, if any, a Safe signature may release (a table): the one held for the address leg 1 pays, in time. */
+export function pairFor(pairs: ReadonlyMap<string, HeldPair>, paid: readonly string[], nowMs: number): HeldPair | null {
+  const hits = paid.map((d) => pairs.get(d)).filter((p): p is HeldPair => !!p && nowMs - p.atMs <= PAIR_KEEP_MS);
+  return hits.length === 1 ? hits[0]! : null;
+}
+
+/** Who may ask a pair (the audit's c4, 6 Nov): only Wallet's own Send from the Safe, as the core stamps the app; never AgentZero,
+ *  a site, another app or the relay, whatever they send. */
+export const pairAsked = (p: { pair?: unknown; app?: unknown }): boolean => p.pair === true && p.app === "wallet";
+
+/** Leg 2 of a Send from the Safe once signed (the audit's MUST, 6 Nov): kept in the core's sealed vault, by leg 1's address,
+ *  BEFORE leg 1 is sent, and deleted when its job ends. Never in the page's storage. */
+export interface KeptPair { outDeposit: string; outTag?: string; inTag?: string; leg2In: string; signed: unknown; atMs: number; untilMs: number; /** a Move's one fill (the audit's ruling, 7 Nov): every leg joined to it, the first one's fields above too */ legs?: KeptLeg[] }
+/** One leg 2 kept under a fill's address. */
+export interface KeptLeg { outDeposit: string; outTag?: string; leg2In: string; signed: unknown; /** its job ended: still counted against what landed, never handed again */ ended?: true }
+/** A kept record's legs: its `legs`, or the one leg a Send's (or an older build's) record holds. */
+export const keptLegs = (k: KeptPair): KeptLeg[] => (Array.isArray(k.legs) && k.legs.length ? k.legs : [{ outDeposit: k.outDeposit, ...(k.outTag ? { outTag: k.outTag } : {}), leg2In: k.leg2In, signed: k.signed }]);
+/** How long a kept leg 2 can still run: its own signed deadline and an hour, never past 3 days; unreadable, an hour. */
+export function keptPairUntil(payload: { message: string }, nowMs: number): number {
+  let at = NaN;
+  try { at = Date.parse(JSON.parse(payload.message)?.deadline); } catch { /* unreadable */ }
+  return Number.isFinite(at) ? Math.min(at + 60 * 60_000, nowMs + 3 * 86_400_000) : nowMs + 60 * 60_000;
+}
+/** The follower's rule, the core's own (a table: one-faceid-keep.test.ts): leg 2 goes to 1Click only when leg 1's own
+ *  status, read with its tag, says SUCCESS with at least leg 2's amount landed in Private. */
+export function leg1Landed(s: { status?: unknown; swapDetails?: { amountOut?: unknown } } | null | undefined, leg2In: string): boolean {
+  const landed = s?.swapDetails?.amountOut;
+  return s?.status === "SUCCESS" && typeof landed === "string" && /^\d{1,40}$/.test(landed) && /^\d{1,40}$/.test(leg2In) && BigInt(landed) >= BigInt(leg2In);
 }

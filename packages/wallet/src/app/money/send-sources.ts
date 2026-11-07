@@ -13,7 +13,7 @@ import type { HeldCoin } from "../trading.ts";
 import type { SpendingWallet } from "@zerofee/core/spending";
 import { SEND_ROWS, coinLabel, rowMax } from "./send-rows.ts";
 import { SEND_CANT, SEND_PART } from "./send-words.ts";
-import { privateRow } from "./send-cap.ts";
+import { privateRow, type RestParts } from "./send-cap.ts";
 import { safeHeld, type EarnPart } from "../format.ts";
 import { nearImplicitOf } from "../../send-reach.ts";
 
@@ -82,11 +82,31 @@ export function sendSources(rows: readonly Balance[], safe: readonly Balance[], 
     // cap is said only when the typed amount is over it ("at most", finding 64), no extra standing text
     const part = fills && Number(amount) - (c.pocket + c.safe) > 1e-9 ? SEND_PART(false, most) : null;
     const fromPrivate = !fills ? { privateOnly: true as const, line: privateRow(c.b.symbol, most) } : {};
+    const rest = per > 0 ? restOf({ symbol: c.b.symbol, amount: Number(amount), usd, per, can, paysPrivate: !fills || c.pocket >= c.one, thisPocket: c.pocket, pocket, earning }) : null;
     // the row names the place it really pays from (QA test, MUST 3): Private's coins are "Private", never "your Safe"
     const place = fills ? "your Safe" : "Private";
-    return { id: `safe:${tokenId}`, row: null, tokenId, label: `${c.b.chain === "near" && c.b.held !== "account" ? c.b.symbol : coinLabel({ ...c.b, held: c.b.held === "private" ? "ledger" : c.b.held }, chainName)} · ${place}`, place, symbol: c.b.symbol, icon: c.b.icon, chain: c.b.chain, amount, ...(usd > 0 ? { usd: usd.toFixed(2) } : {}), max: String(can), ...(c.pocket > 0 ? { pocket: String(c.pocket) } : {}), ...(part ? { part } : {}), ...fromPrivate };
+    return { id: `safe:${tokenId}`, row: null, tokenId, label: `${c.b.chain === "near" && c.b.held !== "account" ? c.b.symbol : coinLabel({ ...c.b, held: c.b.held === "private" ? "ledger" : c.b.held }, chainName)} · ${place}`, place, symbol: c.b.symbol, icon: c.b.icon, chain: c.b.chain, amount, ...(usd > 0 ? { usd: usd.toFixed(2) } : {}), max: String(can), ...(c.pocket > 0 ? { pocket: String(c.pocket) } : {}), ...(part ? { part } : {}), ...(rest ? { rest } : {}), ...fromPrivate };
   }).sort((a, b) => Number(b.usd ?? 0) - Number(a.usd ?? 0));
   return [...wallets, ...tokenSources(held), ...safes];
+}
+
+/**
+ * J2-5 (the audit's MUST, 8 Nov): where Home's figure for a Safe coin is beyond what one send can take now, by real place. One
+ * send pays from ONE place (above: `can`, Private or the Safe's largest place). The rest: Private's rows of the coin
+ * (less what pays, when Private pays), NEAR with validators (Earn), and the Safe's other places (NEAR Intents or the
+ * account, the coin's other forms). No part is "fees": the account's NEAR row is already what it can spend, its storage
+ * and fee room left out (ledger.ts spendable), so Home's figure holds none of it. Dollars at Home's price, in cents; the
+ * parts add up to Home's figure less the ready one. Null: nothing beyond what can go.
+ */
+export function restOf(o: { symbol: string; amount: number; usd: number; per: number; can: number; paysPrivate: boolean; thisPocket: number; pocket: readonly Balance[]; earning: readonly EarnPart[] }): RestParts | null {
+  const c2 = (n: number) => Math.round(n * 100) / 100;
+  const ready = Math.floor(o.can * o.per * 100 + 1e-6) / 100;
+  const rest = c2(o.usd - ready);
+  if (rest < 0.01) return null;
+  const inPrivate = o.pocket.filter((b) => b.symbol === o.symbol && b.listed !== false && Number(b.amount) > 0).reduce((t, b) => t + Number(b.amount), 0);
+  const privateUsd = Math.min(rest, Math.max(0, c2((inPrivate - (o.paysPrivate ? Math.min(o.can, o.thisPocket) : 0)) * o.per)));
+  const stakedUsd = o.symbol === "NEAR" ? Math.min(rest - privateUsd, c2(o.earning.filter((e) => Number(e.amount) > 0).reduce((t, e) => t + Number(e.amount), 0) * o.per)) : 0;
+  return { privateUsd, elsewhereUsd: Math.max(0, c2(rest - privateUsd - stakedUsd)), stakedUsd: Math.max(0, stakedUsd) };
 }
 
 /** A Solana token's send pays the rent of 1Click's new token account from the SOL wallet (core SOL_TOKEN_ACCOUNT_RENT),

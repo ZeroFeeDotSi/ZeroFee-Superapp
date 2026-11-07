@@ -162,7 +162,7 @@ test("ON by default (product decision, 3 Nov): the wallet hook runs; no free try
   assert.match(sheet, /\{keys\?\.model && <ModelPick model=\{keys\.model\} \/>\}/, "the Model and Effort picker sits in the wallet's sheet");
   // control: the developer switch reads as off here (node), and never in the public build
   assert.equal(OWN_KEY_ON, false);
-  assert.match(readFileSync(new URL("../../../../packages/agent/src/chat/own-key.ts", import.meta.url), "utf8"), /VITE_AGENTZERO_OWN_KEY === "1" && \(import\.meta as [^)]*\)\.env\?\.VITE_ZEROFEE_PUBLIC !== "1"/);
+  assert.match(readFileSync(new URL("../../../../packages/agent/src/chat/own-key.ts", import.meta.url), "utf8"), /VITE_AGENTZERO_OWN_KEY === "1" && import\.meta\.env\?\.VITE_ZEROFEE_PUBLIC !== "1"/);
 });
 
 test("control, explicitly off (walletFlag.on = false): no wallet call, the old send; the key chip and card only with the developer setting (no-key.test.ts)", () => {

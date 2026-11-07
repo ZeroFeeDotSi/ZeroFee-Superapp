@@ -492,8 +492,8 @@ test("no cards with buttons inside: Home's code has no pot cards, no pill button
 
 test("Swap: the sheet's words, its line with the swap service's own time, and only the coin named pays", () => {
   assert.equal(swap.swapWords("8.22", "NEAR"), "Swap $8.22 of NEAR for USDC");
-  assert.equal(swap.swapWords("25", "NEAR"), "Swap $25 of NEAR for USDC");
-  assert.equal(swap.swapWords("5", "USDC", "BTC"), "Swap $5 of USDC for BTC", "any coin to any coin (D111)");
+  assert.equal(swap.swapWords("25", "NEAR"), "Swap $25.00 of NEAR for USDC", "two decimals always (copy review, 6 Nov)");
+  assert.equal(swap.swapWords("5", "USDC", "BTC"), "Swap $5.00 of USDC for BTC", "any coin to any coin (D111)");
   // review M3: a refusal while pricing is the sheet's own words, never the core's "Spending"/"Private" or a raw tail
   assert.equal(swap.plainLine({ code: "security.subwallet.refused", whatHappened: "Trading doesn't have that much cash." }), "The swap service can't price this swap right now. Nothing moved.");
   assert.equal(swap.plainLine({ code: "security.partner.unreachable", whatHappened: "x" }), "NEAR Intents didn't answer. Nothing moved. Try again.");
@@ -574,22 +574,26 @@ test("D137 live steps, HOME-VISUAL §3.7: a Move from the Safe to the SOL wallet
   const answers = { "spending.activity": [move, leg], "spending.status": { ...SPENDING, onItsWay: [{ ...leg, id: "mv2" }] } };
   // Home's "Jobs" (product decision, 5 Nov); the step names who does the work; the time LEFT (the HARD RULE, Jobs hunt B3)
   const row = /^Jobs\nMove \$20\.00 to your SOL wallet\nNEAR Intents is moving it to Solana\n\d+ (s|min) left$/m; // a16: the time left is the row's own right column (as the Hot row); the label keeps the one sentence
-  const until = /NEAR Intents is moving it to Solana\n\d+ (s|min) left/;
-  const all = (await homeShown({ answers, wait: 50, until })).shown; // the Safe, where it left from
+  const until = /NEAR\n \nIntents\n \nis\n \nmoving\n \nit\n \nto Solana\n\d+ (s|min) left/;
+  // the step line is drawn piece by piece (job-face linePhrases, 7 Nov): its pieces joined again read the one sentence
+  const all = (await homeShown({ answers, wait: 50, until })).shown.replace(/\n \n/g, " "); // the Safe, where it left from
   assert.match(all, row, "the row: what the person asked, the step now and how long, in words (never a clock)");
   assert.ok(all.indexOf("\nJobs\n") < all.lastIndexOf("\nSafe\n"), "at the top of the list");
   assert.doesNotMatch(all, /^On its way\nMoving \$19\.70 to Solana$/m, "the leg the row stands for isn't drawn twice");
   assert.doesNotMatch(all, /Top(ped)? up|✓ 0:00/, "no Top up, no ticked-steps line on Home (the tracker has the steps)");
-  assert.match((await homeShown({ answers, wait: 50, until, tap: /^Hot/ })).shown, row, "on Hot too, where it goes");
-  const open = (await homeShown({ answers, wait: 50, until, tap: /^Move \$20\.00 to your SOL wallet / })).shown;
-  assert.match(open, /^Move \$20\.00\nMove \$20\.00 to your SOL wallet\nNEAR Intents is moving it to Solana · \d+ (s|min) left\nApproved\n\nIn your NEAR wallet\n41 s\nNEAR Intents is moving it to Solana…\n\nThen Solana lands it in your SOL wallet\.\n\n.+\nEach step shows the moment it's done\./m, "the tracker: its status in words, each step on its line with when it was reached");
+  assert.match((await homeShown({ answers, wait: 50, until, tap: /^Hot/ })).shown.replace(/\n \n/g, " "), row, "on Hot too, where it goes");
+  const open = (await homeShown({ answers, wait: 50, until, tap: /^Move \$20\.00 to your SOL wallet / })).shown.replace(/\n \n/g, " ");
+  // the job page (the copy review's spec Part 2 and rulings, 6 Nov; fix/move-job): the title once, the figure and what it is, the four
+  // checkpoints, where the money is by Home's names, the time left, From and To, then each step on its line with its one word
+  assert.match(open, /^Move\n\$20\.00\nMove \$20\.00 to your SOL wallet\nSigned\nMoving\nLanding\nDone\nYour money is on its way to \nyour SOL wallet\n\d+ (s|min) left\nFrom\nSafe\nTo\nSOL wallet\nApproved\nDone\nIn your NEAR wallet\nDone\nNEAR Intents is moving it to Solana…\n\nThen Solana lands it in your SOL wallet\.\nNot yet\nEach step shows the moment it's done\./m, "the job page: the title once, checkpoints, the money line, each step on its line with its one word");
+  assert.doesNotMatch(open, /^Stopped$|keeps checking/m, "a going job: no stop words");
   const none = (await homeShown({ wait: 50, until })).shown;
   assert.doesNotMatch(none, /^Jobs$/m, "control: nothing in flight, no Jobs");
   const failed = { "spending.activity": [{ ...move, status: "failed", note: "1Click sent it back. It's in your Safe." }] };
   // this phone saw it going (its own record), then it failed
   const seen = { "live-seen": JSON.stringify({ "move:mv1": { start: Date.now() - 60_000, done: {} } }) };
   assert.doesNotMatch((await homeShown({ answers: failed, wait: 50, until: /didn't finish/ })).shown, /didn't finish/, "control: a failure this phone never saw going is Activity's row, not a live row");
-  assert.match((await homeShown({ answers: failed, store: seen, wait: 50, until: /didn't finish/ })).shown, /^Move stopped\nNEAR Intents didn't finish moving it to your NEAR wallet\. 1Click sent it back\. It's in your Safe\.$/m, "a failure names the step and where the money is");
+  assert.match((await homeShown({ answers: failed, store: seen, wait: 50, until: /didn.t\n \nfinish/ })).shown.replace(/\n \n/g, " "), /^Move stopped\nNEAR Intents didn't finish moving it to your NEAR wallet\. 1Click sent it back\. It's in your Safe\.$/m, "a failure names the step and where the money is");
 });
 
 const NEAR_DEAD = { problem: { code: "ledger.nodes.unreachable", service: "near", whatHappened: "NEAR didn't answer.", money: { state: "safe" }, next: { kind: "retry", label: "Try again" } } };
@@ -597,7 +601,7 @@ const NEAR_DEAD = { problem: { code: "ledger.nodes.unreachable", service: "near"
 test("Private's door is instant (rule 2): set up behind when Home opens, the tap shows Private's screen in under 100 ms; control: before the set-up behind is read, the door offers it", async () => {
   const tapMs: number[] = [];
   const r = await homeShown({ tap: /^Private/, tapMs });
-  assert.match(r.shown, /Private balance/, "Private's screen");
+  assert.equal(r.shown, "Private", "Private's screen (copy review, 7 Nov: \"Private\", never \"private balance\")");
   assert.doesNotMatch(r.shown, /Not set up yet/, "set up behind before the tap: ready on arrival");
   assert.ok(tapMs[0]! < 100, `tap → Private's screen ${tapMs[0]!.toFixed(1)} ms`);
   console.log(`tap → Private's screen: ${tapMs[0]!.toFixed(1)} ms`);

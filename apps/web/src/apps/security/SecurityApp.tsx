@@ -27,7 +27,8 @@ import { setupWindowLine } from "./setup-window.ts";
 import { countsFullyLine } from "../../vault-gate.ts";
 import { askDeviceNext, devicesLine, fallbackSeconds, lostName, refillName, removableDevices, type SecondDevice } from "./devices.ts";
 import { ruleChangeWaitWords, waitPlain } from "./rules.ts";
-import { recoveryRowLine } from "./rules-lines.ts";
+import { accountRowWords } from "./account-rows.ts";
+import { PAIR_STEP_TWO, pairStepTwo } from "./pair-steps.ts";
 import { laptopWords } from "./laptop-words.ts";
 import { LaptopWindow } from "../../shell/LaptopWindow.tsx";
 import { PUBLIC_RELEASE } from "@zerofee/shell-api/release.ts";
@@ -39,7 +40,7 @@ import { ThisDevice, onPhone, thisDevice } from "@zerofee/shell-api/approval-wor
 import { ACCOUNT_NAME_KEY, accountNameShown } from "../../shell/settings-words.ts";
 import { readProtection, setKnown, useKnown } from "./known.ts";
 import { oneRowEach } from "./waiting-rows.ts";
-import { QUANTUM_WORDS, canRemoveKey, otherKeyLine, quantumOf, type OldKey } from "./quantum.ts";
+import { QUANTUM_WORDS, canRemoveKey, otherKeyLine, quantumOf, quantumRowsShown, type OldKey } from "./quantum.ts";
 import "./security.css";
 
 
@@ -134,20 +135,20 @@ export function SecurityRows({ account: given, bridge, open }: { account: Accoun
   useEffect(() => void readProtection(bridge), [bridge, ended, shell.active]);
   const [facts] = useFacts(bridge, [ended, shell.active]);
   const account = facts.fresh ?? given;
-  const delay = account.recovery?.delaySeconds ?? 0;
   const pending = account.recovery?.pending;
   const devices = facts.devices;
   const protection = shared.protection;
   const quantum = account.keys.length ? quantumOf(account.keys, undefined, account.rules === true) : null;
   // the audit: a full-access key on an account with rules bypasses the contract: red, in those words, never just "old".
   const bypass = !!quantum?.bypass.length;
+  const says = accountRowWords({ web: !onPhone(), quantumOn: quantum ? quantum.on : null, protection, pending: !!pending, checkDue: facts.checkDue });
   return (
     <>
       {/* Quantum-safe (review, 5 Nov): first, from the account's own key list (quantum.ts), never a fixed On */}
-      {quantum && <NavRow title={QUANTUM_WORDS.title} icon="shield-check" tone={bypass ? "red" : undefined} line={bypass ? QUANTUM_WORDS.bypassLine : quantum.on ? QUANTUM_WORDS.rowLine : QUANTUM_WORDS.oldCount(quantum.old)} value={quantum.on ? QUANTUM_WORDS.on : QUANTUM_WORDS.fix} onClick={() => open("quantum")} />}
-      <NavRow title="Protection" icon="shield" line={protection === false ? "Choose what big payments need" : "What big payments need"} value={protection === null ? "" : protection ? "On" : "Add"} onClick={() => open("protection")} />
+      {quantum && <NavRow title={QUANTUM_WORDS.title} icon="shield-check" tone={bypass ? "red" : undefined} line={bypass ? QUANTUM_WORDS.bypassLine : quantum.on ? QUANTUM_WORDS.rowLine : QUANTUM_WORDS.oldCount(quantum.old)} value={says.quantum} onClick={() => open("quantum")} />}
+      <NavRow title="Protection" icon="shield" line={protection === false ? "Choose what big payments need" : "What big payments need"} value={says.protection} onClick={() => open("protection")} />
       <NavRow title="Devices" icon="phone" line={devices ? devicesLine(devices) : "Who can say yes"} value={facts.guardWaiting > 0 ? `${facts.guardWaiting} waiting` : devices?.some((d) => d.needsReAdd || d.needsRefill) ? "Needs you" : ""} onClick={() => open("devices")} />
-      <NavRow title="Recovery" icon="words" line={pending ? "A new device is waiting" : facts.checkDue ? "Check your backup words" : recoveryRowLine(delay)} value={pending ? "Stop it" : facts.checkDue ? "Check" : "On"} onClick={() => open("recovery")} />
+      <NavRow title="Recovery" icon="words" {...(says.recovery.line ? { line: says.recovery.line } : {})} value={says.recovery.value} onClick={() => open("recovery")} />
     </>
   );
 }
@@ -157,8 +158,11 @@ export function SecurityRows({ account: given, bridge, open }: { account: Accoun
  * words and AgentZero, ticked only when that key is on the account and is ML-DSA-65, else "Not yet"; an old classical
  * key, with its Remove (the same remove-key path as Devices). Never a word about connections.
  */
-function QuantumSheet({ account, waitWords, onClose, onRemove, onNewWords, onPairAgain }: { account: AccountInfo; waitWords: string | null; onClose: () => void; onRemove: (handle: string) => void; onNewWords: () => void; onPairAgain: () => void }) {
-  const q = quantumOf(account.keys, onPhone() ? "This phone" : "This device", account.rules === true);
+function QuantumSheet({ account, wordsChecked, waitWords, onClose, onRemove, onNewWords, onPairAgain }: { account: AccountInfo; wordsChecked: boolean; waitWords: string | null; onClose: () => void; onRemove: (handle: string) => void; onNewWords: () => void; onPairAgain: () => void }) {
+  const phone = onPhone();
+  const q = quantumOf(account.keys, phone ? "This phone" : "This device", account.rules === true);
+  // the audit's MUST, the copy review's S1 (7 Nov): what each row SAYS; on the web never the phone's chip or a tick for a phone-only key.
+  const shown = quantumRowsShown(q.rows, !phone, wordsChecked);
   // Remove is never one tap (audit): it opens a confirm that names the key, what stops working and the wait.
   const [ask, setAsk] = useState<string | null>(null);
   const oldLabel = (k: OldKey) => (k.fix === "other-device" ? QUANTUM_WORDS.otherDevice : k.fix === "new-words" ? QUANTUM_WORDS.oldWords : k.fix === "pair-again" ? QUANTUM_WORDS.oldLaptop : QUANTUM_WORDS.oldRow);
@@ -167,8 +171,9 @@ function QuantumSheet({ account, waitWords, onClose, onRemove, onNewWords, onPai
     <>
     <Sheet title={QUANTUM_WORDS.title} onClose={onClose}>
       <div className="sec-q">
-        <h2 className="zf-title sec-q__head">{q.on ? QUANTUM_WORDS.headOn : q.bypass.length ? QUANTUM_WORDS.bypassHead(q.bypass.length) : QUANTUM_WORDS.oldCount(q.old)}</h2>
-        <p className="zf-body sec-q__line">{q.on ? QUANTUM_WORDS.lineOn : QUANTUM_WORDS.lineOld}</p>
+        {/* the copy review's S1: "Quantum-safe" once (the title); On's headline folds into one body line */}
+        {!q.on && <h2 className="zf-title sec-q__head">{q.bypass.length ? QUANTUM_WORDS.bypassHead(q.bypass.length) : QUANTUM_WORDS.oldCount(q.old)}</h2>}
+        <p className="zf-body sec-q__line">{q.on ? QUANTUM_WORDS.bodyOn : QUANTUM_WORDS.lineOld}</p>
         {q.bypass.length > 0 && (
           <div className="sec-dev__rows sec-q__rows">
             {q.bypass.map((k) => (
@@ -180,10 +185,10 @@ function QuantumSheet({ account, waitWords, onClose, onRemove, onNewWords, onPai
           </div>
         )}
         <div className="sec-dev__rows sec-q__rows">
-          {q.rows.map((r) => (
-            <div key={r.id} className="sec-fact-row" data-safe={r.safe || undefined}>
+          {shown.map((r) => (
+            <div key={r.id} className="sec-fact-row" data-safe={r.tick || undefined}>
               <span className="sec-q__t">{r.label}{r.line && <span className="sec-q__sub">{r.line}</span>}</span>
-              <span className="v">{r.safe ? <span className="zf-tick on sec-key-row__tick" role="img" aria-label="Quantum-safe"><Check /></span> : QUANTUM_WORDS.notYet}</span>
+              <span className="v">{r.value}{r.tick && <span className="zf-tick on sec-key-row__tick" role="img" aria-label="Quantum-safe"><Check /></span>}</span>
             </div>
           ))}
           {q.leftovers.map((h) => (
@@ -306,7 +311,7 @@ export function SecurityPlace({ account: given, actions, place, step, onBack }: 
   if (flow === "laptop-limit" || flow === "guardian-limit") return <LaptopFlow kind={flow === "laptop-limit" ? "laptop" : "guardian"} start="amount" actions={actions} onDone={() => { setFlow(null); actions.onChanged(); }} onHeld={flowBack} />;
   if (flow === "lost") return <LostDevice devices={removableDevices(devices)} delaySeconds={account.recovery?.delaySeconds ?? 0} onBack={flowBack} onRemove={(d) => { setFlow(null); actions.onRemoveKey(d.handle, "second device"); }} />;
   if (flow === "guard") return <GuardianSide bridge={actions.bridge} mainnet={account.network === "mainnet"} onBack={flowBack} onProblem={actions.onProblem} />;
-  if (place === "quantum") return <QuantumSheet account={account} waitWords={release === null ? null : ruleChangeWaitWords(shared.strictestWait ?? 0, changeFloor === 0 ? 0 : account.recovery?.delaySeconds ?? 0)} onClose={onBack} onRemove={(h) => { onBack(); actions.onRemoveKey(h); }} onNewWords={() => actions.onNewWords?.({ id: "security", tab: "recovery" })} onPairAgain={() => setFlow(noLaptopPage ? "phone" : "laptop")} />;
+  if (place === "quantum") return <QuantumSheet account={account} wordsChecked={account.keys.some((k) => k.role === "recovery") && !facts.checkDue} waitWords={release === null ? null : ruleChangeWaitWords(shared.strictestWait ?? 0, changeFloor === 0 ? 0 : account.recovery?.delaySeconds ?? 0)} onClose={onBack} onRemove={(h) => { onBack(); actions.onRemoveKey(h); }} onNewWords={() => actions.onNewWords?.({ id: "security", tab: "recovery" })} onPairAgain={() => setFlow(noLaptopPage ? "phone" : "laptop")} />;
   if (place === "protection") return <Protection bridge={actions.bridge} network={account.network} accountId={account.accountId} hasSecondDevice={account.keys.some((k) => k.role === "second-device")} recoveryDelaySeconds={release !== null && release < 5 ? 0 : account.recovery?.delaySeconds ?? 0} onBack={onBack} onProblem={actions.onProblem} onPairDevice={() => setFlow(noLaptopPage ? "phone" : "laptop")} onWaiting={(h) => actions.onWaiting(h, "protection")} {...(actions.onSafeUpdate ? { onSafeUpdate: actions.onSafeUpdate } : {})} />;
   if (place === "recovery") {
     return (
@@ -338,7 +343,7 @@ export function SecurityPlace({ account: given, actions, place, step, onBack }: 
           {!hasSecond && !addWaiting && !noLaptopPage && <button className="sec-fact-row sec-fact-row--btn" onClick={() => setFlow("laptop")}><span>Add my laptop</span><span className="v">›</span></button>}
           {/* The last row (§2.9): the other side of a guardian. */}
           <button className="sec-fact-row sec-fact-row--btn" onClick={() => (markGuardianUsed(), setFlow("guard"))}>
-            <span>Be a second phone or a guardian</span><span className="v">{facts.guardWaiting > 0 ? `${facts.guardWaiting} waiting ›` : "›"}</span>
+            <span>Approve for someone else</span><span className="v">{facts.guardWaiting > 0 ? `${facts.guardWaiting} waiting ›` : "›"}</span>
           </button>
         </div>
         {devices && countsFullyLine(devices) && <p className="zf-small sec-dev__fn">{countsFullyLine(devices)}</p>}
@@ -420,18 +425,18 @@ function WaitingForYou({ bridge, onOpen, seq = 0 }: { bridge: Bridge; onOpen: (h
 }
 
 function HeldRowView({ held, onOpen }: { held: HeldRow; onOpen: () => void }) {
-  const { left, text } = useCountdown(held.readyAtIso);
+  const { left, alone } = useCountdown(held.readyAtIso);
   const ready = held.ready || left === 0;
   return (
     // Something to fear (code ZeroFee doesn't know, say): the row is red and says why.
-    <button className={`zf-row sec-rowbtn${held.warning ? " sec-row--alert" : ""}`} onClick={onOpen}>
+    <button className={`zf-row sec-rowbtn sec-held-row${held.warning ? " sec-row--alert" : ""}`} onClick={onOpen}>
       <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" style={{ justifySelf: "center" }}><circle className="zf-hl" cx="12" cy="12" r="8" /><path className="zf-hl" d="M12 7.5V12l3 2" /></svg>
       <div>
         <div className="t">{held.title}</div>
         {/* D4: a change that isn't finished says so until the account has it, never a silent "Ready" */}
         <div className="d">{held.warning ?? (held.needsSecondDevice ? "Waiting for your second device's yes" : ready && held.change ? "Not finished: tap to finish it" : held.secondDeviceSaidYes ? (ready ? "Your second device said yes. Ready to send" : "Your second device said yes") : ready ? "Ready to send" : held.change ? "You, or your backup words, can stop it" : "This device can cancel it until then")}</div>
       </div>
-      <span className="v">{ready ? (held.change && !held.needsSecondDevice ? "Finish" : held.needsSecondDevice ? "Waiting" : "Ready") : text}</span>
+      <span className="v">{ready ? (held.change && !held.needsSecondDevice ? "Finish" : held.needsSecondDevice ? "Waiting" : "Ready") : alone}</span>
     </button>
   );
 }
@@ -474,7 +479,7 @@ function RecoveryTab({ account, actions, checkDue = false, devices, bandWait, ch
       <h1 className="zf-title sec-dev__head">Your 24 words bring your money back</h1>
       <p className="zf-body sec-dev__line">{device === "ready" ? `Lose this phone? Type your words on a new one. Your ${named} says yes, then it takes ${wait}.` : `Lose this phone? Type your words on a new one. It takes ${wait}.`}</p>
       <div className="sec-dev__rows">
-        <div className="sec-fact-row"><span>Backup words</span><span className="v">{checkDue ? "Check them" : <>On <span className="zf-tick on sec-key-row__tick" aria-hidden="true"><Check /></span></>}</span></div>
+        <div className="sec-fact-row"><span>Backup words</span><span className="v">{checkDue ? "Check them" : <>{QUANTUM_WORDS.wordsDown} <span className="zf-tick on sec-key-row__tick" aria-hidden="true"><Check /></span></>}</span></div>
         <button className="sec-fact-row sec-fact-row--btn" onClick={() => setSheet("wait")}><span>The wait</span><span className="v">{wait} ›</span></button>
         {/* One pill per screen, on the floor: while a new phone is waiting, Stop it is the one and checking the words is a
             row. R2 (§4.9; the test list: no grey pills): the other actions are rows in this one card, never stacked text
@@ -529,6 +534,9 @@ function PendingCount({ pending, device }: { pending: NonNullable<NonNullable<Ac
   return <>{c.before}<b>{text}</b>{c.after}</>;
 }
 
+/** What the account did may have changed: a move or a payment signed, ended or came back. */
+export const ACCOUNT_CHANGED = ["spending.changed", "ledger.balancesChanged"] as const;
+
 type ActivityRow = { atIso: string; title: string; lines?: string[]; by?: string; ok?: boolean; partly?: boolean; explorerUrl?: string };
 
 /** `bare`: under Activity's own title (Home's Activity, Job 1): no second heading. */
@@ -540,16 +548,20 @@ function ActivityTab({ bridge, bare = false }: { bridge: Bridge; bare?: boolean 
   useEffect(() => {
     let live = true;
     setProblem(null);
-    void bridge.call<ActivityRow[]>("account.activity", { limit: 50 }).then((res) => {
+    // `quiet`: a read again after something was approved (the Activity walk, 6 Nov, item 9: read once on opening, it said
+    // "Nothing yet." after a Send, a Move and a top-up were approved); a failed quiet read keeps the rows shown
+    const read = (quiet = false) => void bridge.call<ActivityRow[]>("account.activity", { limit: 50 }).then((res) => {
       if (!live) return;
       if ("ok" in res) return setRows(res.ok);
       if (res.problem.code === "security.method.unknown") {
         setOnlyHere(true);
         return setRows(localEvents());
       }
-      setProblem(res.problem);
+      if (!quiet) setProblem(res.problem);
     });
-    return () => { live = false; };
+    read();
+    const offs = ACCOUNT_CHANGED.map((ev) => bridge.on(ev, () => read(true)));
+    return () => { live = false; offs.forEach((off) => off()); };
   }, [bridge, attempt]);
   if (problem) return (
     <div className="sec-center-text zf-enter" style={{ marginTop: 60 }}>
@@ -617,7 +629,7 @@ function ago(iso: string): string {
 // the Sim (sample money, ?demo too): the app's own instruction, never an address (its /laptop opens the Sim itself)
 const LAPTOP = laptopWords(PUBLIC_RELEASE || ("page" in MODE && MODE.page === "demo"), typeof location === "undefined" ? undefined : location.origin, MAINNET);
 /** The words of pairing a second device: the person's own laptop, their other phone, or a guardian (a trusted person's
- *  ZeroFee). The other phone pairs the way a guardian's does today (it shows its code under Be a second phone or a guardian; D64), so the
+ *  ZeroFee). The other phone pairs the way a guardian's does today (it shows its code under Approve for someone else; D64), so the
  *  core is asked for a "guardian" device for both. Design review §5 (change 6): the step is one sentence, "All" not
  *  "Always", the amount row before the scan, with air under it. */
 const PAIR_WORDS = {
@@ -630,14 +642,18 @@ const PAIR_WORDS = {
   phone: {
     top: "Second phone", title: "Add your other phone", body: "Big payments then need its yes too. A thief would need both phones.",
     // Dead ends row 16: the other phone needs no account of its own. Welcome offers the same step (Onboarding.tsx).
-    steps: ["On your other phone: ZeroFee, Be a second phone or a guardian. A code shows."],
-    scanButton: "Scan its code", scanTitle: "Scan the code on your other phone", scanWhere: "It shows it under Be a second phone or a guardian.",
+    // the copy review's S5 (7 Nov): the run-on as two numbered lines. Step 1 names the tap the other phone really has (Welcome's
+    // "Approve for someone else", Onboarding.tsx; the copy review ruled it stands); step 2 is its own button's (pair-steps.ts)
+    step1: "On your other phone, open ZeroFee and tap Approve for someone else.",
+    scanButton: PAIR_STEP_TWO.iphone.button, scanTitle: "Scan the code on your other phone", scanWhere: "It shows it under Approve for someone else.",
     match: "Check the letters on your other phone match the next screen.", add: "Add this phone", ask: "Ask your other phone for payments", askRow: "Ask it for payments over",
   },
   guardian: {
     top: "Guardian", title: "Pick a person you trust", body: "They say yes to your big payments too. They never see your money.",
-    steps: ["On their phone: ZeroFee, Be a second phone or a guardian. A code shows."],
-    scanButton: "Scan their code", scanTitle: "Scan the code on their phone", scanWhere: "Their phone shows it under Be a second phone or a guardian.",
+    // the copy review (7 Nov, B11): the heading says where ("On their phone"), so step 1 starts with them
+    stepsHead: "On their phone",
+    step1: "They open ZeroFee and tap Approve for someone else.",
+    scanButton: "Scan their code", scanTitle: "Scan the code on their phone", scanWhere: "Their phone shows it under Approve for someone else.",
     match: "Check their phone's letters match the next screen.", add: "Add my guardian", ask: "Ask your guardian for payments", askRow: "Ask them for payments over",
   },
 } as const;
@@ -778,12 +794,12 @@ export function LaptopFlow({ actions, onDone, onHeld, kind = "laptop", start }: 
               ))}
             </div>
           </div>}
-          {kind === "laptop" && LAPTOP.later && !sample ? <p className="zf-note zf-enter-3" role="note" style={{ marginTop: 18 }}>{LAPTOP.open}</p> : kind === "laptop" ? <ol className="sec-steps zf-enter-3">{t.steps.map((s) => <li key={s}>{s}</li>)}</ol> : <p className="zf-small sec-step-line zf-enter-3">{t.steps[0]}</p>}
+          {kind === "laptop" && LAPTOP.later && !sample ? <p className="zf-note zf-enter-3" role="note" style={{ marginTop: 18 }}>{LAPTOP.open}</p> : <>{"stepsHead" in t && <p className="zf-label sec-steps__head zf-enter-3">{t.stepsHead}</p>}<ol className="sec-steps zf-enter-3">{("step1" in t ? [t.step1, pairStepTwo(phone).step] : t.steps).map((s) => <li key={s}>{s}</li>)}</ol></>}
           {/* H13: the laptop page's one fixed address, to copy (and send to the laptop) instead of typing it */}
           {kind === "laptop" && !sample && LAPTOP.address && <CopyAddress address={LAPTOP.address} />}
           <div className="zf-fill" />
           {/* A browser has no scanner here (Permissions-Policy camera=()): Paste only, no frame that looks like one. */}
-          <div className="zf-floor">{kind === "laptop" && LAPTOP.later && !sample ? <button className="zf-btn" onClick={onDone}>Done</button> : sample ? <button className="zf-btn" onClick={() => setStep("laptop")}>Open ZeroFee on my laptop</button> : phone ? <><button className="zf-btn" onClick={() => setStep("scan")}>{t.scanButton}</button><button className="zf-link" onClick={() => void pasteCode()}>Paste the code</button></> : <button className="zf-btn" disabled={asking} onClick={() => void pasteCode()}>{asking ? "Asking your account…" : "Paste the code"}</button>}</div>
+          <div className="zf-floor">{kind === "laptop" && LAPTOP.later && !sample ? <button className="zf-btn" onClick={onDone}>Done</button> : sample ? <button className="zf-btn" onClick={() => setStep("laptop")}>Open ZeroFee on my laptop</button> : phone ? <><button className="zf-btn" onClick={() => setStep("scan")}>{t.scanButton}</button><button className="zf-link" onClick={() => void pasteCode()}>Paste the code</button></> : <button className="zf-btn" disabled={asking} onClick={() => void pasteCode()}>{asking ? "Asking your account…" : PAIR_STEP_TWO.web.button}</button>}</div>
         </>
       )}
       {step === "laptop" && sample && (

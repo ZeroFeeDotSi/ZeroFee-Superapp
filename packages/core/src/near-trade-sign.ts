@@ -8,7 +8,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import type { Block, Chain } from "./chain.ts";
 import { txHashOf } from "./chain.ts";
 import { NEAR_FAIR_SHARE, NEAR_POOL_DEPTH, NEAR_SLIPPAGE_MAX_BPS, NEAR_STORAGE_MAX_YOCTO, REF_EXCHANGE_ID, WNEAR, nearRegisterTx, nearTradeBytesRefusal, nearTradeTx, sheetSymbol, type NearTradeAsk } from "./near-trade.ts";
-import { RHEA_COIN_ROOM_YOCTO, RHEA_ROOM_YOCTO, rheaBytesRefusal, rheaDepositTx, rheaRoomBackTx, rheaRoomTx, rheaSwapTx, rheaWithdrawTx, type RheaRule } from "./near-rhea.ts";
+import { RHEA_COIN_ROOM_YOCTO, RHEA_ROOM_YOCTO, rheaBytesRefusal, rheaDepositTx, rheaRoomBackTx, rheaClaimTx, rheaRoomTx, rheaSwapTx, rheaWithdrawTx, type RheaRule } from "./near-rhea.ts";
 import { sameTransaction, serialize, signedBase64, type UnsignedTx } from "./tx-build.ts";
 import { decodeTransaction } from "./tx-decode.ts";
 
@@ -288,6 +288,30 @@ export async function buildRheaRoomBack(chain: Chain, wallet: string, publicKey:
   const amount = acct.roomYocto > RHEA_ROOM_YOCTO ? RHEA_ROOM_YOCTO : acct.roomYocto;
   const built = rheaRoomBackTx(amount);
   return { amount, b: { tx: { signerId: wallet, publicKey, nonce, receiverId: built.receiverId, blockHash: block.hash, actions: built.actions }, valueYocto: 0n, poolOut: 0n, block, usd: null, symbol: "NEAR", decimals: 24 } };
+}
+
+/**
+ * A coin Ref keeps for the wallet in its lost and found (a kept trade's coin out, the audit's MUST, 7 Nov), claimed back to the
+ * wallet: Ref's claim_lostfound, 1 yocto, at an agreed block where Ref holds some of it for the wallet (get_lostfound_token
+ * on two nodes) and the wallet has the coin's own account (Ref's transfer to it fails without one, and the coin goes back
+ * to the lost and found). Worth nothing to the caps: only 1 yocto leaves the wallet.
+ */
+export async function buildRheaClaim(chain: Chain, wallet: string, publicKey: string, token: string): Promise<NearBuilt & { held: bigint }> {
+  const block = await chain.commonBlock();
+  const [nonce, held, reg, meta] = await Promise.all([
+    keyAt(chain, wallet, publicKey, block),
+    chain.view(REF_EXCHANGE_ID, "get_lostfound_token", { account_id: wallet, token_id: token }, block),
+    chain.view(token, "storage_balance_of", { account_id: wallet }, block),
+    chain.view(token, "ft_metadata", {}, block),
+  ]);
+  const n = big(held) ?? 0n;
+  if (n <= 0n) throw new NearTradeRefused("Rhea holds none of this coin for your wallet.");
+  if (reg === null) throw new NearTradeRefused("This coin needs its account in your wallet first.", token === WNEAR ? "near.wnear.unregistered" : "near.coin.unregistered");
+  const built = rheaClaimTx(token);
+  const m = meta as { symbol?: unknown; decimals?: unknown } | null;
+  const symbol = token === WNEAR ? "NEAR" : sheetSymbol(m?.symbol, token);
+  const decimals = token === WNEAR ? 24 : typeof m?.decimals === "number" && Number.isInteger(m.decimals) && m.decimals >= 0 && m.decimals <= 32 ? m.decimals : 0;
+  return { tx: { signerId: wallet, publicKey, nonce, receiverId: built.receiverId, blockHash: block.hash, actions: built.actions }, valueYocto: 1n, poolOut: 0n, block, usd: 0, symbol, decimals, held: n };
 }
 
 export const yoctoToNear = (y: bigint) => Number(y) / Number(YOCTO);

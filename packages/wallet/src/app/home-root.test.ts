@@ -61,6 +61,7 @@ test("a sheet past signing only hides: its job and rows carry on, nothing is can
 // sheet drives; the sheet's Approve is exactly spending.topUp), the sheet half is pinned above (MoneyHost's listener is
 // the Close path, "not now", never an approve). The join: nothing outside the shell and the two hosts listens for the event.
 import { createMockBridge } from "@zerofee/shell-api/MockBridge.ts";
+import { simClock } from "@zerofee/shell-api/testing/sim-clock.ts";
 import { ProblemError } from "@zerofee/core/problem";
 import { createSpendingService, type SpendingActivity } from "@zerofee/core/spending";
 import { bridgeWallets, createCoreFloat, type CoreFloatDeps } from "../../../trade/src/float-core.ts";
@@ -69,10 +70,12 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const PX = { sol: 150, hood: 3000, bsc: 600 } as const;
-const settle = () => new Promise((r) => setTimeout(r, 40));
 
 async function engine() {
-  const mock = createMockBridge({ latencyMs: 0, settleMs: 5, float: { moveMs: 10 } });
+  const clock = simClock();
+  const mock = clock.watch(createMockBridge({ latencyMs: 0, settleMs: 5, timers: clock.timers, float: { moveMs: 10, timers: clock.timers } }));
+  /** A round's 40 ms of the test's own time: the engine's calls answered, then the Sim's steps due by then land in order. */
+  const settle = async () => { await clock.quiet(); await clock.advance(40); };
   const call: CoreFloatDeps["call"] = async (method, params) => {
     const r = await mock.call<any>(method, params); if ("problem" in r) throw new ProblemError(r.problem);
     return r.ok;

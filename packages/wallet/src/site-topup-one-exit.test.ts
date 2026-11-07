@@ -38,7 +38,7 @@ function setup(o: { pocketUnits: string; fillOpen?: boolean }) {
 const pay = (s: ReturnType<typeof setup>, usd: number, whole: boolean) => s.ledger.call<{ parts: { wallet: string; ids: string[] }[] }>("ledger.moveFromPrivate", { parts: [{ wallet: "sw-site-pump", usd }], job: JOB, caller: "trade", ...(whole ? { whole: true } : {}) });
 const exits = (s: ReturnType<typeof setup>) => s.asked.filter((q) => !q.dry && q.recipient === SITE);
 
-test("from the Safe (Private short): exactly ONE fill, the whole amount rounded up a step, under ONE Face ID, then ONE exit to the site's wallet; Private's own share stays (control: Home's Move without `whole` pays two exits)", async () => {
+test("from the Safe (Private short): exactly ONE fill, the whole amount rounded up a step, under ONE Face ID, then ONE exit to the site's wallet; Private's own share stays (control: Home's Move without `whole` pays two exits once Private's share is past its buffer)", async () => {
   const s = setup({ pocketUnits: "12500000", fillOpen: true });
   const r = await pay(s, 30, true);
   assert.ok("ok" in r, "problem" in r ? `${r.problem.code} ${r.problem.whatHappened}` : "");
@@ -50,9 +50,15 @@ test("from the Safe (Private short): exactly ONE fill, the whole amount rounded 
   assert.equal(exits(s).length, 1, "one exit to the site's wallet");
   assert.equal(s.core.privatePays.length, 1);
   assert.deepEqual([exits(s)[0].depositType, exits(s)[0].recipientType, exits(s)[0].refundTo], ["CONFIDENTIAL_INTENTS", "DESTINATION_CHAIN", POCKET]);
-  // control: the same Move without `whole` pays Private's share and then the fill's part, two exits
-  const c = setup({ pocketUnits: "12500000", fillOpen: true });
-  const two = await pay(c, 30, false);
+  // one Face ID (6 Nov): the same Move without `whole` folds the same way while Private stays under its $500 buffer (the audit's R2)
+  const f = setup({ pocketUnits: "12500000", fillOpen: true });
+  const folded = await pay(f, 30, false);
+  assert.ok("ok" in folded);
+  assert.deepEqual([folded.ok.parts[0]!.ids.map((id) => id.split(":")[0]), exits(f).length, f.core.signed.length], [["safe-send"], 1, 1]);
+  // control: past the buffer (Private's $450 plus the whole fill's step) without `whole`: Private's share, then the fill's
+  // part, two exits
+  const c = setup({ pocketUnits: "450000000", fillOpen: true });
+  const two = await pay(c, 600, false);
   assert.ok("ok" in two);
   assert.deepEqual(two.ok.parts[0]!.ids.map((id) => id.split(":")[0]), ["pocket-send", "safe-send"]);
   assert.equal(exits(c).length, 2);

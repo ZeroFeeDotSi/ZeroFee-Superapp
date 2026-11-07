@@ -4,6 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { underAmount } from "./send-cap.ts";
 import { TokenDirectory } from "@zerofee/pay/tokens";
 import { RECORDED_TOKENS } from "@zerofee/pay/testing/recorded-tokens";
 import { emv, field as f } from "@zerofee/pay/testing/emv";
@@ -171,7 +172,9 @@ test("POISONED 3, an amount ten times what the code's own words say: the unit gu
   // and on Send itself the code's amount is said in its own coin before the hold ("They asked for 12.5 USDC."), the
   // dollars beside it are that amount at the coin's price, and the core's sheet then shows what 1Click signed
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
-  assert.match(form, /exact \? `They asked for \$\{exact\.amount\} \$\{exact\.symbol\}\.`/);
+  // changed pin (S1, 6 Nov): the slot's words are send-cap.ts underAmount's, read as behaviour
+  assert.equal(underAmount({ over: false, exact: { amount: "12.5", symbol: "USDC" }, amount: "12.5", symbol: "USDC", place: "your Safe", maxLine: null }).coins, "They asked for 12.5 USDC.");
+  assert.match(form, /const under = underAmount\(\{ over, exact: exact \?\? null,/);
   assert.match(form, /const usd = exact \? \(\(\) => \{ const t = tokens\?\.byAsset\(exact\.tokenId\); return t\?\.priceUsd \? Number\(exact\.amount\) \* Number\(t\.priceUsd\) : null; \}\)\(\)/);
 });
 
@@ -216,7 +219,7 @@ test("a scanned amount is in the form, shown and editable (the amount field and 
   // the amount it set is the field the person types in, and Send is a button they tap
   assert.match(form, /value=\{shown\} onChange=\{\(e\) => paste\(e\.target\.value\)\}/);
   assert.match(form, /const setCoins = \(coins: string\) => \{\n\s+setExact\(null\);/, "a change by the person is theirs: the exact amount gives way");
-  assert.match(form, /<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">\{label\}<\/button>/, "and sending is the person's own tap (no hold: product decision, 5 Nov)");
+  assert.match(form, /<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">\{floor\.label\}<\/button>/, "and sending is the person's own tap (no hold: product decision, 5 Nov)");
 });
 
 test("the scan glyph sits at the end of Send's 'where to' field; Home keeps its four buttons; the camera loads on first tap", () => {

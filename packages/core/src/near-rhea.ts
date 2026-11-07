@@ -10,6 +10,9 @@
 //   withdraw: v2.ref-finance.near  withdraw { token_id: wrap.near, amount, unregister: false, skip_unwrap_near: true } (1 yocto)
 //   room back: v2.ref-finance.near storage_withdraw { amount } (1 yocto): the room's unused NEAR, once Put away has taken
 //              all the wallet's NEAR out of Rhea (the audit's SHOULD, 5 Nov)
+//   claim:    v2.ref-finance.near  claim_lostfound { token_id } (1 yocto): a coin Ref kept for the wallet in its lost and
+//              found (a trade's transfer out failed), sent to the caller's own wallet by Ref (verified 7 Nov on mainnet:
+//              the wasm's export, its 1-yocto guard, and a user's own claim tx; the audit's MUST: nothing else new)
 // The core builds each from its own reads (near-trade-sign.ts), decodes its bytes again (tx-decode.ts) and holds them to
 // rheaBytesRefusal: anything else is never signed. The risk said plainly (review): while ready, the wallet's NEAR and
 // coins sit in Rhea's contract, under Rhea's code (upgradable by its DAO, ref-finance.sputnik-dao.near) and its guardians'
@@ -43,7 +46,8 @@ export type RheaRule =
   | { rhea: "room" }
   | { rhea: "deposit"; amount: bigint }
   | { rhea: "withdraw"; amount: bigint }
-  | { rhea: "roomBack"; amount: bigint };
+  | { rhea: "roomBack"; amount: bigint }
+  | { rhea: "claim"; token: string };
 
 const enc = (o: unknown) => new TextEncoder().encode(JSON.stringify(o));
 
@@ -77,6 +81,11 @@ export function rheaRoomBackTx(amount: bigint): { receiverId: string; actions: C
 
 export function rheaWithdrawTx(amount: bigint): { receiverId: string; actions: CoreAction[] } {
   return { receiverId: REF_EXCHANGE_ID, actions: [{ kind: "call", method: "withdraw", args: enc({ token_id: WNEAR, amount: amount.toString(), unregister: false, skip_unwrap_near: true }), gas: RHEA_WITHDRAW_GAS, depositYocto: ONE_YOCTO }] };
+}
+
+/** A coin Ref holds for the wallet in its lost and found, sent back to the wallet (the caller; no account in the args). */
+export function rheaClaimTx(token: string): { receiverId: string; actions: CoreAction[] } {
+  return { receiverId: REF_EXCHANGE_ID, actions: [{ kind: "call", method: "claim_lostfound", args: enc({ token_id: token }), gas: RHEA_WITHDRAW_GAS, depositYocto: ONE_YOCTO }] };
 }
 
 const json = (b: Uint8Array): unknown => { try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(b)); } catch { return undefined; } };
@@ -131,6 +140,12 @@ export function rheaBytesRefusal(d: DecodedTx, wallet: string, r: RheaRule): str
   if (r.rhea === "roomBack") {
     const a = args as { amount?: unknown } | undefined;
     if (s.method !== "storage_withdraw" || s.depositYocto !== ONE_YOCTO || !sameKeys(a, ["amount"]) || a!.amount !== r.amount.toString() || r.amount <= 0n || r.amount > RHEA_ROOM_YOCTO) return "It isn't your wallet's room coming back from Rhea.";
+    return null;
+  }
+  if (r.rhea === "claim") {
+    // the audit's MUST (7 Nov): exactly Ref's claim_lostfound, 1 yocto, { token_id } alone, the kept trade's coin
+    const a = args as { token_id?: unknown } | undefined;
+    if (s.method !== "claim_lostfound" || s.depositYocto !== ONE_YOCTO || !sameKeys(a, ["token_id"]) || a!.token_id !== r.token) return "It isn't your coin coming back from Rhea.";
     return null;
   }
   const a = args as { token_id?: unknown; amount?: unknown; unregister?: unknown; skip_unwrap_near?: unknown } | undefined;

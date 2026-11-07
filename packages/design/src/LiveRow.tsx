@@ -5,6 +5,8 @@
 // go in its slots as they are (a coin's age chip, its price's glint, its coloured change).
 import type { CSSProperties, ReactNode, Ref } from "react";
 import "./liverow.css";
+import { Checkpoints } from "./Checkpoints.tsx";
+import { checkpointLabel, type CheckpointKind } from "./checkpoints.ts";
 export { progressOf, timeSlot } from "./live-row.ts";
 
 import type { LiveRowState } from "./live-row.ts";
@@ -18,7 +20,7 @@ const Badge = ({ state }: { state: LiveRowState }) => (
   </span>
 );
 
-export function LiveRow({ mark, title, line, below, usd, when, state, p, onOpen, label, rowRef, className, style, onPointerDown }: {
+export function LiveRow({ mark, title, line, below, usd, when, state, p, track, onOpen, label, rowRef, className, style, onPointerDown }: {
   /** The coin's logo or the app's glyph. */
   mark: ReactNode;
   title: ReactNode;
@@ -32,6 +34,9 @@ export function LiveRow({ mark, title, line, below, usd, when, state, p, onOpen,
   state: LiveRowState;
   /** Progress, 0..1 (progressOf). Only a row with progress draws its line: a finished row in a list has none. */
   p?: number;
+  /** A going job's four checkpoints (the copy review's spec, 6 Nov), in place of the progress line: its kind and the current one
+   *  (checkpointAt). Never on an ended row. The row's label gains "step 2 of 4, Swapping". */
+  track?: { kind: CheckpointKind; at: number };
   onOpen?: () => void;
   /** The whole row in words, for screen readers. */
   label?: string;
@@ -41,8 +46,10 @@ export function LiveRow({ mark, title, line, below, usd, when, state, p, onOpen,
   style?: CSSProperties;
   onPointerDown?: () => void;
 }) {
+  const cp = track && (state === "going" || state === "slow") ? track : undefined;
+  const said = cp && label ? `${label}, ${checkpointLabel(cp.kind, Math.max(0, Math.min(3, Math.round(cp.at))))}` : label;
   return (
-    <button ref={rowRef} type="button" className={`zf-lrow is-${state}${className ? ` ${className}` : ""}`} style={style} onClick={onOpen} onPointerDown={onPointerDown} aria-label={label}>
+    <button ref={rowRef} type="button" className={`zf-lrow is-${state}${cp ? " has-track" : ""}${className ? ` ${className}` : ""}`} style={style} onClick={onOpen} onPointerDown={onPointerDown} aria-label={said}>
       <span className="zf-lrow__mark" aria-hidden="true">{mark}<Badge state={state} /></span>
       <span className="zf-lrow__text">
         <span className="zf-lrow__t">{title}</span>
@@ -55,7 +62,8 @@ export function LiveRow({ mark, title, line, below, usd, when, state, p, onOpen,
           {when && <span className="zf-lrow__w">{when}</span>}
         </span>
       )}
-      {p !== undefined && (
+      {cp && <Checkpoints className="zf-lrow__cp" kind={cp.kind} at={cp.at} />}
+      {!cp && p !== undefined && (
         <span className="zf-lrow__line" aria-hidden="true">
           <span className="zf-lrow__fill" style={{ "--p": p } as CSSProperties}><span className="zf-lrow__flow" /></span>
         </span>

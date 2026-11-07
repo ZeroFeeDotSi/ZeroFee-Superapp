@@ -7,9 +7,9 @@ import { grade } from "../../../../../tools/copy/voice.ts";
 import { CANT_PRIVATE, FEE_ROOM, FIRST_MODE, MODE_WORDS, MOVE_TO_PRIVATE, OPEN_AMOUNT_LINE, PLAIN_LINE, SEND_PLAIN, SET_UP_PRIVATE, hiddenCantLine, privateOnly, privateShortUsd, shortLine } from "./chat-private.ts";
 
 test("the short line says by how much, in dollars first", () => {
-  assert.equal(shortLine(3), "Your private balance is $3 short. Move money to it first.");
-  assert.equal(shortLine(0.034), "Your private balance is $0.04 short. Move money to it first.", "rounded up: moving that much covers it");
-  assert.equal(shortLine(null), "Your private balance is short. Move money to it first.");
+  assert.equal(shortLine(3), "Private is $3 short. Move money to it first.");
+  assert.equal(shortLine(0.034), "Private is $0.04 short. Move money to it first.", "rounded up: moving that much covers it");
+  assert.equal(shortLine(null), "Private is short. Move money to it first.");
   const near = (x: number) => Math.round(x * 1e6) / 1e6;
   assert.equal(near(privateShortUsd({ amount: "5", symbol: "USDC", chain: "near" }, [{ symbol: "USDC", amount: "2", usd: "2", chain: "near" }])!), near(5 * FEE_ROOM - 2), "the fee's room counted");
   assert.equal(near(privateShortUsd({ amount: "0.01", symbol: "NEAR", priceUsd: "4.2" }, [])!), near(0.042 * FEE_ROOM));

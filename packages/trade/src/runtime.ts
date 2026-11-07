@@ -5,7 +5,6 @@ import { every as restEvery } from "@zerofee/shell-api/rest.ts";
 import type { Bridge } from "@zerofee/core/bridge";
 import { sessionRefusal } from "@zerofee/core/solana";
 import { createDemoEngine, isSampleAddress } from "./demo-engine.ts";
-import { createMarket } from "./market/index.ts";
 import { createSwitchMarket } from "./market/switch.ts";
 import type { NearRpc } from "./market/near.ts";
 import type { NearEngineDeps } from "./near/engine.ts";
@@ -58,8 +57,8 @@ function lazyNearRpc(): NearRpc {
 function lazyNearEngine(d: NearEngineDeps): ChainEngine {
   let made: Promise<ChainEngine> | undefined;
   // each door hands its call to the engines once they're loaded (Home's JS budget: kept small here)
-  const later = <K extends "prepare" | "settle" | "followMove" | "holdings" | "send" | "status" | "fill">(k: K) => (async (...a: unknown[]) => ((await (made ??= import("./near/route.ts").then((m) => m.nearEngines(d))))[k] as (...x: unknown[]) => unknown)(...a)) as unknown as NonNullable<ChainEngine[K]>;
-  return { chain: "near", owner: d.owner, prepare: later("prepare"), settle: later("settle"), followMove: later("followMove"), holdings: later("holdings"), send: later("send"), status: later("status"), fill: later("fill"), txHash: () => { throw new Error(); }, poolChanged: () => {} };
+  const later = <K extends "prepare" | "settle" | "followMove" | "finalAgain" | "keptHeld" | "claimKept" | "holdings" | "send" | "status" | "fill">(k: K) => (async (...a: unknown[]) => ((await (made ??= import("./near/route.ts").then((m) => m.nearEngines(d))))[k] as (...x: unknown[]) => unknown)(...a)) as unknown as NonNullable<ChainEngine[K]>;
+  return { chain: "near", owner: d.owner, prepare: later("prepare"), settle: later("settle"), followMove: later("followMove"), finalAgain: later("finalAgain"), keptHeld: later("keptHeld"), claimKept: later("claimKept"), holdings: later("holdings"), send: later("send"), status: later("status"), fill: later("fill"), txHash: () => { throw new Error(); }, poolChanged: () => {} };
 }
 
 export interface TradeRuntime {
@@ -80,7 +79,7 @@ export interface TradeRuntime {
 const demoFlag = (k: string): string | null => (typeof location === "undefined" ? null : new URLSearchParams(location.search).get(k));
 
 /** The build's market relay (VITE_ZEROFEE_RELAY), read where a bundler set it; nothing under node. */
-const buildRelay = (): string | undefined => (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_RELAY;
+const buildRelay = (): string | undefined => import.meta.env?.VITE_ZEROFEE_RELAY;
 
 export function createTradeRuntime(bridge: Bridge): TradeRuntime {
   // the market reads GeckoTerminal and, read-only, the chains themselves; ?demo trades nothing on a chain and reads no node.
@@ -94,11 +93,15 @@ export function createTradeRuntime(bridge: Bridge): TradeRuntime {
   // ?demo (the shell's sample wallets): the market answers from recordings, never the network, so a demo never meets a
   // shared connection's rate limit (market/recorded.ts, loaded only then). Everywhere else, the live client.
   const sample = bridge.call<{ address: string }[]>("subwallet.list", {}).then((r) => !("problem" in r) && r.ok.some((w) => isSampleAddress(w.address)), () => false);
+  // the market's own code (its lists, spam filter and live prices) loads later (Home's JS budget), asked for here, beside
+  // the wallet list above, so it is in long before any tap: every market call already waits for this one pick
+  const marketCode = import("./market/index.ts");
   const market = createSwitchMarket(sample.then(async (yes) => {
+    const { createMarket } = await marketCode;
     // the build's market relay (apps/quotes; VITE_ZEROFEE_RELAY, a public address): the GeckoTerminal key stays on it
     // the chain is read beside it (read-only), so a coin pasted minutes after its launch is found before the market data lists it
     // D157: the Chrome extension has no Sim at all: always the live market (read inline, so the recorded one doesn't ship)
-    if (!yes || ((import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_TARGET === "extension" && (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_EXTENSION_CHECK !== "1")) {
+    if (!yes || (import.meta.env?.VITE_ZEROFEE_TARGET === "extension" && import.meta.env?.VITE_ZEROFEE_EXTENSION_CHECK !== "1")) {
       const evm = { bsc: createEvmRpc({ chain: "bsc" }), hood: createEvmRpc({ chain: "hood" }) };
       // the open coin's live price over the chains' sockets (WS_HOSTS only; polling behind them, and wherever a CSP refuses wss:)
       const ws = browserWs();

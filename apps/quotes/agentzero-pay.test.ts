@@ -54,7 +54,11 @@ function txResult(o: { from?: string; amount?: string; memo?: string; receive?: 
 /** `secret`: the relay's sign-up secret (a rotation: another); `up`: the store, shared with another world (one relay, its
  *  secret changed). */
 function world(o: { receive?: string | undefined; anthropic?: () => Response; nodeLies?: (url: string, r: any) => any; usage?: [number, number]; balance?: bigint | null; account?: string | null; bind?: (token: string) => string; secret?: string; up?: ReturnType<typeof fakeUpstash> } = {}) {
-  const clock = { t: Date.now() };
+  // The relay's caps count by UTC day, so a test's clock never starts in the day's last hour: a run there crossed
+  // midnight mid-test (8 NovZ: "one address" read 9 !== 5). It moves forward to just past midnight, never back,
+  // because the test's sign-up ids carry the real hour.
+  const real = Date.now(), left = 86_400_000 - (real % 86_400_000);
+  const clock = { t: left < 3_600_000 ? real + left + 60_000 : real };
   const now = () => clock.t;
   const up = o.up ?? fakeUpstash(now);
   const counter = privateCounter(redisCounter({ url: "https://redis.test", token: "t", fetchFn: up.fetchFn as never, now }), STORE_KEY);

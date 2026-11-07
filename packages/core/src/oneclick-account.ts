@@ -56,7 +56,9 @@ export function signInPayload(signerId: string, saltHex: string, deadlineMs: num
 /** NEAR Intents' salt, read from NEAR, gave no usable answer: a NEAR read, never 1Click's (bug 8). */
 export class SaltUnread extends Error {}
 
-export async function privateBalances(o: { signerId: string; secret: Uint8Array; salt: () => Promise<string | null>; fetch?: typeof fetch; now?: () => number }): Promise<{ tokenId: string; amount: string }[]> {
+/** `strict`: a row it can't read (no coin id, or an amount that isn't units) fails the whole read, never left out (a plan
+ *  that sizes the Safe's fill from it: the audit's SHOULD, 7 Nov). Default: such a row is left out, as before. */
+export async function privateBalances(o: { signerId: string; secret: Uint8Array; salt: () => Promise<string | null>; fetch?: typeof fetch; now?: () => number; strict?: boolean }): Promise<{ tokenId: string; amount: string }[]> {
   const get = o.fetch ?? fetch;
   const salt = await o.salt();
   if (!salt) throw new SaltUnread("salt unread");
@@ -70,8 +72,9 @@ export async function privateBalances(o: { signerId: string; secret: Uint8Array;
   if (!res.ok) throw new Error(`NEAR Intents' balances said ${res.status}`);
   const list = ((await readJson(res)) as { balances?: unknown })?.balances;
   if (!Array.isArray(list)) throw new Error("NEAR Intents' balances can't be read");
-  return list
-    .filter((b): b is { tokenId: string; available: string } => typeof b?.tokenId === "string" && /^nep(141|245):[A-Za-z0-9._:-]{2,200}$/.test(b.tokenId) && typeof b?.available === "string" && /^\d{1,40}$/.test(b.available))
+  const read = list.filter((b): b is { tokenId: string; available: string } => typeof b?.tokenId === "string" && /^nep(141|245):[A-Za-z0-9._:-]{2,200}$/.test(b.tokenId) && typeof b?.available === "string" && /^\d{1,40}$/.test(b.available));
+  if (o.strict && read.length !== list.length) throw new Error("NEAR Intents' balances can't be read");
+  return read
     .filter((b) => BigInt(b.available) > 0n)
     .map((b) => ({ tokenId: b.tokenId, amount: b.available }));
 }

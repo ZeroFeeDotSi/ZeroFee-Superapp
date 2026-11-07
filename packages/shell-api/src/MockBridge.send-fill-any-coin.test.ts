@@ -30,10 +30,10 @@ test("QA walk MUST 1: a $40 NEAR Send from the Safe with Private short fills Pri
   const priv = await privRow(mock, WNEAR);
   assert.ok(Math.abs(Number(priv!.amount) - 0.871326373 - (step - Number(asked))) < 1e-6, "the extra is in Private, Private's own NEAR untouched");
   const sheet = words[0]!;
-  assert.equal(sheet.title, "Send $40.00 from your Safe");
+  assert.equal(sheet.title, "Send $40.00 to bob.near");
   // the copy review's fill-sheet words (train 37): what they get first (coin, then its dollars), what the Safe sends, what stays
   // QA's Sim walk: the brackets are what the payee's coin is worth ($39.60), and the $0.40 is named, last
-  assert.deepEqual(sheet.lines.filter((l) => /^(They get|Your Safe sends|Stays in Private|Fees) · /.test(l)), ["They get · 8.939 wNEAR ($39.60)", "Your Safe sends · $50.00", "Stays in Private · $10.00", "Fees · about $0.40"]);
+  assert.deepEqual(sheet.lines.filter((l) => /^(They get|Your Safe sends|From your Safe|Private keeps the rest|Stays in Private|Fees) · /.test(l)), ["They get · 8.939 wNEAR (about $39.60)", "From your Safe · $50.00", "Private keeps the rest · about $10.00", "Fees · about $0.40"]);
   assert.ok(![sheet.title, ...sheet.lines].some((l) => /\d\.\d{5,}/.test(l)), "no coin figure past 4 places");
   // control: USDC as before ($25 → the $30 step)
   const u = await send(mock, USDC, "25");
@@ -47,7 +47,7 @@ test("QA walk MUST 1: a $40 NEAR Send from the Safe with Private short fills Pri
 test("QA walk (c): the day's limit counts what leaves the Safe, the whole $50 step of a $40 NEAR Send (as the core's sendRoom): \"Send up to $436.89\" after it; a Send Private pays alone counts nothing (control)", async () => {
   const mock = sim(true);
   const p5 = await send(mock, WNEAR, (0.5).toFixed(9));
-  assert.ok("ok" in p5 && String(p5.ok[0]!.id).startsWith("mv-"), "control: Private pays it, no fill");
+  assert.ok("ok" in p5 && String(p5.ok[0]!.id).startsWith("pocket-send:"), "control: Private pays it (pocket-send:, 83 M1), no fill");
   const r = await send(mock, WNEAR, (40 / 4.43).toFixed(9));
   assert.ok("ok" in r, "problem" in r ? JSON.stringify(r.problem) : "");
   const big = await send(mock, USDC, "900");

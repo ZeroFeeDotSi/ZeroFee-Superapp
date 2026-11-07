@@ -20,7 +20,7 @@ import { reloadForChunk } from "@zerofee/shell-api/chunk-reload.ts";
  *  the public build (product decision, 3 Nov: AgentZero is live there; the public site is the sample-money demo, so its chat is
  *  the sample one, and AgentZeroChatApp.tsx leaves the real chat, its relay turn and every key path out of that build);
  *  elsewhere only with ?azchat. The build-time flags are read inline so a build without the chat drops its code. */
-const AZ_CHAT = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ZEROFEE_PUBLIC === "1" || (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_AGENTZERO_CHAT === "1" || (typeof location !== "undefined" && new URLSearchParams(location.search).has("azchat"));
+const AZ_CHAT = import.meta.env?.VITE_ZEROFEE_PUBLIC === "1" || import.meta.env?.VITE_AGENTZERO_CHAT === "1" || (typeof location !== "undefined" && new URLSearchParams(location.search).has("azchat"));
 
 /**
  * A component whose code loads later (speed, D145, AgentZero's speed worker 3 Nov): once its code is here (preloaded with

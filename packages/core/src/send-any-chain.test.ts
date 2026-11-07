@@ -188,7 +188,7 @@ test("QA's MUST (5 Nov): a Move's Private leg is the core's own record: the pock
   assert.equal(s.w.privateLeg(leg1.depositAddress), null, "nothing before leg 2 joins");
   await s.w.privatePay(s.pocket.id, OUT, s.pay({ coin: USDC, dest: SOL_IN, recipient: SOL_PAYEE }, leg1), "Move", "tag-for-this-quote-0001", leg1.depositAddress);
   // the ruling (the audit and the copy review, 5 Nov): leg 2's own signed amountIn and its payee beside the share; `own` is ownPayee's word
-  assert.deepEqual(s.w.privateLeg(leg1.depositAddress), { tokenId: USDC, payUnits: "19800000", recipient: SOL_PAYEE, own: false, units: "12500000" });
+  assert.deepEqual(s.w.privateLeg(leg1.depositAddress), { tokenId: USDC, payUnits: "19800000", recipient: SOL_PAYEE, own: false, toTokenId: SOL_IN, units: "12500000" });
   assert.equal(s.w.privateLeg("f".repeat(64)), null, "only that move in's address");
   // controls: the share went to another payee; no share at all; a join that was refused records nothing
   const other = await setup();
@@ -199,7 +199,7 @@ test("QA's MUST (5 Nov): a Move's Private leg is the core's own record: the pock
   const none = await setup();
   const n1 = await none.w.privateQuoteIn(USDC, "20000000", false, true);
   await none.w.privatePay(none.pocket.id, OUT, none.pay({ coin: USDC, dest: SOL_IN, recipient: SOL_PAYEE }, n1), "Move", "tag-for-this-quote-0001", n1.depositAddress);
-  assert.deepEqual(none.w.privateLeg(n1.depositAddress), { tokenId: USDC, payUnits: "19800000", recipient: SOL_PAYEE, own: false }, "no share: leg 2 alone, no Private share");
+  assert.deepEqual(none.w.privateLeg(n1.depositAddress), { tokenId: USDC, payUnits: "19800000", recipient: SOL_PAYEE, own: false, toTokenId: SOL_IN }, "no share: leg 2 alone, no Private share");
   // the person's own SOL wallet as the payee: ownPayee says so
   const mine = await setup();
   const solOwn = (await mine.w.list()).find((x: any) => x.kind === "trade" && x.chain === "sol")!.address;

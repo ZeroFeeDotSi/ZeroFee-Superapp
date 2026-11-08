@@ -20,7 +20,7 @@ test("the public build shows AgentZero (product decision, 3 Nov) as the sample-m
   // build's Real mode (no web wallet, not the extension) still says one plain line
   assert.match(app, /const LiveChat = lazy\(\(\) => import\("\.\/LiveChat\.tsx"\)/);
   assert.match(app, /const liveHere = \(\): boolean => import\.meta\.env\?\.VITE_ZEROFEE_PUBLIC !== "1" \|\| import\.meta\.env\?\.VITE_ZEROFEE_TARGET === "extension" \|\| webWallet\(\);/);
-  assert.match(app, /\{SAMPLE \? <Suspense fallback=\{<p className="zf-small azc-note">Opening…<\/p>\}><SimChat shown=\{chatShown\} \{\.\.\.m\} \/><\/Suspense> : !liveHere\(\) \? <WebSoon \/> :/);
+  assert.match(app, /\{SAMPLE \? <Suspense fallback=\{null\}><SimChat shown=\{chatShown\} \{\.\.\.m\} \/><\/Suspense> : !liveHere\(\) \? <WebSoon \/> :/);
   assert.match(app, /AZ_WEB_SOON = "AgentZero opens on the web soon\. It works on the ZeroFee iPhone app today\."/);
   // the own-key reading path of Jobs and limits (rulebox readJob) is inline-gated too, so the SDK is never in the build
   const rule = readFileSync(new URL("../../../../packages/agent/src/zero/rulebox.ts", import.meta.url), "utf8");

@@ -16,7 +16,7 @@ test("the NEAR row: $1,383.92 ready, and the rest named by place: Private's $8.8
   const near = sendSources([], SAFE, POCKET, true).find((s) => s.symbol === "NEAR")!;
   assert.equal(near.usd, "1448.16", "Home's figure");
   assert.ok(near.rest, "a rest");
-  assert.equal(restLine(near), "$8.86 more is in Private. $55.38 more is elsewhere in your Safe.", "the copy review's trim: the row says the ready figure; this only the causes");
+  assert.equal(restLine(near), "Your Safe holds $1,448.16 in NEAR, $8.86 of it in Private. One send can't take it all.", "QA 16's MUST 3: one idea, Home's figure and Private's part; the row says the ready figure");
   const total = 1383.92 + near.rest!.privateUsd + near.rest!.elsewhereUsd + near.rest!.stakedUsd;
   assert.equal(total.toFixed(2), "1448.16", "ready + the parts = Home's figure");
   const whole = sendSources([], [row("nep141:wrap.near", "NEAR", "10", "44.30", "ledger")], [], true).find((s) => s.symbol === "NEAR")!;
@@ -31,21 +31,22 @@ test("a split whose paying place is Private names the Safe's places elsewhere, n
 
 test("the words by place; a part under $0.01 is left out; no fees words (audit: the account's NEAR row is already net of its storage and fee room, ledger.ts spendable)", () => {
   const s = { row: null, symbol: "NEAR", amount: "326.9", usd: "1448.16", max: "312.4" };
-  assert.equal(restLine({ ...s, rest: { privateUsd: 8.86, elsewhereUsd: 0.004, stakedUsd: 0 } }), "$8.86 more is in Private.");
-  assert.equal(REST_WORDS.elsewhere("$1.00"), "$1.00 more is elsewhere in your Safe.");
-  assert.deepEqual(Object.keys(REST_WORDS), ["private", "elsewhere", "staked", "kept"], "no fees branch (kept: the round sum's gap, QA 16 7 Nov)");
+  assert.equal(restLine({ ...s, rest: { privateUsd: 8.86, elsewhereUsd: 0.004, stakedUsd: 0 } }), "Private keeps the rest · about $8.86");
+  assert.equal(restLine({ ...s, rest: { privateUsd: 0, elsewhereUsd: 55.38, stakedUsd: 17.72, keptUsd: 1 } }), "Your Safe keeps the rest · about $74.10", "QA 20: no Private part, the rest's one figure");
+  assert.equal(REST_WORDS.holds("$1.00", "NEAR", "$0.50"), "Your Safe holds $1.00 in NEAR, $0.50 of it in Private. One send can't take it all.");
+  assert.deepEqual(Object.keys(REST_WORDS), ["holds"], "no fees branch, no privacy claim (QA 16's MUST 3)");
   assert.equal(restLine({ ...s, rest: { privateUsd: 0, elsewhereUsd: 0, stakedUsd: 0 } }), null, "control: nothing to say");
 });
 
 test("QA 20 (8 Nov, B+): the line under From names the rest's figure: all in Private \"Private keeps the rest · about $X\" (copy review), spread by place, else \"Your Safe keeps the rest · about $X\" (controls: a dollar coin is exact, no price says the coins, all of it can go says nothing, a wallet says nothing)", async () => {
   const { restStaysLine, REST_KEPT } = await import("./send-cap.ts");
   const near = sendSources([], SAFE, POCKET, true).find((s) => s.symbol === "NEAR")!;
-  assert.equal(restStaysLine(near), "$8.86 more is in Private. $55.38 more is elsewhere in your Safe.", "spread over two places: each by its own figure, the From list's own words");
+  assert.equal(restStaysLine(near), "Your Safe holds $1,448.16 in NEAR, $8.86 of it in Private. One send can't take it all.", "spread over two places: one idea, the From list's own words");
   // the copy review's exact words (8 Nov, QA 16's B+): the rest all in Private
   const inPrivate = { row: null, symbol: "NEAR", amount: "314.4", usd: "1392.79", max: "312.4", rest: { privateUsd: 8.86, elsewhereUsd: 0, stakedUsd: 0 } };
   assert.equal(restStaysLine(inPrivate), "Private keeps the rest · about $8.86");
   assert.equal(restStaysLine({ ...inPrivate, rest: { privateUsd: 8.86, elsewhereUsd: 0.004, stakedUsd: 0 } }), "Private keeps the rest · about $8.86", "a part under $0.01 elsewhere doesn't count");
-  assert.equal(restStaysLine({ ...inPrivate, rest: { privateUsd: 0, elsewhereUsd: 4, stakedUsd: 0 } }), "$4.00 more is elsewhere in your Safe.", "control: none in Private, never Private's words");
+  assert.equal(restStaysLine({ ...inPrivate, rest: { privateUsd: 0, elsewhereUsd: 4, stakedUsd: 0 } }), "Your Safe keeps the rest · about $4.00", "control: none in Private, never Private's words");
   const s = { row: null, symbol: "NEAR", amount: "326.9", usd: "1448.16", max: "312.4" };
   assert.equal(restStaysLine(s), `${REST_KEPT} · about $64.23`, "14.5 NEAR at the row's price, down to the cent");
   assert.equal(restStaysLine({ row: null, symbol: "USDC", amount: "30", usd: "30", max: "12.5" }), "Your Safe keeps the rest · $17.50", "control: a dollar coin's figure is exact, no about");

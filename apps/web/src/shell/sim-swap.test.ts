@@ -67,7 +67,9 @@ test("Sim: Home's Swap of the Safe's USDC for SOL lands SOL, reads Swap from the
   assert.ok(Math.abs((await s.sol()) - 10 / PX.sol) < 0.002, `about $10 of SOL came into the SOL wallet: ${await s.sol()}`);
   const done = await s.track(r.id, swapLabel(r.id), swapLands(r.id));
   assert.equal(done.title, words);
-  assert.deepEqual(done.end, { ok: true, line: "About 0.0644 SOL came into your SOL wallet." });
+  // M12-2 (8 Nov): done, the row says what its record shows came in, no "About" (the sheet priced 0.0644 at the tap)
+  assert.equal(done.end?.ok, true);
+  assert.match(done.end!.line, /^0\.06\d\d SOL came into your SOL wallet\.$/);
 });
 
 test("control: a Move from the Safe (nothing named) still reads Move", async (t) => {

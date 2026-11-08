@@ -4,7 +4,7 @@ import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
 import type { CoinRow } from "../../market/types.ts";
 import type { ChainId } from "../../types.ts";
 import { CHAIN_NAME, useLive, useTrade } from "../runtime.tsx";
-import { atSale, chainTotalLine, coinRowWords, heldOn } from "../your-coins.ts";
+import { NO_PRICE, atSale, chainTotalLine, coinRowWords, heldOn } from "../your-coins.ts";
 import { heldNetOf, IF_SOLD } from "../held-net.ts";
 
 export function YourCoins({ chain, onCoin }: { chain: ChainId; onCoin: (seed: CoinRow) => void }) {
@@ -27,7 +27,7 @@ export function YourCoins({ chain, onCoin }: { chain: ChainId; onCoin: (seed: Co
           <button key={p.coin} className="zf-row tr-row" onClick={() => onCoin({ chain: p.chain, address: p.coin, symbol: p.symbol, name: p.symbol })}>
             <CoinIcon symbol={p.symbol} size={30} />
             <span><span className="t">{p.symbol}</span><span className="d">{w.since}</span></span>
-            <span className="tr-right"><span className="tr-v">{w.value}</span>{p.valueUsd !== undefined && <span className="zf-small tr-mute">{IF_SOLD}</span>}</span>
+            <span className="tr-right"><span className="tr-v">{w.value}</span>{p.valueUsd !== undefined && w.value !== NO_PRICE && <span className="zf-small tr-mute">{IF_SOLD}</span>}</span>
           </button>
         );
       })}

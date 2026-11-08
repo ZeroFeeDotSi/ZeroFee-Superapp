@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { cgFallbackIds, cgLogoPath, GT_MULTI_MAX, gtKey, gtMultiPaths, logoVia, nativeCoins, rankNative, readGtTokens, readMarkets, readTokens, searchNative, SAFE_CASH } from "./assets.ts";
 import { createNativeData, readFacts, readOhlcv } from "./data.ts";
-import { amountIn, heldOf, NATIVE_WORDS, resultOf, resumeSwapJobs, runSwap, safeCashOf, sellStart, SHEET_WORDS, type SafeQuote, type SwapMove, type SwapView } from "./swap.ts";
+import { amountIn, confidentialLegs, heldOf, legsTime, NATIVE_WORDS, resultOf, resumeSwapJobs, runSwap, safeCashOf, sellStart, SHEET_WORDS, type SafeQuote, type SwapMove, type SwapView } from "./swap.ts";
+import type { TaskStep } from "@zerofee/shell-api/tasks.ts";
 import { safeCanSell } from "@zerofee/core/band-coins";
 import { coinRoute, readRequest, segOfRequest } from "../app/requests.ts";
 import { NATIVE_COPY } from "./words.ts";
@@ -153,22 +154,29 @@ function fakeBridge(o: { swap: (p: unknown) => unknown; after?: (emit: (m: SwapM
     on(_e: string, h: (p: { movement: SwapMove }) => void) { handler = h; return () => { handler = undefined; }; },
   };
   const log: string[] = [];
+  const published: { steps?: TaskStep[]; endsAt?: number }[] = [];
+  const updates: { steps?: TaskStep[]; endsAt?: number; detail?: string }[] = [];
   const tasks = {
-    publish: (t: { id: string; title: string; detail?: string }) => { log.push(`publish:${t.title}:${t.detail ?? ""}`); log.push(`calls-before:${calls.length}`); return true; },
-    update: (_id: string, p: { detail?: string }) => { log.push(`update:${p.detail ?? ""}`); return true; },
+    publish: (t: { id: string; title: string; detail?: string; steps?: TaskStep[]; endsAt?: number }) => { log.push(`publish:${t.title}:${t.detail ?? ""}`); log.push(`calls-before:${calls.length}`); published.push(t); return true; },
+    update: (_id: string, p: { detail?: string; steps?: TaskStep[]; endsAt?: number }) => { log.push(`update:${p.detail ?? ""}`); updates.push(p); return true; },
     end: (_id: string, s: string, d?: string) => { log.push(`end:${s}:${d ?? ""}`); return true; },
     open: () => undefined,
   };
-  return { bridge: bridge as never, tasks: tasks as never, calls, log };
+  return { bridge: bridge as never, tasks: tasks as never, calls, log, published, updates };
 }
 const Q: SafeQuote = { id: "q1", from: SAFE_CASH, to: "nep141:wrap.near", amountIn: "25", amountOut: "6.2", minOut: "6.1", feeUsd: 0.05, etaSeconds: 11, expiresAtIso: new Date(Date.now() + 30_000).toISOString(), source: "safe" };
 const MOVE: SwapMove = { id: "m1", kind: "swap", status: "moving", from: SAFE_CASH, to: "nep141:wrap.near", amount: "25" };
 
-test("Buy: the job is published at the tap with 1Click's own time, BEFORE ledger.swap; it ends on the ledger's done", async () => {
+test("Buy: the job is published at the tap with its three steps and its legs' end, BEFORE ledger.swap; it ends on the ledger's done", async () => {
   const f = fakeBridge({ swap: () => ({ ok: MOVE }), after: (emit) => emit({ ...MOVE, status: "done", amountOut: "6.2", settledMs: 9_800 }) });
-  const end = await runSwap({ bridge: f.bridge, tasks: f.tasks, taskId: "t", title: "Buy $25.00 of NEAR", usd: "$25.00", quote: Q, tapMs: Date.now() });
+  const tap = Date.now();
+  const end = await runSwap({ bridge: f.bridge, tasks: f.tasks, taskId: "t", title: "Buy $25.00 of NEAR", usd: "$25.00", quote: Q, tapMs: tap, got: "NEAR" });
   assert.equal(end, "done");
-  assert.equal(f.log[0], "publish:Buy $25.00 of NEAR:NEAR Intents says about 11 s");
+  assert.equal(f.log[0], "publish:Buy $25.00 of NEAR:");
+  // the one clock: into Private as measured (30 s), then NEAR Intents' own quoted swap (11 s)
+  assert.equal(f.published[0]!.endsAt, tap + 41_000);
+  assert.deepEqual(f.published[0]!.steps!.map((x) => [x.label, x.state]), [["NEAR Confidential is moving it from your Safe to Private.", "doing"], ["Then NEAR Intents swaps it for NEAR.", "waiting"], ["Then it comes back to your Safe.", "waiting"]]);
+  assert.deepEqual(f.updates.at(-1)!.steps!.map((x) => x.state), ["done", "done", "done"], "every step done on the ledger's done");
   assert.equal(f.log[1], "calls-before:0", "nothing asked of the ledger before the job exists");
   assert.deepEqual(f.calls, ["ledger.swap"]);
   assert.ok(f.log.includes("update:Took 9.8 s."), "the protocol's measured time");
@@ -359,14 +367,19 @@ test("rule 1: the list hides a coin without a working Buy and Sell (safeCanSell)
   const { fetch, state } = marketFake();
   const d = createNativeData({ fetch, storage: store, now: () => 0, relay: RELAY, listed: safeCanSell });
   const rows = await d.refreshList();
-  assert.deepEqual(rows.map((r) => r.assetId).sort(), ["nep141:base.omft.near", "nep141:eth.omft.near", "nep141:wrap.near"], "AURORA and TLO (the Safe can't sell them today) are not listed");
+  // audit 17's H1: one row per coin (ETH on Ethereum and on Base is one ETH row: NEAR first, then the app's chains, then the
+  // list's ranked order)
+  const ethRows = rows.filter((r) => r.symbol === "ETH");
+  assert.equal(ethRows.length, 1, "ETH once");
+  assert.ok(rows.some((r) => r.assetId === "nep141:wrap.near"));
+  assert.ok(rows.every((r) => ["nep141:wrap.near", "nep141:base.omft.near", "nep141:eth.omft.near"].includes(r.assetId)), "AURORA and TLO (the Safe can't sell them today) are not listed");
   assert.ok(rows.every((r) => safeCanSell(r.assetId)));
   assert.deepEqual(d.list()!.map((r) => r.assetId).sort(), rows.map((r) => r.assetId).sort(), "list() is the same shown list");
   assert.equal(d.coin("nep141:sol-abc.omft.near")?.symbol, "TLO", "a hidden coin's page still opens (a coin held)");
   // the market down after a reload: the kept list is filtered too
   state.busy = "dead";
   const again = await createNativeData({ fetch, storage: store, now: () => 1, relay: RELAY, listed: safeCanSell }).refreshList();
-  assert.ok(again.length === 3 && again.every((r) => safeCanSell(r.assetId)), "the kept list, filtered");
+  assert.ok(again.length === rows.length && again.every((r) => safeCanSell(r.assetId)), "the kept list, filtered");
   const all = await createNativeData({ fetch: marketFake().fetch, storage: null, now: () => 0, relay: RELAY }).refreshList();
   assert.equal(all.length, 5, "control: without the filter every coin 1Click lists is a row");
 });
@@ -440,5 +453,48 @@ test("Sim re-check (5 Nov): a Buy says \"Job created.\" with its time left: the 
   const page = readFileSync(new URL("./NativeScreens.tsx", import.meta.url), "utf8");
   assert.match(page, /setMade\(!sheetsHeard\("safe"\)\);/, "at the tap where no sheet of ours comes (the iPhone)");
   assert.match(page, /onOwnApproval\(\(yes\) => \{ if \(yes\) setMade\(true\); \}\)/, "on the Safe's own yes where it is heard");
-  assert.match(page, /made && <>\n\s+<p className="zf-receipt__head" data-testid="native-job-created">\{JOB_WORDS\.created\}<\/p>\n\s+<TimeLeft etaSec=\{eta\} \/>/);
+  // the made job is the shared receipt (Swap's and Send's: "Job created." then "Done.", the one clock), on its own row
+  assert.match(page, /view && view\.state !== "failed" && made && job \? \(/);
+  assert.match(page, /<JobReceipt amount=\{side === "sell" && view\.got \? landedUsd\(view\.got\) : usdText\} testid="native-job" job=\{job\} onDone=\{onClose\}/);
+  assert.match(page, /const taskId = ownRowJob\(`native-\$\{side\}-\$\{row\.assetId\}-\$\{tapMs\}`\);/);
+});
+
+test("builder 15 (8 Nov): step 1 ticks only on the ledger's read of the leg into Private, and the clock counts the rest from that read; a stop marks the step it stopped at", async () => {
+  const tap = 1_000_000;
+  const inAt = tap + 25_000;
+  let t = tap;
+  const f = fakeBridge({ swap: () => ({ ok: MOVE }), after: (emit) => { emit({ ...MOVE, inPrivateAtIso: new Date(inAt).toISOString() }); t = inAt + 9_000; emit({ ...MOVE, status: "done", amountOut: "6.2", inPrivateAtIso: new Date(inAt).toISOString() }); } });
+  assert.equal(await runSwap({ bridge: f.bridge, tasks: f.tasks, taskId: "t", title: "x", usd: "$25.00", quote: Q, tapMs: tap, now: () => t, got: "NEAR" }), "done");
+  const inPrivate = f.updates.find((u) => u.steps && u.steps[0]!.state === "done" && u.steps[1]!.state === "doing")!;
+  assert.ok(inPrivate, "step 1 alone ticked first");
+  assert.deepEqual(inPrivate.steps!.map((x) => x.label), ["NEAR Confidential moved it to Private.", "NEAR Intents is swapping it for NEAR.", "Then it comes back to your Safe."]);
+  assert.equal(inPrivate.steps![0]!.at, inAt, "at the read's own time");
+  assert.equal(inPrivate.endsAt, inAt + 11_000, "the rest from that read: the swap's quoted 11 s");
+  assert.deepEqual(f.updates.at(-1)!.steps!.map((x) => x.label), ["NEAR Confidential moved it to Private.", "NEAR Intents swapped it for NEAR.", "It's in your Safe."]);
+  // stopped before the leg into Private landed: its first step failed, nothing after it ticked
+  const g = fakeBridge({ swap: () => ({ ok: MOVE }), after: (emit) => emit({ ...MOVE, status: "problem", problem: { whatHappened: "NEAR Intents sent it back. The $25.00 is in Private." } }) });
+  assert.equal(await runSwap({ bridge: g.bridge, tasks: g.tasks, taskId: "t", title: "x", usd: "$25.00", quote: Q, tapMs: tap, got: "NEAR" }), "failed");
+  assert.deepEqual(g.updates.at(-1)!.steps!.map((x) => x.state), ["failed", "waiting", "waiting"]);
+  assert.equal(g.log.at(-1), "end:failed:NEAR Intents sent it back. The $25.00 is in Private.");
+  // its words: grade-5 lines, each said once, naming who does the work
+  assert.deepEqual(confidentialLegs(11), [30, 11, 0]);
+  assert.deepEqual(confidentialLegs(), [30, 60, 0], "no quoted time: Private's swap leg");
+  assert.equal(legsTime([30, 11, 0]), "41 s");
+  assert.equal(legsTime([30, 60, 0]), "2 min");
+});
+
+test("audit 17's H4: one Sell, one figure: the Jobs row, the done screen and Activity all say what landed, read off amountOut, cents down", async () => {
+  const SELL_Q: SafeQuote = { ...Q, from: "nep141:wrap.near", to: SAFE_CASH, amountIn: "78.1", amountOut: "200.86", minOut: "198.65" };
+  const SELL: SwapMove = { ...MOVE, from: "nep141:wrap.near", to: SAFE_CASH, amount: "78.1" };
+  const f = fakeBridge({ swap: () => ({ ok: SELL }), after: (emit) => emit({ ...SELL, status: "done", amountOut: "200.659", settledMs: 6_000 }) });
+  const views: SwapView[] = [];
+  assert.equal(await runSwap({ bridge: f.bridge, tasks: f.tasks, taskId: "t", title: "Sell $200.86 of NEAR", usd: "$200.86", quote: SELL_Q, tapMs: Date.now(), got: "USDC", onView: (v) => views.push(v) }), "done");
+  assert.equal((f.updates.at(-1) as { usd?: string }).usd, "$200.65", "fails on main: the row kept the asked $200.86");
+  assert.equal(views.at(-1)!.got, "200.659", "the done screen reads the same field");
+  const page = readFileSync(new URL("./NativeScreens.tsx", import.meta.url), "utf8");
+  assert.match(page, /W\.soldIn\(row\.symbol\)/, "the landed line names no second figure ($200.66 under $200.86)");
+  // a Buy's row keeps the paid figure (the coin is said in coins)
+  const b = fakeBridge({ swap: () => ({ ok: MOVE }), after: (emit) => emit({ ...MOVE, status: "done", amountOut: "6.2" }) });
+  await runSwap({ bridge: b.bridge, tasks: b.tasks, taskId: "t", title: "Buy $25.00 of NEAR", usd: "$25.00", quote: Q, tapMs: Date.now(), got: "NEAR" });
+  assert.equal((b.updates.at(-1) as { usd?: string }).usd, undefined, "control: a Buy's row stays $25.00");
 });

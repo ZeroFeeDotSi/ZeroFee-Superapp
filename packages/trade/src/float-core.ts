@@ -190,21 +190,29 @@ export function createCoreFloat(d: CoreFloatDeps): FloatView & { fromPrivate: bo
   let unreadChains: ReadonlySet<FloatChain> = new Set(FLOAT_CHAINS);
   /** An unread wallet's own coin, when its balance was read and only its price wasn't (bridgeWallets): by wallet id. */
   let unpricedRaw: { chain: FloatChain; raw?: string }[] = [];
+  /** Audit 18 (S18-4, Trenches): when each chain's wallets last answered, all of them; a chain whose read failed keeps
+   *  its time, so its kept figure says "As of 2:25 PM" (Home's Hot words). */
+  const chainReadAt: Partial<Record<FloatChain, number>> = {};
+  /** The chains showing a kept figure: a wallet's read failed and its last figure stands. */
+  let keptChains: ReadonlySet<FloatChain> = new Set();
   /** The wallets' answer taken in: a wallet whose own read failed keeps its last figure; one never read has none (its chain
    *  is unread, and the planner never sees it, so it never takes it for an empty wallet). No answer at all: as it was. */
   const takeWallets = (ws: EngineWallet[] | null): void => {
     if (ws === null) return;
-    const none = new Set<FloatChain>(), raws: typeof unpricedRaw = [];
+    const none = new Set<FloatChain>(), raws: typeof unpricedRaw = [], kept = new Set<FloatChain>();
     wallets = ws.flatMap((w) => {
       if (!w.unread) return [w];
       const was = wallets.find((x) => x.id === w.id);
-      if (was) return [{ ...was, current: w.current }];
+      if (was) { kept.add(w.chain); return [{ ...was, current: w.current }]; }
       none.add(w.chain);
       raws.push({ chain: w.chain, ...(w.nativeRaw ? { raw: w.nativeRaw } : {}) });
       return [];
     });
     unreadChains = none;
     unpricedRaw = raws;
+    keptChains = kept;
+    const at = d.now();
+    for (const c of new Set(ws.map((w) => w.chain))) if (!none.has(c) && !kept.has(c)) chainReadAt[c] = at;
   };
   /** Spending's cap (D52): what the engine plans under; cash above it goes home by itself (never coins). */
   let cap = Infinity;
@@ -864,6 +872,7 @@ export function createCoreFloat(d: CoreFloatDeps): FloatView & { fromPrivate: bo
         const now = ws.find((w) => w.current);
         return {
           chain: c, name: NAME[c], nativeUsd: chainUsd(c), coinsUsd: ws.reduce((n, w) => n + w.coinsUsd, 0), ...(unreadChains.has(c) ? { unread: true as const } : {}),
+          ...(chainReadAt[c] !== undefined ? { readAt: chainReadAt[c] } : {}), ...(keptChains.has(c) ? { kept: true as const } : {}),
           ...(((all) => (all.length > 0 && all.every((r) => typeof r === "string" && /^\d{1,40}$/.test(r)) ? { nativeAmount: coinAmount(all.reduce((n, r) => n + BigInt(r!), 0n), DECIMALS[c]) } : {}))(
             [...ws, ...unpricedRaw.filter((u) => u.chain === c).map((u) => ({ nativeRaw: u.raw }))].map((w) => w.nativeRaw))),
           // buys use the current wallet: what's ready is what that one holds, less the fee reserve
@@ -891,7 +900,7 @@ export function createCoreFloat(d: CoreFloatDeps): FloatView & { fromPrivate: bo
       let m: { id?: string; status?: string; held?: MoveRow["held"]; etaSeconds?: number; depositAddress?: string };
       // a Top up for a site's wallet says so on the Approve sheet's hint ("Add $10.00 to your pump.fun wallet")
       // Move (FLOW-V4): the one Approve names every leg ("Move $25.00 from your Safe · SOL $15.00 · ETH on Robinhood $10.00")
-      const LEG: Record<string, string> = { sol: "SOL", hood: "ETH (RH)", bsc: "BNB", near: "NEAR" };
+      const LEG: Record<string, string> = { sol: "SOL", hood: "Robinhood", bsc: "BNB", near: "NEAR" };
       // paid with a coin that isn't dollars, the Approve says that coin's amount (review: never "$25" over 3.2 NEAR)
       const label = legs?.length ? `Move ${from ? `${from.amount} ${from.symbol}` : `$${usd.toFixed(2)}`} from your Safe · ${legs.map((l) => `${LEG[l.chain]} $${l.usd.toFixed(2)}`).join(" · ")}`
         : then?.home && from ? `Swap ${from.amount} ${from.symbol} for USDC in your Safe`

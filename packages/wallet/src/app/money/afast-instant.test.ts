@@ -129,7 +129,7 @@ test("the sheets read the rule: SwapSheet's Safe route and MoveSheet's Move ask 
 
 test("Approve is never offered on an unbound quote: the Safe's sheet is the core's, drawn only after its quote, and the Swap's button is off while the swap is blocked (control: the web sheet arms before Approve counts)", () => {
   const swap = src("./SwapSheet.tsx");
-  assert.match(swap, /disabled=\{busy \|\| \(on\.tap === "swap" && \(nothing \|\| !!short \|\| services\.down \|\| \(!!block && block !== SWAP_WORDS\.amount\)\)\)\}/);
+  assert.match(swap, /disabled=\{busy \|\| rests \|\| \(on\.tap === "swap" && \(nothing \|\| !!short \|\| services\.down \|\| \(!!block && block !== SWAP_WORDS\.amount\)\)\)\}/);
   const view = readFileSync(new URL("../../../../../apps/web/src/shell/ApprovalSheetView.tsx", import.meta.url), "utf8");
   // R4 (audit, 6 Nov): ARM_MS from the Getting-ready sheet's start when the bound figures match it, from the words' own start otherwise
   assert.match(view, /const left = Math\.max\(0, \(armAt \?\? Date\.now\(\)\) \+ ARM_MS - Date\.now\(\)\);/, "control: Approve arms after the words are up");

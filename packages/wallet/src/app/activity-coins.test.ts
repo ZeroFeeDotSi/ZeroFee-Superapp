@@ -61,7 +61,7 @@ test("the $10 Swap from your private balance into my own SOL row: 10.02 USDC mov
   assert.equal(movementDollars(SWAP, TOKENS), "$10.02");
   assert.deepEqual(describe({ ...SWAP, status: "moving" }, TOKENS, CHAINS, OWN), { title: "Moving to your SOL wallet", detail: "From Private · on its way to your SOL wallet" });
   // an EVM row matched in any case
-  assert.equal(describe({ ...SWAP, to: MY_ETH.toLowerCase() }, TOKENS, CHAINS, OWN).title, "Moved to your ETH (RH) wallet");
+  assert.equal(describe({ ...SWAP, to: MY_ETH.toLowerCase() }, TOKENS, CHAINS, OWN).title, "Moved to your Robinhood wallet");
   // control: the demo's old record (SOL's out-amount under USDC, no payee) is the bug as QA saw it
   const old = { ...SWAP, amount: "0.09828010", to: undefined } as Movement;
   assert.deepEqual(describe(old, TOKENS, CHAINS, OWN), { title: "Sent", detail: "From Private" });
@@ -108,7 +108,7 @@ test("own-row matching: the network a record names must be the row's; an address
   const send = (to: string) => describe(mv({ id: "w", kind: "withdraw", from: USDC, to, amount: "18" }), TOKENS, CHAINS, own).title;
   assert.equal(send(`${SAME} on Base`), "Sent", "Base is not a row");
   assert.equal(send(`${SAME} on BNB Chain`), "Moved to your BNB wallet", "control: the same address on BNB Chain is the BNB row");
-  assert.equal(send(`${SAME.toLowerCase()} on Robinhood Chain`), "Moved to your ETH (RH) wallet");
+  assert.equal(send(`${SAME.toLowerCase()} on Robinhood Chain`), "Moved to your Robinhood wallet");
   assert.equal(send(SAME), "Sent", "two rows share it and no network is named: neither");
   // review L1: a bare address (no network named) counts only for a Hidden payment; a plain one to the row's own address
   // could be on another chain the same key reaches

@@ -4,7 +4,7 @@
 // engine's own states, or the moment this phone saw a step done), always in words ("2 min"), never a clock. Loaded
 // after Home's first paint.
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { cardStep, timeLeft } from "@zerofee/shell-api/job-steps.ts";
+import { cardStep, rowTook, timeLeft } from "@zerofee/shell-api/job-steps.ts";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { ReceiptMark } from "@zerofee/design/Receipt.tsx";
 import "@zerofee/design/receipt.css";
@@ -140,8 +140,10 @@ const slowAdd = (t: LiveTrack, now: number) => !t.end && t.kind === "add" && Num
  *  HARD RULE, 5 Nov), or that there is none; "Done in 2 min"; where it stopped; an Add slower than usual says so. */
 export function rowLine(t: LiveTrack, now: number): string {
   if (t.end?.ok) {
-    const took = shortElapsed((t.endMs !== undefined && Number.isFinite(t.endMs) ? t.endMs : now) - t.startMs);
-    return took === "now" ? "Done" : `Done in ${took}`;
+    // audit 10's A8: from the Approve when the job had one (doneFrom), never the tap before its Check sheet
+    const from = t.doneFrom !== undefined && t.doneFrom > t.startMs ? t.doneFrom : t.startMs;
+    const took = rowTook((t.endMs !== undefined && Number.isFinite(t.endMs) ? t.endMs : now) - from);
+    return took === null ? "Done" : `Done in ${took}`;
   }
   if (t.end) return t.end.row ?? endLine(t) ?? t.end.line;
   if (slowAdd(t, now)) return `Slower than usual · ${shortElapsed(now - t.startMs)}`;

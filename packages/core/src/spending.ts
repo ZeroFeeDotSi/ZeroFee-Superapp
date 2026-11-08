@@ -34,9 +34,13 @@ const siteOfWallet = (id: string): string | undefined => siteWallet(siteIdOf(id)
 export type SpendingNetwork = "sol" | "hood" | "bsc";
 export const SPENDING_NETWORKS: readonly SpendingNetwork[] = ["sol", "hood", "bsc"];
 export const NETWORK_NAME: Record<SpendingNetwork, string> = { sol: "Solana", hood: "Robinhood Chain", bsc: "BNB Chain" };
+/** A Trade wallet's own name, as Home's Hot says it (audit 12 C8: Details said "Solana wallet" and "Robinhood Chain
+ *  wallet" beside Home's "SOL wallet" and "Robinhood wallet"): one name per wallet everywhere; the chain keeps
+ *  NETWORK_NAME on the line under it. */
+export const WALLET_LABEL: Record<SpendingNetwork, string> = { sol: "SOL wallet", hood: "Robinhood wallet", bsc: "BNB wallet" };
 
 /** Home's words for each wallet (D124, the Agent app's contract: "your ETH (RH) wallet", never "ETH on Robinhood"). */
-export const WALLET_NAME: Record<SpendingNetwork | "near", string> = { sol: "your SOL wallet", hood: "your ETH (RH) wallet", bsc: "your BNB wallet", near: "your NEAR wallet" };
+export const WALLET_NAME: Record<SpendingNetwork | "near", string> = { sol: `your ${WALLET_LABEL.sol}`, hood: `your ${WALLET_LABEL.hood}`, bsc: `your ${WALLET_LABEL.bsc}`, near: "your NEAR wallet" };
 /** The cap (product decision, 1 Nov). The default equals the Safe's default Face ID band ($500 a day, DEFAULT_PROTECTION), so a Top
  *  up to the cap always fits inside Face ID and never waits. */
 export const SPENDING_CAP = { defaultUsd: 500, presetsUsd: [100, 500, 2000] as readonly number[], minUsd: 10, maxUsd: 5000 } as const;
@@ -223,6 +227,11 @@ export interface SpendingWallet {
   oldWords?: true;
   /** It can't be read right now ("Can't see it right now", never $0.00). */
   unread?: true;
+  /** Home's kept copy only (audit 13's D7): when its figure was last read. A wallet that can't be read now shows that
+   *  figure with this time ("As of 9:43 AM"), never "Can't see it now" over money read minutes before. */
+  readAt?: number;
+  /** Shown from the kept copy: its last read figure, as of this time (Home's view only, never the core's). */
+  asOf?: number;
   /** A site's wallet: its own coin in the chain's smallest units (lamports), as read with `cashUsd`, so Take out can move
    *  part of it (SiteMoney.tsx backAmount). */
   units?: string;
@@ -270,7 +279,7 @@ export interface SafeCoin { tokenId: string; symbol: string; usd?: string | numb
  *  Add), so a Safe holding more USDT than USDC never pays a "USDC" swap with USDT. */
 export const SWAP_COINS = ["NEAR", "USDT", "USDC"] as const;
 /** A chain wallet's own coin, as Home names it (D124), for a Swap's sheet. */
-const SWAP_GETS: Record<string, string> = { sol: "SOL", hood: "ETH (RH)", bsc: "BNB" };
+const SWAP_GETS: Record<string, string> = { sol: "SOL", hood: "Robinhood", bsc: "BNB" };
 export type SwapCoin = (typeof SWAP_COINS)[number];
 const SAFE_USDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
 export const isSwapCoin = (c: SafeCoin, swap: SwapCoin): boolean =>
@@ -782,7 +791,9 @@ export function createSpendingService(d: SpendingDeps): Bridge & { capUsd(): num
       : kind === "over-cap" ? `${usd} back to your Safe, over your limit`
       : kind === "ready" && m.why === "asked" ? (done ? `Moved ${usd} to ${on}` : `Moving ${usd} to ${on}`)
       : kind === "ready" ? (done ? `Made ${usd} ready on ${on}` : `Making ${usd} ready on ${on}`)
-      : kind === "gas" ? `${usd} kept for fees on ${on}`
+      // audit 10's A10 (8 Nov): the row said "$2.50 kept for fees on Solana · Done · $2.50"; the figure is the row's right
+      // column alone (the audit's T10 rule: one figure per row)
+      : kind === "gas" ? `Kept for fees on ${on}`
       : kind === "older" ? `${usd} back from an older ${on} wallet`
       // from a journal before D102 only (most never went: their note says so)
       : kind === "refill" ? `${usd} to ${on}` : `${usd} back from ${on}`;
@@ -1148,7 +1159,7 @@ export function createSpendingService(d: SpendingDeps): Bridge & { capUsd(): num
 /** spending-move.ts, Spending's lazy part (Move, makeReady, legsFit, the promised-money check): one door, so Home's first
  *  load carries one loader for it, not one per call (the speed budget; lap FAILs, 5 Nov). */
 const moveDoor = () => import("./spending-move.ts");
-const LIB = { ProblemError, securityProblems, spendingProblems, NETWORK_NAME, APPS_NETWORK_NAME, SPENDING_NETWORKS, SPENDING_MIN_MOVE_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, HOME_LEG_MIN_USD, MAX_OVER, usdText, isAgentPocket };
+const LIB = { ProblemError, securityProblems, spendingProblems, NETWORK_NAME, WALLET_LABEL, APPS_NETWORK_NAME, SPENDING_NETWORKS, SPENDING_MIN_MOVE_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, HOME_LEG_MIN_USD, MAX_OVER, usdText, isAgentPocket };
 export type SpendingLib = typeof LIB;
 
 /** The coin ledger.toTrading takes as dollars, as they are (no swap). */

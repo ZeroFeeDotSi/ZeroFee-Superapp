@@ -11,7 +11,7 @@ import type { Candle, Range } from "../market/types.ts";
 import { relayBase, relayUrl } from "../market/relay.ts";
 import { safeCanSell } from "@zerofee/core/band-coins";
 import { faultOf, type Fault } from "@zerofee/core/services";
-import { cgFallbackIds, gtMultiPaths, nativeCoins, rankNative, readGtTokens, readMarkets, readTokens, type GtSpot, type MarketRow, type NativeCoin, type NativeRow } from "./assets.ts";
+import { appCoins, cgFallbackIds, gtMultiPaths, nativeCoins, rankNative, readGtTokens, readMarkets, readTokens, type GtSpot, type MarketRow, type NativeCoin, type NativeRow } from "./assets.ts";
 
 export const ONECLICK_TOKENS = "https://1click.chaindefuser.com/v0/tokens";
 export const CG = "https://api.coingecko.com/api/v3";
@@ -181,7 +181,8 @@ export function createNativeData(opt: NativeDataOptions = {}): NativeData {
   };
   fromKept();
   // the list as shown: only coins with a working Buy and Sell (opt.listed); every coin stays in `rows` for coin()
-  const shownOf = (r: NativeRow[] | null): NativeRow[] | null => (r && opt.listed ? r.filter((x) => opt.listed!(x.assetId)) : r);
+  // audit 17's H1: the app's own list is also the app's chains only, one row per coin (assets.ts appCoins)
+  const shownOf = (r: NativeRow[] | null): NativeRow[] | null => (r && opt.listed ? appCoins(r.filter((x) => opt.listed!(x.assetId))) : r);
   return {
     list: () => shownOf(rows),
     fault: () => faults.get("oneclick") ?? faults.get("market") ?? null,
@@ -211,14 +212,18 @@ export function createNativeData(opt: NativeDataOptions = {}): NativeData {
     peekFacts: (spot) => { const e = kept<unknown>(gtTokenUrl(spot)); return e ? readFacts(e.v, spot) : undefined; },
     async candles(coin, range, pool) {
       const p = GT_PLAN[range];
+      // C9 (audit 12): a read that failed says whose it was (whoFailed), so the page names who didn't answer
+      const tagged = (url: string) => (err: unknown): never => { throw Object.assign(err instanceof Error ? err : new Error(String(err)), { service: whoFailed(url, err) }); };
+      let gtFailed: ((err: unknown) => never) | null = null, gtErr: unknown;
       if (coin.gt && pool) {
         const tok = pool.side === "base" ? "base" : "quote";
         const url = `${GT}/networks/${coin.gt.network}/pools/${encodeURIComponent(pool.address)}/ohlcv/${p.tf}?aggregate=${p.agg}&limit=${p.limit}&currency=usd&token=${tok}`;
-        const c = readOhlcv(await get(url, CHART_TTL_MS[range], false, { accept: GT_ACCEPT }).catch(() => null));
+        const c = readOhlcv(await get(url, CHART_TTL_MS[range], false, { accept: GT_ACCEPT }).catch((e: unknown) => { gtFailed = tagged(url); gtErr = e; return null; }));
         if (c.length >= 2) { keep(chartKey(coin, range), c); return c; }
       }
-      if (!coin.cgId) return [];
-      const c = readCgChart(await get(`${CG}/coins/${coin.cgId}/market_chart?vs_currency=usd&days=${CG_DAYS[range]}`, CHART_TTL_MS[range]), range, now());
+      if (!coin.cgId) return gtFailed ? (gtFailed as (err: unknown) => never)(gtErr) : [];
+      const cgUrl = `${CG}/coins/${coin.cgId}/market_chart?vs_currency=usd&days=${CG_DAYS[range]}`;
+      const c = readCgChart(await get(cgUrl, CHART_TTL_MS[range]).catch(tagged(cgUrl)), range, now());
       keep(chartKey(coin, range), c);
       return c;
     },

@@ -9,7 +9,7 @@ import { TradeError } from "./errors.ts";
 const inTradingWallet: MoneyState = { state: "safe", where: "in your wallet" };
 const inTrading: MoneyState = { state: "safe", where: `in your NEAR wallet` };
 /** Home's words for a chain's wallet (D124), from the chain's name as Trade says it. */
-const WALLET_OF: Record<string, string> = { Solana: "your SOL wallet", "Robinhood Chain": "your ETH (RH) wallet", "BNB Chain": "your BNB wallet", NEAR: `your NEAR wallet` };
+const WALLET_OF: Record<string, string> = { Solana: "your SOL wallet", "Robinhood Chain": "your Robinhood wallet", "BNB Chain": "your BNB wallet", NEAR: `your NEAR wallet` };
 export const walletOn = (chain: string): string => WALLET_OF[chain] ?? `your ${chain} wallet`;
 const inSafe: MoneyState = { state: "safe", where: "in your Safe" };
 

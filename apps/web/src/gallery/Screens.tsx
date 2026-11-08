@@ -285,6 +285,10 @@ if (DEMO_KEEP) keepSampleWallets(DEMO_KEEP.storage, DEMO_WALLETS_KEY);
 // wallets and a Take out all read the same balances (`?demo&float=empty` starts them with nothing, as before). The
 // account contract's rules apply as on mainnet (robot 4, 5): big payments and every change wait, said with the real wait.
 const FLOAT_EMPTY = new URLSearchParams(location.search).get("float") === "empty";
+/** Dev only, never the public build (S6's shot, QA 16, 8 Nov): `?demo&near=5` starts the NEAR wallet with $5, so with
+ *  `&gas=none` a Sell short of its fee shows "Sell · $2.50 for fees first" and its two-step job (the Sim's NEAR wallet
+ *  starts with nothing). */
+const NEAR_START = PUBLIC_BUILD ? 0 : Math.min(50, Math.max(0, Number(new URLSearchParams(location.search).get("near")) || 0));
 // latencyMs: each sample call answers in 60 ms, as a phone's own core does; the mock's default 250 ms stacked to seconds
 // on screens that ask several times (grade 1 Nov, item 11: the apps wallet's Add and Take back, a buy).
 // ZeroFee Chat's NEAR reads (J3 part 2), read-only on NEAR itself: a DAO's roles, whether a name exists, a name's key, a
@@ -307,7 +311,7 @@ export const demoBridge = createMockBridge({ latencyMs: 60, nearReads, tradeChai
   // Security's Quantum-safe card, its other state (an old classical key left on the account), for screenshots
   ...(!PUBLIC_BUILD && new URLSearchParams(location.search).has("oldkey") ? { oldKey: true } : {}),
   // the Sim's sample sites (pump.fun, GMGN) start with sample SOL, so their first Buy works (sim-sites.ts)
-  float: { priceUsd: (c) => RECORDED_COIN_USD[c], ...(FLOAT_EMPTY ? {} : { opening: SAMPLE_OPENING, held: simSiteHeld(RECORDED_COIN_USD.sol) }), ...(!PUBLIC_BUILD && new URLSearchParams(location.search).has("bnbclosed") ? { bnbClosed: true } : {}), ...(!PUBLIC_BUILD && new URLSearchParams(location.search).has("nearsol") ? { nearHeld: { "nep141:sol.omft.near": "150000000" } } : {}), ...(!PUBLIC_BUILD && new URLSearchParams(location.search).get("fault") === "1click" ? { nearCoin: () => undefined } : {}) },
+  float: { priceUsd: (c) => RECORDED_COIN_USD[c], ...(NEAR_START > 0 ? { startUsd: NEAR_START } : {}), ...(FLOAT_EMPTY ? {} : { opening: SAMPLE_OPENING, held: simSiteHeld(RECORDED_COIN_USD.sol) }), ...(!PUBLIC_BUILD && new URLSearchParams(location.search).has("bnbclosed") ? { bnbClosed: true } : {}), ...(!PUBLIC_BUILD && new URLSearchParams(location.search).has("nearsol") ? { nearHeld: { "nep141:sol.omft.near": "150000000" } } : {}), ...(!PUBLIC_BUILD && new URLSearchParams(location.search).get("fault") === "1click" ? { nearCoin: () => undefined } : {}) },
   ...(HOLD > 0 ? { holdSeconds: HOLD } : {}),
   ...(KEEP_STORAGE ? { persist: { storage: KEEP_STORAGE } } : DEMO_KEEP ? { persist: { storage: DEMO_KEEP.storage, key: DEMO_STATE_KEY } } : {}) });
 // Earn's read-only reader (earn.positions) sits in front of the mock as it sits in front of the core, so Wallet's

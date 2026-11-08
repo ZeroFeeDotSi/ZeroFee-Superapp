@@ -14,14 +14,15 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ReadLine } from "@zerofee/design/ReadLine.tsx";
 import { shortTime, weekdayName } from "@zerofee/core/clock";
-import type { SpendingActivity, SpendingStatus } from "@zerofee/core/spending";
+import type { SpendingActivity, SpendingStatus, SpendingWallet } from "@zerofee/core/spending";
+import { closedLine, closedRows } from "./closed-rows.ts";
 import { ADD_OPEN } from "@zerofee/core/add-outside";
-import { SERVICE_NAMES, serviceOf } from "@zerofee/core/services";
+import { SERVICE_NAMES, noticeShows, serviceOf, type Service, type ServiceStatus } from "@zerofee/core/services";
 import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
 import { usdOf } from "../../amount.ts";
 import { carried } from "@zerofee/shell-api/job-carry.ts";
 import { homing, homingUsd } from "./home-homing.ts";
-import { amountOf, balanceTotal, chainName, coins, dollars, plusUsd, safeLines, titleOf, type Line } from "../format.ts";
+import { amountOf, andList, balanceTotal, chainName, coins, dollars, plusUsd, safeLines, titleOf, type Line } from "../format.ts";
 import { awayUsd as awayOf, sumUsd, type HeldCoin } from "../trading.ts";
 import { NEAR_CHAIN_COINS, nearOwnCoins, type NearOwnCoin } from "../near-coins.ts";
 import { ActAdd, ActMove, ActSend, ActSwap, TabSafe } from "../icons.tsx";
@@ -36,8 +37,8 @@ import type * as ReadLinesMod from "./read-lines.ts";
 import type * as LiveModule from "../money/LiveTrack.tsx";
 import { usually, useWallet } from "../runtime.tsx";
 import { useCoinLogos } from "../coin-logos.ts";
-import { AS_OF_AFTER_MS, HIDDEN_AMOUNT, webActs, type RowChain } from "./home-view.ts";
-import { HOME_TAB_IS, HOME_TAB_NAME, HOME_TABS, PRIVATE_DOOR_WORDS, privateDoor, siteGroups, siteLineUsd, siteSections, siteTap, tabPulse, type HomeTab, type SiteCoin, type SiteGroup } from "./safe-hot.ts";
+import { AS_OF_AFTER_MS, HIDDEN_AMOUNT, clock, webActs, type RowChain } from "./home-view.ts";
+import { HOME_TAB_IS, HOME_TAB_NAME, HOME_TABS, PRIVATE_DOOR_WORDS, hotAsOf, privateDoor, siteDetail, siteGroups, siteLineUsd, siteSections, siteTap, tabPulse, type HomeTab, type SiteCoin, type SiteGroup } from "./safe-hot.ts";
 // a site's own logo on its Hot row (S14): by address only, never its bytes in Home's first load
 import pumpLogo from "@zerofee/browser/app/logos/pump.png?no-inline";
 import gmgnLogo from "@zerofee/browser/app/logos/gmgn.png?no-inline";
@@ -97,9 +98,15 @@ export interface HomeActions {
 
 /** The words Home shows (grade 5). */
 /** A site with wallets on more than one network names the network in each card head (GMGN: Solana, Base). */
-const NET_WORD: Record<string, string> = { sol: "SOL", base: "Base", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+const NET_WORD: Record<string, string> = { sol: "SOL", base: "Base", hood: "Robinhood", near: "NEAR", bsc: "BNB" };
 /** A site's logo on its Hot row, by its site id (core site-wallets.ts). */
 const SITE_LOGO: Readonly<Record<string, string>> = { pump: pumpLogo, gmgn: gmgnLogo };
+/** Audit 11's B1 (8 Nov): Hot's number leaves out a wallet that can't be read, and the line under it says so. */
+export const notCountedLine = (names: string[]): string => `${andList(names)} not counted`;
+/** M12-3 (8 Nov): the line under the Safe's kept figure while NEAR doesn't answer. */
+export const safeAsOf = (at: number): string => `As of ${clock(at)}`;
+/** M12-4: how often Home asks which services the notice says are down, while its read failed (the notice's own pace). */
+export const TOLD_EVERY_MS = 30_000;
 export const HOME_WORDS = {
   /** A Safe swap in flight (sandbox hunt B5): its money still counts, on this row, until it lands. */
   swapping: "Swapping",
@@ -107,9 +114,17 @@ export const HOME_WORDS = {
   /** P4: a way home's coin in flight (provisional, to 53) */
   homing: "Coming into your Safe",
   safeLine: "Your NEAR account keeps these rules.",
-  reading: "Reading your money from NEAR…",
+  reading: "NEAR is sending your money. About 2 s.",
+  /** Builder 22's item 3: offline, once on top; the figure under it says its time. */
+  offline: "You're offline. Your money is safe.",
+  /** Audit 11's B1 (8 Nov): a site wallet whose chain is down, on its row (Settings' words), never "updating…" or $0.00 */
+  unseen: "Can't see it now",
+
   /** The web wallet's: its money is in its three wallets, read from each chain. */
-  readingWeb: "Reading your wallets…",
+  readingWeb: "Each chain is sending your wallets. About 2 s.",
+  /** Builder 22 (audit 18's I1): a part still coming in, by who, one clock (one NEAR read is about 2 s) */
+  updatingSafe: "NEAR is updating it. About 2 s.",
+  updatingHot: "Your chains are updating it. About 2 s.",
   emptySafe: "Add money from any wallet or exchange. It goes into your Safe.",
   hide: "Hide amounts",
   show: "Show amounts",
@@ -143,16 +158,16 @@ export const emptyLine = (name: string) => `Your ${name} wallet is empty.`;
 
 /** What a wallet's own tab says it is, where its name alone doesn't (findings 43, 51; Copywriter): "RH" and "NEAR". */
 export const WALLET_WHAT: Partial<Record<RowChain, string>> = {
-  hood: "ETH (RH) is ETH on Robinhood Chain.",
+  hood: "Robinhood is ETH on Robinhood Chain.",
   near: HOME_WORDS.nearWhat,
 };
 
 /** A Trade wallet's name on Hot (HOME-SAFE-HOT-LOOK §4). */
-export const HOT_NAME: Record<RowChain, string> = { sol: "SOL wallet", hood: "ETH (RH) wallet", near: "NEAR wallet", bsc: "BNB wallet" };
+export const HOT_NAME: Record<RowChain, string> = { sol: "SOL wallet", hood: "Robinhood wallet", near: "NEAR wallet", bsc: "BNB wallet" };
 /** How many of the Safe's coins show before "Show all". */
 export const SAFE_FIRST = 4;
 /** A wallet's name (D124: "ETH (RH)") and its own coin. */
-export const ROW_NAME: Record<RowChain, string> = { sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+export const ROW_NAME: Record<RowChain, string> = { sol: "SOL", hood: "Robinhood", near: "NEAR", bsc: "BNB" };
 const NATIVE: Record<RowChain, string> = { sol: "SOL", hood: "ETH", near: "NEAR", bsc: "BNB" };
 const ORDER: readonly RowChain[] = ["sol", "hood", "near", "bsc"];
 /** Where the device keeps "amounts hidden". */
@@ -172,6 +187,8 @@ export interface HomeRow {
   /** Its coin read, its dollar price not (the price read failed): `amount` is said where dollars would be, never "Empty"
    *  or "$0.00" (QA, 4 Nov: 0.05 SOL showed "Empty $0.00" for 19 min while a relay 429 kept the price out). */
   unpriced?: true;
+  /** Outside the Trade limit with no dollar figure (closedRows): listed, never in Hot's total, and said so by name. */
+  outside?: true;
 }
 
 /**
@@ -311,7 +328,7 @@ export function Home(a: HomeActions) {
   const [lineHidden, setLineHidden] = useState(() => webLineHidden());
   // D134: every figure from `shown`, the copy kept on this phone until each part is read again (display only)
   const { bridge, balanceProblem, activity, shown: view, refresh, kid: childPhone } = useWallet();
-  const { tokens, balances, balancesAt, chains, earning, pocket, spending, spendingStale, spendingAt, held, nearCoins, nearOwn, heldFailed, wallets, trading, tradingPartial, settled, complete, lastTotal } = view;
+  const { tokens, balances, balancesAt, chains, earning, pocket, spending, spendingStale, spendingAt, tradingAt, held, nearCoins, nearOwn, heldFailed, wallets, trading, tradingPartial, settled, complete, safeComplete, lastTotal } = view;
   // Safe | Hot (product decision, 5 Nov): the Safe first. The web wallet has no Safe: Hot alone (its tab is never drawn)
   const [picked, setTab] = useState<HomeTab>("safe");
   const tab: HomeTab = web ? "hot" : picked;
@@ -350,7 +367,7 @@ export function Home(a: HomeActions) {
     return () => { live = false; };
   }, [bridge]);
   const flip = () => { const next = !hide; setHide(next); buzz(); void bridge.call("device.store.set", { key: HIDE_KEY, value: next ? "1" : null }).catch(() => undefined); };
-  const $ = (usd: string | null | undefined, unread = "updating…") => (hide ? HIDDEN_AMOUNT : usd === null || usd === undefined ? unread : dollars(usd));
+  const $ = (usd: string | null | undefined, unread = "Updating") => (hide ? HIDDEN_AMOUNT : usd === null || usd === undefined ? unread : dollars(usd));
   // an Add from another chain on its way: one line, never a page (V4 step 6)
   const [adds, setAdds] = useState<AddOnWay[]>([]);
   // Home's Add needs only the relay (the test mainnet test, 3 Nov): an older gate on Hidden's own pocket kept
@@ -400,6 +417,22 @@ export function Home(a: HomeActions) {
   // the read lines (read-lines.ts), loaded after the first paint: they only matter once a read failed
   const [lines, setLines] = useState<typeof ReadLinesMod | null>(null);
   useEffect(() => { void import("./read-lines.ts").then((m) => setLines(m), () => undefined); }, []);
+  // M12-4 (8 Nov): the services the shell's notice says are down (its own rule, noticeShows), read only while Home's
+  // read failed, so the read line never says the same outage again under the notice
+  const [told, setTold] = useState<readonly Service[]>([]);
+  const failed = !!a.readFailed;
+  useEffect(() => {
+    if (!failed) { setTold([]); return; }
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const look = () => void bridge.call<ServiceStatus[]>("ledger.status").then((r) => {
+      if (!live) return;
+      setTold("ok" in r && Array.isArray(r.ok) ? r.ok.filter((x) => x && noticeShows(x)).map((x) => x.service) : []);
+      timer = setTimeout(look, TOLD_EVERY_MS);
+    }, () => live && (timer = setTimeout(look, TOLD_EVERY_MS)));
+    look();
+    return () => { live = false; clearTimeout(timer); };
+  }, [bridge, failed]);
   const [grace, setGrace] = useState(true);
   useEffect(() => {
     const t = setTimeout(() => setGrace(false), TOTAL_GRACE_MS);
@@ -408,7 +441,8 @@ export function Home(a: HomeActions) {
 
   // the wallets: Hot's Trade section, one per chain
   const kid = childPhone === true;
-  const rows = spending?.loaded && !spending.unread ? homeRows(spending, held ?? [], nearChainCoins(nearCoins, (id) => Number(tokens.get(id)?.priceUsd) || null), nearOwn) : null;
+  const homeOwn = spending?.loaded && !spending.unread ? homeRows(spending, held ?? [], nearChainCoins(nearCoins, (id) => Number(tokens.get(id)?.priceUsd) || null), nearOwn) : null;
+  const rows = homeOwn ? [...homeOwn, ...closedRows(homeOwn, wallets, (c) => ROW_NAME[c])] : null;
   // a wallet's figure: its own coin and the coins in it (a site's wallet is its own section, after Trade's)
   const figure = (r: HomeRow) => {
     const usd = walletUsd(r);
@@ -427,7 +461,7 @@ export function Home(a: HomeActions) {
   // P4 (the audit's way-home audit, D140): a way home out of Private in flight is in neither count: counted at its price until it ends
   const homes = homing(activity);
   const addsUsd = (onWayOf ? onWayOf(adds) : 0) + swapping.reduce((t, m) => t + (Number(usdOf(m.amount, tokens.get(m.from ?? "")?.priceUsd)) || 0), 0) + homingUsd(homes, (id) => tokens.get(id)?.priceUsd);
-  const counted = web ? (webBig ? webBig.usd : read && rows?.some((r) => r.unpriced) ? null : lastTotal) : read ? balanceTotal(balances!, chains, earning, pocket, trading) : lastTotal;
+  const counted = web ? (webBig ? webBig.usd : read && rows?.some((r) => r.unpriced && !r.outside) ? null : lastTotal) : read ? balanceTotal(balances!, chains, earning, pocket, trading) : lastTotal;
   const total = counted && addsUsd > 0 ? plusUsd(counted, addsUsd.toFixed(2)) : counted;
   const shown = read && (web || complete || !grace);
   // a wallet whose coin is read but not its price (QA, 4 Nov): its amount is the number, or the line under it
@@ -445,7 +479,11 @@ export function Home(a: HomeActions) {
   // core's figure until then
   const awayUsd = spending?.loaded && !spending.unread ? awayOf(spending) : 0;
   // (a row or a site not read makes the core's figure partial: tradingUsd)
-  const hotUsd = rows && !tradingPartial ? sumUsd([...rows.map((r) => figure(r).usd), awayUsd.toFixed(2), ...sites.map((x) => x.usd)]) : trading;
+  // audit 11's B1 (8 Nov): a site wallet whose chain is down is left out of Hot's number, and the line under it names it
+  // ("pump.fun and GMGN not counted"); the core's figure counted its last read under a row that said "updating…"
+  const unseen = groups.filter((g) => g.unseen).map((g) => g.name);
+  const onlyUnseen = unseen.length > 0 && held !== null && wallets !== null && !!spending && (["sol", "hood"] as const).every((c) => spending.networks.some((n) => n.network === c));
+  const hotUsd = rows && (!tradingPartial || onlyUnseen) ? sumUsd([...rows.map((r) => figure(r).usd), awayUsd.toFixed(2), ...sites.map((x) => x.usd)]) : trading;
   const tabUsd = tab === "safe" ? (!shown ? null : safeUsd && addsUsd > 0 ? plusUsd(safeUsd, addsUsd.toFixed(2)) : safeUsd) : hotUsd;
   // the moving rows and their time left (TimeLeft) load with the first money on its way, never in Home's first load
   const [Moving, setMoving] = useState<{ rows: typeof MovingMod; Left: typeof JobMadeMod.TimeLeft } | null>(null);
@@ -459,6 +497,16 @@ export function Home(a: HomeActions) {
   const moving = Moving && spending && anyMoving ? Moving.rows.movingRows(spending) : [];
   const Left = Moving?.Left, movingWords = Moving?.rows.MOVING_WORDS;
   const hero = web ? bareHero ?? (shown ? (total === null ? null : dollars(total)) : lastTotal ? dollars(lastTotal) : null) : tabUsd === null ? null : dollars(tabUsd);
+  // M12-3 (owner's free-version rule, 8 Nov): NEAR not answering, the Safe shows its last figure with its time under it
+  // ("As of 7:40 AM"); "Can't see it now" only when this phone never read it
+  // audit 13's D7 + QA's SHOULD (8 Nov): a chain down, Hot's rows show their kept figures and Hot's total says when, once
+  const hotAt = !web && tab === "hot" ? hotAsOf(wallets) : undefined;
+  // builder 22's item 3 (audit 18's S18-3): offline, Home says so at once (one line on top) and its figure says when it
+  // was last read ("As of 7:40 AM"), never only after a read fails; no Try again while offline (the phone's own events
+  // re-read the line: onlineChanged above)
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const lastAt = tab === "safe" ? balancesAt : hotAt ?? spendingAt ?? tradingAt;
+  const asOf = !web && offline && read && lastAt ? safeAsOf(lastAt) : !web && tab === "safe" && a.readFailed && read && balancesAt ? safeAsOf(balancesAt) : hotAt ? safeAsOf(hotAt) : null;
   // the 7-day line under the number (concept v3.1; home-days.ts): the phone's own last days of the number shown (the
   // tab's own figure since Safe | Hot, each tab its own kept days), read once it is shown and kept on the phone; nothing
   // under two days. Loaded after Home's first paint, as the pulse is
@@ -554,7 +602,8 @@ export function Home(a: HomeActions) {
     // NEAR's line is its cash; beside coins bought in it (each its own row below, NEAR too) its cash's own figure, $0.00 too
     // (all of it spent), so the row's figure (cash and coins) is never read as its cash; hidden amounts hide it
     const cashOf = r.chain === "near" && !hide ? r.coins.find((c) => c.symbol === "Cash") ?? (r.coins.length ? { usd: "0.00" } : undefined) : undefined;
-    const names = r.chain === "near" ? (cashOf ? `${HOME_WORDS.nearLine} ${$(cashOf.usd)}` : HOME_WORDS.nearLine) : r.amount ?? "";
+    // its amount said where dollars go is said once (audit 12 C7: "0.08 BNB" twice on the BNB row)
+    const names = r.chain === "near" ? (cashOf ? `${HOME_WORDS.nearLine} ${$(cashOf.usd)}` : HOME_WORDS.nearLine) : said && !hide ? "" : r.amount ?? "";
     // every coin in it but its cash: bought ones (an address: their page), and SOL or ETH the NEAR wallet holds (D140)
     const bought = r.coins.filter((c) => c.symbol !== "Cash");
     const icon = r.chain === "hood" ? "eth" : r.chain;
@@ -569,6 +618,7 @@ export function Home(a: HomeActions) {
         {bought.map((c, i) => <CoinRow key={c.key} i={i + 1} symbol={c.symbol} {...(c.icon ? { icon: c.icon } : c.address && logo(r.chain, c.address) ? { src: logo(r.chain, c.address)! } : {})}
           chain={r.chain} title={c.symbol} {...(c.amount ? { detail: `${hide ? HIDDEN_AMOUNT : coins(c.amount, 4)} ${c.symbol}` } : {})} usd={c.usd === null && r.uncounted ? "" : $(c.usd)} {...(c.address ? { on: () => a.onRowCoin?.(r.chain, c.address!, c.symbol) } : {})} />)}
         {r.uncounted && <p className="zf-small wl-list-empty">{HOME_WORDS.unpriced}</p>}
+        {r.outside && <p className="zf-small wl-list-empty" data-testid="hot-outside">{closedLine([HOT_NAME[r.chain]], ROW_NAME[r.chain])}</p>}
       </div>
     );
   };
@@ -616,7 +666,7 @@ export function Home(a: HomeActions) {
       <Tag key={g.key} {...(inGroup ? { role: "group" } : { className: "zf-group wl-hot" })} data-site={g.key} aria-label={g.name}>
         <CoinRow i={0} symbol={g.name} {...(src ? { src } : g.agent ? {} : g.wallets[0]?.mark ? { icon: g.wallets[0].mark } : {})} title={g.name}
           kind="wl-site"
-          detail={g.agent ? `${HOME_WORDS.agent} · ${g.usd !== null && !(Number(g.usd) >= 0.01) ? HOME_WORDS.agentEmpty : $(g.usd)}` : `${walletCount(g.wallets.length)} · ${$(g.usd)}`} usd={$(g.usd)} on={toggle} expanded={open} />
+          detail={g.agent ? `${HOME_WORDS.agent} · ${g.usd !== null && !(Number(g.usd) >= 0.01) ? HOME_WORDS.agentEmpty : $(g.usd)}` : siteDetail(g, $)} usd={$(g.usd, g.unseen ? HOME_WORDS.unseen : undefined)} on={toggle} expanded={open} />
         {open && g.wallets.map((w, i) => siteWallet(w, i + 1))}
       </Tag>
     );
@@ -651,9 +701,12 @@ export function Home(a: HomeActions) {
   const missing = rows && !(Array.isArray(spendingStale) && spendingStale.length) ? (["sol", "hood"] as const).filter((c) => !spending!.networks.some((n) => n.network === c) && !rows.some((r) => r.chain === c && r.unpriced)) : [];
   // D134: a kept figure under 2 minutes old is as good as fresh, so its failed read says nothing (an older one: "as of")
   const old = (at: number | null) => !at || Date.now() - at > AS_OF_AFTER_MS;
-  const reads = !lines ? [] : lines.readLines({
-    offline: typeof navigator !== "undefined" && navigator.onLine === false,
-    ...(!web && a.readFailed && (!balances || old(balancesAt)) ? { safe: { by: SERVICE_NAMES[serviceOf(balanceProblem) ?? "near"], at: balancesAt, shown: !!balances } } : {}),
+  const safeBy: Service = serviceOf(balanceProblem) ?? "near";
+  // offline: the one line on top says it (HOME_WORDS.offline), never a second one under the rows with a Retry
+  const reads = !lines || (offline && !web) ? [] : lines.readLines({
+    offline,
+    // M12-3: the hero says the kept figure's time on the Safe's tab; M12-4: the notice says the service is down
+    ...(!web && a.readFailed && (!balances || old(balancesAt) || asOf) ? { safe: { by: SERVICE_NAMES[safeBy], at: balancesAt, shown: !!balances, ...(asOf ? { timed: true } : {}), ...(told.includes(safeBy) && !offline ? { told: true } : {}) } } : {}),
     ...(spending?.unread ? { oneClick: { at: null } } : spendingStale === "all" && old(spendingAt) ? { oneClick: { at: spendingAt } } : {}),
     ...(Array.isArray(spendingStale) && spendingStale.length ? (old(spendingAt) ? { chains: { ids: spendingStale, at: spendingAt } } : {}) : missing.length ? { chains: { ids: [...missing], at: null } } : {}),
     trade: heldFailed && held === null,
@@ -713,7 +766,16 @@ export function Home(a: HomeActions) {
 
   // The big number is ALWAYS everything, on both tabs (product decision, 3 Nov). Under it ONE line: while reading, what it's doing;
   // then the day's change of the tab shown. The four buttons below are pre-set to the Safe on its tab.
-  const statusWords = !read ? (lastTotal ? "Updating…" : web ? HOME_WORDS.readingWeb : HOME_WORDS.reading) : !web && !complete ? (grace ? HOME_WORDS.reading : "Updating…") : null;
+  // audit 11's B1/B2 (8 Nov): a part that is down ends the read. The Safe's figure waits only on its own parts (a chain down
+  // for Hot never keeps it "Updating…"); Hot's names what it left out; NEAR not answering is said once, by the read line
+  // (and the bar), never "Reading your money from NEAR…" for good
+  const partsIn = tab === "safe" ? safeComplete ?? complete : complete;
+  // no shimmer for good: once NEAR failed, the number's place is empty until it answers (the read line says why)
+  const stillReading = web || !a.readFailed;
+  const updating = tab === "hot" || web ? HOME_WORDS.updatingHot : HOME_WORDS.updatingSafe;
+  const statusWords = !read ? (!web && a.readFailed ? HOME_WORDS.unseen : lastTotal ? updating : web ? HOME_WORDS.readingWeb : HOME_WORDS.reading)
+    : asOf && hero ? asOf
+    : !web && !partsIn ? (grace ? HOME_WORDS.reading : tab === "hot" && onlyUnseen ? notCountedLine(unseen) : updating) : null;
   const change = !hide && pulseText ? /^(Up|Down) (\$[\d,]+\.\d\d) today$/.exec(pulseText) : null;
   const slotStatus = !!statusWords;
   const slot: ReactNode = statusWords ? statusWords
@@ -730,13 +792,13 @@ export function Home(a: HomeActions) {
       )}
       {!web && !kid && (
         <div className="wl-collapsed" data-on={away || undefined} aria-hidden="true">
-          <p>{hero ? (hide ? HIDDEN_AMOUNT : hero) : ""}<span> · {HOME_TAB_NAME[tab]}{change ? ` · ${change[1]} ${change[2]} today` : ""}</span></p>
+          <p>{hero ? (hide ? HIDDEN_AMOUNT : hero) : ""}<span>{hero ? " · " : ""}{HOME_TAB_NAME[tab]}{change ? ` · ${change[1]} ${change[2]} today` : ""}</span></p>
         </div>
       )}
       <div className="wl-hero" ref={heroEl}>
         {!web && !kid && <p className="wl-hero__label">{tab === "safe" ? "Your Safe" : HOME_WORDS.hotLabel}</p>}
-        <button type="button" className="wl-display wl-hero__n" onClick={flip} disabled={!hero} aria-label={hero ? `${web ? "Your money" : tab === "safe" ? "Your Safe" : HOME_WORDS.hotLabel}: ${hide ? "hidden" : hero}. ${hide ? HOME_WORDS.show : HOME_WORDS.hide}` : "Reading your money"}>
-          {!hero ? <span className="wl-total-skel" /> : hide ? HIDDEN_AMOUNT : bareHero ? hero : <Roll text={hero} />}
+        <button type="button" className="wl-display wl-hero__n" onClick={flip} disabled={!hero} aria-label={hero ? `${web ? "Your money" : tab === "safe" ? "Your Safe" : HOME_WORDS.hotLabel}: ${hide ? "hidden" : hero}. ${hide ? HOME_WORDS.show : HOME_WORDS.hide}` : stillReading ? "Reading your money" : HOME_WORDS.unseen}>
+          {!hero ? (stillReading ? <span className="wl-total-skel" /> : null) : hide ? HIDDEN_AMOUNT : bareHero ? hero : <Roll text={hero} />}
         </button>
         {/* ONE line under the number, its height kept from the first paint so the four buttons never move (HOME-VISUAL
             §3.4): a tab's own figure ("SOL wallet $144.37"); on All, while reading, what it's doing, then the day's change
@@ -759,6 +821,7 @@ export function Home(a: HomeActions) {
           <span className="wl-bar__line" aria-hidden="true" />
         </div>
       )}
+      {!web && offline && <p className="zf-small wl-offline" role="status" data-testid="home-offline">{HOME_WORDS.offline}</p>}
       {Live && <Live bridge={bridge} feed={feed} only={web ? "all" : tab} overlay={a.overlay} onCovered={setCovered} buzz={buzz} />}
       {web && readLine}
       <div className="wl-rows wl-list" key={tab} role="tabpanel">

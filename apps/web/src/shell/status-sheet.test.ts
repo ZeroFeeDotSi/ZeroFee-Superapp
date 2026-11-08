@@ -83,7 +83,7 @@ test("a row that isn't the usual says so under it: the public servers it is on, 
 });
 
 test("before the first answer the sheet says Checking…; a look that couldn't run says so by name", () => {
-  assert.match(renderToString(StatusList({ report: null })), /Checking…/);
+  assert.match(renderToString(StatusList({ report: null })), /ZeroFee checks each one now\. Up to 5 s\./);
   assert.ok(renderToString(StatusList({ report: null, failed: true })).includes(NOT_CHECKED_LINE.replace(/'/g, "&#x27;")));
 });
 
@@ -112,16 +112,17 @@ test("the Settings row: Checking… until the look answered, then All working, o
   const { bridge, calls } = probeBridge(() => new Promise((r) => { give = r; }));
   const Row = () => createElement("span", null, useStatusSummary(bridge, t));
   await runtime.mount(createElement(Row));
-  assert.equal(runtime.text(), "Checking…");
+  assert.equal(runtime.text(), "Checking");
   assert.equal([...t.due.values()][0]?.ms, ROW_WAIT_MS, "at most 5 s");
   const r = up();
   r.rows[1] = { id: "near", state: "down", via: "public", ms: null };
   give({ ok: r });
   await runtime.settle();
-  assert.equal(runtime.text(), "NEAR down");
+  assert.equal(runtime.text(), "NEAR is down");
   assert.equal(t.due.size, 0, "the 5 s cap is cleared once it answered");
   runtime.unmount();
-  assert.deepEqual(calls, ["status.probe"], "one look per open");
+  // audit 13's D6: one look per open, with the app's own record for NEAR Confidential's row
+  assert.deepEqual(calls, ["status.probe", "ledger.status"], "one look per open");
 });
 
 test("the Settings row never says Checking… past 5 s: no answer by then is Not checked", async () => {
@@ -129,7 +130,7 @@ test("the Settings row never says Checking… past 5 s: no answer by then is Not
   const { bridge } = probeBridge(() => null);
   const Row = () => createElement("span", null, useStatusSummary(bridge, t));
   await runtime.mount(createElement(Row));
-  assert.equal(runtime.text(), "Checking…");
+  assert.equal(runtime.text(), "Checking");
   t.fire();
   await runtime.settle();
   assert.equal(runtime.text(), "Not checked");
@@ -149,7 +150,8 @@ test("Settings shows the Status row with this open's word; no bridge (the galler
 
 test("only Settings' row and the Status sheet ask for the checks: nothing on Home, nothing in the background", () => {
   const out = execFileSync("git", ["grep", "-l", "--untracked", "status\\.probe", "--", "apps", "packages", "tools"], { cwd: REPO, encoding: "utf8" }).trim().split("\n").filter((f) => !/\.test\.tsx?$/.test(f));
-  assert.deepEqual(out.sort(), ["apps/web/src/shell/StatusSheet.tsx", "apps/web/src/shell/status-row.ts", "packages/core/src/money-calls.ts", "packages/core/src/status-probe.ts", "packages/shell-api/src/MockBridge.ts", "packages/shell-api/src/faults.ts"]);
+  // audit 13's D6: the sheet looks through status-row.ts lookStatus
+  assert.deepEqual(out.sort(), ["apps/web/src/shell/status-row.ts", "packages/core/src/money-calls.ts", "packages/core/src/status-probe.ts", "packages/shell-api/src/MockBridge.ts", "packages/shell-api/src/faults.ts"]);
   const settings = readFileSync(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
   // the sheet (and the checks behind it) load when it opens: Home's JS budget (speed-budget.test.ts)
   assert.match(settings, /const StatusSheet = lazy\(\(\) => import\("\.\/StatusSheet\.tsx"\)/);

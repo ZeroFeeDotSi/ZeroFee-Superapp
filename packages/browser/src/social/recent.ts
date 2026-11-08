@@ -3,10 +3,11 @@
 // sites, newest first; RECENT_SHOWN rows at most. Pure, so node tests it. Nothing here is a recommendation: only sites
 // the person signed in to or opened.
 import { usd } from "@zerofee/trade/app/format.ts";
+import { shortTime } from "@zerofee/core/clock";
 import type { Visit } from "../visits.ts";
 import { RECENT_SHOWN } from "../visits.ts";
 
-export interface RecentSite { site: string; name: string; usd: number | null; wallet?: string; hosts: readonly string[] }
+export interface RecentSite { site: string; name: string; usd: number | null; wallet?: string; hosts: readonly string[]; /** audit 15 FB1: the last figure read and when, for a read with none */ kept?: { usd: number; at: number } }
 export interface RecentRow {
   key: string;
   name: string;
@@ -17,8 +18,10 @@ export interface RecentRow {
   host: string;
 }
 
-/** "Signed in · wallet $25.00"; an unread wallet says only that you're signed in. */
-export const siteLine = (s: RecentSite): string => (s.usd === null ? "Signed in" : `Signed in · wallet ${usd(s.usd)}`);
+/** "Signed in · wallet $25.00"; an unread wallet keeps its last figure with its time (audit 15 FB1, rule 9a); never read,
+ *  only that you're signed in. */
+export const siteLine = (s: RecentSite, locale?: string): string =>
+  s.usd !== null ? `Signed in · wallet ${usd(s.usd)}` : s.kept ? `Signed in · wallet ${usd(s.kept.usd)} · As of ${shortTime(s.kept.at, locale)}` : "Signed in";
 
 /** "Opened today" / "Opened 3 Nov". */
 export const visitLine = (v: Visit, now = new Date()): string => {

@@ -10,14 +10,14 @@ import type { SpendingActivity } from "@zerofee/core/spending";
 import type { Problem } from "@zerofee/core/problem";
 import { moneyMayHaveMoved } from "@zerofee/core/money-calls";
 import type { Tasks } from "@zerofee/shell-api/tasks.ts";
-import { JOB_WORDS, startJob, type JobHandle } from "@zerofee/shell-api/job-start.ts";
+import { JOB_WORDS, jobKeyPart, startJob, type JobHandle } from "@zerofee/shell-api/job-start.ts";
 import { carryTo } from "@zerofee/shell-api/job-carry.ts";
 import { safeAskedAfterAll } from "@zerofee/shell-api/job-run.ts";
 import { refusalFace, refusalText } from "@zerofee/shell-api/refusal-face.ts";
 import type { Opened } from "@zerofee/shell-api/approval-answered.ts";
 import { onPendingClosed, onSafeSigned, pendingSheet, refuseClosed, sheetsHeard } from "@zerofee/shell-api/approval-answered.ts";
 import { moneyClosed } from "@zerofee/core/money-closed";
-import { PLACES, legLine, legTime, legWords, WHERE, type Leg, type MoveFollow, type MovePlan, type MoveStep } from "./move-split.ts";
+import { PLACES, legLine, legTime, legWords, placesWords, WHERE, type Leg, type MoveFollow, type MovePlan, type MoveStep } from "./move-split.ts";
 
 type Answer<T> = { ok: T } | { problem: Problem };
 export interface MoveRunIo {
@@ -54,11 +54,13 @@ export type MoveRan = { followed: MoveFollow[]; held?: NonNullable<SpendingActiv
 
 const usdText = (n: number) => `$${n.toFixed(2)}`;
 
-/** The job's title: "Move $30.00 to your SOL wallet", or "Move $30.00" when its legs end in several places. */
+/** The job's title: "Move $30.00 to your SOL wallet"; several places by placesWords, as the receipt and the floor say
+ *  them (the audit's Move S5, 8 Nov: "Move $30.00" here, "your SOL and Robinhood wallets" on the receipt). */
 export function moveTitle(legs: readonly Leg[]): string {
   const total = legs.reduce((n, l) => n + l.usd, 0);
   const to = [...new Set(legs.map((l) => l.to))];
-  return `Move ${usdText(total)}${to.length === 1 ? ` to ${WHERE[to[0]!]}` : ""}`;
+  const where = to.length === 1 ? WHERE[to[0]!] : placesWords(to);
+  return `Move ${usdText(total)}${where ? ` to ${where}` : ""}`;
 }
 
 /** A call that threw after the job existed (QA's crawl, 5 Nov: a refused Move stayed "1 going"): its row ends. */
@@ -122,13 +124,15 @@ async function runMoveNow(legs: readonly Leg[], plan: MovePlan, io: MoveRunIo, m
   let job: JobHandle | null = null;
   // a Safe Move's key is its job's: the core saves the job under `mv-<key>` before the Safe signs, so its row here has
   // that id from the start (bug report, 5 Nov: closed and opened again, it is the same row, never gone, never two)
+  // K2 (audit 13): the Safe leg's key goes with the core's add as its job (float-core), which stamps it on its movement;
+  // the job keeps it on its carry when made, so a reload before the core answers ends it by its key (reopenOf)
   const topKey = plan.topUp ? io.keyFor(`topup ${JSON.stringify(plan.topUp.legs)}`) : undefined;
   // the Safe's own money is in it (its fill into Private): the Safe's Approve. Paid from Private alone, no sheet comes
   // (the ledger's D143), so the job is made at the tap like any other (Sim re-check, 5 Nov: a Private -> NEAR wallet
   // Move waited 1.6 s for the core's answer and drew no Home line meanwhile)
   const safeAsks = !!plan.topUp && legs.some((l) => l.from === "safe") && io.fills !== false;
   // Try again keeps its key, so a refused try's ended row has this id, and an ended row never goes back to pending (tasks.ts): this try takes its place (audit, 6 Nov)
-  const make = () => { if (job) return; if (topKey) io.tasks?.drop?.(`move:mv-${topKey}`); job = made.job = startJob(io.tasks, { ...(safeAsks ? { approve: true } : plan.topUp && legs.some((l) => l.from === "safe") ? { fromPrivate: true } : {}), title: moveTitle(legs), usd: usdText(total), ...(topKey ? { id: `move:mv-${topKey}` } : {}), etaSec: Math.max(0, ...legs.map(legTime)) }); carryTo([job.id], { to }); io.made(total, job.id); };
+  const make = () => { if (job) return; if (topKey) io.tasks?.drop?.(`move:mv-${topKey}`); job = made.job = startJob(io.tasks, { ...(safeAsks ? { approve: true } : plan.topUp && legs.some((l) => l.from === "safe") ? { fromPrivate: true } : {}), title: moveTitle(legs), usd: usdText(total), ...(topKey ? { id: `move:mv-${topKey}` } : {}), etaSec: Math.max(0, ...legs.map((l) => legTime(l, safeAsks))) }); carryTo([job.id], { to, ...(topKey ? { parts: [jobKeyPart(topKey)] } : {}) }); io.made(total, job.id); };
   // bug report (6 Nov): a Move with a Safe leg is made only once the Safe has signed (the core's job.signed, after its one
   // Face ID, before anything is sent), never at the tap and never on a sheet's yes alone; "Check this" is up at the tap
   // instead (pendingSheet, the copy review's W2). Paid from Private alone (no Safe sheet, D143): made at the tap, as before

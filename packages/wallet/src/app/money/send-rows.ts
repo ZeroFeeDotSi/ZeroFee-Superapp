@@ -10,7 +10,7 @@ import type { Balance } from "../../types.ts";
  *  ZeroFee pays there, FEE_CAPS). Max never asks for that room. */
 export const SEND_ROWS = {
   sol: { name: "SOL wallet", coin: "SOL", symbol: "SOL", icon: "sol", network: "Solana", room: 0.001, decimals: 9 },
-  hood: { name: "ETH (RH) wallet", coin: "ETH (RH)", symbol: "ETH", icon: "eth", network: "Robinhood Chain", room: 0.0001, decimals: 18 },
+  hood: { name: "Robinhood wallet", coin: "ETH", symbol: "ETH", icon: "eth", network: "Robinhood Chain", room: 0.0001, decimals: 18 },
 } as const;
 export type SendRowChain = keyof typeof SEND_ROWS;
 

@@ -20,7 +20,7 @@ test("coin prices: up to six decimals under $1 (T2-3, the copy review's walk), n
   // e2e walk 3 Nov: a $70 price read "$70.204"; dollars and up are cents (control: under $10 keeps its small digits)
   assert.equal(price(70.204), "$70.20");
   assert.equal(price(150), "$150.00");
-  assert.equal(price(3.1416), "$3.1416");
+  assert.equal(price(3.1416), "$3.14");
   assert.doesNotMatch(price(0.000000001234), /\de[-+]?\d/);
   assert.equal(price(0.000000001234), "under $0.000001");
 });
@@ -124,7 +124,8 @@ test("T2-3 (the copy review's walk, 8 Nov; was the subscript form of 5 Nov): a l
   const { readFileSync } = await import("node:fs");
   const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
   assert.match(src("./screens/Discover.tsx"), /listPrice\(r\.priceUsd\)/, "Trade's list rows");
-  assert.match(src("../native/NativeScreens.tsx"), /\{r\.price \? listPrice\(r\.price\) : ""\}<\/span>/, "the Native list rows");
+  // audit 12's C3: the Native row's price is the one price (one-price.ts), Home's where the ledger has it
+  assert.match(src("../native/NativeScreens.tsx"), /\{px \? listPrice\(px\) : ""\}<\/span>/, "the Native list rows");
   assert.match(src("./screens/Home.tsx"), /listPrice\(r\.priceUsd\)/, "Trade Home's coin rows");
 });
 

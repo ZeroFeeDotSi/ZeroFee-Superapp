@@ -30,9 +30,9 @@ export const tasksOf = (shell: { tasks?: ShellTasks | undefined } | null | undef
 export const CHAT_ROUTE = "ask";
 export const JOBS_ROUTE = "jobs";
 
-const COIN: Record<HomeCoin, string> = { SOL: "SOL", ETH: "ETH (RH)", NEAR: "NEAR", USDC: "USDC", BNB: "BNB" };
-const PLACE: Record<HomePlace, string> = { safe: "your Safe", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
-const CHAIN: Record<string, string> = { sol: "Solana", hood: "Robinhood Chain", near: "NEAR", bsc: "BNB Chain" };
+const COIN: Record<HomeCoin, string> = { SOL: "SOL", ETH: "ETH", NEAR: "NEAR", USDC: "USDC" };
+const PLACE: Record<HomePlace, string> = { safe: "your Safe", sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet" };
+const CHAIN: Record<string, string> = { sol: "Solana", hood: "Robinhood Chain", near: "NEAR" };
 const usd = (x: string | number | undefined) => { const n = Number(x); return Number.isFinite(n) && n > 0 ? `$${n.toFixed(2)}` : ""; };
 /** A ticker as a word only when it looks like one (a coin's name could be anything a stranger chose). */
 const ticker = (s: string | undefined) => (s && /^[A-Za-z0-9.$_-]{1,12}$/.test(s) ? s : "a coin");
@@ -297,7 +297,7 @@ export function replyReceipt(tasks: Tasks | null, micros: number, title: string,
 /** The chat's older money sheets (the agent package's ChatSheetCard: a payment, or an act: send, swap, move, pay, trade), as a
  *  task: what and how much, never who (a payment's payee stays on its sheet). */
 export type MoneySheet = { kind: "pay"; usd: number } | { kind: "act"; act: string; from: string; to: string | null; usd: number };
-const SHEET_PLACE: Record<string, string> = { spending: "your NEAR wallet", near: "your NEAR wallet", sol: "your SOL wallet", hood: "your ETH (RH) wallet", bsc: "your BNB wallet", safe: "your Safe", agent: "AgentZero's wallet" };
+const SHEET_PLACE: Record<string, string> = { spending: "your NEAR wallet", near: "your NEAR wallet", sol: "your SOL wallet", hood: "your Robinhood wallet", safe: "your Safe", agent: "AgentZero's wallet" };
 export function sheetTitle(s: MoneySheet): string {
   if (s.kind === "pay") return `Pay ${usd(s.usd) || "someone"}`.trim();
   const act = /^(send|swap|move|pay|trade)$/.test(s.act) ? s.act[0]!.toUpperCase() + s.act.slice(1) : "Move";

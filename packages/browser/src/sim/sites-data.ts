@@ -4,6 +4,7 @@
 // drawn by ZeroFee in its own style (SimSitePage.tsx): a launchpad board in pump.fun's place, trenches in GMGN's, a
 // plain page for any other address. Pure, so node tests it (sim-sites.test.ts).
 import { onDemoPage, simPage } from "@zerofee/shell-api/release.ts";
+import { TOR_IN_PHONE_BUILD } from "../privacy.ts";
 
 /** Is the Sim on here? The public Sim (simPage), or the sample demo (?demo) in a browser. On the phone app, never:
  *  there a site opens in ZeroFee's real window. */
@@ -146,5 +147,20 @@ export function sparkPath(pts: readonly number[], w: number, h: number, pad = 2)
 
 /** History's sample visits (SIM_HISTORY), as the Browser's own Visit rows. */
 export const simHistory = (now = Date.now()) => SIM_HISTORY.map((h) => ({ host: h.host, url: `https://${h.host}/`, atIso: new Date(now - h.agoMin * 60e3).toISOString() }));
-/** Privacy's sample in the Sim: the phone's own view, private browsing on, trackers blocked; its switches move only here. */
-export const SIM_PRIVACY = { kind: "phone", private: true, normalSites: ["gmgn.ai"], built: true, blockTrackers: true } as const;
+/** Privacy's sample in the Sim: the phone's own view, trackers blocked; its switches move only here. Private browsing is
+ *  what the phone build has (privacy.ts TOR_IN_PHONE_BUILD, audit 15 FB3): not ready until Tor is linked. */
+export const SIM_PRIVACY = { kind: "phone", private: true, normalSites: ["gmgn.ai"], built: TOR_IN_PHONE_BUILD, blockTrackers: true } as const;
+
+/**
+ * b18: AgentZero's browser in the Sim: the phone's own loop and guards (phone.ts) over the Sim's made-up sites, thought
+ * by the Sim's thinker (agent-thinker.ts: no model, no network, no money). Loaded only where the Sim is on (never on the
+ * phone, never in the extension, whose stand-in for this file returns null). Null anywhere else.
+ */
+export async function simAgent(env: { sim?: boolean; demo?: boolean; phone?: boolean } = {}): Promise<import("../agent/live.ts").CloudBrowser | null> {
+  const phone = env.phone ?? (typeof window !== "undefined" && !!(window as { webkit?: { messageHandlers?: Record<string, unknown> } }).webkit?.messageHandlers?.zerofee);
+  if (phone || !simSitesOn(env)) return null;
+  return (await import("./agent-sim.ts")).simCloud();
+}
+
+/** b18: the Sim's made-up sites AgentZero's browser can open (agent-fixtures.ts FIXTURE_SITES; a test holds them equal). */
+export const SIM_AGENT_SITES: readonly string[] = ["mugs.example.com", "news.example.com", "events.example.com", "docs.example.com"];

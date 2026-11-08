@@ -127,8 +127,8 @@ test("a leg 1 this core didn't price, leg 1 not sent, a row short, and a double 
   assert.ok(two.status === "rejected" && /one at a time/.test((two.reason as any).problem.more), "a double tap goes once");
   assert.equal(twice.sent.length, 1);
   // a SOL price never pays from ETH (RH) (its coin is the row's own), and a chain with no row is refused
-  await assert.rejects(a.w.hiddenFromRow("hood", a.leg1.depositAddress, OUT, { payload: a.payload() }), (e: any) => /isn't the one asked for/.test(e.problem.more), "the SOL row's price, asked from ETH (RH)");
-  await assert.rejects(a.w.hiddenFromRow("bsc", a.leg1.depositAddress, OUT, { payload: a.payload() }), (e: any) => /only from your SOL wallet or your ETH \(RH\) wallet/.test(e.problem.more));
+  await assert.rejects(a.w.hiddenFromRow("hood", a.leg1.depositAddress, OUT, { payload: a.payload() }), (e: any) => /isn't the one asked for/.test(e.problem.more), "the SOL row's price, asked from Robinhood");
+  await assert.rejects(a.w.hiddenFromRow("bsc", a.leg1.depositAddress, OUT, { payload: a.payload() }), (e: any) => /only from your SOL wallet or your Robinhood wallet/.test(e.problem.more));
 });
 
 test("review fixes: leg 2 only when leg 1 is done on both nodes; one quote address is paid once; room for Solana's fee", async () => {
@@ -208,20 +208,20 @@ async function setupHood(o: { leg2In?: string; approve?: boolean; sent?: boolean
   return { w, shown, sent, reads, leg1, payload, row, go };
 }
 
-test("ETH (RH): 1Click's ETH on Robinhood Chain is an outside coin your private balance takes (OUTSIDE_CHAINS), its tokens only", async () => {
+test("Robinhood: 1Click's ETH on Robinhood Chain is an outside coin your private balance takes (OUTSIDE_CHAINS), its tokens only", async () => {
   const { leg1 } = await setupHood();
   assert.match(leg1.depositAddress, /^0x[0-9a-f]{40}$/);
   const { w } = await setupHood();
   await assert.rejects(w.privateQuoteIn("nep141:hoodx.omft.near", "1000", true), (e: any) => /can't come in through Private/.test(e.problem.more), "control: a chain name that only starts with hood");
 });
 
-test("ETH (RH): an outside payee asks Face ID once (QA, 5 Nov); leg 2 is signed and handed back and leg 1 is the row's own EVM transfer", async () => {
+test("Robinhood: an outside payee asks Face ID once (QA, 5 Nov); leg 2 is signed and handed back and leg 1 is the row's own EVM transfer", async () => {
   const { shown, sent, leg1, row, go } = await setupHood();
   const r = await go();
   assert.equal(shown.length, 1, "one sheet: the payee is outside");
   assert.equal(shown[0]!.tap, undefined, "Face ID");
   // QA's lap: "your Chain wallet", twice; the Robinhood wallet by its own name
-  assert.equal(shown[0]!.title, "Send from your ETH (RH) wallet");
+  assert.equal(shown[0]!.title, "Send from your Robinhood wallet");
   assert.doesNotMatch(JSON.stringify(shown[0]), /Chain wallet/, "control: never the kind label");
   assert.equal(sent.length, 1, "leg 1 sent");
   const t = parseTx(fromBase64(sent[0]!));
@@ -235,7 +235,7 @@ test("ETH (RH): an outside payee asks Face ID once (QA, 5 Nov); leg 2 is signed 
   assert.ok(r.signedData?.signature, "leg 2 signed, for the app to submit after leg 1 lands");
 });
 
-test("ETH (RH): leg 1 short of leg 2 is refused before any sheet; exactly its signed minimum goes (control)", async () => {
+test("Robinhood: leg 1 short of leg 2 is refused before any sheet; exactly its signed minimum goes (control)", async () => {
   const short = await setupHood({ leg2In: "1980000000000001" });
   await assert.rejects(short.go(), (e: any) => /may bring less than the payment needs/.test(e.problem.more));
   assert.deepEqual([short.shown.length, short.sent.length], [0, 0]);
@@ -243,7 +243,7 @@ test("ETH (RH): leg 1 short of leg 2 is refused before any sheet; exactly its si
   assert.equal((await exact.go()).leg1.status, "done");
 });
 
-test("ETH (RH): leg 1 not taken, failed or unconfirmed: leg 2 is never handed back; a double tap goes once", async () => {
+test("Robinhood: leg 1 not taken, failed or unconfirmed: leg 2 is never handed back; a double tap goes once", async () => {
   for (const [o, code] of [[{ sent: false }, "security.subwallet.not-sent"], [{ seen: ["failed", "failed"] }, "security.subwallet.send-failed"], [{ seen: [null, null] }, "security.subwallet.unconfirmed"], [{ seen: ["ok", null] }, "security.subwallet.unconfirmed"]] as const) {
     const x = await setupHood(o as never);
     const r = await x.go();
@@ -267,7 +267,7 @@ test("ETH (RH): leg 1 not taken, failed or unconfirmed: leg 2 is never handed ba
   await assert.rejects(once.go(), (e: any) => /wasn't priced here/.test(e.problem.more), "the same address never paid twice");
 });
 
-test("ETH (RH): gas room. The row must hold leg 1 and its fee with FEE_ROOM over it, read before anything is signed (control: exactly enough goes)", async () => {
+test("Robinhood: gas room. The row must hold leg 1 and its fee with FEE_ROOM over it, read before anything is signed (control: exactly enough goes)", async () => {
   const thin = await setupHood({ held: LEG1 + ROOM - 1n });
   await assert.rejects(thin.go(), (e: any) => e.problem.code === "security.balance.low-coin" && /ETH/.test(e.problem.whatHappened));
   assert.deepEqual([thin.shown.length, thin.sent.length], [0, 0], "a short row sends nothing");
@@ -277,7 +277,7 @@ test("ETH (RH): gas room. The row must hold leg 1 and its fee with FEE_ROOM over
   assert.equal((await enough.go()).leg1.status, "done");
 });
 
-test("ETH (RH): a fee past what ZeroFee pays there is refused before anything is signed; one that rose past the room after the check is never signed", async () => {
+test("Robinhood: a fee past what ZeroFee pays there is refused before anything is signed; one that rose past the room after the check is never signed", async () => {
   const high = await setupHood({ fees: () => ({ tip: 1_000_000n, maxFee: 2_000_000_001n }) });
   await assert.rejects(high.go(), (e: any) => e.problem.code === "security.fee.high");
   assert.deepEqual([high.shown.length, high.sent.length], [0, 0]);
@@ -295,7 +295,7 @@ test("ETH (RH): a fee past what ZeroFee pays there is refused before anything is
   assert.equal((await inside.go()).leg1.status, "done");
 });
 
-test("ETH (RH): a deposit address that isn't an EVM one is never paid", async () => {
+test("Robinhood: a deposit address that isn't an EVM one is never paid", async () => {
   const odd = await setupHood({ deposit: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM" });
   await assert.rejects(odd.go(), (e: any) => /isn't the one asked for/.test(e.problem.more));
   assert.deepEqual([odd.shown.length, odd.sent.length], [0, 0]);

@@ -68,12 +68,12 @@ test("a site's top-up on the web is the one On your phone page; no site wallet i
 // name; (b) no "Tap Send to try again." where the lit Send button sits right under the line, only where it is off-screen.
 const PRIVATE_REFUSED = (where: string) => ({ problem: { code: "security.send.private-refused", whatHappened: "NEAR Intents said no. Nothing moved.", money: { where } } });
 
-test("the copy review (a): the refusal names the row the money was in (SOL wallet, ETH (RH) wallet, Safe), never a fixed name (control: the core's own fallback \"in your wallet\" is never what is said)", () => {
+test("the copy review (a): the refusal names the row the money was in (SOL wallet, Robinhood wallet, Safe), never a fixed name (control: the core's own fallback \"in your wallet\" is never what is said)", () => {
   assert.equal(webSendLine(PRIVATE_REFUSED("in your wallet"), "1", "SOL", "Solana", "SOL wallet").line, "NEAR Intents said no. Nothing moved. Your money is in your SOL wallet.");
-  assert.equal(webSendLine(PRIVATE_REFUSED("in your wallet"), "1", "ETH", "Robinhood Chain", "ETH (RH) wallet").line, "NEAR Intents said no. Nothing moved. Your money is in your ETH (RH) wallet.");
+  assert.equal(webSendLine(PRIVATE_REFUSED("in your wallet"), "1", "ETH", "Robinhood Chain", "Robinhood wallet").line, "NEAR Intents said no. Nothing moved. Your money is in your Robinhood wallet.");
   assert.equal(W.refused("NEAR Intents said no. Nothing moved.", "Safe"), "NEAR Intents said no. Nothing moved. Your money is in your Safe.");
   // each of the sheet's From rows carries its own row name, and webSendGo hands it on
-  assert.deepEqual(WEB_SEND_FROM.map((f) => f.row), ["SOL wallet", "ETH (RH) wallet"]);
+  assert.deepEqual(WEB_SEND_FROM.map((f) => f.row), ["SOL wallet", "Robinhood wallet"]);
   assert.match(src("./web-send.ts"), /webSendLine\("ok" in r \? \{ ok: r\.ok\.sent \} : r, o\.ask\.amount, o\.from\.symbol, o\.from\.network, o\.from\.row\)/);
   assert.doesNotMatch(src("./web-send.ts"), /refused: \(what: string, where: string\)/, "the old shape took the core's fixed words");
 });

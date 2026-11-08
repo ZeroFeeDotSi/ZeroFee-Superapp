@@ -162,7 +162,9 @@ test("S14: one row per site, its wallets inside it (GMGN's SOL and Base once, pu
   // an older wallet of a site joins its site's row; one not read adds nothing and, holding nothing known, is no wallet in
   // its count (core site-funded.ts, as its page counts: test), and a site with none read says so (null)
   const more = siteGroups(siteSections([...ws, site({ id: "old-pump", current: false, cashUsd: "4.00", coinsUsd: "0.00" }), site({ id: "u", site: "gmgn", network: "base" as never, label: "GMGN wallet", unread: true })], () => null, sumUsd), sumUsd);
-  assert.deepEqual(more.map((g) => [g.key, g.usd, g.wallets.length]), [["site:pump", "14.00", 2], ["site:gmgn", "18.10", 2], ["agent", "1.99", 1]]);
+  // (changed pin, audit 11's B1, 8 Nov: a site with a wallet not read has no figure and is "Can't see it now" on Home,
+  // never its read part alone; Hot's number leaves it out and says so)
+  assert.deepEqual(more.map((g) => [g.key, g.usd, g.wallets.length, g.unseen]), [["site:pump", "14.00", 2, undefined], ["site:gmgn", null, 2, true], ["agent", "1.99", 1, undefined]]);
   assert.equal(siteGroups(siteSections([site({ unread: true })], () => null, sumUsd), sumUsd)[0]!.usd, null, "control: nothing read, never $0");
 });
 
@@ -177,7 +179,7 @@ test("Home draws each site as one row that opens to its wallets (S14): the site 
   assert.match(home, /usd=\{amountOnly && !hide \? held! : lineUsd === null && native \? "" : \$\(lineUsd\)\} \{\.\.\.\(siteOpen \? \{ on: siteOpen \} : \{\}\)\} \/>/, "a wallet row opens its site's page");
   assert.doesNotMatch(home, /\{sites\.map\(siteWallet\)\}/, "control: no card per wallet");
   // the copy review's S14 ruling: the site row (wl-site) says its count and total, then a quiet chevron; each wallet row is wl-site__wallet
-  assert.match(home, /kind="wl-site"\n\s*detail=\{g\.agent \? `\$\{HOME_WORDS\.agent\} · \$\{g\.usd !== null && !\(Number\(g\.usd\) >= 0\.01\) \? HOME_WORDS\.agentEmpty : \$\(g\.usd\)\}` : `\$\{walletCount\(g\.wallets\.length\)\} · \$\{\$\(g\.usd\)\}`\}/);
+  assert.match(home, /kind="wl-site"\n\s*detail=\{g\.agent \? `\$\{HOME_WORDS\.agent\} · \$\{g\.usd !== null && !\(Number\(g\.usd\) >= 0\.01\) \? HOME_WORDS\.agentEmpty : \$\(g\.usd\)\}` : siteDetail\(g, \$\)\}/, "audit 13's D7: the count, then the figure; a kept read, the count alone (its time under Hot's total; safe-hot siteDetail)");
   assert.match(home, /\{expanded !== undefined && <span className="wl-site__chev" aria-hidden="true">›<\/span>\}/);
   assert.match(home, /title=\{`\$\{NET_WORD\[x\.network\] \?\? x\.network\.toUpperCase\(\)\} wallet`\} kind="wl-site__wallet"/);
   assert.doesNotMatch(home, /nets\.join\(" · "\)/, "control: no chain words on the closed row");

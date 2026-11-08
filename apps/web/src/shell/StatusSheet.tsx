@@ -13,6 +13,7 @@ import type { Bridge } from "@zerofee/core/bridge";
 import type { OwnHosts, OwnTest, StatusReport, StatusRow } from "@zerofee/core/status-probe";
 import { ownHostOf, type OwnChain } from "@zerofee/core/own-servers";
 import { CHECKING, DOOR_NAMES, NOT_CHECKED_LINE, OWN_BACK, OWN_CHAIN_NAMES, OWN_FIELD, OWN_HIDE, OWN_INTRO, OWN_KEPT, OWN_NONE, OWN_PLACEHOLDER, OWN_SHOW, OWN_TEST, OWN_TESTING, OWN_TEST_FIRST, OWN_TITLE, OWN_USE, STATE_WORDS, STATUS_NAMES, STATUS_TITLE, checkedWords, ownTestWords, rowLines, shownDown, shownWord, usingDefault } from "@zerofee/core/status-words";
+import { lookStatus } from "./status-row.ts";
 import "./status.css";
 
 /** The sheet's own look again this often while it is up (spec line 3); the service's cache keeps it to one per 30 s. */
@@ -45,7 +46,7 @@ export function StatusList({ report, failed = false }: { report: StatusReport | 
   if (!report) return <p className="zf-small st__top" role="status">{CHECKING}</p>;
   return (
     <>
-      <p className="zf-small st__top">{usingDefault(report.relay)}</p>
+      <p className="zf-small st__top">{usingDefault(report.relay, report.rows)}</p>
       <p className="zf-small st__top st__checked">{checkedWords(report.at)}</p>
       <div className="zf-group st__list">
         {report.rows.map((r) => <Row key={r.id} row={r} relay={report.relay} />)}
@@ -139,7 +140,7 @@ export function StatusSheet({ bridge, onClose, onBack, everyMs = STATUS_LOOK_MS,
     let live = true;
     let timer: unknown;
     const look = () =>
-      void bridge.call<StatusReport>("status.probe").then((r) => {
+      void lookStatus(bridge).then((r) => {
         if (!live) return;
         if ("ok" in r && Array.isArray(r.ok?.rows)) { setReport(r.ok); setFailed(false); } else setFailed(true);
         timer = timers.set(look, everyMs);

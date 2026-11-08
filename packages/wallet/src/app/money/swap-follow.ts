@@ -14,10 +14,19 @@ export const swapLabel = (id: string): string | undefined => carried(`move:${id}
 /** the audit's Send audit M5 (7 Nov): what a Swap's movement landed, from its own record (core spending-fold landedOf: 1Click's
  *  settled amountOut on the row, or its one leg's), as the receipt's figure: "0.0644 SOL". `fig`: the sheet's own coin
  *  figure (coinFigure, rounded down). Null until its row is done with that figure. Pure. */
-export function landedFigure(rows: readonly SpendingActivity[], id: string, fig: (n: number) => string): string | null {
+/** `want` (audit 11's B5, 8 Nov): the coin the sheet promised ("ETH"); a figure in another coin is a leg on the way (SOL
+ *  wallet -> Robinhood wallet said "About 24.4999 USDC is in your Robinhood wallet."), so the last leg that landed in it is
+ *  read, else nothing (the tap's estimate stays). */
+export function landedFigure(rows: readonly SpendingActivity[], id: string, fig: (n: number) => string, want?: string): string | null {
   const row = rows.find((r) => r.id === id);
   if (!row) return null;
-  const out = landedOf({ ...row, legs: rows.filter((r) => r.of === id && r.id !== id) });
+  return readOut(row, rows.filter((r) => r.of === id && r.id !== id), fig, want);
+}
+/** The same read on a row and its legs already joined (Activity's row, live-steps moveTrack / privateMove; M12-2, 8 Nov):
+ *  "0.0101 ETH", or null while nothing done carries a figure in that coin. Pure. */
+export function readOut(row: SpendingActivity, legs: readonly SpendingActivity[], fig: (n: number) => string, want?: string): string | null {
+  const out = want === undefined ? landedOf({ ...row, legs: [...legs] }) : row.status !== "done" ? undefined
+    : [row.amountOut, ...legs.map((l) => (l.status === "done" ? l.amountOut : undefined))].filter((o) => o?.symbol === want).at(-1);
   const n = Number(out?.amount);
   return out && n > 0 ? `${fig(n)} ${out.symbol}` : null;
 }

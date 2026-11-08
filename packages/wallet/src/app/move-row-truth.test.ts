@@ -17,8 +17,8 @@ const row = (o: Partial<SpendingActivity>): SpendingActivity => ({ id: "r1", kin
 // the ETH (RH) wallet's $3.94 to the SOL wallet and $5.52 to the NEAR wallet (two core moves): $119.33 in all
 const JOB = "move:mv-truth-1";
 const safe = row({ id: "mv-truth-1", via: "private", goesTo: ["sol"], landed: ["sol"], paidDone: true, askedUsd: "109.87", usd: "109.87", words: "Moved $8.39 to your SOL wallet" });
-const toSol = (status: SpendingActivity["status"]) => row({ id: "mt-sol", kind: "move", network: "hood", to: "sol", usd: "3.94", status: "done", words: "Moved $3.94 from your ETH (RH) wallet to your SOL wallet", atIso: iso(T0 + 1_000), legs: [row({ id: "mt-sol-leg", kind: "ready", network: "sol", usd: "3.90", status, of: "mt-sol", words: "Moving $3.90 to Solana", atIso: iso(T0 + 30_000) })] });
-const toNear = (status: SpendingActivity["status"]) => row({ id: "mt-near", kind: "move", network: "hood", to: "near", usd: "5.52", status, words: "Moving $5.52 from your ETH (RH) wallet to your NEAR wallet", atIso: iso(T0 + 2_000) });
+const toSol = (status: SpendingActivity["status"]) => row({ id: "mt-sol", kind: "move", network: "hood", to: "sol", usd: "3.94", status: "done", words: "Moved $3.94 from your Robinhood wallet to your SOL wallet", atIso: iso(T0 + 1_000), legs: [row({ id: "mt-sol-leg", kind: "ready", network: "sol", usd: "3.90", status, of: "mt-sol", words: "Moving $3.90 to Solana", atIso: iso(T0 + 30_000) })] });
+const toNear = (status: SpendingActivity["status"]) => row({ id: "mt-near", kind: "move", network: "hood", to: "near", usd: "5.52", status, words: "Moving $5.52 from your Robinhood wallet to your NEAR wallet", atIso: iso(T0 + 2_000) });
 carryTo([`move:${safe.id}`, "move:mt-sol", "move:mt-near"], { usd: "$119.33", job: JOB, to: ["sol", "near"] });
 const jobOf = (id: string) => (["mv-truth-1", "mt-sol", "mt-near"].includes(id) ? JOB : undefined);
 
@@ -38,10 +38,10 @@ test("(1b, 1c) a two-wallet Move's row names both wallets in the plan's order, w
   const [r] = foldJobs([safe, toSol("done"), toNear("done")], jobOf);
   assert.equal(nameOf(r!), "Move $119.33 to your SOL and NEAR wallets");
   assert.equal(usdOf(r!), "$119.33", "the receipt's figure");
-  assert.equal(placesSaid(["near", "hood", "sol"]), "your SOL, ETH (RH) and NEAR wallets", "three, in the plan's order");
+  assert.equal(placesSaid(["near", "hood", "sol"]), "your SOL, Robinhood and NEAR wallets", "three, in the plan's order");
   assert.equal(placesSaid(["sol"]), "your SOL wallet", "control: one wallet");
   // the same words as the sheet's (B13's walletsWords), for every set of wallets in the plan's order
-  const name: Record<string, string> = { sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+  const name: Record<string, string> = { sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
   for (const set of [["sol"], ["near"], ["sol", "near"], ["sol", "hood"], ["hood", "near"], ["sol", "hood", "near"], ["sol", "hood", "near", "bsc"]]) assert.equal(placesSaid(set), walletsWords(set.map((p) => name[p]!)), set.join(","));
 });
 
@@ -49,7 +49,7 @@ test("(1d) the Move's page: To lists every wallet (on cbaddc66d: \"SOL wallet\")
   const [r] = foldJobs([safe, toSol("done"), toNear("done")], jobOf);
   const facts = [{ label: "From", value: "Safe" }, { label: "To", value: "SOL wallet" }];
   // fix/move-leg-steps (QA's SHOULD): From names every wallet that paid ("Safe" alone before)
-  assert.deepEqual(jobFacts(r!, facts), [{ label: "From", value: "Safe, ETH (RH) wallet" }, { label: "To", value: "SOL wallet, NEAR wallet" }]);
+  assert.deepEqual(jobFacts(r!, facts), [{ label: "From", value: "Safe, Robinhood wallet" }, { label: "To", value: "SOL wallet, NEAR wallet" }]);
   assert.deepEqual(jobFacts(toNear("done"), facts), facts, "control: no parts");
 });
 

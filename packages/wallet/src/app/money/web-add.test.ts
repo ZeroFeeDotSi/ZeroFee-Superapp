@@ -17,10 +17,10 @@ const list = [
   { id: "n1", kind: "trade", chain: "near", address: NEAR },
 ];
 
-test("web Add: SOL, ETH (RH) and NEAR, each its wallet's own current address; never a site's, an old one, or BNB", () => {
+test("web Add: SOL, Robinhood and NEAR, each its wallet's own current address; never a site's, an old one, or BNB", () => {
   const rows = webAddRows(list);
   assert.deepEqual(rows.map((r) => [r.row.chain, r.address]), [["sol", SOL], ["hood", ETH], ["near", NEAR]]);
-  assert.deepEqual(rows.map((r) => r.row.name), ["SOL", "ETH (RH)", "NEAR"]);
+  assert.deepEqual(rows.map((r) => r.row.name), ["SOL", "Robinhood", "NEAR"]);
 });
 
 test("web Add: a chain with no wallet yet has no row (never a made-up address); control: nothing, nothing", () => {

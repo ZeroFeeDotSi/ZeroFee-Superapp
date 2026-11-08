@@ -169,7 +169,7 @@ export function Activity({ onProblem, onHeld, onStatement, statementFailed, over
     const line = line0;
     const payee = m.private && m.kind === "pay" && !ownRowOf(m, own) ? payeeOf(m) : "";
     const swap = swapDetail(m, tokens, chains, own);
-    return { title, line: send?.line ?? line, ...(send ? { usd: send.usd } : movementDollars(m, tokens) ? { usd: movementDollars(m, tokens)! } : {}), atIso: m.updatedAtIso, page: swap ? { ...movementPage(m), ended: swap.ended } : movementPage(m), ...(m.problem ? { onProblem: () => onProblem(m.problem!) } : {}), ...(payee ? { payee } : {}), facts: home ? [...movementFacts(m, tokens, chains, own), ...home.coins.map((c) => ({ label: c.symbol, value: c.usd }))] : movementFacts(m, tokens, chains, own), ...(swap?.line ? { line: swap.line } : {}), ...(swap?.dayFirst ? { dayFirst: true } : {}), };
+    return { title, line: send?.line ?? line, ...(send ? { usd: send.usd } : movementDollars(m, tokens) ? { usd: movementDollars(m, tokens)! } : {}), atIso: m.updatedAtIso, page: swap ? { ...movementPage(m), ended: swap.ended, ...(swap.steps ? { steps: swap.steps } : {}) } : movementPage(m), ...(m.problem ? { onProblem: () => onProblem(m.problem!) } : {}), ...(payee ? { payee } : {}), facts: home ? [...movementFacts(m, tokens, chains, own), ...home.coins.map((c) => ({ label: c.symbol, value: c.usd }))] : movementFacts(m, tokens, chains, own), ...(swap?.line ? { line: swap.line } : {}), ...(swap?.dayFirst ? { dayFirst: true } : {}), };
   };
   // finding 61: a site's Add that stopped in the NEAR wallet: its page offers the one tap that ends it
   const waysOf = (s: (typeof moves)[number]) => stoppedWays(s, wallets).map((w) => ({

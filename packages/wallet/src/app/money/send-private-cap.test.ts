@@ -39,7 +39,7 @@ test("the copy review's ruling: the keypad caps at Private's figure, in dollars 
 });
 
 test("the copy review's ruling: one line, only when the typed amount was over Private's figure; gone on the next key, Max or another coin (control: never shown before that, and the route-open over line is unchanged)", () => {
-  assert.equal(privateOver("$8.86", "NEAR"), "Private holds $8.86 of NEAR. Send up to that, or pick another coin.");
+  assert.equal(privateOver("$8.86", "NEAR"), "Private holds $8.86 in NEAR. Send up to that, or pick another coin.");
   assert.match(form, /\{capped && source\.privateOnly\n\s*\? <p className="zf-small wl-send2__coins" role="status" data-testid="send-private-over">\{privateOver\(most, source\.symbol\)\}<\/p>\n/);
   assert.match(form, /const type = \(v: string\) => \{\n\s+setAmountNo\(null\);\n[^\n]*\n\s+setTyped\(clean\);\n\s+setCapped\(false\);/, "each key starts with no line");
   assert.match(form, /const setCoins = \(coins: string\) => \{\n\s+setExact\(null\);\n\s+setCapped\(false\);/, "Max and the slider: no line");

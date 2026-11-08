@@ -13,13 +13,13 @@ import type { IntentsFacts, QuoteFacts, SendPayout } from "@zerofee/core/intents
 import { createMockBridge } from "@zerofee/shell-api/MockBridge.ts";
 
 const max = "0.0106 ETH goes to them. The rest stays in Private.";
-const at = (o: Partial<Parameters<typeof underAmount>[0]>) => underAmount({ over: false, exact: null, amount: "0", symbol: "ETH", place: "your ETH (RH) wallet", maxLine: null, ...o });
+const at = (o: Partial<Parameters<typeof underAmount>[0]>) => underAmount({ over: false, exact: null, amount: "0", symbol: "ETH", place: "your Robinhood wallet", maxLine: null, ...o });
 
 test("S1 (b/21): over what can go, the slot under the amount says no coin figure and no Max line (controls: under it, both as before; a request's coin; nothing typed)", () => {
   const rows: [string, Parameters<typeof at>[0], ReturnType<typeof underAmount>][] = [
     ["a $90 ask over the $27.93 a wallet can send", { over: true, amount: "0.0383", maxLine: max }, { coins: null, max: null }],
     ["over, with no Max line", { over: true, amount: "0.0383" }, { coins: null, max: null }],
-    ["control: under the most", { amount: "0.0042" }, { coins: "0.0042 ETH from your ETH (RH) wallet", max: null }],
+    ["control: under the most", { amount: "0.0042" }, { coins: "0.0042 ETH from your Robinhood wallet", max: null }],
     ["Max picked: its line alone, one line in the slot (copy review, 6 Nov)", { amount: "0.012", maxLine: max }, { coins: null, max }],
     ["control: a request's exact coin", { exact: { amount: "12.5", symbol: "USDC" }, amount: "12.5", maxLine: max }, { coins: "They asked for 12.5 USDC.", max: null }],
     ["control: nothing typed", {}, { coins: null, max: null }],
@@ -31,7 +31,7 @@ test("S1 (b/21): over what can go, the slot under the amount says no coin figure
 });
 
 test("S1: the at-most line names the next tap, Max, while Max can set something (control: a coin that can send nothing names no tap)", () => {
-  assert.equal(overLine("your ETH (RH) wallet", "$27.93", true), "You can send at most $27.93 from your ETH (RH) wallet. Tap Max to send that.");
+  assert.equal(overLine("your Robinhood wallet", "$27.93", true), "You can send at most $27.93 from your Robinhood wallet. Tap Max to send that.");
   assert.equal(overLine("your Safe", "$0.00", false), "You can send at most $0.00 from your Safe.", "control: nothing Max could set");
   assert.equal(overLine("your SOL wallet", "$144.27"), "You can send at most $144.27 from your SOL wallet.", "control: the old two-argument call");
   assert.ok(!/→|->/.test(OVER_MAX_TAP), "no arrow glyphs");

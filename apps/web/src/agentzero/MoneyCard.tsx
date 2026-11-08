@@ -178,8 +178,8 @@ export function MoneyCard({ ask, line, onOpen, onEnd, onCard, stale = false }: {
 }
 
 /** The coin the mark shows: the ask's, or the wallet's own (a move's Safe holds USDC; the chain wallets their coin). */
-const PLACE_COIN: Record<string, string> = { safe: "USDC", sol: "SOL", hood: "ETH", near: "NEAR", bsc: "BNB" };
-const ICON_OF: Record<string, string> = { SOL: "sol", ETH: "hood", NEAR: "near", USDC: "usdc", BNB: "bsc" };
+const PLACE_COIN: Record<string, string> = { safe: "USDC", sol: "SOL", hood: "ETH", near: "NEAR" };
+const ICON_OF: Record<string, string> = { SOL: "sol", ETH: "hood", NEAR: "near", USDC: "usdc" };
 function coinOf(ask: HomeAsk): string {
   if (ask.kind === "trade") return ask.symbol;
   if (ask.kind === "swap") return ask.to;
@@ -199,7 +199,8 @@ export function OldSheet({ line, was }: { line: string; was: CardWas }) {
   return (
     <div className="azc-step azc-money" data-testid="az-old-sheet">
       <p className="azc-step-line">{line}</p>
-      <p className="zf-small azc-system" role="status">{said ?? "Looking in your Activity…"}</p>
+      {/* item 6: Activity is read on this phone in a moment; until then the card's own line stands alone */}
+      <p className="zf-small azc-system" role="status">{said ?? ""}</p>
     </div>
   );
 }

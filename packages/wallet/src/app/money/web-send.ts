@@ -77,7 +77,7 @@ export const WEB_SEND_TASK = "web-send:";
 /** The wallets the web Send pays from: the core's chain names, each wallet's own coin. */
 export const WEB_SEND_FROM = [
   { chain: "sol", wallet: "SOL", row: "SOL wallet", symbol: "SOL", network: "Solana", decimals: 9, to: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/, lands: "nep141:sol.omft.near" },
-  { chain: "hood", wallet: "ETH (RH)", row: "ETH (RH) wallet", symbol: "ETH", network: "Robinhood Chain", decimals: 18, to: /^0x[0-9a-fA-F]{40}$/, lands: "nep141:hood.omft.near" },
+  { chain: "hood", wallet: "Robinhood", row: "Robinhood wallet", symbol: "ETH", network: "Robinhood Chain", decimals: 18, to: /^0x[0-9a-fA-F]{40}$/, lands: "nep141:hood.omft.near" },
 ] as const;
 /** One thing the web Send pays from: a wallet's own coin (WEB_SEND_FROM), or a token it holds that the core sends
  *  privately (webSendCoins). `lands`: 1Click's id of the coin, which it lands as. `token`: the wallet's coin pays the fee. */

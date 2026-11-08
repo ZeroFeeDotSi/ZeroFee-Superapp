@@ -41,8 +41,9 @@ export function quoteDelayMs(instant: boolean): number {
  *  kept until the check ends say anything else. */
 export function buttonWords(o: { online: boolean; busy: boolean; queued: boolean; side: "buy" | "sell"; label: string }): string {
   if (!o.online && !o.busy) return "You're offline";
-  if (o.busy) return "Sending…";
-  if (o.queued) return o.side === "buy" ? "Buying when it's checked…" : "Selling when it's checked…";
+  // rule 2 (b9): a state, never an ellipsis
+  if (o.busy) return "Sending";
+  if (o.queued) return o.side === "buy" ? "Buys once it's checked" : "Sells once it's checked";
   return o.label;
 }
 

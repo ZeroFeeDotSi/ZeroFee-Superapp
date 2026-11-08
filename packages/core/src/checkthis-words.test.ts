@@ -67,7 +67,7 @@ test("the copy review's (a), the core's check: the plan's other parts only once 
 test("the copy review's (b): the fill's rows, a table, in this order: the wallet gets, From your Safe, Stays in Private and its why, only when a difference stays; never Together", () => {
   const rows: [bigint, bigint, string, string[]][] = [
     [14825n, 15000n, "your SOL wallet", ["Your SOL wallet gets · $148.25", "From your Safe · $150.00", "Private keeps the rest · about $1.75", "Fee · $0.00"]],
-    [14825n, 14825n, "your ETH (RH) wallet", ["Your ETH (RH) wallet gets · $148.25", "From your Safe · $148.25", "Fee · $0.00"]],
+    [14825n, 14825n, "your Robinhood wallet", ["Your Robinhood wallet gets · $148.25", "From your Safe · $148.25", "Fee · $0.00"]],
     [500n, 1000n, "your NEAR wallet", ["Your NEAR wallet gets · $5.00", "From your Safe · $10.00", "Private keeps the rest · about $5.00", "Fee · $0.00"]],
     [500n, 1000n, "your Safe", ["Your Safe gets · $5.00", "From your Safe · $10.00", "Private keeps the rest · about $5.00", "Fee · $0.00"]],
     [500n, 1000n, "Private", ["Private gets · $5.00", "From your Safe · $10.00", "Private keeps the rest · about $5.00", "Fee · $0.00"]],

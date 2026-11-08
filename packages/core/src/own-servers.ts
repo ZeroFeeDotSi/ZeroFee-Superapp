@@ -17,6 +17,8 @@ export const isOwnChain = (c: unknown): c is OwnChain => typeof c === "string" &
 export const OWN_STORE_APP = "trade";
 export const ownStoreKey = (c: OwnChain): string => `status.own.${c}`;
 
+/** A typed address that isn't one (the Status service's and the core's own refusal). */
+export const OWN_BAD = "That isn't a server address. It starts with https://";
 /** The one line when a person's own server didn't answer and ZeroFee's server took over (spec line 8). */
 export const OWN_SWITCHED = "Your server didn't answer. Using ZeroFee's server.";
 

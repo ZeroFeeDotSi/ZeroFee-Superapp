@@ -77,7 +77,10 @@ test("a newer ask is refused while an earlier ask's trade is on its way, never e
 test("Trade's page for an ask never keeps a press, takes no tap in its first moments, and compares addresses the market's way (source)", async () => {
   const { readFileSync } = await import("node:fs");
   const sheet = readFileSync(new URL("../../trade/src/app/screens/TradeSheet.tsx", import.meta.url), "utf8");
-  assert.match(sheet, /if \(filledBy && \(performance\.now\(\) - shownAt\.current < FILLED_GRACE_MS \|\| !canTap\(quote, intent, busy\)\)\) return;/);
+  // changed pin (the audit's S6, QA 16): the grace, then no kept press but one: a Sell short of its fee, whose button says both
+  // steps ("Sell · $2.50 for fees first"), so its one tap is the yes to the fee and the sale (one job)
+  assert.match(sheet, /if \(filledBy && performance\.now\(\) - shownAt\.current < FILLED_GRACE_MS\) return;/);
+  assert.match(sheet, /const feeFirst = needsGas && !gasAsked && !gasJob\.current && !busy;\n    if \(filledBy && !feeFirst && !canTap\(quote, intent, busy\)\) return;/);
   const app = readFileSync(new URL("../../trade/src/app/TradeApp.tsx", import.meta.url), "utf8");
   assert.match(app, /normAddr\(coin\.chain, asked\.ask\.address\) === normAddr\(coin\.chain, coin\.address\)/);
   assert.match(app, /asked && !asked\.opened && !sheet && view\.ask === asked\.seq/, "opens only over no other page");

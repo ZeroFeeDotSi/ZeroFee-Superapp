@@ -112,7 +112,8 @@ test("each dependency at 404 (1Click, NEAR Intents' bridge, NEAR, Solana, the re
         if (needs) {
           assert.ok(line, `${label}: a line naming it\n${shown}`);
           // F2: the line names what waits in the sheet's own word: "Move", never "Add" (the sheet says "Put money in")
-          if (s.name === "Add") assert.match(line!, / Add waits until it's back\.$/, label);
+          // (changed pin, audit 11's B4: the line says the money's place and what to do, never "Add waits")
+          if (s.name === "Add") assert.match(line!, /, so this can't go now\. Your money stays (where it is|in your Safe)\. (Try again when it's back|It checks again by itself)\.$/, label);
           assert.throws(() => runtime.press(/^(Add|Take out) \$/), /is off|nothing to tap/, `${label}: Move waits until it's back`);
         } else assert.equal(line, null, `${label}: no line for a service it doesn't use`);
         ROWS.push(`${SERVICE_NAMES[service]} | 404 | ${s.name} | ${needs ? "line, Move held" : "not needed, no line"} | ${line ?? "(none)"}`);

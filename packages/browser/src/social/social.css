@@ -365,3 +365,6 @@
 .sh-fav { padding: 0; }
 /* the bar's ring only while its field has the caret, never left on after Go is tapped */
 .sh-address-bar:focus-within:not(:has(input:focus)) { box-shadow: none; }
+
+/* audit 18 (S18-4): a kept figure's line under Social trading's sites */
+.st-as-of { margin: 10px 4px 0; color: var(--mute); }

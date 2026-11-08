@@ -22,9 +22,9 @@ test("the phone's setting is read as it is; the web has none; a build without To
   const web = phone(() => ({ ok: { private: true, normalSites: [], built: true } }));
   assert.deepEqual(await readPrivacy(web.bridge, false), { kind: "web" });
   assert.equal(web.calls.length, 0, "nothing asked off the iPhone");
-  assert.equal(PRIVACY.rowLine({ kind: "phone", private: true, normalSites: [], built: false }), "Private browsing isn't ready yet");
+  assert.equal(PRIVACY.rowLine({ kind: "phone", private: true, normalSites: [], built: false }), "Trackers, history and site data");
   assert.equal(PRIVACY.rowLine({ kind: "phone", private: false, normalSites: [], built: true }), "Private browsing is off");
-  assert.equal(PRIVACY.rowLine({ kind: "web" }), "Private browsing, history and site data");
+  assert.equal(PRIVACY.rowLine({ kind: "web" }), "History");
 });
 
 test("a malformed answer, or one from an older phone, is never read as private browsing on", () => {

@@ -143,6 +143,10 @@ export const PRIVATE_MORE = ["Future computers could break its key. Your Safe's 
  *  or coming out (a payout lands on a public chain, PRIVATE_HOW; this line stands alone on the fill's sheet and the first
  *  win), and not NEAR Intents' solver, which sees every payment. Never "private from everyone". */
 export const PRIVATE_SEEN = "Private from the public, except the money going in and coming out. NEAR Intents sees every payment.";
+/** Audit 13's D11 (8 Nov): Add to Private named NEAR Intents, never NEAR Confidential, before the tap; every money move names
+ *  the protocol that moves it (the hard rule, 4 Nov). One line, under "Private is your NEAR wallet the public can't
+ *  see into." (PRIVATE_SEEN said that idea a second time there); what the public sees is on its Check. */
+export const PRIVATE_THROUGH = "It goes in through NEAR Confidential.";
 /** What a Send through it hides, and what it doesn't (privacy audit, 4 Nov; D137: no wait between the steps): the middle
  *  is hidden, the step in and the step out are public and close in time, and money that sat there a while hides best. */
 export const PRIVATE_HOW = ["Only the middle of a send is hidden.", "Anyone can see money go in and come out, close in time.", "Money that sits here a while is the most private."];
@@ -167,6 +171,19 @@ export const privateUsd = (rows: Balance[]): string => fixed2(sum(rows.filter((r
  *  can pay only a part of it (a site's Add pays in USDC; Send pays one coin) says that part in its own line. Null: Private
  *  not read yet, or not set up on this phone. */
 export const privateFigure = (pocket: Pick<PrivatePocket, "available" | "ready" | "rows"> | null | undefined): string | null => (pocket?.available && pocket.ready ? privateUsd(pocket.rows) : null);
+/** Private's part in one coin (audit 11's B6, 8 Nov: a Safe Swap's pay card said "USDC · Private · $33.86", all of
+ *  Private, while its USDC was $25.00): the figure under a coin is that coin's. Null as privateFigure. */
+export const privateCoinFigure = (pocket: Pick<PrivatePocket, "available" | "ready" | "rows"> | null | undefined, symbol: string): string | null =>
+  pocket?.available && pocket.ready ? privateUsd(pocket.rows.filter((r) => r.symbol.toUpperCase() === symbol.toUpperCase())) : null;
+/** Private's whole figure as Home and the Private page say it (privateAllUsd: its rows and the old wallets' money), and
+ *  the old wallets' part of it (the audit's S2, 7 Nov: the Move sheet said Private's rows alone, and the gap landed in "Not
+ *  moved" as "coins in your wallets"). Null: Private not read yet, or not set up on this phone (privateFigure's rule). */
+export function privateWhole(pocket: Pick<PrivatePocket, "available" | "ready" | "rows" | "oldWords"> | null | undefined): { usd: number; oldUsd: number } | null {
+  const own = privateFigure(pocket);
+  if (own === null) return null;
+  const all = Number(privateAllUsd(pocket!));
+  return { usd: all, oldUsd: Math.max(0, Math.round((all - Number(own)) * 100) / 100) };
+}
 /** Two dollar amounts added, to the cent. */
 export const plusUsd = (a: string, b: string): string => fixed2(sum([a, b], 2));
 
@@ -387,7 +404,7 @@ const isAddress = (who: string): boolean => /^0x[0-9a-f]{6,}$/i.test(who) || (wh
 export const payeeOf = (m: Pick<Movement, "to">): string => split(m.to ?? "")[0];
 
 /** Each row's word, and its network's name as a record writes it ("… on Solana"), for a move into the person's own row. */
-const ROW_WORD: Record<string, [string, string]> = { sol: ["SOL", "Solana"], hood: ["ETH (RH)", "Robinhood Chain"], bsc: ["BNB", "BNB Chain"] };
+const ROW_WORD: Record<string, [string, string]> = { sol: ["SOL", "Solana"], hood: ["Robinhood", "Robinhood Chain"], bsc: ["BNB", "BNB Chain"] };
 /** The person's own rows by address (Spending's wallets: each network's wallet, and an older one), as [word, network].
  *  Read on this phone from what it already lists; nothing is asked. */
 export type OwnRows = ReadonlyMap<string, readonly [string, string][]>;
@@ -431,7 +448,7 @@ export const SEND_FROM: Record<string, string> = { "safe-send": "safe", "pocket-
 const UNCONFIRMED = new Set(["ledger.send.unread", "ledger.hold.unknown"]);
 
 /** Where money that came in landed, by the wallet's name (D124). */
-const INTO_WORDS: Record<NonNullable<Movement["into"]>, string> = { safe: "Safe", sol: "SOL wallet", hood: "ETH (RH) wallet", near: "NEAR wallet", bsc: "BNB wallet" };
+const INTO_WORDS: Record<NonNullable<Movement["into"]>, string> = { safe: "Safe", sol: "SOL wallet", hood: "Robinhood wallet", near: "NEAR wallet", bsc: "BNB wallet" };
 
 /**
  * Where the money is now, in plain words (Alpha metric 4): the last part of every Activity row. Never a promise the
@@ -467,6 +484,9 @@ export function whereNow(m: Movement, to: string): string {
     // cut 7: "with nep141:zec.omft.near"); one in the NEAR wallet stays in the NEAR wallet (source "private" is its float, the copy review's ruling, 6 Nov)
     case "swap":
       if (m.source === "private") return m.status === "moving" ? `with ${SERVICE_NAMES.oneclick}, converting` : m.status === "done" ? "in your NEAR wallet" : "still in your NEAR wallet";
+      // the Safe's through NEAR Confidential (builder 15, 8 Nov): going, it is there; ended short, its money is in Private
+      // (leg 1 and leg 2 refund there, then it goes home to the Safe: send-job.ts ended)
+      if (m.private) return m.status === "moving" ? "going through NEAR Confidential" : m.status === "done" ? "in your Safe" : "in Private";
     // falls through: the Safe's
     case "convert":
       return m.status === "moving" ? `with ${SERVICE_NAMES.oneclick}, converting` : m.status === "done" ? "in your Safe" : `with ${SERVICE_NAMES.oneclick}`;
@@ -483,8 +503,38 @@ export function whereNow(m: Movement, to: string): string {
  * amount at the coin list's price (NEAR at the core's one snapshot, H1), to the cent as the sheet rounds. None for a step
  * that moved no money, a Top up or Put away whose title already says its dollars, or a coin with no price.
  */
+/** Audit 16's G6: a Safe's Buy or Sell on Trade's NEAR Intents tab (builder 15: one job through NEAR Confidential, its
+ *  movement a Safe swap, source "safe"): "buy" when it paid USDC, "sell" when it got USDC, else null. Pure. */
+export const safeTrade = (m: Pick<Movement, "kind" | "private" | "source" | "from">): "buy" | "sell" | null =>
+  m.kind === "swap" && m.private && m.source === "safe" ? (m.from === USDC_ON_NEAR ? "buy" : "sell") : null;
+/** Its coin, by symbol: what a Buy got, what a Sell paid. */
+const tradeCoin = (m: Movement, tokens: Map<string, Token>): string => {
+  const id = safeTrade(m) === "buy" ? m.to : m.from;
+  return id === "near" ? "NEAR" : tokens.get(id ?? "")?.symbol ?? "";
+};
+/** The Safe's Buy or Sell's line, as Move's row and receipt say it (builder 14's D1). */
+export const WENT_THROUGH = "It went through NEAR Confidential.";
+export const GOES_THROUGH = "It goes through NEAR Confidential.";
+
+/** A USDC figure read off a record, as every screen says it: cents down, never more than landed ("$200.65"). */
+export const landedUsd = (usdc: string): string => (Number(usdc) < 0.01 ? "under $0.01" : dollars(usdc));
+/**
+ * Audit 17's H4: a Safe Buy or Sell has ONE dollar figure, its USDC side read off one record field, the same on the done
+ * screen, the Jobs row, Activity's row and its page: a Buy the USDC it paid (`amount`, "$25.00", never its coin at
+ * today's price, "$24.97"); a Sell, once landed, the USDC that came in (`amountOut`, "$200.65", never the asked $200.86).
+ * Null: not a Safe trade, or a Sell still going (what left, at its price, as any move says).
+ */
+export function tradeUsd(m: Pick<Movement, "kind" | "private" | "source" | "from" | "status" | "amount" | "amountOut">): string | null {
+  const t = safeTrade(m);
+  const v = t === "buy" ? m.amount : t === "sell" && m.status === "done" ? m.amountOut : undefined;
+  return v && Number(v) > 0 ? landedUsd(v) : null;
+}
+
 export function movementDollars(m: Movement, tokens: Map<string, Token>): string | null {
   if (m.kind === "account" || !m.amount) return null;
+  // G6 + audit 17's H4: a Safe's Buy or Sell says its one figure (tradeUsd), read off its record, never a price's
+  const traded = tradeUsd(m);
+  if (traded) return traded;
   if (m.kind === "trading" && (m.from === "trading" || m.from === USDC_ON_NEAR)) return null;
   const native = m.from === "near" || m.to === "near";
   const id = native ? "nep141:wrap.near" : m.kind === "deposit" || m.from === "trading" || m.from === "private" ? m.to ?? "" : m.from ?? "";
@@ -570,6 +620,13 @@ export function describe(m: Movement, tokens: Map<string, Token>, chains: Chain[
     }
     case "swap":
     case "convert": {
+      // audit 16's G6 (8 Nov): the Safe's Buy or Sell is its job, by name ("Sell of NEAR"), and names NEAR Confidential
+      const trade = safeTrade(m);
+      if (trade && m.status !== "problem") {
+        const sym = tradeCoin(m, tokens) || "a coin";
+        const title = m.status === "moving" ? `${trade === "buy" ? "Buying" : "Selling"} ${sym}` : m.status === "refunded" ? "Refunded" : `${trade === "buy" ? "Buy" : "Sell"} of ${sym}`;
+        return { title, detail: m.status === "done" ? WENT_THROUGH : m.status === "moving" ? GOES_THROUGH : where };
+      }
       // a swap in place (kind "swap", ledger.swap) reads as a conversion
       const into = tokens.get(m.to ?? "")?.symbol;
       const title = m.status === "moving" ? "Converting" : m.status === "refunded" ? "Refunded" : m.status === "problem" ? (m.kind === "swap" ? NEAR_SWAP_HEAD : "Not converted") : "Converted";

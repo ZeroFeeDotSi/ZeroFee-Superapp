@@ -16,7 +16,7 @@ test("finding 64: a typed number over what the coin can send stays as typed, Hol
   assert.equal(overMax("abc", "42.1"), false);
   assert.equal(overLine("your SOL wallet", "$144.27"), "You can send at most $144.27 from your SOL wallet.");
   // S1 (QA's ledger re-walk, 6 Nov): the line names the next tap while Max can set something (control: none, no tap)
-  assert.equal(overLine("your ETH (RH) wallet", "$27.93", true), "You can send at most $27.93 from your ETH (RH) wallet. Tap Max to send that.");
+  assert.equal(overLine("your Robinhood wallet", "$27.93", true), "You can send at most $27.93 from your Robinhood wallet. Tap Max to send that.");
   assert.equal(OVER_MAX_TAP, "Tap Max to send that.");
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
   const type = form.slice(form.indexOf("const type = (v: string)"), form.indexOf("const slide = "));
@@ -24,7 +24,7 @@ test("finding 64: a typed number over what the coin can send stays as typed, Hol
   const notPrivate = type.split("\n").filter((l) => !/privateCap|if \(cap\)|Send from Private/.test(l)).join("\n");
   assert.doesNotMatch(notPrivate, /max|setTyped\(null\)/, "typing never turns into the whole balance, nor drops what was typed");
   assert.match(type, /source\.privateOnly \? privateCap\(/, "control: the cap is only a Send from Private's");
-  assert.match(form, /: waits \? waits\s*(: amountNo \? amountNo\s*)?: over \? overLine\(source\.place, most, Number\(max\) > 0\)/, "said before any other reason, once something is typed");
+  assert.match(form, /: waits \? \(topSaid \? null : waits\)\s*(: amountNo \? amountNo\s*)?: over \? overLine\(source\.place, most, Number\(max\) > 0\)/, "said before any other reason, once something is typed");
   assert.match(form, /if \(typed === null && Number\(amount\) > Number\(max\)\)/, "a new source caps only what wasn't typed (Max)");
   assert.match(form, /onClick=\{\(\) => \{ setPreset\(true\); slide\(STEPS\); \}\} data-testid="send-max"/, "Max is the way to all of it");
 });
@@ -112,7 +112,10 @@ test("review fixes: a stale lookup can't set who; a link's recipient passes Send
 
 test("every disabled Hold says why, the first that applies; the relay's own limit is named; the line and the button agree", () => {
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
-  for (const why of ['"Paste an address or a name."', "LOOKALIKE_LINE", '"Pick the network first."', '"Pick how much."', "RELAY_LIMIT_LINE", "waits ? waits"]) assert.ok(form.includes(why), why);
+  // QA 16's SHOULD (8 Nov, b8's): while To is empty its placeholder says it; nothing under the keypad repeats it.
+  // Typed but not taken, the line still says it (the rehearsal's symptom, agentzero-e2e)
+  assert.match(form, /: !who \? \(line \|\| !text\.trim\(\) \? null : "Paste an address or a name\."\)/, "an empty To leaves the line empty");
+  for (const why of ['"Paste an address or a name."', "LOOKALIKE_LINE", '"Pick the network first."', '"Pick how much."', "RELAY_LIMIT_LINE", "waits ? (topSaid ? null : waits)"]) assert.ok(form.includes(why), why);
   // a19d97be's Sim crawl (4 Nov, 03-send-3.png): `waits ? null` left Hold off with no line when the sheet had none
   assert.ok(!form.includes("waits ? null"), "a waiting Send says why under Hold too");
   assert.match(form, /const ready = !!source && !!who && !!network && !why && !waits && !busy/, "Hold is on only when no reason stands");

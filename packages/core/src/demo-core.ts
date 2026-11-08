@@ -42,6 +42,7 @@ import { ProblemError, type Problem } from "./problem.ts";
 import { FORK, FORK_CROSS_CHAIN } from "./fork.ts";
 import { seedToWords, wordsProblem, wordsToSeed } from "./recovery-words.ts";
 import { securityProblems } from "./security-problems.ts";
+import { SAFE_SWAP_PRIVATE } from "./safe-swap-private.ts";
 import { faultOf, relayLimitProblem, relayOldLimit, serviceProblem } from "./services.ts";
 import { RpcEvmChain } from "./evm.ts";
 import { oneClickQuote, oneClickStatus } from "./intents.ts";
@@ -648,7 +649,7 @@ function ownWalletName(w: { kind: string; chain: string; current?: boolean; labe
   return `your ${w.current === false ? "older " : ""}${CHAIN_WORDS[w.chain] ?? w.chain} wallet`;
 }
 /** Home V4's row names (packages/wallet Home.tsx ROW_NAME), for the core's sheets. */
-const ROW_WORDS: Record<string, string> = { sol: "SOL", hood: "ETH (RH)", bsc: "BNB" };
+const ROW_WORDS: Record<string, string> = { sol: "SOL", hood: "Robinhood", bsc: "BNB" };
 
 interface Saved {
   accountId: string;
@@ -1283,7 +1284,7 @@ export class DemoCore implements Bridge {
       case "account.removeKey":
         return this.removeKey(p.handle);
       case "account.protection.get":
-        return this.protectionGet();
+        return p.room === true ? this.protectionRoom() : this.protectionGet();
       case "account.rules":
         return this.rulesInfo();
       case "account.rules.update":
@@ -1345,6 +1346,11 @@ export class DemoCore implements Bridge {
       // NEAR into its own account in Rhea, sent by the core). Trade's only
       case "subwallet.near.rheaSwap":
         return this.ready().then(() => this.tradeOnly(p)).then(() => this.subwallets.nearRheaSwap(p.ask));
+      // the person's own server for the core's own checks and reads (own-core.ts): ZeroFee's own Status only
+      case "subwallet.own.set":
+        return import("./own-core.ts").then((m) => m.ownIntoCore(p));
+      case "subwallet.own.state":
+        return import("./own-core.ts").then((m) => m.ownCoreState(p));
       case "subwallet.near.rheaAdd":
         return this.ready().then(() => this.tradeOnly(p)).then(() => this.subwallets.nearRheaAdd(p.amount));
       // a kept trade's coin back from Ref's lost and found (the audit's MUST, 7 Nov): signed here, sent by Trade. Trade's only
@@ -1557,7 +1563,10 @@ export class DemoCore implements Bridge {
         return this.ready().then(() => this.tradeOnly(p, 1)).then(() => this.subwallets.floatMoveList());
       // The Safe's swap in place (product decision, 5 Nov, safe-swap.ts): the quote the core asks for itself, for Home's Swap and
       // Trade's native coins (through ledger.swap); the Safe's own sheet then checks its one mt_transfer against it
+      // the public Safe swap is gone (product decision, 8 Nov; safe-swap-private.ts): the ledger swaps from
+      // the Safe only through Private (wallet safe-send.ts swapFromSafe), so this door says no, by name, before any price
       case "subwallet.safeSwapQuote":
+        if (SAFE_SWAP_PRIVATE) return Promise.reject(new ProblemError(securityProblems.subwalletRefused("Swaps from your Safe go through NEAR Confidential. Nothing moved.")));
         return this.ready().then(() => this.tradeOnly(p, 1)).then(() => this.subwallets.safeSwapQuote(p.from, p.to, p.amount, p.atLeast));
       // C2: a Move's wallet parts, kept by this core's own read for its one Safe sheet (Spending's, as Trade)
       case "subwallet.moveOthers":
@@ -2673,6 +2682,21 @@ export class DemoCore implements Bridge {
     let usd = usdBands(bands, null);
     if (!usd && Array.isArray(bands) && bands.length) usd = usdBands(bands, (await this.sheetNearUsd()) ?? (await (at?.prices ?? this.prices()).then((p) => p.near, () => null)));
     return { bands, secondDevices: Number(secondDevices ?? 0), usd };
+  }
+
+  /** Send's own read (audit 10's A4, 8 Nov): the rules plus what one Send from the Safe can still take today, its fill
+   *  included (send-fill.ts sendRoom over the contract's band state, the figure the over-limit refusal says), so Send's
+   *  "ready" and Max never offer what the rules refuse. Asked only with `room` (the spent read is Send's alone, never
+   *  Protection's or Home's). No figure: the rules have no Face ID band in coins, or the spent read failed. */
+  private async protectionRoom(): Promise<{ bands: unknown; secondDevices: number; usd: ProtectionBand[] | null; sendLeftUsd?: number }> {
+    const signer = await this.ready();
+    const block = await this.chain.commonBlock();
+    const spentP = this.chain.view(signer.accountId, "spent_today", {}, block).catch(() => undefined);
+    const got = await this.protectionGet({ signer, block });
+    const spent = await spentP;
+    if (spent === undefined) return got;
+    const room = (await import("./send-fill.ts")).sendRoom(got.bands, spent);
+    return room ? { ...got, sendLeftUsd: room.leftUsd } : got;
   }
 
   /** Dollar bands → coin amounts at today's prices, fixed when saved; then the contract's set_protection (approval sheet). */

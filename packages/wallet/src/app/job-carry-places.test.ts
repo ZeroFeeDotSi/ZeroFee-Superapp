@@ -35,7 +35,7 @@ test("jobFacts: a job's To never prints a raw unknown key; control: the plan's w
   const [r] = foldJobs([a, b], (id) => (id === "j1" || id === "j2" ? JOB : undefined));
   const facts = [{ label: "From", value: "Safe" }, { label: "To", value: "SOL wallet" }];
   // fix/move-leg-steps (QA's SHOULD): From names every wallet that paid
-  const from = { label: "From", value: "Safe, ETH (RH) wallet" };
+  const from = { label: "From", value: "Safe, Robinhood wallet" };
   assert.deepEqual(jobFacts(r!, facts, ["near", "sol"]), [from, { label: "To", value: "SOL wallet, NEAR wallet" }]);
   const odd = jobFacts(r!, facts, ["sol", "evil", "near"]);
   assert.deepEqual(odd, [from, { label: "To", value: "SOL wallet, NEAR wallet" }], JSON.stringify(odd));

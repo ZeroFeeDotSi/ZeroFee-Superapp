@@ -576,8 +576,8 @@ test("spending.wallets reads Spending first: one wallet per chain (D55), older o
   assert.equal(refreshed, 1);
   assert.deepEqual(r.ok.map((x) => [x.id, x.role, x.label, x.current, x.inCap, x.cashUsd ?? x.holds, x.keyExported, x.unread ?? false]), [
     ["hub", "hub", "Your NEAR wallet's cash", true, true, "30.00", false, false],
-    ["w0", "chain", "Solana wallet", true, true, "16.00", true, false],
-    ["w2", "older", "Older Solana wallet", false, true, "5.00", false, false],
+    ["w0", "chain", "SOL wallet", true, true, "16.00", true, false],
+    ["w2", "older", "Older SOL wallet", false, true, "5.00", false, false],
     ["b0", "chain", "Base wallet", true, false, "0.0012 ETH", false, false],
   ], "an empty older wallet (w3) isn't listed; the card isn't Spending's");
   // a read that fails still lists the wallet, marked unread (never a $0 that looks read)
@@ -783,7 +783,7 @@ test("D102: every move the engine makes by itself is named and shown; the person
   const r = await svc.call<{ id: string; kind: string; shown: boolean; words: string }[]>("spending.activity", {});
   assert.ok("ok" in r);
   const by = Object.fromEntries(r.ok.map((x) => [x.id, x]));
-  assert.deepEqual([by.g!.kind, by.g!.shown, by.g!.words], ["gas", true, "$2.10 kept for fees on Solana"]);
+  assert.deepEqual([by.g!.kind, by.g!.shown, by.g!.words], ["gas", true, "Kept for fees on Solana"]);
   assert.deepEqual([by.c!.kind, by.c!.shown, by.c!.words], ["over-cap", true, "$12.00 back to your Safe, over your limit"]);
   assert.deepEqual([by.ci!.kind, by.ci!.shown, by.ci!.words], ["over-cap", true, "$7.00 back from Robinhood Chain, above your cap"]);
   assert.deepEqual([by.o!.kind, by.o!.shown, by.o!.words], ["older", true, "$5.00 back from an older Solana wallet"]);
@@ -959,4 +959,18 @@ test("QA's matrix (5 Nov, real money): the money in Private moves on every leg f
     const no = await service(c, { "account.protection.get": DEFAULT_BANDS, "ledger.balances": [SAFE_NEAR], "ledger.private": { available: true, ready: true, rows: [] } }).svc.call("spending.topUp", { usd: 4, legs: [{ network, usd: 4 }] });
     assert.ok("problem" in no && no.problem.code === "spending.topup.one-coin", `${network} control: ${JSON.stringify(no)}`);
   }
+});
+
+test("audit 10's A10 (8 Nov): the fee job's Activity row says its figure once, on the right (\"Kept for fees on Solana\" · $2.50), never \"$2.50 kept for fees on Solana · $2.50\" (control: a Move keeps its figure in its words)", async () => {
+  const e = fakeEngine({ totalUsd: 40, moves: [
+    { id: "g", kind: "out", chain: "sol", usd: 2.5, status: "done", at: 0, why: "gas" },
+    { id: "mo", kind: "out", chain: "sol", usd: 15, status: "moving", at: 0, why: "asked" },
+  ] });
+  const { svc } = service(e);
+  const r = await svc.call<{ id: string; usd: string; words: string }[]>("spending.activity", {});
+  assert.ok("ok" in r);
+  const g = r.ok.find((x) => x.id === "g")!;
+  assert.deepEqual([g.words, g.usd], ["Kept for fees on Solana", "2.50"]);
+  assert.doesNotMatch(g.words, /\$/, "no figure in the words");
+  assert.match(r.ok.find((x) => x.id === "mo")!.words, /\$15\.00/, "control");
 });

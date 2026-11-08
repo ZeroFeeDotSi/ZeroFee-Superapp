@@ -7,7 +7,7 @@ export const WEB_START = {
   sub: "A wallet in your browser. ZeroFee never holds your words.",
   create: "Create my wallet",
   have: "I already have one",
-  making: "Making your wallet…",
+  making: "Your wallet is being made by ZeroFee. About 2 s.",
 } as const;
 
 let waiting: string[] | null = null;

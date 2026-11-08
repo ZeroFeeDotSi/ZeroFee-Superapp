@@ -7,6 +7,8 @@
 
 /* The tabs: All, then a market chain's logo and its wallet's balance; a wallet with no market yet sits quiet after them. */
 .dc-top { display: flex; align-items: center; gap: 4px; margin: 2px 0 14px; }
+/* audit 18 (S18-4): a kept chip's line, under the strip, before the search */
+.dc-as-of { margin: -8px 0 12px; color: var(--mute); }
 .dc-tabs { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 2px 0 10px; overflow-x: auto; overscroll-behavior-x: none; scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to right, #000 96%, transparent); mask-image: linear-gradient(to right, #000 96%, transparent); }
 .dc-tabs::-webkit-scrollbar { display: none; }
@@ -139,7 +141,8 @@
    spacing (gaps 16 → 10, the figures' lead 12 → 8, the chip's pill 14 → 10 a side), the chip's hit still 44 pt */
 .dc-row.zf-lrow { column-gap: 10px; }
 .dc-row .zf-lrow__r { padding-left: 8px; }
-.dc-rr .dc-row { padding-right: 54px; }
+/* the chip says its figure ("Buy $50", QA 16, 8 Nov): the row keeps room for the widest */
+.dc-rr .dc-row { padding-right: 76px; }
 .dc-qb__pill { padding: 0 10px; }
 .dc-rr.is-away .dc-row, .dc-rr.is-landed .dc-row, .dc-rr.is-checking .dc-row, .dc-rr.is-refused .dc-row { padding-right: 0; }
 
@@ -170,6 +173,10 @@
 .dc-tab-name { font: 500 12px/1.1 var(--font); letter-spacing: 0; }
 .dc-tab-quiet .dc-tab-two { gap: 2px; }
 .dc-sym .dc-cap { font: 400 13px/1.2 var(--font-money, var(--font)); color: var(--mute); margin-left: -4px; }
+/* a figure is never cut ("$1.2" read as a smaller cap, b7's once the chip said "Buy $5"): the cap and the age
+   are whole or wrap onto a second line the symbol's one line hides; the coin page still says its Market cap */
+.dc-sym { flex-wrap: wrap; height: 1.2em; }
+.dc-sym .dc-cap, .dc-sym .dc-age { flex-shrink: 0; }
 .dc-sym .dc-cap::before { margin: 0 .3em 0 0; }
 .dc-row .zf-lrow__d:has(> .dc-sub--name) { white-space: normal; overflow: visible; text-overflow: clip; }
 .dc-sub--name { display: block; }
@@ -183,8 +190,22 @@
 .dc-move { height: 44px; margin-top: -2px; }
 /* the chips name their wallet in words, so the coin mark goes: both chips, Move and Settings fit 390 pt (after-walk, 7 Nov) */
 .dc-tabs { gap: 14px; }
+/* QA 16 (8 Nov): no wallet's name under the strip's fade at 390 pt: "Robinhood" ended 7 pt into it (157-219, fade from
+   212); 10 pt between chips and 8 pt before Move put it 9 pt clear (149-211, fade from 220). Only the quiet NEAR chip, the
+   scroll's next, starts there */
+.dc-tabs { gap: 10px; margin-right: 8px; }
 /* T2-5 (the copy review's walk, 8 Nov): "Not for sale" in mute where a refused coin's Buy was; the row keeps room for it. the copy review's walk:
    in every phase too (the receipt's padding-right: 0 above is 3 classes, so a refused trap's price and change ran under
    "Not for sale"); the price and change stay where they are, the row keeps its height */
 .dc-rr--nfs .dc-row, .dc-rr--nfs.is-away .dc-row, .dc-rr--nfs.is-landed .dc-row, .dc-rr--nfs.is-checking .dc-row, .dc-rr--nfs.is-refused .dc-row { padding-right: 86px; }
 .dc-nfs { position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: var(--mute); font: 500 13px/1 var(--font); white-space: nowrap; pointer-events: none; }
+
+/* audit 11's B9 (8 Nov): a trap coin's refused row: its name, then "ZeroFee won't buy it · Nothing was spent" in mute (no red:
+   nothing went wrong with the person's money) */
+.dc-sub--trap { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dc-sub--trap .dc-sub__words { color: var(--mute); font-size: 13px; }
+/* builder 24, item 1: a row on a down chain says it on its second line, in mute, where the name was ("Robinhood is down");
+   no chip, so the price and change stay whole in the slot every row keeps */
+.dc-sub--down { color: var(--mute); }
+.dc-row .zf-lrow__d:has(> .dc-sub--down) { white-space: normal; overflow: visible; text-overflow: clip; }
+.dc-sub--down { display: block; }

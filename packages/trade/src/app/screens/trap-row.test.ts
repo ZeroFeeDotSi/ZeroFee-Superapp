@@ -57,7 +57,8 @@ function contrast(a: string, b: string): number {
 test("the copy review's walk: a trap coin's refused row reads \"Didn't buy\" alone, never the refusal's sentence (control: another refusal keeps its why)", () => {
   const trap = tradeProblems.coinUnsellable("NOSELL").whatHappened;
   assert.match(trap, /^Not for sale\./, "the refusal's own words");
-  assert.equal(rowBuyLine({ phase: "refused", at: 0, why: trap }, "NOSELL", true), "Didn't buy");
+  // (changed pin, audit 11's B9, 8 Nov: who said no and the money, never "Didn't buy" alone)
+  assert.equal(rowBuyLine({ phase: "refused", at: 0, why: trap }, "NOSELL", true), "ZeroFee won't buy it · Nothing was spent");
   assert.equal(rowBuyLine({ phase: "refused", at: 0, why: "Only $3.00 on Solana. Open the coin to buy less." }, "DOPE"), "Didn't buy · Only $3.00 on Solana. Open the coin to buy less.", "control: a refusal on a coin for sale says why");
   assert.equal(rowBuyLine({ phase: "landed", at: 0, got: "7,505 DOPE" }, "DOPE", true), "Bought · 7,505 DOPE", "control: only the refused line changes");
   // the row hands its own not-for-sale state to the line
@@ -69,7 +70,7 @@ test("the copy review's walk: \"Not for sale\" sits where Buy was, never over th
     for (const phase of ["", "is-away", "is-landed", "is-checking", "is-refused"]) {
       assert.equal(rowPadding(["dc-rr", "dc-rr--nfs", ...(phase ? [phase] : [])], theme), "86px", `not for sale, ${phase || "at rest"}, ${theme}`);
     }
-    assert.equal(rowPadding(["dc-rr"], theme), "54px", `control: a normal coin keeps Buy's room, ${theme}`);
+    assert.equal(rowPadding(["dc-rr"], theme), "76px", `control: a normal coin keeps the chip's room ("Buy $50", QA 16), ${theme}`);
     assert.equal(rowPadding(["dc-rr", "is-refused"], theme), "0", `control: a refused coin for sale is the receipt, no chip, ${theme}`);
   }
   // "Not for sale" is drawn in that room only, in mute, on one line, and lets the tap through to the row (44 pt: the row's own)
@@ -86,7 +87,7 @@ test("the copy review's walk: the price and change are drawn on every row, trap 
   assert.match(src, /when=\{ch !== undefined \? <span className=\{`dc-chg [^\n]*\{pct\(ch\)\}<\/span> : undefined\} \/>/);
   const row = src.slice(src.indexOf("const Row = memo("), src.indexOf("/** The quiet Buy chip (Build A)"));
   assert.doesNotMatch(row.slice(row.indexOf("usd={"), row.indexOf("{/* T2-5")), /noSale|buy \?/, "the figures never wait on the row's state");
-  assert.match(row, /\{noSale \? <span className="dc-nfs" data-testid="row-not-for-sale">\{NOT_FOR_SALE\}<\/span> : !buy && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}/, "Buy or Not for sale, one of them");
+  assert.match(row, /\{noSale \? <span className="dc-nfs" data-testid="row-not-for-sale">\{NOT_FOR_SALE\}<\/span> : !buy && !down && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}/, "Buy or Not for sale, one of them");
 });
 
 test("the copy review's walk, both themes: \"Not for sale\" in mute reads on White and on Black (WCAG 4.5:1), and the row it sits in is the 44 pt tap target (control: the theme reader sees a dark-only rule)", () => {

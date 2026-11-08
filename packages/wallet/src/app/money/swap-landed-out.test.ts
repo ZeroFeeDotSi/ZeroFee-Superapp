@@ -71,7 +71,7 @@ test("M5: a row of legs lands on its one leg; the receipt's figure is the moveme
 
 test("M5: the Swap receipt reads its movement once it went and puts that figure on the landed line", () => {
   const sheet = src("./SwapSheet.tsx");
-  assert.match(sheet, /nameSwap\(ok\.id, words, lands\);\n\s+setLanding\(\{ id: ok\.id, where: SWAP_COIN\[get\]\.where \}\);/);
-  assert.match(sheet, /const fig = landedFigure\(r\.ok, landing\.id, \(n\) => coinFigure\(n, "down"\)\);\n\s+if \(fig\) \{ live = false; setMadeSaid\(\(m\) => \(m \? \{ \.\.\.m, landed: swappedLine\(fig, landing\.where\) \} : m\)\); \}/);
+  assert.match(sheet, /nameSwap\(ok\.id, words, lands\);\n\s+setLanding\(\{ id: ok\.id, where: SWAP_COIN\[get\]\.where, coin: SWAP_COIN\[get\]\.symbol \}\);/);
+  assert.match(sheet, /const fig = landedFigure\(r\.ok, landing\.id, \(n\) => coinFigure\(n, "down"\), landing\.coin\);\n\s+if \(fig\) \{ live = false; setMadeSaid\(\(m\) => \(m \? \{ \.\.\.m, landed: swappedLine\(fig, landing\.where, true\) \} : m\)\); \}/);
   assert.match(sheet, /bridge\.call<SpendingActivity\[\]>\("spending\.activity", \{\}\)/);
 });

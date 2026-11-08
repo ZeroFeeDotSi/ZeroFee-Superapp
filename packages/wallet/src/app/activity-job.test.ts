@@ -14,7 +14,8 @@ test("Activity's Move row is its job's: \"Move $30.00 to your Safe\" with the as
   carryTo(["move:pa-1", "move:pa-2"], { usd: "$30.00" });
   const done = row("pa-1", "done");
   assert.equal(nameOf(done), "Move $30.00 to your Safe", "the asked form, as Home's row (copy review, 5 Nov)");
-  assert.equal(usdOf(done), "$30.00", "the figure asked, the receipt's");
+  assert.equal(usdOf(done), "$28.80", "landed: what came in, read off its record (audit 13's D2; it said the $30.00 asked)");
+  assert.equal(usdOf(row("pa-2", "on-its-way")), "$30.00", "control: going, the figure asked, the receipt's");
   assert.doesNotMatch(lineOf(done), /\$28\.80|\$29\.39/, "no second figure under it");
   const going = row("pa-2", "on-its-way");
   assert.equal(nameOf(going), "Move $30.00 to your Safe", "while it goes too: the line carries the state");

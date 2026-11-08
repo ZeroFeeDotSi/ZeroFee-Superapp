@@ -218,7 +218,7 @@ const planKey = (a: string): string => (/^0x[0-9a-fA-F]{40}$/.test(a) ? a.toLowe
 /** Room left in the SOL row for Solana's fee and the account's own minimum (lamports). */
 const HIDDEN_ROW_SOL_ROOM = 1_000_000n;
 /** Hidden from a row (V4 Send): each row's own coin as 1Click names it, and the row's name on its sheet. */
-const HIDDEN_ROWS = { sol: { coin: "nep141:sol.omft.near", row: "SOL wallet", symbol: "SOL" }, hood: { coin: "nep141:hood.omft.near", row: "ETH (RH) wallet", symbol: "ETH" } } as const;
+const HIDDEN_ROWS = { sol: { coin: "nep141:sol.omft.near", row: "SOL wallet", symbol: "SOL" }, hood: { coin: "nep141:hood.omft.near", row: "Robinhood wallet", symbol: "ETH" } } as const;
 /** Home's Add from another chain (V4 step 6): 1Click's coins on chains whose addresses need no memo (review M1). Robinhood
  *  Chain (hood): 1Click's GET /v0/tokens lists "nep141:hood.omft.near" (ETH, 18 decimals, blockchain "hood"), 3 Nov. */
 const OUTSIDE_CHAINS = /^nep141:(?:btc|eth|base|arb|sol|hood|doge|ltc|zec|bch|pol|op|avax|gnosis|bera)(?:-[a-z0-9]+)?\.omft\.near$/;
@@ -2567,10 +2567,10 @@ export class SubWallets {
         // now is the person's no (security.send.declined): the Send sheet takes the job away and says nothing was sent
         // (QA's lap, 5 Nov), never "ZeroFee said no"
         if (!(await this.ownPayee(quote!.recipient))) {
-          if (!(await this.outsideSheet("private balance", quote!.recipient, usd, quote!.amountOutUsd, `$${Number(usd).toFixed(2)}`, landsWords(quote!)))) throw new ProblemError(securityProblems.sendDeclined("in your private balance"));
+          if (!(await this.outsideSheet("Private", quote!.recipient, usd, quote!.amountOutUsd, `$${Number(usd).toFixed(2)}`, landsWords(quote!)))) throw new ProblemError(securityProblems.sendDeclined("in Private"));
         } else {
           const capped = await this.capGate(Number(usd));
-          if (capped && !(await this.capSheet("Send from your private balance", [`About $${Number(usd || 0).toFixed(2)} leaves your private balance.`], capped, "wallet"))) throw new ProblemError(securityProblems.sendDeclined("in your private balance"));
+          if (capped && !(await this.capSheet("Send from Private", [`About $${Number(usd || 0).toFixed(2)} leaves Private.`], capped, "wallet"))) throw new ProblemError(securityProblems.sendDeclined("in Private"));
         }
       }
       // the one Face ID (the audit's c1, R1, 6 Nov): leg 2 of a Send from the Safe is checked now, before the Safe's one sheet, and
@@ -2607,7 +2607,7 @@ export class SubWallets {
     // Wallet or ZeroFee's own screens reach this (ownKind). Everything above is checked as 1Click signed it.
     // audit C1: under the one cap at 1Click's signed dollars; past it, one tap
     const capped = await this.capGate(Number(usd));
-    if (capped && !(await this.capSheet("Pay from your private balance", [`About $${Number(usd).toFixed(2)} leaves your private balance.`], capped, "wallet", undefined, !(await this.ownPayee(quote!.recipient))))) throw new ProblemError(securityProblems.subwalletRefused("You said not now. Nothing moved."));
+    if (capped && !(await this.capSheet("Pay from Private", [`About $${Number(usd).toFixed(2)} leaves Private.`], capped, "wallet", undefined, !(await this.ownPayee(quote!.recipient))))) throw new ProblemError(securityProblems.subwalletRefused("You said not now. Nothing moved."));
     return { signedData: signNep413(payload, await this.secret(w)) };
   }
 
@@ -2910,7 +2910,7 @@ export class SubWallets {
 
   private async hiddenFromRowNow(chain: unknown, inDeposit: unknown, outDeposit: unknown, intent: unknown, outTag: unknown, _why: unknown, payee: unknown, coin: unknown): Promise<{ leg1: TxOutcome; signedData?: ReturnType<typeof signNep413> }> {
     const row = chain === "sol" || chain === "hood" ? HIDDEN_ROWS[chain] : undefined;
-    if (!row) throw new ProblemError(securityProblems.subwalletRefused("A private send goes only from your SOL wallet or your ETH (RH) wallet. Nothing moved."));
+    if (!row) throw new ProblemError(securityProblems.subwalletRefused("A private send goes only from your SOL wallet or your Robinhood wallet. Nothing moved."));
     const token: HiddenCoin | null = coin === undefined ? null : hiddenCoin(coin, chain);
     if (coin !== undefined && !token) throw new ProblemError(securityProblems.subwalletRefused("Private can't take this yet. Nothing moved."));
     const leg1Coin = token ? (coin as string) : row.coin, symbol = token ? token.symbol : row.symbol;
@@ -3096,7 +3096,7 @@ export class SubWallets {
 
   private async sendPrivateNow(chain: unknown, to: unknown, toTokenId: unknown, amount: unknown): Promise<{ sent: TxOutcome; depositAddress: string; amountOut: string; amountOutUsd?: string; amountInUsd: string }> {
     const row = chain === "sol" || chain === "hood" ? HIDDEN_ROWS[chain] : undefined;
-    if (!row) throw new ProblemError(securityProblems.subwalletRefused("A private send goes only from your SOL wallet or your ETH (RH) wallet. Nothing moved."));
+    if (!row) throw new ProblemError(securityProblems.subwalletRefused("A private send goes only from your SOL wallet or your Robinhood wallet. Nothing moved."));
     // the payee as typed: one address, no spaces, never a 64-hex account (that's a confidential balance, not a payout)
     if (typeof to !== "string" || !/^[A-Za-z0-9._:-]{2,128}$/.test(to) || /^[0-9a-f]{64}$/.test(to)) throw new ProblemError(securityProblems.requestInvalid("to is the payee's address on its own network"));
     // the same coin on the same network only (QA MUST, 5 Nov: the relay takes nothing wider): the wallet's own
@@ -3345,7 +3345,7 @@ export class SubWallets {
     // wrong or missing one: no second ask); on the phone Face ID on the sheet. To the person's own wallet, the one cap
     // and past it one tap (decision C).
     if (outside) {
-      if (!outsideGate && !(await this.o.approve({ title: OUTSIDE_WORDS.title(chain === "sol" ? "SOL wallet" : chain === "hood" ? "ETH (RH) wallet" : w.label), ...outsideLines(to, undefined, undefined, CHAIN_WORDS[chain as string] ?? null), effect: [], amount: usd === null ? `${amount} ${symbol}` : `$${usd.toFixed(2)} (${amount} ${symbol})`, asker: app }).catch(() => false))) return { status: "declined" };
+      if (!outsideGate && !(await this.o.approve({ title: OUTSIDE_WORDS.title(chain === "sol" ? "SOL wallet" : chain === "hood" ? "Robinhood wallet" : w.label), ...outsideLines(to, undefined, undefined, CHAIN_WORDS[chain as string] ?? null), effect: [], amount: usd === null ? `${amount} ${symbol}` : `$${usd.toFixed(2)} (${amount} ${symbol})`, asker: app }).catch(() => false))) return { status: "declined" };
     } else {
       const capped = await this.capGate(usd);
       if (capped && !(await this.capSheet(`Send ${amount} ${symbol}`, [`To ${to}`, `From your ${w.label}`], capped, app, usd === null ? undefined : `$${usd.toFixed(2)} (${amount} ${symbol})`))) return { status: "declined" };

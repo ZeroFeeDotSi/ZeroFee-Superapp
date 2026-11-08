@@ -853,12 +853,12 @@ test("product decision, 4 Nov (charts accurate on every time frame): minute cand
   assert.equal((await at("second")).status, 404, "control: a timeframe Trade doesn't ask for isn't relayed");
 });
 
-test("case (h) (QA's real path, 5 Nov): the web wallet's Send, ONE confidential quote from its SOL or ETH (RH) wallet straight to the payee, refunded to that wallet; the same coin on the same network only (the audit's MUST); up to $10,000, never the opening's $25; nothing wider (controls: each changed field refused)", async () => {
+test("case (h) (QA's real path, 5 Nov): the web wallet's Send, ONE confidential quote from its SOL or Robinhood wallet straight to the payee, refunded to that wallet; the same coin on the same network only (the audit's MUST); up to $10,000, never the opening's $25; nothing wider (controls: each changed field refused)", async () => {
   const send = { dry: false, swapType: "EXACT_INPUT", slippageTolerance: 100, originAsset: "nep141:sol.omft.near", depositType: "ORIGIN_CHAIN", destinationAsset: "nep141:sol.omft.near", amount: "50000000", refundTo: SOL_WALLET, refundType: "ORIGIN_CHAIN", recipient: "13QkxhNMrTPxoCkRdYdJ65tFuwXPhL5gLS2Z5Nr6gjRK", recipientType: "DESTINATION_CHAIN", deadline: "2026-11-05T18:00:00.000Z", confidentiality: "basic" };
   const evm = { ...send, originAsset: "nep141:hood.omft.near", destinationAsset: "nep141:hood.omft.near", refundTo: EVM_WALLET, recipient: "0x12345678901234567890123456789012345678ab", amount: "2000000000000000" };
   const { post, sent } = setup({ usd: "60.00" });
   assert.equal((await post("quote", send)).status, 201, "SOL to a Solana address, $60: past the opening's $25");
-  assert.equal((await post("quote", evm)).status, 201, "ETH (RH) to a Robinhood Chain address");
+  assert.equal((await post("quote", evm)).status, 201, "Robinhood to a Robinhood Chain address");
   assert.deepEqual(JSON.parse(String(sent[0].init.body)), send, "rebuilt from ZeroFee's own fields, nothing added");
   const before = sent.length;
   const refused = async (b: unknown, why: string) => assert.equal((await post("quote", b)).status, 400, why);
@@ -875,8 +875,8 @@ test("case (h) (QA's real path, 5 Nov): the web wallet's Send, ONE confidential 
   // QA's MUST: the app's own scope only, the same coin on the same network, never an open cross-chain swap
   await refused({ ...send, destinationAsset: "nep141:btc.omft.near", recipient: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq" }, "SOL to BTC");
   await refused({ ...send, destinationAsset: "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", recipient: "bob.near" }, "SOL to USDC on NEAR");
-  await refused({ ...send, destinationAsset: "nep141:hood.omft.near" }, "SOL to ETH (RH)");
-  await refused({ ...evm, destinationAsset: "nep141:sol.omft.near" }, "ETH (RH) to SOL");
+  await refused({ ...send, destinationAsset: "nep141:hood.omft.near" }, "SOL to Robinhood");
+  await refused({ ...evm, destinationAsset: "nep141:sol.omft.near" }, "Robinhood to SOL");
   await refused({ ...send, recipientType: "INTENTS", recipient: "bob.near" }, "into someone's NEAR Intents balance");
   await refused({ ...send, depositType: "INTENTS" }, "not from the wallet's own chain");
   assert.equal(sent.length, before, "none of these reached 1Click");

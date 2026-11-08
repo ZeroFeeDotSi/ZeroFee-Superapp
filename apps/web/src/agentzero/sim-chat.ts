@@ -13,6 +13,8 @@ import { sendId } from "@zerofee/agent/chat/use-chat-turn";
 import type { AzMessage, AzPart } from "./chat-events.ts";
 import { WATCH_MS } from "./chat-items.ts";
 import type { ChatSource } from "./AgentZeroChat.tsx";
+import { readTask } from "@zerofee/browser/agent/live";
+import { SIM_AGENT_SITES } from "@zerofee/browser/sim/sites-data";
 
 /** The Sim's ready screen: what runs on its pretend money (AgentZero's jobs are the iPhone app's). */
 export const SIM_STARTERS = ["What can you do?", "Move $5 from my Safe to my SOL wallet", "What's my balance?"] as const;
@@ -68,6 +70,8 @@ export const starterOf = (words: string): (typeof SIM_STARTERS)[number] | null =
  * line. Never a network call. The balance's figure is the Sim's own (a fact), so the screen shows it as read.
  */
 export async function simReply(words: string, total: () => Promise<string | null>): Promise<AzPart[]> {
+  const browse = simBrowse(words);
+  if (browse) return browse;
   const s = starterOf(words);
   const typed = s ? null : SIM_TYPED.find((t) => t.test.test(plain(words)));
   if (!s && !typed) return [{ type: "text", text: SIM_ONLY_STARTERS }];
@@ -82,6 +86,15 @@ export async function simReply(words: string, total: () => Promise<string | null
     }
   }
   return [{ type: "text", text: [`*${SIM_SAMPLE_TAG}*`, ...lines].join("\n\n"), ...(facts ? { facts } : {}) }];
+}
+
+/** b18: a task on one of the Sim's made-up sites: AgentZero's browse card, run in the Sim on its own thinker (no model,
+ *  no money). Any other site keeps the one line. */
+export const simBrowseLine = (host: string) => `I can open ${host} for you. It's a made-up site in the Sim. Tap Start to watch.`;
+export function simBrowse(words: string): AzPart[] | null {
+  const r = readTask(words);
+  if (!r.ok || !r.url || !r.host || !SIM_AGENT_SITES.includes(r.host)) return null;
+  return [{ type: "text", text: `*${SIM_SAMPLE_TAG}*\n\n${simBrowseLine(r.host)}` }, { type: "needs", why: "browse", sheet: { kind: "browse", task: r.task, url: r.url } }];
 }
 
 /** What the Sim's screen shows of a reply, in the browser's approval words (no Face ID in a tab, D157). */

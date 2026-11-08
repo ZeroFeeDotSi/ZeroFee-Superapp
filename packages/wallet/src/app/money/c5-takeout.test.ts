@@ -40,7 +40,7 @@ test("item 4: Move above Private (crawl K: Private $5 USDC + $8.86 in NEAR, SOL 
 test("item 5: a Take out says one arrival figure before the tap: the Safe's row is the \"Arrives\" row's least, never the gross $20 (control: a Move out of the Safe cuts nothing)", () => {
   const home: Leg[] = [{ from: "sol", to: "safe", usd: 20 }];
   const rows = costRows(home)!.rows;
-  const arrives = Number(rows.find((r) => r.label.startsWith("Arrives"))!.value.replace(/[^0-9.]/g, ""));
+  const arrives = Number(rows.find((r) => /^(Arrives|To )/.test(r.label))!.value.replace(/[^0-9.]/g, ""));
   // the crawl's sheet: Safe was $5,288.01, said $5,308.01 (+20.00), "at least $18.36"
   const safeShown = Math.round((5288.01 + 20 - homeCut(home)) * 100) / 100;
   assert.equal(Math.round((safeShown - 5288.01) * 100) / 100, arrives, "the row's change is the one arrival figure");
@@ -74,7 +74,7 @@ test("item 7: AgentZero's funding is a job made on the Safe's yes, saying where 
   const app = readFileSync(new URL("../../../../agent/src/app/AgentApp.tsx", import.meta.url), "utf8");
   assert.match(app, /const f = fund \? fundJob\(usd, Math\.max\(0, usd - pocketUsd\)\) : null;/);
   assert.match(app, /onOwnApproval\(\(yes\) => \{ if \(yes && !job\) \{ job = startMoneyJob\(shell\.tasks, f\.job\);/);
-  assert.match(app, /data-testid="az-fund-made"[^]*?\{JOB_WORDS\.created\}[^]*?data-testid="az-fund-from">\{funded\.from\}/);
+  assert.match(app, /data-testid="az-fund-made"[^]*?\{funded\.landedAt !== undefined && !funded\.slow \? JOB_WORDS\.landed : JOB_WORDS\.created\}[^]*?data-testid="az-fund-from">\{funded\.from\}/);
   assert.match(app, /setPocket\(choice, runningList\(jobs\), needsAnyAddress\(jobs\), true\)/, "only the fund button makes it");
   assert.equal(FUND_JOB_WORDS.from, "From your Safe");
 });

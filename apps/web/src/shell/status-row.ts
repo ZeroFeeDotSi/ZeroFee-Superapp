@@ -4,7 +4,16 @@
 import { useEffect, useState } from "react";
 import type { Bridge } from "@zerofee/core/bridge";
 import type { StatusReport } from "@zerofee/core/status-probe";
-import { statusSummary } from "@zerofee/core/status-summary";
+import { statusSummary, withConfidential } from "@zerofee/core/status-summary";
+import type { BridgeResult } from "@zerofee/core/bridge";
+import type { ServiceStatus } from "@zerofee/core/services";
+
+/** One look (audit 13's D6): the checks (status.probe) with NEAR Confidential's row from the app's own record (ledger.status). */
+export async function lookStatus(bridge: Bridge): Promise<BridgeResult<StatusReport>> {
+  const [r, h] = await Promise.all([bridge.call<StatusReport>("status.probe"), bridge.call<ServiceStatus[]>("ledger.status").catch(() => null)]);
+  if (!("ok" in r) || !Array.isArray(r.ok?.rows)) return r;
+  return { ok: withConfidential(r.ok, h && "ok" in h && Array.isArray(h.ok) ? h.ok : []) };
+}
 
 /** status-probe.ts PROBE_MS, said here so Home's first load never carries the checks' code. */
 export const ROW_WAIT_MS = 5_000;
@@ -18,7 +27,7 @@ export function useStatusSummary(bridge: Bridge | null | undefined, timers: RowT
     if (!bridge) return;
     let live = true;
     const cap = timers.set(() => { if (live) setGot((x) => (x === null ? "failed" : x)); }, ROW_WAIT_MS);
-    void bridge.call<StatusReport>("status.probe").then(
+    void lookStatus(bridge).then(
       (r) => { if (!live) return; timers.clear(cap); setGot("ok" in r && Array.isArray(r.ok?.rows) ? r.ok : "failed"); },
       () => { if (live) { timers.clear(cap); setGot("failed"); } },
     );

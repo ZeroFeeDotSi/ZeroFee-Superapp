@@ -227,8 +227,6 @@
 .wl-swap2__sub > p { margin: 0; font: 400 13px/18px var(--font); }
 /* the audit's M5: a price past its life with nothing newer is greyed until the next one comes (the tap asks again first) */
 .wl-swap2 .wl-swap2--stale { opacity: 0.5; }
-.wl-swap2__scroll > .zf-keypad { flex: 0 1 224px; min-height: 120px; margin: 0; grid-auto-rows: minmax(0, 1fr); overflow: clip; overflow-clip-margin: 12px; }   /* 4 rows: never under 30 pt; a key's press disc shows, but never counts as the box's scroll */
-.wl-swap2__scroll > .zf-keypad button { height: auto; min-height: 0; }
 .wl-swap2__floor { position: relative; flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 0 24px; background: var(--bg); }
 .wl-swap2__floor::before { content: ""; position: absolute; left: calc(-1 * var(--gutter, 24px)); right: calc(-1 * var(--gutter, 24px)); bottom: 100%; height: 12px; background: linear-gradient(to top, var(--bg), color-mix(in srgb, var(--bg) 0%, transparent)); pointer-events: none; }
 /* line 1 keeps two lines' room, the fee block its three, so a refusal coming or going moves nothing */
@@ -251,8 +249,6 @@
   .wl-swap2__scroll .zf-money__field { font-size: 44px; line-height: 48px; }
   .wl-swap2__scroll .zf-money__amount { margin: 0; }
   .wl-swap2__floor { padding: 8px 0 12px; }
-  .wl-swap2__scroll > .zf-keypad { overflow-clip-margin: 0; }
-  .wl-swap2__scroll > .zf-keypad button::before { width: 30px; height: 30px; margin: -15px; }   /* a key's press disc stays inside its row: it can't make the box scroll */
 }
 .wl-swap2__floor > .wl-sheet-go:disabled:not(.is-busy), .wl-swap2__floor > .wl-sheet-go.is-idle { background: var(--fill); background-image: none; color: var(--mute); opacity: 1; box-shadow: inset 0 0 0 1px var(--line); }
 /* Move, the same floor (the UI reviewer's ruling, 6 Nov): its rows and plan are the box that scrolls; .wl-swap2__floor is the floor */
@@ -282,6 +278,10 @@
 .zf-sheet__content:has(> .wl-request-chips) > .zf-money__line { margin: 12px 0 0; padding: 0 16px; background: none; box-shadow: none; border-radius: 0; color: var(--mute); text-align: left; }  /* on the same 16 px inset as the line under it */
 /* Private's row (pair look): ink like the Safe's, its mark a 24 pt disc; the notes under the rows are quiet, centred, mute */
 .wl-mv-private { --c: var(--ink); }
+/* the audit's S1 (7 Nov): Private is part of the Safe's figure, so its row sits in under the Safe's name (24 px mark + 12 px gap),
+   with no line between them: the rows at the edge add up to the headline */
+.wl-mv-row.is-part { margin-left: 36px; padding-top: 0; }
+.wl-mv-row:has(+ .wl-mv-row.is-part) { border-bottom: 0; }
 .wl-mv-rows ~ .wl-mv-foot, .wl-mv-sum ~ .wl-mv-foot, .wl-mv-who .wl-mv-foot { text-align: center; color: var(--mute); font: 400 13px/18px var(--font); }
 .wl-mv-rows .wl-mv-hint { text-align: center; }
 
@@ -290,6 +290,17 @@
 .wl-swap-chips .zf-chip, .wl-swap-chips .zf-chip.wl-swap-all { height: 44px; min-height: 44px; border-radius: 22px; }
 .wl-swap2__who { display: inline-flex; align-items: center; min-height: 44px; vertical-align: middle; }
 .wl-swap2__who::before { content: none; }
-.wl-swap2__scroll > .zf-keypad { flex: none; min-height: 224px; grid-auto-rows: 56px; overflow: visible; }
-.wl-swap2__scroll > .zf-keypad button { height: 56px; min-height: 56px; }
-@media (max-height: 740px) { .wl-swap2__scroll > .zf-keypad button::before { width: 56px; height: 56px; margin: -28px; } .wl-swap2__scroll > .zf-keypad { overflow-clip-margin: 12px; } }
+/* builder 25 (J5): the keypad heads the floor (SwapSheet.tsx), never in the scroll: a problem line on top scrolls the form,
+   the keys stay whole; 6 px under it keep the Who link's 44 pt tap (13 px over its line) off the bottom row */
+.wl-swap2__floor > .zf-keypad { flex: none; min-height: 224px; grid-auto-rows: 56px; margin: 0 0 6px; overflow: visible; }
+.wl-swap2__floor > .zf-keypad button { height: 56px; min-height: 56px; }
+/* with a problem line on top, the form tightens as on a small phone (the line a step smaller, the dollars 44 px), so the
+   dollars stay in sight over the keypad; the sheet has its link to Status under the line */
+.wl-swap2__scroll > .zf-money__top { margin: 0 0 8px !important; gap: 4px !important; }
+.wl-swap2__scroll > .zf-money__top > .zf-body { font-size: 15px; line-height: 20px; }
+.wl-swap2__scroll:has(> .zf-money__top) > .wl-swap-amount { min-height: 56px; }
+.wl-swap2__scroll:has(> .zf-money__top) .zf-money__field { font-size: 44px; line-height: 48px; }
+/* audit 18's I2 (builder 22): a Move's job steps on its receipt, the Safe Buy's step look (trade native.css .nc-steps) */
+.wl-mv-made .nc-steps { list-style: none; margin: 8px 0 0; padding: 0; }
+.wl-mv-made .nc-steps li { margin: 0; }
+.wl-mv-made .nc-steps li[data-state="done"]::before { content: "\2713\00a0"; color: var(--up, currentColor); }

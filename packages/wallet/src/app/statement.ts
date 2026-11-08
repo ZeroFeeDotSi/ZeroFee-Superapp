@@ -81,7 +81,7 @@ export function ledgerRow(m: Movement, tokens: Map<string, Token>, chains: Chain
 const SPENDING_STATUS: Record<SpendingActivity["status"], string> = { "waiting-for-you": "Waiting for you", waiting: "On hold", "on-its-way": "On its way", done: "Done", refused: "Didn't go through", refunded: "Came back", failed: "Didn't go through" };
 
 /** E5's wallets by name, for a statement's From and To. */
-const WALLET: Record<string, string> = { sol: "SOL wallet", hood: "ETH (RH) wallet", bsc: "BNB wallet", near: "NEAR wallet" };
+const WALLET: Record<string, string> = { sol: "SOL wallet", hood: "Robinhood wallet", bsc: "BNB wallet", near: "NEAR wallet" };
 /** sendFrom's place as a statement names it. */
 const LEFT_FROM: Record<string, string> = { safe: "Safe", private: "Private", ...WALLET };
 
@@ -112,6 +112,9 @@ function spendingEnds(s: SpendingActivity): { from: string; to: string } {
   // (Sim test: a swap into SOL said "To / NEAR wallet"; the UI reviewer, 6 Nov, line 26: a SOL and ETH (RH)
   // Move said "To / NEAR wallet"): goesWords
   const onTo = toTrading ? goesWords(s) ?? undefined : undefined;
+  // audit 11's B11 (8 Nov): money kept for fees on a chain went from the NEAR wallet to that chain's wallet, as its Sell
+  // sheet said ("$2.50 moves from your NEAR wallet to your SOL wallet for fees"), never "From SOL wallet · To Safe"
+  if (s.kind === "gas" && s.network && WALLET[s.network]) return { from: WALLET.near!, to: WALLET[s.network]! };
   // a Swap or Move Private paid whole (J3, the audit's MUST 1, 7 Nov: D143, no Safe signature) came from Private, never "Safe"
   return { from: move ? WALLET[s.network!]! : toTrading ? (paidFrom(s)[0] === "private" ? "Private" : "Safe") : homeFrom(s), to: move ? WALLET[s.to!]! : s.site ? `Your ${s.siteName ?? s.site} wallet` : onTo ?? (toTrading ? "NEAR wallet" : "Safe") };
 }
@@ -191,6 +194,14 @@ export function mayBeShort(ledger: Movement[], limit: number, year: number, mont
   if (ledger.length < limit) return false;
   const oldest = Math.min(...ledger.map((m) => Date.parse(m.updatedAtIso)));
   return monthBounds(year, month).from < oldest;
+}
+
+/** the audit's Trade S9 (8 Nov): a month older than the first read pages it: each read asks four times as many moves, until the
+ *  month is whole or this many are read (the note says so only then). */
+export const READ_MAX = 16_000;
+/** The next read's size while the month may be short, or null when it is whole or the reads are at their most (pure). */
+export function nextRead(short: boolean, limit: number): number | null {
+  return short && limit < READ_MAX ? Math.min(READ_MAX, limit * 4) : null;
 }
 
 export function toCsv(rows: StatementRow[]): string {

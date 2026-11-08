@@ -21,7 +21,7 @@ test("a coin bought here: its value, then dollars and percent since you bought (
 
 test("never a made-up number: no record of the buy says so; a price that can't be read is —, never $0 or NaN (control: a priced coin with a cost has a result)", () => {
   assert.deepEqual(coinRowWords(pos({ costUsd: 0, valueUsd: 12 })), { value: "$12.00", since: NO_RECORD });
-  for (const valueUsd of [undefined, NaN, Infinity]) assert.deepEqual(coinRowWords(pos({ valueUsd })), { value: "—", since: NO_PRICE }, String(valueUsd));
+  for (const valueUsd of [undefined, NaN, Infinity]) assert.deepEqual(coinRowWords(pos({ valueUsd })), { value: NO_PRICE, since: "" }, String(valueUsd));
   const all = JSON.stringify([coinRowWords(pos({ valueUsd: NaN })), coinRowWords(pos({ costUsd: 0 }))]);
   assert.doesNotMatch(all, /NaN|undefined|\$0\.00|Infinity/);
   assert.match(coinRowWords(pos({ valueUsd: 36 })).since, /^Up \$0\.90/, "control");
@@ -62,7 +62,7 @@ test("review H1: a coin worth under a millionth of a dollar never reads as whole
 });
 
 test("review L2: a negative, huge or infinite value is unpriced; an infinite cost is no record (control: a sane one has a result)", () => {
-  for (const valueUsd of [-5, 1e13]) assert.deepEqual(coinRowWords(pos({ valueUsd })), { value: "—", since: NO_PRICE }, String(valueUsd));
+  for (const valueUsd of [-5, 1e13]) assert.deepEqual(coinRowWords(pos({ valueUsd })), { value: NO_PRICE, since: "" }, String(valueUsd));
   assert.equal(coinRowWords(pos({ valueUsd: 10, costUsd: Infinity })).since, NO_RECORD);
   assert.equal(coinRowWords(pos({ valueUsd: 10, costUsd: NaN })).since, NO_RECORD);
   assert.match(coinRowWords(pos({ valueUsd: 10 })).since, /^Down \$25\.10/, "control");
@@ -116,4 +116,16 @@ test("review 2: a scam coin's price can't inflate the total, a near-zero cost is
   assert.equal(coinRowWords(pos({ valueUsd: 0.1 + 0.2, costUsd: 0.3 })).since, "No change", "L4: noise reads as no change (fix/trade-list-coin; was +$0.00)");
   assert.match(chainTotalLine("Solana", [real, pos({ coin: "g", valueUsd: 990, costUsd: 0 })])!, /· \+\$6\.10 on coins bought here$/, "L5");
   assert.match(chainTotalLine("Solana", [real])!, /since you bought$/, "control: all bought here");
+});
+
+test("the audit's S11: a coin with no price says \"No price yet\" once, in the figure's place; never a dash, never \"If sold\" under it", () => {
+  for (const valueUsd of [undefined, NaN, -1, 1e12]) {
+    const w = coinRowWords(pos({ valueUsd }));
+    assert.equal(w.value, "No price yet", String(valueUsd));
+    assert.equal(w.since, "", "said once: no second line saying it again");
+  }
+  assert.doesNotMatch(readFileSync(new URL("./your-coins.ts", import.meta.url), "utf8"), /value: "—"/, "control: the dash is gone");
+  const row = readFileSync(new URL("./screens/YourCoins.tsx", import.meta.url), "utf8");
+  assert.match(row, /p\.valueUsd !== undefined && w\.value !== NO_PRICE && <span className="zf-small tr-mute">\{IF_SOLD\}<\/span>/);
+  assert.equal(coinRowWords(pos({ valueUsd: 12, costUsd: 0 })).value, "$12.00", "control: a priced coin keeps its figure");
 });

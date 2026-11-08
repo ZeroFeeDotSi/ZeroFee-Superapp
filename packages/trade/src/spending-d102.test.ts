@@ -126,7 +126,7 @@ test("D102: gas still happens by itself, and it is shown and named: \"$2.10 kept
   const row = (await s.activity()).find((a) => a.kind === "gas");
   assert.ok(row, "gas is a row of Activity");
   assert.equal(row.shown, true, "shown, not behind the scenes");
-  assert.equal(row.words, `$${row.usd} kept for fees on Robinhood Chain`);
+  assert.equal(row.words, "Kept for fees on Robinhood Chain");
 });
 
 test("D102: the cash above the cap still goes home by itself, shown and named, and it never lands on another network", async () => {

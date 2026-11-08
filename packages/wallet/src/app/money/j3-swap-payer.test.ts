@@ -20,7 +20,7 @@ test("J3-3: Private paying the Safe's Swap whole names Private and Private's fig
 test("J3-3: the card, the \"leaves Private\" line, the tap's job and the receipt read ONE value; the Safe paying never says \"From Private, so no Face ID.\"", () => {
   const sheet = readFileSync(new URL("./SwapSheet.tsx", import.meta.url), "utf8");
   assert.equal(sheet.split("safeSigns(").length - 1, 1, "fails on main: the card guessed nothing, the tap computed its own");
-  assert.match(sheet, /const payer = pay \? swapPayer\(\{ safeRoute: route\?\.kind === "topup", signs, where: SWAP_COIN\[pay\.place\]\.where, usd: pay\.usd, privateUsd: privateFigure\(pocket\) \}\) : null;/);
+  assert.match(sheet, /const payer = pay \? swapPayer\(\{ safeRoute: route\?\.kind === "topup", signs, where: SWAP_COIN\[pay\.place\]\.where, usd: pay\.usd, privateUsd: privateCoinFigure\(pocket, SWAP_COIN\[pay\.place\]\.symbol\) \}\) : null;/);
   assert.match(sheet, /const stays = !block && !payer\?\.private \? swapStays\(/, "the card says Private pays: no \"$25.00 leaves Private.\" under it");
   assert.match(sheet, /\{payer\?\.where \?\? SWAP_COIN\[pay\.place\]\.where\}/);
   assert.match(sheet, /\.\.\.\(signs === false \? \{ fromPrivate: true \} : \{\}\)/, "the job's W1 step only when the same value says Private");

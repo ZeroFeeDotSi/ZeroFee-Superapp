@@ -112,7 +112,7 @@ test("item 1, the audit's check: a folded Move with one leg done and one unsure 
   // never a guess) and failed (its ETH (RH) part stopped), then Done waiting)
   const joined = joinTracks([moveTrack({ ...j!, status: j!.own ?? j!.status }), ...j!.parts!.map((p) => moveTrack(p))])!;
   const one = moveTrack(safe)!;
-  assert.deepEqual(joined.steps.map((s) => [s.label, s.state]), [["Signed.", "done"], ["Left your ETH (RH) wallet · about $12.92", "done"], ["Through NEAR Confidential · about $40.00", "failed"], ["Solana is landing it in your SOL wallet", "failed"], ["Then it's done.", "waiting"]]);
+  assert.deepEqual(joined.steps.map((s) => [s.label, s.state]), [["Signed.", "done"], ["Left your Robinhood wallet · about $12.92", "done"], ["Through NEAR Confidential · about $40.00", "failed"], ["Solana is landing it in your SOL wallet", "failed"], ["Then it's done.", "waiting"]]);
   // control: every part done, the job's own line, once (fix/move-row-truth, the audit's M2: the wallet leg's own leg on to Solana
   // landed too; its row's "done" alone is its leg into the NEAR wallet, never the SOL wallet's)
   const [k] = foldJobs([safe, { ...leg, status: "done", unsure: undefined, note: undefined, words: "Moved $12.92 to your SOL wallet", legs: [row({ id: "l1-on", kind: "ready", network: "sol", of: "l1", usd: "12.80", atIso: iso(T0 + 30_000) })] }], () => "job:fold-1");
@@ -128,7 +128,8 @@ test("item 2: a Send's row and title say what was signed and sent, never the typ
   assert.deepEqual(sendRowOf(send(), "$25.00", TOKENS), { title: "Send $24.75 to bob.near", usd: "$24.75", line: "From your Safe" });
   assert.deepEqual(sendRowOf(send({ amount: "25" }), "$25.00", TOKENS), { title: "Send $25.00 to bob.near", usd: "$25.00", line: "From your Safe" }, "control: signed as typed");
   // another coin: its own amount at its price; no price known, the typed figure (never no figure)
-  assert.equal(sendRowOf(send({ from: "nep141:wrap.near", amount: "5.6433" }), "$25.00", TOKENS)?.usd, "$25.00");
+  // the audit's S6 (b8): cents down, as the Face ID sheet says it (5.6433 NEAR at $4.43 is $24.9998)
+  assert.equal(sendRowOf(send({ from: "nep141:wrap.near", amount: "5.6433" }), "$25.00", TOKENS)?.usd, "$24.99");
   assert.equal(sendRowOf(send({ from: "nep141:wrap.near", amount: "5" }), "$25.00", TOKENS)?.usd, "$22.15");
   assert.equal(sendRowOf(send({ from: "nep141:nope.near" }), "$25.00", TOKENS)?.usd, "$25.00");
   assert.equal(sendRowOf(send(), undefined, TOKENS), null, "control: a payment this phone didn't make");
@@ -145,7 +146,7 @@ test("item 3: a step line's pieces never leave one lone word on line 2 (\"NEAR C
   const table: [string, string[]][] = [
     ["NEAR Confidential is moving it", ["NEAR", "Confidential", "is", "moving it"]],
     ["NEAR Confidential is moving it…", ["NEAR", "Confidential", "is", "moving it…"]],
-    ["Robinhood Chain is landing it in your ETH (RH) wallet", ["Robinhood", "Chain", "is", "landing", "it", "in", "your", "ETH", "(RH) wallet"]],
+    ["Robinhood Chain is landing it in your Robinhood wallet", ["Robinhood", "Chain", "is", "landing", "it", "in", "your", "Robinhood wallet"]],
     ["Then NEAR Confidential moves it.", ["Then", "NEAR", "Confidential", "moves it."]],
     ["Done", ["Done"]],
     ["In Private", ["In Private"]],

@@ -40,21 +40,21 @@ const block = (w: PlainWords) => [w.title, ...w.lines.slice(0, w.lines.indexOf("
 
 test("the audit's conditions 2 and 4: the engine's job key is topUp's own key; the Sim's one sheet says the whole Move from the core's check; two Moves back to back, each sheet its own parts", async () => {
   const s = await phone();
-  assert.ok(s.hoodUsd >= 4, `the Sim's ETH (RH) wallet holds ${s.hoodUsd}`);
+  assert.ok(s.hoodUsd >= 4, `the Sim's Robinhood wallet holds ${s.hoodUsd}`);
   const A = "whole-move-a-0123456789", B = "whole-move-b-0123456789";
   const ra = await top(s, A, [{ from: "hood", to: "sol", usd: 2.5 }, { from: "hood", to: "near", usd: 1.25 }]);
   assert.ok("ok" in ra, JSON.stringify(ra));
   assert.equal(s.asked.at(-1)?.job, A, "the engine asks the ledger under topUp's own key");
   const a = block(s.sheets.at(-1)!);
   assert.match(a[0]!, /^Move \$33\.75 to your SOL and NEAR wallets$/, a.join(" | "));
-  assert.ok(a.includes("From your ETH (RH) wallet · about $3.75"), a.join(" | "));
+  assert.ok(a.includes("From Robinhood wallet · about $3.75"), a.join(" | "));
   assert.ok(a.some((l) => /^Your SOL wallet gets · about \$/.test(l)) && a.some((l) => /^Your NEAR wallet gets · about \$/.test(l)), a.join(" | "));
   assert.equal(a.at(-1), "Anyone can see the Safe's part.");
   const rb = await top(s, B, [{ from: "hood", to: "sol", usd: 2 }]);
   assert.ok("ok" in rb, JSON.stringify(rb));
   const b = block(s.sheets.at(-1)!);
   assert.equal(b[0], "Move $32.00 to your SOL and NEAR wallets", b.join(" | "));
-  assert.ok(b.includes("From your ETH (RH) wallet · about $2.00") && !b.some((l) => /3\.75/.test(l)), b.join(" | "));
+  assert.ok(b.includes("From Robinhood wallet · about $2.00") && !b.some((l) => /3\.75/.test(l)), b.join(" | "));
 });
 
 test("the audit's condition 4: a page part higher than the engine's own read, or a wallet it can't see, is not said: the Safe's side only, the title its figure; control, no parts: the Safe's side as today", async () => {
@@ -63,10 +63,10 @@ test("the audit's condition 4: a page part higher than the engine's own read, or
   assert.ok("ok" in r, JSON.stringify(r));
   const c = block(s.sheets.at(-1)!);
   assert.equal(c[0], "Move $30.00 to your SOL and NEAR wallets", c.join(" | "));
-  assert.ok(!c.some((l) => /ETH \(RH\)/.test(l)), c.join(" | "));
+  assert.ok(!c.some((l) => /Robinhood wallet|ETH \(RH\)/.test(l)), c.join(" | "));
   // control: a part at or under the read is said, on the same phone
   assert.ok("ok" in (await top(s, "whole-move-g-0123456789", [{ from: "hood", to: "sol", usd: 1 }])));
-  assert.ok(block(s.sheets.at(-1)!).includes("From your ETH (RH) wallet · about $1.00"), block(s.sheets.at(-1)!).join(" | "));
+  assert.ok(block(s.sheets.at(-1)!).includes("From Robinhood wallet · about $1.00"), block(s.sheets.at(-1)!).join(" | "));
   const fresh = await phone();
   const r2 = await top(fresh, "whole-move-d-0123456789");
   assert.ok("ok" in r2);

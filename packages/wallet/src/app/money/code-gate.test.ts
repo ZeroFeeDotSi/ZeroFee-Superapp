@@ -20,7 +20,7 @@ test("(1) a slow guard load: nothing is here, so Send stays off and a tap sends 
   const asked = gate.load();
   assert.equal(gate.here(), null, "on its way: not here");
   // the sheet's wiring: the button is off while the guard isn't here, and a tap without it returns before anything
-  assert.match(sheet, /<SendForm key=\{formKey\} prefill=\{prefill\} sources=\{sources\} [^>]*?busy=\{busy\} waits=\{waits\} blocked=\{stop\} notYet=\{guard \? null : guardFailed \? GUARD_FAILED_WHY : GETTING_READY\}/, "Hold off until the guard is here, and it says why (the review's walk, item 2)");
+  assert.match(sheet, /<SendForm key=\{formKey\} prefill=\{prefill\} sources=\{sources\} [^>]*?busy=\{busy\} waits=\{waits\} topSaid=\{!!downTop\} blocked=\{stop\} offline=\{offline\} notYet=\{guard \? null : guardFailed \? GUARD_FAILED_WHY : GETTING_READY\}/, "Hold off until the guard is here, and it says why (the review's walk, item 2)");
   const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
   assert.match(form, /const why = !source \? null\n\s+: source\.cant \? source\.cant\n\s+: notYet \? notYet\n/, "the reason first (after a coin that can't go), said under the Send button");
   assert.match(form, /const ready = [^;]*!why[^;]*;/, "and Hold is off while it stands");
@@ -47,7 +47,7 @@ test("(2) a failed load: one named line with Try again, nothing sent; asking aga
   assert.equal(gate.here()?.judge(), "ok");
   // the guard: its line and its Try again on the sheet
   assert.match(sheet, /guardCode\.load\(\)\.then\(\(g\) => setGuard\(\(\) => g\), \(\) => setGuardFailed\(true\)\)/);
-  assert.match(sheet, /\{guardFailed && \([^]*?\{DIDNT_LOAD\}[^]*?onClick=\{loadTheGuard\}>Try again</);
+  assert.match(sheet, /\) : guardFailed && \([^]*?\{didntLoad\("Send"\)\}[^]*?onClick=\{loadTheGuard\}>Try again</);
   // the sheets' own code (Add, Swap, Send): the same line and Try again, never "Reading…" for ever (sheet-code test below)
   // a failed load's Try again at once (its words aren't the plain "Reading…"); a slow read's after 5 s (phone test, 3 Nov)
   assert.match(host, /const again = retry && \(late \|\| words !== "Reading your money…"\) \? retry : undefined;/);
@@ -65,7 +65,7 @@ test("Add, Swap and Send's own code: a failed load is never kept; each says its 
   assert.doesNotMatch(host, /\b(add|swap|send)Asked\b|\?\?= import\(/, "no import's promise kept by hand");
   // the shared loader: a failure sets the line; Try again clears it and asks again (a fresh ask: the gate forgot the failure)
   assert.match(host, /code\.load\(\)\.then\(\(c\) => live && setHere\(\(\) => c\), \(\) => live && setFailed\(true\)\)/);
-  assert.match(host, /failed: failed \? \{ retry: \(\) => \{ setFailed\(false\); setTries\(\(n\) => n \+ 1\); \} \} : null/);
+  assert.match(host, /failed: failed \? \(chunkOffline\(\) \? \{\} : \{ retry: \(\) => \{ setFailed\(false\); setTries\(\(n\) => n \+ 1\); \} \}\) : null/);
   assert.match(host, /\}, \[tries\]\);/);
   // the gate itself, as the loader uses it: offline, then back (control: a good load is kept)
   let online = false;
@@ -74,4 +74,39 @@ test("Add, Swap and Send's own code: a failed load is never kept; each says its 
   online = true;
   assert.equal(await gate.load(), "the sheet");
   assert.equal(gate.here(), "the sheet");
+});
+
+// Audit 12 C1: offline on the web, Send's code didn't arrive and the page reloaded into Chrome's "No internet" page. The
+// sheet now says so in the app's own words and asks again by itself once the phone is back.
+test("offline, a sheet whose code didn't arrive says the app's offline words and asks again once back (control: online it says Try again)", async () => {
+  const cr = await import("@zerofee/shell-api/chunk-reload.ts");
+  let on = false;
+  cr.resetChunkReload();
+  cr.setChunkReloadDeps({ online: () => on, storage: null });
+  try {
+    assert.equal(didntLoad("Send"), "You're offline. Your money is safe. Send opens when you're back.");
+    on = true;
+    assert.equal(didntLoad("Send"), "Send didn't load. Try again.", "control: online");
+  } finally { cr.resetChunkReload(); }
+  assert.match(host, /useEffect\(\(\) => \(failed && !here \? whenOnline\(\(\) => \{ setFailed\(false\); setTries\(\(n\) => n \+ 1\); \}\) : undefined\), \[failed, here\]\);/, "the sheet asks again when back");
+  assert.match(sheet, /useEffect\(\(\) => \(guardFailed \? whenOnline\(loadTheGuard\) : undefined\), \[guardFailed\]\);/, "the guard too");
+});
+
+// QA 16 on audit 12's C1 shot (8 Nov): offline, Send said "You're offline." twice (its top and under the keypad), said
+// "Send opens when you're back." over an open sheet with a live keypad, and offered Try again with nothing to try. Now
+// the top says it once and true, no Try again, the keypad and Send rest dimmed, and the sheet checks again by itself.
+test("offline Send: one true line at the top, no Try again, keypad and Send at rest (control: online, the guard's own line and Try again)", async () => {
+  const SEND_OFFLINE = /export const SEND_OFFLINE = "([^"]+)";/.exec(sheet)?.[1];
+  assert.equal(SEND_OFFLINE, "You're offline. Your money is safe. Send works again when you're back. It checks again by itself.");
+  assert.match(sheet, /\{offline && !flying \? \(\n\s+<div role="status" data-testid="send-offline"[^\n]*\n\s+<p className="zf-body">\{SEND_OFFLINE\}<\/p>\n\s+<\/div>\n\s+\) : downTop \? \([^]*?\) : guardFailed && \(/, "the top block, with no button");
+  assert.match(sheet, /blocked=\{stop\} offline=\{offline\}/);
+  const form = readFileSync(new URL("./SendForm.tsx", import.meta.url), "utf8");
+  assert.match(sheet, /const waits = services\.down \? services\.line : null;/, "Send rests: offline is a service line that holds it (servicesLine)");
+  // inert, never disabled buttons (keypad.css hides a disabled key: the Sim shot lost the whole keypad)
+  assert.match(form, /const rests = offline \|\| !!waits;/, "D14: offline is one of the causes that rest it");
+  assert.match(form, /<div \{\.\.\.restsProps\(rests\)\} data-testid="send-pad"><Keypad /, "the keypad rests, dimmed");
+  assert.match(form, /\{offline \? null : floor\.line === "said"/, "no second offline line under the keypad");
+  assert.match(host, /failed: failed \? \(chunkOffline\(\) \? \{\} : \{ retry:/, "a sheet whose code didn't arrive offers no Try again offline");
+  // control: online, the guard's failure keeps its line and Try again
+  assert.match(sheet, /\) : guardFailed && \([^]*?\{didntLoad\("Send"\)\}[^]*?onClick=\{loadTheGuard\}>Try again</);
 });

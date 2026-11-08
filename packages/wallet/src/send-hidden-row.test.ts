@@ -30,7 +30,7 @@ const SOL_ADDR = "13QkxhNMrTPxoCkRdYdJ65tFuwXPhL5gLS2Z5Nr6gjRK";
 const EVM_ADDR = "0x7d06e272b5305a4b9d40e872c7950d3437547e3d";
 const CELLS = [
   { row: "SOL", toTokenId: "nep141:sol.omft.near", to: { kind: "chain", chain: "sol", address: SOL_ADDR }, recipient: SOL_ADDR, type: "DESTINATION_CHAIN" },
-  { row: "ETH (RH)", toTokenId: "nep141:hood.omft.near", to: { kind: "chain", chain: "hood", address: EVM_ADDR }, recipient: EVM_ADDR, type: "DESTINATION_CHAIN" },
+  { row: "Robinhood", toTokenId: "nep141:hood.omft.near", to: { kind: "chain", chain: "hood", address: EVM_ADDR }, recipient: EVM_ADDR, type: "DESTINATION_CHAIN" },
   { row: "BNB", toTokenId: "nep245:v2_1.omni.hot.tg:56_11111111111111111111", to: { kind: "chain", chain: "bsc", address: EVM_ADDR }, recipient: EVM_ADDR, type: "DESTINATION_CHAIN" },
   { row: "NEAR", toTokenId: USDC, to: { kind: "ledger", accountId: "bob.near" }, recipient: "bob.near", type: "INTENTS" },
 ] as const;

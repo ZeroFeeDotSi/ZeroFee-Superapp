@@ -11,7 +11,7 @@ const src = readFileSync(new URL("./safe-send.ts", import.meta.url), "utf8");
 const core = readFileSync(new URL("../../core/src/demo-core.ts", import.meta.url), "utf8");
 
 test("M9: Private's part carries the Send's key only when it is the whole Send (no Safe part, not a Move's own wallet leg)", () => {
-  assert.match(src, /payFromPocket\(pocket, pocketCoin, pocketPart, coin, to, toTokenId, why, named, caller, route\.ownWallet === true, undefined, !plan && route\.ownWallet !== true \? jobKey : undefined\)/);
+  assert.match(src, /payFromPocket\(pocket, pocketCoin, pocketPart, coin, to, toTokenId, why, named, caller, route\.ownWallet === true, undefined, !plan && route\.ownWallet !== true \? jobKey : undefined, jobKey\)/);
   assert.match(src, /\.\.\.\(moveJob \? \{ job: moveJob \} : \{\}\), \.\.\.\(sendJob \? \{ sendJob \} : \{\}\) \}\);/, "beside the Move's plan key, never as it");
   // a Move's own legs (payOwn) keep the plan key alone
   assert.match(src, /return payFromPocket\(await ensurePocket\(\), pocketCoin, o\.units, coin, to, toTokenId, why, named, caller, true, o\.job\);/);

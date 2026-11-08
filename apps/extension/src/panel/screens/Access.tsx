@@ -13,6 +13,7 @@ import { extProblems } from "../../problems.ts";
 import type { Touch } from "../../vault/vault.ts";
 import { ask, local, useLive, usePanel } from "../runtime.tsx";
 import { enrol, NoPrf, prfFor, touchOffered } from "../touch.ts";
+import { PHONE_LINK_SHOWN } from "../setup.ts";
 
 type OnProblem = (p: Problem) => void;
 const SHOW_MS = 30_000;
@@ -67,7 +68,7 @@ export function Unlock({ touch, onOpen, onProblem }: { touch?: Touch; onOpen: ()
       <div className="zf-fill" />
       <Passcode id="pass" label="Passcode" value={pass} onChange={setPass} />
       <div className="p-floor">
-        <button className="zf-btn" type="submit" disabled={busy || (!byTouch && pass.length === 0)}>{busy ? "Unlocking…" : byTouch ? "Unlock with Touch ID" : "Unlock"}</button>
+        <button className="zf-btn" type="submit" disabled={busy || (!byTouch && pass.length === 0)}>{byTouch ? "Unlock with Touch ID" : "Unlock"}</button>
         <p className="zf-small">{tried ? "Touch ID didn't open it. Type your passcode." : "It locks after an hour without a trade, and when Chrome closes."}</p>
         {forgot
           ? <p className="zf-small">Without the passcode, this browser can't open the wallet, and nobody can open it for you.</p>
@@ -124,7 +125,7 @@ export function Link({ onProblem, onShown, journey }: { onProblem: OnProblem; on
       </div>
       <Passcode id="link-pass" label="Passcode" value={pass} onChange={setPass} focus={false} />
       <div className="p-floor">
-        <button className="zf-btn" type="submit" disabled={busy || !code || !pass}>{busy ? "Making it…" : "Make the link"}</button>
+        <button className="zf-btn" type="submit" disabled={busy || !code || !pass}>Make the link</button>
         {journey && <button className="zf-link" type="button" onClick={journey.onNotNow}>Not now</button>}
       </div>
     </form>
@@ -181,7 +182,7 @@ export function Settings({ limitUsd, sol, touch, onLink, onLock, onChanged, onPr
       ) : (
         <Row title="One-tap limit" detail="Above it, a trade asks for your passcode" value={`$${limitUsd}`} onClick={() => setEditing(true)} />
       )}
-      <Row title="Link your phone" detail="So your phone can bring the money back" onClick={onLink} />
+      {PHONE_LINK_SHOWN && <Row title="Link your phone" detail="So your phone can bring the money back" onClick={onLink} />}
       {offered && <Row title="Unlock with Touch ID" detail="Your passcode keeps working too" value={touch ? "On" : "Off"} onClick={() => setTouchSheet(true)} />}
       <Row title="Look" detail="The panel and the button on the site" value={dark ? "Dark" : "Light"} onClick={() => void look()} />
       <Row title="Lock now" onClick={onLock} />
@@ -223,7 +224,7 @@ function TouchSheet({ on, sol, onClose, onDone, onProblem }: { on: boolean; sol:
       <form className="p-confirm" onSubmit={go}>
         <p className="zf-small">{on ? "Type your passcode first. Then Touch ID opens this wallet too, and your passcode keeps working." : "Type your passcode. Then only your passcode opens this wallet."}</p>
         <Passcode id="touch-pass" label="Passcode" value={pass} onChange={setPass} />
-        <button className="zf-btn" type="submit" disabled={!pass || busy}>{busy ? (on ? "Turning it on…" : "Turning it off…") : on ? "Turn on" : "Turn off"}</button>
+        <button className="zf-btn" type="submit" disabled={!pass || busy}>{on ? "Turn on" : "Turn off"}</button>
       </form>
     </Sheet>
   );

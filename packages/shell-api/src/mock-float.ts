@@ -36,6 +36,11 @@ export interface FloatMockOptions {
   timers?: { set(run: () => void, ms: number): unknown; clear(handle: unknown): void };
 }
 
+/** D9 (audit 13, 8 Nov): the Sim's one price per coin. ETH, BTC, SOL and NEAR are each one coin on every chain, so the
+ *  Safe's list (MockBridge DEFAULT_TOKENS), the NEAR wallet's coins here and Trade's list read this one figure (Hot said
+ *  ETH $2,347.51 while Trade's list said $2,230.47; BTC $80,456.00 beside $77,820.22). */
+export const SIM_PRICE = { ETH: 2347.51, BTC: 80456, SOL: 101.75, NEAR: 4.43 } as const;
+
 /** NEAR coins 1Click trades in the demo, at their recorded prices (GeckoTerminal's near list, 2 Nov 2026). NEARLY trades on
  *  Rhea only, so it isn't here: its Buy says 1Click doesn't trade it, as on mainnet. */
 export const SAMPLE_NEAR_COINS: Record<string, { usd: number; decimals: number; symbol: string }> = {
@@ -43,12 +48,12 @@ export const SAMPLE_NEAR_COINS: Record<string, { usd: number; decimals: number; 
   "nep141:zec.omft.near": { usd: 1244.27478813456, decimals: 8, symbol: "ZEC" },
   "nep141:token.rhealab.near": { usd: 0.0535650143577631, decimals: 18, symbol: "RHEA" },
   "nep141:xrp.omft.near": { usd: 1.25176710438929, decimals: 6, symbol: "XRP" },
-  "nep141:eth.omft.near": { usd: 2278.85814416606, decimals: 18, symbol: "ETH" },
-  "nep141:sol.omft.near": { usd: 93.6944399590669, decimals: 9, symbol: "SOL" },
-  "nep141:nbtc.bridge.near": { usd: 77820.2167837972, decimals: 8, symbol: "NBTC" },
+  "nep141:eth.omft.near": { usd: SIM_PRICE.ETH, decimals: 18, symbol: "ETH" },
+  "nep141:sol.omft.near": { usd: SIM_PRICE.SOL, decimals: 9, symbol: "SOL" },
+  "nep141:nbtc.bridge.near": { usd: SIM_PRICE.BTC, decimals: 8, symbol: "NBTC" },
   "nep141:tron.omft.near": { usd: 0.315563028546166, decimals: 6, symbol: "TRX" },
   // NEAR itself, as a coin the NEAR wallet holds (wNEAR, 1Click's id), at the Sim's NEAR price (MockBridge DEFAULT_TOKENS)
-  "nep141:wrap.near": { usd: 4.43, decimals: 24, symbol: "NEAR" },
+  "nep141:wrap.near": { usd: SIM_PRICE.NEAR, decimals: 24, symbol: "NEAR" },
 };
 /** 1Click's spread in the demo's swaps inside Spending. */
 const SWAP_SPREAD = 0.003;
@@ -94,6 +99,8 @@ export interface FloatSnapshot {
   moves: FloatMove[];
   byKey: [string, { fields: string; moveId: string }][];
   pending: [string, { dueAt: number; walletId?: string }][];
+  /** The `startUsd` rig (`?demo&near=N`) the state was made under, if any. */
+  rig?: number;
 }
 
 export function createFloatMock(o: FloatMockOptions, wallets: () => { id: string; kind: string; chain: string; slot?: number; current?: boolean }[], decline: () => boolean, landedHome: (usdc: bigint, key?: string) => void = () => {}, hooks: { changed?: (landed?: boolean) => void } = {}) {
@@ -211,6 +218,7 @@ export function createFloatMock(o: FloatMockOptions, wallets: () => { id: string
       moves: moves.map((m) => ({ ...m, sent: { ...m.sent }, expected: { ...m.expected } })),
       byKey: [...byKey].map(([k, v]) => [k, { fields: v.fields, moveId: v.move.id }]),
       pending: [...pending].map(([k, v]) => [k, { dueAt: v.dueAt, ...(v.walletId ? { walletId: v.walletId } : {}) }]),
+      ...(o.startUsd !== undefined ? { rig: o.startUsd } : {}),
     }),
     /** Back to a snapshot: pending moves re-armed for what's left of their time (MockBridge lands any already due, with `land`, in time order with its own steps). */
     restore(s: FloatSnapshot) {
@@ -218,6 +226,10 @@ export function createFloatMock(o: FloatMockOptions, wallets: () => { id: string
       pending.clear();
       held.clear();
       for (const [k, v] of s.held) held.set(k, BigInt(v));
+      // builder 22's item 9 (b14's SHOULD, audit 13): `?demo&near=N` (startUsd) was lost under a saved Sim, which this
+      // replays on load, so the rig worked only on a fresh Sim. A saved Sim made without this rig (`rig`, the start it was
+      // made with) now takes the rig's start; one saved under the same rig replays as saved (a reload keeps what was spent).
+      if (o.startUsd !== undefined && s.rig !== o.startUsd) held.set(FLOAT_USDC, BigInt(Math.round(o.startUsd * 1e6)));
       native.clear();
       for (const [k, v] of s.native) native.set(k, BigInt(v));
       moves.splice(0, moves.length, ...s.moves.map((m) => ({ ...m, sent: { ...m.sent }, expected: { ...m.expected } })));

@@ -4,17 +4,22 @@
 import type { SpendingWallet } from "@zerofee/core/spending";
 import { SITE_WALLETS, isAgentPocket } from "@zerofee/core/site-wallets";
 import { siteWalletFunded } from "@zerofee/core/site-funded";
+import { appChain } from "@zerofee/core/app-chains";
 
 /** The sites whose wallets the hub always shows, first (product decision, 2 Nov: pump.fun and GMGN are the two in the bottom row). */
 export const HUB_SITES: readonly string[] = ["pump", "gmgn"];
 
 /**
- * ST13 (product decision, 2 Nov): a site has a wallet per network it trades on (GMGN: Solana, BNB, Base, Ethereum). The money
- * sheet asks "Which coins will you trade?" with these, in this order; the hub never shows a network.
+ * ST13 (product decision, 2 Nov): a site has a wallet per network it trades on (GMGN trades on four). The money sheet asks "Which
+ * coins will you trade?" with these, in this order; the hub never shows a network. Builder 25 (J8, product decision, 8 Nov: no BNB
+ * in V1): only the chains the app shows (core app-chains.ts), so GMGN's sheet goes straight to its SOL wallet; its other
+ * networks' wallets stay where they are (nothing is deleted) and come back when app-chains.ts lists their chain.
  */
 export type SiteChain = "sol" | "bsc" | "base" | "eth";
-export const SITE_CHAINS: Readonly<Record<string, readonly SiteChain[]>> = { gmgn: ["sol", "bsc", "base", "eth"], pump: ["sol"] };
-export const CHAIN_NAME: Readonly<Record<SiteChain, string>> = { sol: "Solana", bsc: "BNB", base: "Base", eth: "Ethereum" };
+const SITE_NETS: Readonly<Record<string, readonly SiteChain[]>> = { gmgn: ["sol", "bsc", "base", "eth"], pump: ["sol"] };
+export const SITE_CHAINS: Readonly<Record<string, readonly SiteChain[]>> = Object.fromEntries(Object.entries(SITE_NETS).map(([k, v]) => [k, v.filter((c) => appChain(c))]));
+/** The names of the chains a site list may show (the app's chains only). */
+export const CHAIN_NAME: Readonly<Record<string, string>> = { sol: "Solana" };
 /**
  * The networks Spending fills a site's wallet on today (core spending.ts: Solana open; BNB Chain closed until its own move
  * test, D13; Base and Ethereum are networks Spending never fills). Only these get an amount and Approve.
@@ -22,10 +27,11 @@ export const CHAIN_NAME: Readonly<Record<SiteChain, string>> = { sol: "Solana", 
 export const SPENDING_FILLS: readonly SiteChain[] = ["sol"];
 /**
  * A network the site trades on that Spending can't fill: the site window's line when the person switches the site to it
- * (never a choice on a sheet: the auditor's rule, "never show a choice that can't be chosen"). BNB Chain is closed until
- * its own move test (D13): the swap service's least move there was $1,000 when last priced (2 Nov evening).
+ * (never a choice on a sheet: the auditor's rule, "never show a choice that can't be chosen"). Builder 25 (J8): it says
+ * what V1 does, never a chain V1 doesn't show. The phone's own line is apps/ios HostRules.swift notCarriedLine (its
+ * owner changes it to match: handoff "## builder 25").
  */
-export const notCarried = (c: SiteChain): string => (c === "bsc" ? "ZeroFee can't move BNB under $1,000 yet." : `${CHAIN_NAME[c]} isn't in ZeroFee yet.`);
+export const notCarried = (_c: SiteChain): string => "GMGN pays from its SOL wallet.";
 /** The networks the money sheet may offer for a site: the ones Spending fills, in the site's order. The question "Which
  *  coins will you trade?" shows only when there are two or more; today GMGN's sheet goes straight to Solana. */
 export const pickable = (site: string, fills: readonly SiteChain[] = SPENDING_FILLS): SiteChain[] => (SITE_CHAINS[site] ?? ["sol"]).filter((c) => fills.includes(c));
@@ -78,7 +84,8 @@ const holdsSome = (h: string | undefined): boolean => !!h && /[1-9]/.test(h.spli
  * `wallet` is the Solana one, the one Add fills.
  */
 export function hubRows(list: readonly SpendingWallet[]): HubRow[] {
-  const mine = list.filter((w) => w.role === "site" && w.current && w.site);
+  // builder 25 (J8): only the chains the app shows (core app-chains.ts): GMGN's sum is its SOL wallet's, never a BNB figure
+  const mine = list.filter((w) => w.role === "site" && w.current && w.site && appChain(String(w.network)));
   const rowOf = (site: string): HubRow => {
     const ws = mine.filter((x) => x.site === site);
     const sol = ws.find((x) => x.network === "sol");
@@ -99,10 +106,10 @@ export function hubRows(list: readonly SpendingWallet[]): HubRow[] {
   return [...HUB_SITES.map(rowOf), ...others.sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0))];
 }
 
-/** ST13: the wallet sheet's list, wallets with money only, Solana first: "Solana $10.00 · Base 0.0012 ETH". */
+/** ST13: the wallet sheet's list, wallets with money only, Solana first: "Solana $10.00". */
 export function fundedLine(r: HubRow): string {
   const order = (n: string) => { const i = (SITE_CHAINS[r.site] ?? []).indexOf(n as SiteChain); return i < 0 ? 99 : i; };
-  const funded = (r.wallets ?? []).filter((w) => siteWalletFunded(w.usd, w.holds)).sort((a, b) => order(a.network) - order(b.network));
+  const funded = (r.wallets ?? []).filter((w) => appChain(w.network)).filter((w) => siteWalletFunded(w.usd, w.holds)).sort((a, b) => order(a.network) - order(b.network));
   const nameOfChain = (n: string) => CHAIN_NAME[n as SiteChain] ?? n;
   return funded.map((w) => `${nameOfChain(w.network)} ${w.usd !== null ? `$${w.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : w.holds}`).join(" · ");
 }
@@ -150,11 +157,28 @@ export function readHub(store: Pick<Storage, "getItem"> | undefined = globalThis
   return HUB_SITES.map((site) => ({ site, name: nameOf(site), usd: null }));
 }
 
-export function saveHub(rows: readonly HubRow[], store: Pick<Storage, "setItem"> | undefined = globalThis.localStorage): void {
+export function saveHub(rows: readonly HubRow[], store: Pick<Storage, "setItem"> & Partial<Pick<Storage, "getItem">> | undefined = globalThis.localStorage, now: number = Date.now()): void {
   try {
-    store?.setItem(KEY, JSON.stringify({ rows: rows.map((r) => ({ site: r.site, usd: r.usd })) }));
+    // audit 15 FB1 (rule 9a): a wallet Solana couldn't read keeps its last figure and that read's time, never a blank
+    const before = store?.getItem ? keptHub(store as Pick<Storage, "getItem">) : {};
+    store?.setItem(KEY, JSON.stringify({ rows: rows.map((r) => (r.usd !== null ? { site: r.site, usd: r.usd, at: now } : { site: r.site, usd: before[r.site]?.usd ?? null, ...(before[r.site] ? { at: before[r.site]!.at } : {}) })) }));
   } catch {
     // storage blocked: it reads again next time
+  }
+}
+
+/** Each site wallet's last figure that was read, and when (saveHub): what a read Solana couldn't answer shows instead. */
+export function keptHub(store: Pick<Storage, "getItem"> | undefined = globalThis.localStorage): Record<string, { usd: number; at: number }> {
+  try {
+    const v = JSON.parse(store?.getItem(KEY) ?? "null") as { rows?: unknown } | null;
+    const out: Record<string, { usd: number; at: number }> = {};
+    for (const r of Array.isArray(v?.rows) ? v!.rows : []) {
+      const x = r as { site?: unknown; usd?: unknown; at?: unknown };
+      if (typeof x.site === "string" && typeof x.usd === "number" && Number.isFinite(x.usd) && typeof x.at === "number" && Number.isFinite(x.at)) out[x.site] = { usd: x.usd, at: x.at };
+    }
+    return out;
+  } catch {
+    return {};
   }
 }
 

@@ -105,7 +105,7 @@ test("read_holdings: dollars and coin amounts per wallet in the product's words;
   const t = await hands({ bridge: bridgeOf(WALLETS) }).holdings();
   assert.match(t, /^Your Safe: \$2,667\.53 \(312\.4 NEAR \$1,383\.93, 1282\.6 USDC \$1,282\.60, an unnamed coin \$1\.00\)$/m);
   assert.match(t, /^Your SOL wallet: \$51\.60 \(0\.1385 SOL\)\. Coins: 1250000 BONK \$29\.10\.$/m);
-  assert.match(t, /^Your ETH \(RH\) wallet: \$4\.10 \(0\.0018 ETH\)\.$/m);
+  assert.match(t, /^Your Robinhood wallet: \$4\.10 \(0\.0018 ETH\)\.$/m);
   assert.match(t, /^Your NEAR wallet: \$50\.50 \(cash \$15\.40 in USDC\)\. Coins: 0\.5 QTC \$35\.10\.$/m);
   assert.doesNotMatch(t, /BNB/, "a closed, empty BNB wallet isn't said");
   assert.doesNotMatch(t, /\b(?:Hidden|Trading|Spending)\b|row/);
@@ -115,7 +115,7 @@ test("read_holdings: dollars and coin amounts per wallet in the product's words;
 
 test("read_holdings, control: a wallet that can't be read is said so, never $0.00", async () => {
   const t = await hands({ bridge: bridgeOf({ "ledger.balances": WALLETS["ledger.balances"] }) }).holdings();
-  assert.match(t, /^Your SOL wallet, your ETH \(RH\) wallet and your NEAR wallet: couldn't be read right now\.$/m);
+  assert.match(t, /^Your SOL wallet, your Robinhood wallet and your NEAR wallet: couldn't be read right now\.$/m);
   const none = await hands({ bridge: bridgeOf({}) }).holdings();
   assert.match(none, /^Your Safe: couldn't be read right now\.$/m);
   assert.doesNotMatch(none, /\$0\.00/);
@@ -177,18 +177,18 @@ test("service_status: the core's own view names a failing service and since when
   assert.match(hung, /NEAR Intents \(the swap service\): couldn't be checked right now\./, "control: an unread table is never 'fine'");
 });
 
-test("covered_coins: each wallet's coins, BNB's state, the swaps AgentZero may propose (never from the Safe) and the chains to add from", async () => {
+test("covered_coins: each wallet's coins, the swaps AgentZero may propose (never from the Safe) and the chains to add from", async () => {
   const t = await hands({ bridge: bridgeOf({ "spending.status": STATUS, "ledger.chains": [{ name: "Bitcoin" }, { name: "Ethereum" }, { name: "Solana" }, { name: "<b>x</b>" }] }) }).coins();
-  assert.match(t, /your SOL wallet holds SOL; your ETH \(RH\) wallet holds ETH/);
-  assert.match(t, /^BNB: not open yet\.$/m);
+  assert.match(t, /your SOL wallet holds SOL; your Robinhood wallet holds ETH/);
+  // audit 18's I8 (b22 item 14): no BNB line at all (core app-chains.ts: SOL, NEAR, Robinhood)
+  assert.doesNotMatch(t, /BNB/);
   assert.match(t, /^Swaps AgentZero can propose: .*SOL · your SOL wallet → USDC · your Safe/m);
   assert.doesNotMatch(t.split("\n").find((l) => l.startsWith("Swaps AgentZero"))!, /BNB|· your Safe →/);
   assert.match(t, /^From your Safe \(AgentZero opens Home's own Swap filled in; you approve it\): USDC · your Safe → SOL · your SOL wallet/m);
   assert.match(t, /Money can be added to your Safe from: Bitcoin, Ethereum, Solana, bxb\./);
   assert.doesNotMatch(t, /\b(?:Hidden|Trading|Spending)\b|\brows?\b/);
   const open = await hands({ bridge: bridgeOf({ "spending.status": { ...STATUS, networks: [...STATUS.networks.slice(0, 2), { ...STATUS.networks[2], closed: undefined }] } }) }).coins();
-  assert.match(open, /^BNB: open\.$/m, "control: an open BNB wallet is said open");
-  assert.match(open, /BNB · your BNB wallet → /);
+  assert.doesNotMatch(open, /BNB/, "b22 item 14: an open BNB network is still no wallet of the app's");
 });
 
 // ---- the chat turn's half: input checked before the phone reads, every answer fenced and scrubbed

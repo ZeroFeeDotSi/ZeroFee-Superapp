@@ -12,8 +12,8 @@ const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8").rep
 
 test("Send's line sits right above Hold, where every money sheet says it; never at the top while the form is up (control: the sent screen still says it)", () => {
   const form = src("./SendForm.tsx"), sheet = src("./SendSheet.tsx");
-  assert.match(form, /\{floor\.line === "said" \? <SheetLine text=\{said\} \/> : floor\.line === "why" && <p className="zf-small wl-send2__why"[^\n]*\n\s*\{\}\n\s*<div className="zf-fee">\n[^\n]*\n[^\n]*\n\s*<\/div>\n\s*(?:\{source\.cant && source\.swap && onSwap\n\s*\? <button [^\n]*\n\s*: source\.cant && source\.back && onBack\n\s*\? <button [^\n]*\n\s*: )?<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">/, "the line, the fee block, then Hold (or, for a coin that can't go, its Swap or Move back in Hold's place)");
-  assert.match(sheet, /said=\{line \?\? services\.line\}/);
+  assert.match(form, /\{offline \? null : floor\.line === "said" \? <SheetLine text=\{said\} \/> : floor\.line === "why" && <p className="zf-small wl-send2__why"[^\n]*\n\s*\{\}\n\s*<div className="zf-fee">\n[^\n]*\n[^\n]*\n\s*<\/div>\n\s*(?:\{source\.cant && source\.swap && onSwap\n\s*\? <button [^\n]*\n\s*: source\.cant && source\.back && onBack\n\s*\? <button [^\n]*\n\s*: )?<button type="button" className="zf-btn wl-hold" disabled=\{!ready\} onClick=\{go\} data-testid="send-go">/, "the line, the fee block, then Hold (or, for a coin that can't go, its Swap or Move back in Hold's place)");
+  assert.match(sheet, /said=\{line \?\? \(downTop \? null : services\.line\)\}/);
   assert.doesNotMatch(sheet, /^\s*<SheetLine text=\{line \?\? services\.line\} \/>$/m, "no line at the top over the form");
   assert.match(sheet, /\{flying && <SheetLine text=\{line \?\? services\.line\} \/>\}/, "control: with no form, the line still shows");
   // every other money sheet already says its line right above its button

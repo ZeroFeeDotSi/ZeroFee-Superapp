@@ -23,7 +23,7 @@ test("finding 43: no Add where Add can't fill; the NEAR wallet's row says what i
 });
 
 test("finding 51, superseded by product decision (5 Nov): Robinhood's row is named by its chain and says its ETH; the number is the tab's own (the Safe's on Safe)", () => {
-  assert.match(home, /hood: "ETH \(RH\) wallet"/, "one wallet-name set app-wide (look 4): the chain in the name");
+  assert.match(home, /hood: "Robinhood wallet"/, "one wallet-name set app-wide (look 4): the chain in the name");
   assert.match(home, /const tabUsd = tab === "safe" \?/);
 });
 

@@ -55,7 +55,8 @@ test("Swap, Move, Add and Request filled in: each read once into the sheet's own
   assert.match(money, /export type SwapCoin = "sol" \| "hood" \| "bsc" \| "near" \| "safe-usdc" \| "safe-near";/);
   assert.deepEqual(Object.keys(ADD_OPEN).sort(), ["bsc", "hood", "near", "sol"]);
   assert.match(money, /export type AddCoin = "sol" \| "hood" \| "near" \| "bsc";/);
-  assert.deepEqual([...PLACES].sort(), ["bsc", "hood", "near", "private", "safe", "sol"], "Move's places are Home's wallets and Private (its own row, the pair-private walk)");
+  // D13 (product decision, 8 Nov): no BNB in V1 (core app-chains.ts)
+  assert.deepEqual([...PLACES].sort(), ["hood", "near", "private", "safe", "sol"], "Move's places are Home's wallets and Private (its own row, the pair-private walk)");
   assert.match(swap, /useState<SwapPlace \| null>\(prefill\?\.from \?\? null\)/);
   assert.match(swap, /useState<SwapPlace \| null>\(prefill\?\.to \?\? null\)/);
   assert.match(swap, /const \[usd, setUsd\] = useState\(prefill\?\.usd \?\? ""\);/);

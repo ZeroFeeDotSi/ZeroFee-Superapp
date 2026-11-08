@@ -32,7 +32,7 @@ test("rule 2: Swap's receipt says the route's time left, from the same table as 
   assert.match(sheet, /etaSec: routeSec\(route\), safe,/, "the job's row counts down from the tap");
   assert.match(sheet, /<JobReceipt amount=\{made\} icon=\{<ActSwap \/>\} testid="swap-made" etaSec=\{route \? routeSec\(route\) : undefined\}/);
   const made = src("./JobMade.tsx");
-  assert.match(made, /\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/, "under Job created., above where to watch it");
+  assert.match(made, /\{landed \? JOB_WORDS\.landed : JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/, "under Job created., above where to watch it");
   assert.match(src("../../../../shell-api/src/job-run.ts"), /\.\.\.\(a\.etaSec \? \{ etaSec: a\.etaSec \} : \{\}\)/, "runJob hands it to startJob");
 });
 
@@ -56,7 +56,7 @@ test("rule 8: Send's first payment names who, the wallet it comes from, and the 
   const sol = "First time paying this Solana address.";
   assert.equal(firstPayLine(sol, { place: "your Safe", safe: true }), "First payment to this Solana address. It comes from your Safe. Check the address, then approve.");
   assert.equal(firstPayLine(sol, { place: "your SOL wallet", safe: false }), "First payment to this Solana address, from your SOL wallet. Check the address; the next one will be quicker.");
-  assert.equal(firstPayLine("First time paying this Robinhood Chain address.", { place: "your ETH (RH) wallet", safe: false }), "First payment to this Robinhood Chain address, from your ETH (RH) wallet. Check the address; the next one will be quicker.", "the chain and the wallet come from the data");
+  assert.equal(firstPayLine("First time paying this Robinhood Chain address.", { place: "your Robinhood wallet", safe: false }), "First payment to this Robinhood Chain address, from your Robinhood wallet. Check the address; the next one will be quicker.", "the chain and the wallet come from the data");
   assert.equal(firstPayLine("First time paying kim.near.", { place: "your Safe", safe: true }), "First payment to kim.near. It comes from your Safe. Check the address, then approve.");
   assert.equal(firstPayLine("First time paying kim.near.", { place: "your NEAR wallet", safe: false }), "First payment to kim.near, from your NEAR wallet. Check the address; the next one will be quicker.");
   assert.match(firstPayLine("First time paying kim.near. It runs code: it's an app, not a person's wallet.", { place: "your Safe", safe: true })!, /^First payment to kim\.near\. It runs code: it's an app, not a person's wallet\. It comes from your Safe\. Check the address, then approve\.$/);
@@ -70,7 +70,7 @@ test("rule 8: Send's first payment names who, the wallet it comes from, and the 
 
 test("S2 (the build's trace): a refused swap clears \"Job created.\" and says the refusal; train 10's runJob decides the row (control: a No on the sheet makes nothing)", async () => {
   const sheet = src("./SwapSheet.tsx");
-  assert.match(sheet, /made: \(j\) => \{ sayWent\(""\); setMadeJob\(j\.id\); setMadeSaid\(\{ going: swappingLine\(SWAP_COIN\[pay\.place\]\.label, SWAP_COIN\[get\]\.label\), landed: swappedLine\(lands, SWAP_COIN\[get\]\.where\) \}\); setMade\(said\); setBusy\(false\); \},/);
+  assert.match(sheet, /made: \(j\) => \{ if \(typeof a\.params\.key === "string"\) carryTo\(\[j\.id\], \{ parts: \[jobKeyPart\(a\.params\.key\)\] \}\); sayWent\(""\); setMadeJob\(j\.id\); setMadeSaid\(\{ going: swappingLine\(SWAP_COIN\[pay\.place\]\.label, SWAP_COIN\[get\]\.label\), landed: swappedLine\(undefined, SWAP_COIN\[get\]\.where\) \}\); setMade\(said\); setBusy\(false\); \},/);
   assert.match(sheet, /if \("refused" in end\) \{ mark\("refused"\); setMade\(null\); return void \(sendEndsHere\(end\.refused\) \? endHere\(shell, end\.refused, onClose\) : saidOnSheet\(end\.refused\) \? setStopped\(end\.refused\) : problem\(swapRefusal\(end\.refused\), onUsd\)\); \}/);
   assert.match(sheet, /if \("problem" in end\) \{ mark\("refused"\); setMade\(null\); return void \(sendEndsHere\(end\.problem\) \? endHere\(shell, end\.problem, onClose\) : saidOnSheet\(end\.problem\) \? setStopped\(end\.problem\) : problem\(swapRefusal\(end\.problem\), onUsd\)\); \}/, "refused after the job existed: the row says why (runJob), and the sheet too");
   assert.match(sheet, /if \("declined" in end\) return setMade\(null\);/, "control: a No makes nothing");

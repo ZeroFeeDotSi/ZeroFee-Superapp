@@ -20,8 +20,8 @@ const row = (o: Partial<SpendingActivity>): SpendingActivity => ({ id: "r1", kin
 // goesTo names chains only), then the ETH (RH) wallet's two core moves ($3.94 to the SOL wallet, $5.52 to the NEAR wallet)
 const JOB = "move:mv-legs-1";
 const safe = (o: Partial<SpendingActivity> = {}) => row({ id: "mv-legs-1", via: "private", goesTo: ["sol"], landed: ["sol"], paidDone: true, askedUsd: "109.87", usd: "109.87", words: "Moved $8.39 to your SOL wallet", fill: "done", ...o });
-const toSol = (status: SpendingActivity["status"] = "done") => row({ id: "ml-sol", kind: "move", network: "hood", to: "sol", usd: "3.94", status: "done", words: "Moved $3.94 from your ETH (RH) wallet to your SOL wallet", atIso: iso(T0 + 1_000), legs: [row({ id: "ml-sol-leg", kind: "ready", network: "sol", usd: "3.90", status, of: "ml-sol", words: "Moving $3.90 to Solana", atIso: iso(T0 + 30_000) })] });
-const toNear = (status: SpendingActivity["status"] = "done") => row({ id: "ml-near", kind: "move", network: "hood", to: "near", usd: "5.52", status, words: "Moving $5.52 from your ETH (RH) wallet to your NEAR wallet", atIso: iso(T0 + 2_000) });
+const toSol = (status: SpendingActivity["status"] = "done") => row({ id: "ml-sol", kind: "move", network: "hood", to: "sol", usd: "3.94", status: "done", words: "Moved $3.94 from your Robinhood wallet to your SOL wallet", atIso: iso(T0 + 1_000), legs: [row({ id: "ml-sol-leg", kind: "ready", network: "sol", usd: "3.90", status, of: "ml-sol", words: "Moving $3.90 to Solana", atIso: iso(T0 + 30_000) })] });
+const toNear = (status: SpendingActivity["status"] = "done") => row({ id: "ml-near", kind: "move", network: "hood", to: "near", usd: "5.52", status, words: "Moving $5.52 from your Robinhood wallet to your NEAR wallet", atIso: iso(T0 + 2_000) });
 carryTo([`move:mv-legs-1`, "move:ml-sol", "move:ml-near"], { usd: "$119.33", job: JOB, to: ["sol", "near"] });
 // move-run's carry of the plan's legs for the Safe's part (the tap's own record)
 carryTo(["move:mv-legs-1"], { legs: [{ to: "sol", usd: "$8.39" }, { to: "near", usd: "$101.48" }] });
@@ -33,20 +33,20 @@ const page = (rows: SpendingActivity[]) => {
   return joinTracks([{ ...j!, status: j!.own ?? j!.status }, ...(j!.parts ?? [])].map((x) => moveTrack(x)))!.steps;
 };
 const labels = (s: readonly { label: string }[]) => s.map((x) => x.label);
-const face = (s: readonly { label: string; state: string; note?: string }[]) => s.map((x) => [x.label.replace(/^Done in \d+ seconds\.$/, "Done in N seconds."), x.note ?? "", x.state]);
+const face = (s: readonly { label: string; state: string; note?: string }[]) => s.map((x) => [x.label.replace(/^Took (?:\d+ s|\d+ min|under a second)\.$/, "Took N."), x.note ?? "", x.state]);
 
 // the copy review's ruling (7 Nov): grouped by what the person sees, six steps at most; a wallet's line names only what the records
 // prove (the ETH (RH) wallet's own part, never the Safe or Private); the run's figure the plan's whole $119.33 (every
 // part goes through NEAR Confidential), "about" as the ETH (RH) parts are priced
-test("M4 (a): the two-wallet Move's page, every part landed, is six steps: Signed, the ETH (RH) wallet once, NEAR Confidential once with the whole run's figure, each wallet with its share and its proven part, Done (on 6c4cab5a1: ten steps, two \"Left your ETH (RH) wallet\", no NEAR wallet step for the Safe's part)", () => {
+test("M4 (a): the two-wallet Move's page, every part landed, is six steps: Signed, the Robinhood wallet once, NEAR Confidential once with the whole run's figure, each wallet with its share and its proven part, Done (on 6c4cab5a1: ten steps, two \"Left your Robinhood wallet\", no NEAR wallet step for the Safe's part)", () => {
   const s = page([safe(), toSol(), toNear()]);
   assert.deepEqual(face(s), [
     ["Signed.", "", "done"],
-    ["Left your ETH (RH) wallet · about $9.46", "to your SOL and NEAR wallets", "done"],
+    ["Left your Robinhood wallet · about $9.46", "to your SOL and NEAR wallets", "done"],
     ["Through NEAR Confidential · about $119.33", "NEAR Confidential moved it to your SOL and NEAR wallets.", "done"],
-    ["It's in your SOL wallet · about $12.33", "about $3.94 of it from your ETH (RH) wallet", "done"],
-    ["It's in your NEAR wallet · about $107.00", "about $5.52 of it from your ETH (RH) wallet", "done"],
-    ["Done in N seconds.", "", "done"],
+    ["It's in your SOL wallet · about $12.33", "about $3.94 of it from your Robinhood wallet", "done"],
+    ["It's in your NEAR wallet · about $107.00", "about $5.52 of it from your Robinhood wallet", "done"],
+    ["Took N.", "", "done"],
   ]);
   assert.equal(new Set(s.map((x) => x.label)).size, s.length, "no two steps read the same");
   assert.ok(!s.some((x) => /from your Safe|from Private/.test(`${x.label} ${x.note ?? ""}`)), "never a source the records don't prove");
@@ -59,10 +59,10 @@ test("M4 (b): Now's card (watchLive's fold, rowTrack) is the same six steps; goi
   assert.equal(going.length, 1);
   assert.deepEqual(face(going[0]!.steps), [
     ["Signed.", "", "done"],
-    ["Left your ETH (RH) wallet · about $9.46", "to your SOL and NEAR wallets", "done"],
+    ["Left your Robinhood wallet · about $9.46", "to your SOL and NEAR wallets", "done"],
     ["Through NEAR Confidential · about $119.33", "NEAR Confidential moved it to your SOL and NEAR wallets.", "done"],
-    ["Solana is landing it in your SOL wallet · about $12.33", "about $3.94 of it from your ETH (RH) wallet", "doing"],
-    ["NEAR is landing it in your NEAR wallet · about $107.00", "about $5.52 of it from your ETH (RH) wallet", "doing"],
+    ["Solana is landing it in your SOL wallet · about $12.33", "about $3.94 of it from your Robinhood wallet", "doing"],
+    ["NEAR is landing it in your NEAR wallet · about $107.00", "about $5.52 of it from your Robinhood wallet", "doing"],
     ["Then it's done.", "", "waiting"],
   ]);
   assert.equal(going[0]!.end, undefined, "going");
@@ -77,14 +77,14 @@ test("M4 (c): a share the records can't split names no source (the Safe's part a
   const [j] = foldJobs([s2, toSol()], (id) => (id === "mv-legs-2" || id === "ml-sol" ? "move:j2" : undefined));
   const s = joinTracks([{ ...j!, status: j!.own ?? j!.status }, ...(j!.parts ?? [])].map((x) => moveTrack(x)))!.steps;
   assert.deepEqual(face(s).slice(3, 5), [
-    ["It's in your SOL wallet · about $3.94", "from your ETH (RH) wallet", "done"],
+    ["It's in your SOL wallet · about $3.94", "from your Robinhood wallet", "done"],
     ["It's in your NEAR wallet · about $20.00", "", "done"],
   ]);
 });
 
 test("M4 control: a one-wallet Move is unchanged: a wallet's own Move, and the Safe's Move to one wallet, keep their steps with no figure on them", () => {
-  const one = moveTrack(row({ id: "ml-only", kind: "move", network: "hood", to: "sol", usd: "3.94", words: "Moved $3.94 from your ETH (RH) wallet to your SOL wallet", legs: [row({ id: "ml-only-leg", kind: "ready", network: "sol", usd: "3.90", of: "ml-only" })] }))!;
-  assert.deepEqual(labels(joinTracks([one])!.steps), ["Left your ETH (RH) wallet", "Through NEAR Confidential", "In your SOL wallet"]);
+  const one = moveTrack(row({ id: "ml-only", kind: "move", network: "hood", to: "sol", usd: "3.94", words: "Moved $3.94 from your Robinhood wallet to your SOL wallet", legs: [row({ id: "ml-only-leg", kind: "ready", network: "sol", usd: "3.90", of: "ml-only" })] }))!;
+  assert.deepEqual(labels(joinTracks([one])!.steps), ["Left your Robinhood wallet", "Through NEAR Confidential", "In your SOL wallet"]);
   const s1 = row({ id: "mv-only", via: "private", goesTo: ["sol"], landed: ["sol"], paidDone: true, usd: "5.00", words: "Moved $5.00 to your SOL wallet" });
   carryTo(["move:mv-only"], { legs: [{ to: "sol", usd: "$5.00" }] });
   const t = moveTrack(s1)!;
@@ -141,9 +141,9 @@ test("QA's MUST: \"This step is private\" shows only when every leg had no publi
 
 test("QA's SHOULD: From names every wallet that paid, in the sheet's row order (on b72730c69: \"Safe\"); control: a row of one move keeps its facts", () => {
   const [j] = foldJobs([safe(), toSol(), toNear()], jobOf);
-  assert.equal(rows.jobFrom?.(j!), "Safe, Private, ETH (RH) wallet");
-  assert.deepEqual(rows.jobFacts(j!, [{ label: "From", value: "Safe" }, { label: "To", value: "SOL wallet" }]), [{ label: "From", value: "Safe, Private, ETH (RH) wallet" }, { label: "To", value: "SOL wallet, NEAR wallet" }]);
-  assert.deepEqual(rows.jobFacts(toNear(), [{ label: "From", value: "ETH (RH) wallet" }]), [{ label: "From", value: "ETH (RH) wallet" }], "control");
+  assert.equal(rows.jobFrom?.(j!), "Safe, Private, Robinhood wallet");
+  assert.deepEqual(rows.jobFacts(j!, [{ label: "From", value: "Safe" }, { label: "To", value: "SOL wallet" }]), [{ label: "From", value: "Safe, Private, Robinhood wallet" }, { label: "To", value: "SOL wallet, NEAR wallet" }]);
+  assert.deepEqual(rows.jobFacts(toNear(), [{ label: "From", value: "Robinhood wallet" }]), [{ label: "From", value: "Robinhood wallet" }], "control");
 });
 
 test("53 (2): a finished step's line is its date alone, no \"Done\"; the live step says \"Going\", a stopped one \"Stopped\" (on b72730c69: \"7 Nov, 8:08 am · Done\")", () => {
@@ -164,7 +164,7 @@ test("53 (5): a card's step words never repeat a figure its title shows (on b727
   const title = "Move $119.33 to your SOL and NEAR wallets";
   assert.equal(jobWords.cardStep?.("Through NEAR Confidential · about $119.33", title), "Through NEAR Confidential");
   assert.equal(jobWords.cardStep?.("It's in your SOL wallet · about $12.33", title), "It's in your SOL wallet · about $12.33", "control");
-  assert.equal(jobWords.cardStep?.("Left your ETH (RH) wallet · about $9.46", undefined), "Left your ETH (RH) wallet · about $9.46", "control: no title");
+  assert.equal(jobWords.cardStep?.("Left your Robinhood wallet · about $9.46", undefined), "Left your Robinhood wallet · about $9.46", "control: no title");
   // every card line: the Activity centre's going line and Home's row
   assert.match(readFileSync(new URL("../../../shell-api/src/TaskCentre.tsx", import.meta.url), "utf8"), /cardStep\(step\.label, t\.title\)/);
   assert.match(readFileSync(new URL("./money/LiveTrack.tsx", import.meta.url), "utf8"), /cardStep\(step\.label, t\.title\)/);

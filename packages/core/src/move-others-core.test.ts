@@ -79,7 +79,7 @@ test("the core keeps a part only by its own read: a forged part over it refused 
   assert.equal(othersForSheet(job("b"), "dep-b"), undefined);
   assert.deepEqual(await w.moveOthers(job("c"), [{ from: "sol", to: "near", cents: "9.46" }], false), { kept: 0 }, "malformed: dropped");
   assert.equal(othersForSheet(job("c"), "dep-c"), undefined);
-  assert.deepEqual(await w.moveOthers(job("d"), [{ from: "hood", to: "near", cents: "100" }], false), { kept: 0 }, "a wallet this core can't read (no ETH (RH) wallet here)");
+  assert.deepEqual(await w.moveOthers(job("d"), [{ from: "hood", to: "near", cents: "100" }], false), { kept: 0 }, "a wallet this core can't read (no Robinhood wallet here)");
   assert.deepEqual(await (await core(SOL_946, null)).moveOthers(job("e"), [{ from: "sol", to: "near", cents: "100" }], false), { kept: 0 }, "no price of its own: none");
   assert.deepEqual(await w.moveOthers(job("f"), [{ from: "near", to: "sol", cents: "100" }], false), { kept: 0 }, "the NEAR wallet's cash unread here: none");
   await assert.rejects(w.moveOthers("short", [{ from: "sol", to: "near", cents: "1" }], false), (e: any) => e?.problem?.code === "security.request.invalid");
@@ -145,7 +145,7 @@ test("the isolated core's path end to end: the page's keep is not the core's; th
   await w.moveOthers("phone-sheet-ok-0123456789", honest, false);
   const ok = await sheet("phone-sheet-ok-0123456789");
   assert.equal(ok.title, "Move $119.33 to your SOL and NEAR wallets");
-  assert.ok(ok.lines.includes("From your SOL wallet · about $9.46"), ok.lines.join(" | "));
+  assert.ok(ok.lines.includes("From SOL wallet · about $9.46"), ok.lines.join(" | "));
   assert.ok(ok.lines.includes("Your NEAR wallet gets · about $110.94"), ok.lines.join(" | "));
   await w.moveOthers("phone-sheet-forged-0123456789", [{ from: "sol", to: "near", cents: "5000" }], false);
   const forged = await sheet("phone-sheet-forged-0123456789");

@@ -2,7 +2,7 @@
 // here, so it draws at once every time after; until then it draws nothing (the parts that use it aren't Home's first
 // paint: Settings, the account's rows, its places, a hold's line). A failed load is asked again on the next draw.
 import { createElement, useEffect, useState, type ComponentType } from "react";
-import { reloadForChunk } from "@zerofee/shell-api/chunk-reload.ts";
+import { reloadForChunk, whenOnline } from "@zerofee/shell-api/chunk-reload.ts";
 
 export function later<P extends object>(load: () => Promise<ComponentType<P>>): ComponentType<P> & { preload: () => Promise<unknown> } {
   let here: ComponentType<P> | null = null;
@@ -11,9 +11,11 @@ export function later<P extends object>(load: () => Promise<ComponentType<P>>): 
   function Later(props: P) {
     const [c, setC] = useState<ComponentType<P> | null>(() => here);
     useEffect(() => {
-      let live = true;
-      if (!c) void get().then((x) => live && setC(() => x), () => undefined);
-      return () => { live = false; };
+      let live = true, stop = () => {};
+      // a load that failed offline (audit 12 C1) is asked for again once the phone is back
+      const ask = () => void get().then((x) => live && setC(() => x), () => { if (live) stop = whenOnline(ask); });
+      if (!c) ask();
+      return () => { live = false; stop(); };
     }, []);
     return c ? createElement(c, props) : null;
   }

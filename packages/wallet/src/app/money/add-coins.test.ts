@@ -23,8 +23,8 @@ const SOL_ADDR = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 const EVM_ADDR = "0xAb5e688E42cE07Fc83e0AD8ca0486b96a5D53e39";
 const answer = (o: Record<string, unknown> = {}) => ({ key: "add-sol-wallet-0123456789", chain: "sol", to: "wallet", depositAddress: SOL_ADDR, tokenId: "nep141:sol.omft.near", symbol: "SOL", decimals: 9, amountIn: "29484029", minAmountIn: "29189188", untilIso: new Date(NOW + 86_400_000).toISOString(), ...o });
 
-test("D123: Add's rows are each open chain's own coin only, SOL and ETH (RH) now; NEAR and BNB wait behind ADD_OPEN (control: the switch on lists them)", () => {
-  assert.deepEqual(addRows().map((r) => `${r.chain}:${r.symbol}:${r.name}`), ["sol:SOL:SOL", "hood:ETH:ETH (RH)"]);
+test("D123: Add's rows are each open chain's own coin only, SOL and Robinhood now; NEAR and BNB wait behind ADD_OPEN (control: the switch on lists them)", () => {
+  assert.deepEqual(addRows().map((r) => `${r.chain}:${r.symbol}:${r.name}`), ["sol:SOL:SOL", "hood:ETH:Robinhood"]);
   assert.deepEqual(ADD_OPEN, { sol: true, hood: true, near: false, bsc: false });
   assert.deepEqual(addRows({ sol: true, hood: true, near: true, bsc: true }).map((r) => r.chain), ["sol", "hood", "near", "bsc"], "control");
   // no token anywhere in Add: every row is a chain's own coin (no USDC, no USDT, nothing with a contract)
@@ -33,7 +33,7 @@ test("D123: Add's rows are each open chain's own coin only, SOL and ETH (RH) now
   assert.ok(addCoins(LIST).some((x) => x.symbol === "USDC"), "control: the token list has USDC");
   assert.ok(!addRows().some((r) => /USD/.test(r.symbol)));
   // D124: "ETH (RH)", never "ETH on Robinhood"
-  assert.doesNotMatch(JSON.stringify([ADD_ROWS, ADD_WORDS.rowName("ETH (RH)", "wallet")]), /ETH on Robinhood/);
+  assert.doesNotMatch(JSON.stringify([ADD_ROWS, ADD_WORDS.rowName("Robinhood", "wallet")]), /ETH on Robinhood/);
 });
 
 test("the QR sheet's address, whole and grouped in fours (address poisoning)", () => {
@@ -91,10 +91,10 @@ test("'At least' has at most 4 decimals and sending exactly it is always taken: 
 test("the words: short, the least rounded up (never under what the address takes), the end in the day's time", () => {
   // rule: at most 4 decimals of a coin, what the payer must send rounded UP
   assert.equal(leastWords("29189188", 9), "0.0292");
-  assert.equal(leastWords("1265170000000000", 18), "0.0013", "ETH (RH)");
+  assert.equal(leastWords("1265170000000000", 18), "0.0013", "Robinhood");
   assert.equal(leastWords("29200000", 9), "0.0292", "already 4 places: unchanged");
   assert.equal(ADD_WORDS.only("SOL", "Solana", "0.0292"), "Send only SOL on Solana, at least 0.0292 SOL.");
-  assert.equal(ADD_WORDS.rowName("ETH (RH)", "wallet"), "ETH (RH) wallet");
+  assert.equal(ADD_WORDS.rowName("Robinhood", "wallet"), "Robinhood wallet");
   assert.equal(ADD_WORDS.rowName("SOL", "safe"), "Safe");
   assert.equal(ADD_WORDS.until("7 Nov, 4:15 pm", "wallet"), "Until 7 Nov, 4:15 pm.");
   assert.equal(ADD_WORDS.until("7 Nov, 4:15 pm", "safe"), "Lands in your Safe as USDC. Until 7 Nov, 4:15 pm.");
@@ -196,7 +196,7 @@ test("owner's Bugs: (6 Nov): the core's ADD_USED renews the row's address at onc
     // the three rows on his phone: a kept key past its day; and one money reached
     ["Safe row, kept key past its day", [used, "sol", "safe", now, false], "renew"],
     ["SOL wallet row, kept key past its day", [used, "sol", "wallet", now, false], "renew"],
-    ["ETH (RH) wallet row, kept key past its day", [used, "hood", "wallet", now, false], "renew"],
+    ["Robinhood wallet row, kept key past its day", [used, "hood", "wallet", now, false], "renew"],
     ["a renewed key the core calls used too", [used, "sol", "wallet", now, true], "why"],
     ["control: a fitting address", [ok("sol", "wallet"), "sol", "wallet", now, false], "show"],
     ["control: a fitting Safe address", [ok("sol", "safe"), "sol", "safe", now, true], "show"],
@@ -252,12 +252,12 @@ test("Add opened from Home's tab puts that wallet's row first, the Safe's from t
   const rows = addRows();
   const names = (x: { name: string }[]) => x.map((r) => r.name);
   const plain = addOrder(undefined, rows);
-  assert.deepEqual([names(plain.rows), plain.safe?.name, plain.safeFirst], [["SOL", "ETH (RH)"], "SOL", true], "control: opened from All, the Safe first (HOME-VISUAL §3.8)");
+  assert.deepEqual([names(plain.rows), plain.safe?.name, plain.safeFirst], [["SOL", "Robinhood"], "SOL", true], "control: opened from All, the Safe first (HOME-VISUAL §3.8)");
   assert.equal(addOrder("sol", rows).safeFirst, false, "an open wallet's tab: its own row first, the Safe after");
-  assert.deepEqual(names(addOrder("sol", rows).rows), ["SOL", "ETH (RH)"]);
-  assert.deepEqual(names(addOrder("hood", rows).rows), ["ETH (RH)", "SOL"], "the ETH (RH) tab: its row first, the rest still there");
+  assert.deepEqual(names(addOrder("sol", rows).rows), ["SOL", "Robinhood"]);
+  assert.deepEqual(names(addOrder("hood", rows).rows), ["Robinhood", "SOL"], "the Robinhood tab: its row first, the rest still there");
   const safe = addOrder("safe", rows);
-  assert.deepEqual([names(safe.rows), safe.safe?.name, safe.safeFirst], [["SOL", "ETH (RH)"], "SOL", true]);
+  assert.deepEqual([names(safe.rows), safe.safe?.name, safe.safeFirst], [["SOL", "Robinhood"], "SOL", true]);
   // the NEAR tab's round Add while NEAR's Add isn't open: exactly what Add opened from nowhere is (no not-yet line)
   for (const w of ["near", "bsc"] as const) assert.deepEqual(addOrder(w, rows), plain, `${w}: plain Add`);
   assert.notDeepEqual(addOrder("hood", rows), plain, "control: an open wallet's tab puts its row first");
@@ -297,7 +297,7 @@ test("UI's rehearsal (3 Nov): Add opened with a coin (AgentZero's receive {coin:
   assert.equal(addOpensOn("near", "near", false, rows), null, "control: a coin whose Add isn't open yet: the list, never a dead page");
   const sheet = here("./AddSheet.tsx"), host = here("./MoneyHost.tsx");
   const on = sheet.slice(sheet.indexOf("function AddOn("), sheet.indexOf("const QrGlyph"));
-  assert.match(on, /const direct = addOpensOn\(coin, wallet, !!request, addRows\(\)\);\n\s+if \(direct && !asking && !ready\) return <Sheet [^\n]*\n\s+if \(direct && !asking\) return <CoinPage [^\n]*onClose=\{onClose\} \/>;/, "the coin page at once; its ✕ is Add's own Close (back to Home), not back to the list");
+  assert.match(on, /const direct = addOpensOn\(coin, wallet, !!request, addRows\(\)\);\n\s+if \(direct && !asking && !ready\) return <Sheet [^\n]*\n(?:\s+if \(down && !asking\) return <Sheet [^\n]*\n)?\s+if \(direct && !asking\) return <CoinPage [^\n]*onClose=\{onClose\} \/>;/, "the coin page at once; its ✕ is Add's own Close (back to Home), not back to the list");
   assert.ok(on.indexOf("if (direct && !asking) return <CoinPage") < on.indexOf('data-testid="add-rows"'), "the page comes before the list is drawn");
   const page = sheet.slice(sheet.indexOf("function CoinPage("), sheet.indexOf("function QrPage("));
   assert.match(page, /<Sheet title=\{W\.title\} onClose=\{onClose\}>/, "one full-screen sheet (D135)");

@@ -83,12 +83,12 @@ test("the audit's MUST (2) + (4): Get it back shows only while Ref's lost and fo
   assert.deepEqual(keptWay(k, "5000000000000000000"), { head: "Your BLACKDRAGON is still with Rhea.", body: "About 5 BLACKDRAGON. Nothing is lost.", claim: { label: "Get it back", running: "Getting it back…" } });
   const owner = keptWay(k, "0");
   assert.equal(owner.claim, undefined, "no button: only Rhea's team can send it back");
-  assert.deepEqual([owner.head, owner.body], ["Your BLACKDRAGON didn't reach your NEAR wallet.", "It's most likely with Rhea's team. Ask them to send it back."]);
+  assert.deepEqual([owner.head, owner.body], ["Your BLACKDRAGON didn't reach your NEAR wallet.", "Ask Rhea's team to send it back. Show them the details below."]);
   assert.deepEqual(owner.details, { open: "Show details", head: "Give them these:", rows: [{ label: "Your wallet", value: "w.near" }, { label: "The trade", value: "h1" }, { label: "The coin", value: COIN }] });
   assert.ok(!JSON.stringify(owner).includes("Nothing is lost"));
   for (const h of [null, undefined]) assert.equal(keptWay(k, h).claim, undefined, String(h));
   assert.deepEqual([keptWay(k, null).head, keptWay(k, null).body], ["Rhea's servers didn't answer.", "Ref kept the BLACKDRAGON. Open this again to check."], "the audit's T9: never \"Nothing moved.\" (kept-claim-words.test.ts: with what left)");
-  assert.equal(keptWay(k, undefined).head, "Checking with Rhea…");
+  assert.equal(keptWay(k, undefined).head, "Checking with Rhea");
   // the copy review: "your NEAR wallet" everywhere, never a bare "your wallet"
   for (const h of ["5", "0", null, undefined]) assert.ok(!/your wallet/.test(JSON.stringify(keptWay(k, h)).replace(/Your wallet"/g, "")), String(h));
 });

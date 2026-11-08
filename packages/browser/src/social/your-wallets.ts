@@ -11,6 +11,7 @@
 //   networks ZeroFee carries back (take-out.ts TAKES_OUT), $2 or more; any other coin is sold on its site first.
 import type { SpendingWallet } from "@zerofee/core/spending";
 import { SITE_WALLETS, isAgentPocket } from "@zerofee/core/site-wallets";
+import { appChain } from "@zerofee/core/app-chains";
 import { usd } from "@zerofee/trade/app/format.ts";
 import type { SiteCoin } from "./site-wallet.ts";
 import { TAKES_OUT } from "./take-out.ts";
@@ -18,10 +19,11 @@ import { TAKES_OUT } from "./take-out.ts";
 /** Under this a move back would mostly go on fees (take-out.ts's floor, the money sheet's SITE_MIN_USD). */
 export const BACK_MIN_USD = 2;
 /** Each network's own coin. */
-const NATIVE: Readonly<Record<string, string>> = { sol: "SOL", bsc: "BNB", eth: "ETH", base: "ETH", arb: "ETH", hood: "ETH", gnosis: "xDAI" };
-const NETWORK: Readonly<Record<string, string>> = { sol: "Solana", bsc: "BNB", eth: "Ethereum", base: "Base", arb: "Arbitrum", hood: "Robinhood Chain", gnosis: "Gnosis" };
+/** Each network's own coin and name: the app's chains only (core app-chains.ts; builder 25, J8: no BNB or Base in V1). */
+const NATIVE: Readonly<Record<string, string>> = { sol: "SOL", hood: "ETH", near: "NEAR" };
+const NETWORK: Readonly<Record<string, string>> = { sol: "Solana", hood: "Robinhood", near: "NEAR" };
 /** The order a site's networks are listed in. */
-const ORDER = ["sol", "bsc", "hood", "eth", "base", "arb", "gnosis"];
+const ORDER = ["sol", "hood", "near"];
 const rank = (n: string) => { const i = ORDER.indexOf(n); return i < 0 ? 99 : i; };
 
 export const words = {
@@ -42,7 +44,9 @@ export const words = {
   hideEmpty: "Hide empty",
   none: "No site wallets yet. A site gets its own wallet when you sign in to it.",
   allEmpty: "No money in any site wallet.",
-  looking: "Looking…",
+  /** Builder 25 (item 2): before the first read, the word and who reads it, never "Looking…" or "…". */
+  looking: "Reading",
+  reading: "Solana is reading your site wallets.",
   cantSee: "Can't see it now",
   lastLook: "Can't see it now. This is from the last look.",
   readFailed: "Your wallets didn't load. These are from the last look.",
@@ -67,7 +71,7 @@ export interface WalletCard {
   host?: string;
   /** The tile's letter when there is no logo. */
   letter: string;
-  /** Its dollars ("$12.40"); a coin's amount when nothing has a price; "Looking…" or "Can't see it now" when unknown. */
+  /** Its dollars ("$12.40"); a coin's amount when nothing has a price; "Reading" or "Can't see it now" when unknown. */
   dollars: string;
   /** Its priced dollars, for the total and the order; null: not known now. */
   usd: number | null;
@@ -89,7 +93,7 @@ export interface YourWallets {
   money: WalletCard[];
   /** Wallets with nothing in them: behind "Show empty", listed sites first. */
   empty: WalletCard[];
-  /** The total of every priced coin; "…" before anything is read. */
+  /** The total of every priced coin; "Reading" before anything is read. */
   total: string;
   totalNote?: string;
   /** "Move everything back": the money sheets it opens, one site after another, largest first. */
@@ -103,9 +107,10 @@ export function keepLast(last: Readonly<Record<string, readonly SiteCoin[]>>, go
   return out;
 }
 
-/** The site wallets Spending lists, by site (current ones; never AgentZero's pocket or a chain wallet). */
+/** The site wallets Spending lists, by site (current ones; never AgentZero's pocket or a chain wallet), on the chains the
+ *  app shows only (core app-chains.ts; builder 25, J8): a wallet on another chain stays where it is, unshown. */
 export function siteWalletsOf(list: readonly SpendingWallet[]): SpendingWallet[] {
-  return list.filter((w) => w.role === "site" && w.current && typeof w.site === "string" && w.site !== "" && !isAgentPocket(w.site));
+  return list.filter((w) => w.role === "site" && w.current && typeof w.site === "string" && w.site !== "" && !isAgentPocket(w.site) && appChain(String(w.network)));
 }
 
 const hostOf = (site: string): string | undefined => (site.startsWith("host:") ? site.slice(5) : undefined);
@@ -194,7 +199,7 @@ export function yourWallets(i: { list: readonly SpendingWallet[]; coins?: Readon
   const money = cards.filter((c) => c.hasMoney).sort((a, b) => (a.usd === null ? 1 : 0) - (b.usd === null ? 1 : 0) || (b.usd ?? 0) - (a.usd ?? 0) || listedFirst(a, b));
   const empty = cards.filter((c) => !c.hasMoney).sort(listedFirst);
   const sum = Math.round(money.reduce((t, c) => t + (c.usd ?? 0), 0) * 100) / 100;
-  const total = i.read === "first" && !cards.length ? "…" : usd(sum);
+  const total = i.read === "first" && !cards.length ? words.looking : usd(sum);
   const totalNote = money.some((c) => c.usd === null) ? words.someUnseen : money.some((c) => c.unpriced || (c.usd !== null && c.usd < 0.01 && c.coins.length)) ? words.noPrice : undefined;
   return { money, empty, total, ...(totalNote ? { totalNote } : {}), sweep: money.flatMap((c) => (c.back ? [c.back] : [])) };
 }

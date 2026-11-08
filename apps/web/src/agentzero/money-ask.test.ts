@@ -43,7 +43,7 @@ test("the coins AgentZero names are Swap's and Add's own (held equal to Home's l
 });
 
 test("the move is followed to its end in Activity's words: never a landed line before done", () => {
-  assert.deepEqual(followLine({ status: "moving" }, 1000), { text: "On its way. AgentZero is following it…", end: false });
+  assert.deepEqual(followLine({ status: "moving" }, 1000), { text: "On its way. Jobs shows the time left.", end: false });
   assert.deepEqual(followLine({ status: "done" }, 1000), { text: "Landed. It's in your Activity.", end: true });
   assert.equal(followLine({ status: "refunded" }, 1000).text, "It came back to you, so nothing was lost.");
   assert.equal(followLine({ status: "problem", problem: { code: "x", whatHappened: "The swap service didn't answer.", money: { state: "safe", where: "your Safe" }, next: { kind: "nothing", label: "OK" } } }, 1000).text, "It stopped. The swap service didn't answer.");
@@ -73,7 +73,7 @@ test("a sheet's moves as one: by its id, or every new leg; a stop in any leg is 
   assert.equal(movesOf([mv("a", "done"), mv("b", "moving")], "a", before).m?.status, "done");
 });
 
-test("a Move or Swap on to the SOL or ETH (RH) wallet is two steps: AgentZero never says the whole move landed when it can only see step one", () => {
+test("a Move or Swap on to the SOL or Robinhood wallet is two steps: AgentZero never says the whole move landed when it can only see step one", () => {
   assert.equal(hopOf({ kind: "move", from: "safe", to: "sol", usd: "20.00" }), "sol");
   assert.equal(hopOf({ kind: "swap", from: "USDC", to: "ETH", usd: "5.00" }), "hood");
   assert.equal(hopOf({ kind: "move", from: "sol", to: "safe" }), null, "control: to the Safe, step one is the move");

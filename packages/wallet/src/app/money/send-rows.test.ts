@@ -20,9 +20,9 @@ const status = (o: Partial<SpendingStatus> = {}) => ({ loaded: true, unread: fal
 const sheet = readFileSync(new URL("./SendSheet.tsx", import.meta.url), "utf8");
 const usdc = (amount: string, held: Balance["held"]): Balance => ({ tokenId: "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", symbol: "USDC", name: "USD Coin", icon: "usdc", chain: "near", amount, usd: amount, bridged: false, held, listed: true });
 
-test("the dropdown's wallets: your SOL wallet and your ETH (RH) wallet, their own amount and dollars; none unread; BNB not offered yet", () => {
+test("the dropdown's wallets: your SOL wallet and your Robinhood wallet, their own amount and dollars; none unread; BNB not offered yet", () => {
   const rows = rowCoins(status());
-  assert.deepEqual(rows.map((r) => [r.tokenId, r.name, r.symbol, r.amount, r.usd, r.chain]), [["row:sol", "SOL wallet", "SOL", "4.82", "490.43", "sol"], ["row:hood", "ETH (RH) wallet", "ETH", "0.05", "120.00", "hood"]]);
+  assert.deepEqual(rows.map((r) => [r.tokenId, r.name, r.symbol, r.amount, r.usd, r.chain]), [["row:sol", "SOL wallet", "SOL", "4.82", "490.43", "sol"], ["row:hood", "Robinhood wallet", "ETH", "0.05", "120.00", "hood"]]);
   assert.deepEqual(rowCoins(status({ unread: true } as never)), [], "unread: no wallet, never a $0 one");
   assert.deepEqual(rowCoins(null), []);
   assert.equal(rowChain({ tokenId: "nep141:sol.omft.near" }), null, "control: the Safe's SOL is not a wallet");
@@ -53,8 +53,8 @@ test("Hidden's coins counted under the Safe (D128): From shows the coin's one fi
   assert.deepEqual(sendSources([], [usdc("30", "ledger")], [], false), [], "all of it in the Safe and its route shut: not offered (D125)");
   // the wallets come first, each with its fee room kept
   const both = sendSources(rowCoins(status()), [usdc("30", "ledger")], [usdc("20", "private")], false);
-  assert.deepEqual(both.map((s) => s.label), ["SOL · your SOL wallet", "ETH (RH) · your ETH (RH) wallet", "USDC · Private"], "the coin, then where it is");
-  assert.deepEqual(both.map((s) => s.place), ["your SOL wallet", "your ETH (RH) wallet", "Private"], "the amount line's place: \"0.5 SOL from your SOL wallet\"");
+  assert.deepEqual(both.map((s) => s.label), ["SOL · your SOL wallet", "ETH · your Robinhood wallet", "USDC · Private"], "the coin, then where it is");
+  assert.deepEqual(both.map((s) => s.place), ["your SOL wallet", "your Robinhood wallet", "Private"], "the amount line's place: \"0.5 SOL from your SOL wallet\"");
   assert.ok(!both.some((s) => /\brow\b|ETH on Robinhood|Hidden|in your Safe/.test(s.label)), "control: never a row, ETH on Robinhood, Hidden, or \"USDC on NEAR in your Safe\"");
   // the Safe's share is the engine's: one call, which pays the pocket's part first and says the most it can (ledger.sendFromSafe)
   assert.match(sheet, /"ledger\.sendFromSafe", \{ tokenId: a\.source\.tokenId, to: payee, toTokenId,/);
@@ -87,7 +87,7 @@ test("every coin in Send's and Swap's pickers has its own name: the network wher
   const all = [...rowCoins(status()), ...safe.filter((b) => b.listed !== false)];
   const names = all.map((b) => coinLabel(b, chainName));
   assert.deepEqual(names.filter((n, i) => names.indexOf(n) !== i), [], `two coins read the same: ${names.join(", ")}`);
-  for (const want of ["SOL wallet", "ETH (RH) wallet", "USDC on NEAR", "USDC on your account", "USDC on Solana", "USDC on Base", "NEAR", "NEAR on your account", "SOL", "ETH", "BTC"]) assert.ok(names.includes(want), `${want} in ${names.join(", ")}`);
+  for (const want of ["SOL wallet", "Robinhood wallet", "USDC on NEAR", "USDC on your account", "USDC on Solana", "USDC on Base", "NEAR", "NEAR on your account", "SOL", "ETH", "BTC"]) assert.ok(names.includes(want), `${want} in ${names.join(", ")}`);
   // control: the symbol alone (the walk's chips) reads four USDC and two NEAR the same
   const bare = all.map((b) => (isRowLike(b) ? b.name : b.symbol));
   assert.equal(bare.filter((n) => n === "USDC").length, 4);

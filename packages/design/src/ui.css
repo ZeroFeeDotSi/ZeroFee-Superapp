@@ -202,7 +202,7 @@ html, body, button, a, input, textarea, select, summary, label, [role="button"],
   /* the lit button: brighter, its own glow kept (a16: 1.04 did not show on the sim's desktop; 1.06 does) */
   .zf-btn:hover:not(:disabled):not(.zf-btn--quiet):not(.is-busy) { filter: brightness(1.06); }
   /* Home's ink Buy pill (wallet.css .wl-buy) and its action discs (.wl-act): the film, in the ground's colour on ink */
-  .wl-buy:hover:not(:disabled) { background-image: linear-gradient(color-mix(in srgb, var(--bg) 14%, transparent), color-mix(in srgb, var(--bg) 14%, transparent)); }
+  .wl-buy:hover:not(:disabled) > span { background-image: linear-gradient(color-mix(in srgb, var(--bg) 14%, transparent), color-mix(in srgb, var(--bg) 14%, transparent)); }
   .wl-act:hover:not(:disabled) .wl-act__dot { background-image: linear-gradient(var(--hover-film), var(--hover-film)); }
   /* a key: its press disc, half lit */
   .zf-keypad button:hover:not(:disabled)::before { opacity: .6; transform: none; }

@@ -45,9 +45,9 @@ test("J2-4: a Send's page says it once: bar \"Activity\", the figure, \"Send to 
 
 test("J2-4: a done Send's or Move's page says \"Done in N seconds.\" from its own start and end; control: going, or an end not its own, none", () => {
   const done = { ...sendTrack(send({ status: "done", updatedAtIso: iso(T + 6000) }), "safe", "alice.near", "$25.00")!, endMs: T + 6000 };
-  assert.equal(jobFace(done).took, "Done in 6 seconds.", "fails before: no time on the done page");
+  assert.equal(jobFace(done).took, "Took 6 s.", "fails before: no time on the done page");
   const move: LiveTrack = { id: "move:m", kind: "move", title: "Move $5.00 to your SOL wallet", wallets: ["safe", "sol"], startMs: T, endMs: T + 6000, steps: [{ label: "In your SOL wallet", state: "done" }], end: { ok: true, line: "In your SOL wallet." } };
-  assert.equal(jobFace(move).took, "Done in 6 seconds.");
+  assert.equal(jobFace(move).took, "Took 6 s.");
   assert.equal(jobFace({ ...move, endMs: -Infinity }).took, undefined, "control: a track first seen ended has no made-up time");
   assert.equal(jobFace(sendTrack(send(), "safe", "alice.near", "$25.00")!).took, undefined, "control: going");
   const page = src("./LiveTrack.tsx");
@@ -95,7 +95,7 @@ test("J2-4: the Swap receipt's \"From Private, so no Face ID.\" only when the jo
 test("J2-4: \"You can close this. It keeps going.\" never under \"Done in 6 seconds.\": Move's receipt draws it through TimeLeft's landing; the job page only while going", () => {
   const move = src("../screens/MoveSheet.tsx");
   assert.doesNotMatch(move, /\{job\.state === "away" && <p className="zf-receipt__line">\{JOB_WORDS\.watch\}<\/p>\}/, "fails before: its own line, deaf to the landing");
-  assert.match(move, /watch job=\{madeJob\} \/>/);
+  assert.match(move, /watch job=\{madeJob\} (?:doneAt=\{[^}]+\} )?\/>/);
   assert.match(src("./LiveTrack.tsx"), /\{f\.state === "going" && <p className="zf-small lv-tracker__note">Each step shows the moment it's done\. You can close this\. It keeps going\.<\/p>\}/, "control");
 });
 
@@ -107,7 +107,7 @@ test("J2-3 (MUST): every amount chip, network chip, the QR's Copy and \"Who can 
   assert.match(last(send, ".wl-send2 .zf-keypad, .wl-send2:has(.wl-send2__nets) .zf-keypad {"), /flex: none; min-height: 224px; grid-auto-rows: 56px/);
   assert.match(last(swap, ".wl-swap-chips .zf-chip, .wl-swap-chips .zf-chip.wl-swap-all {"), /height: 44px; min-height: 44px/);
   assert.match(last(swap, ".wl-swap2__who {"), /min-height: 44px/, "fails before: an 18 px link");
-  assert.match(last(swap, ".wl-swap2__scroll > .zf-keypad button {"), /height: 56px; min-height: 56px/);
+  assert.match(last(swap, ".wl-swap2__floor > .zf-keypad button {"), /height: 56px; min-height: 56px/, "builder 25 (J5): the keypad heads the floor");
   assert.match(last(wallet, ".zf-btn.wl-qrfull__copy {"), /height: 44px; min-height: 44px/, "fails before: 32 px");
   assert.match(last(send, ".wl-send2__nets .wl-chips { scroll-padding-inline"), /scroll-padding-inline: 24px/, "the chosen chip stops clear of the 24 px fade");
   const form = src("./SendForm.tsx");

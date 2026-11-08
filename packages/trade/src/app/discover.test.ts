@@ -62,7 +62,7 @@ test("Activity's row: the coins in their own units, the dollars, a status only w
   assert.equal(done.usd, 5);
   assert.deepEqual(done.coin, { chain: "sol", address: "MINT", symbol: "DOPE" });
   assert.equal(done.status, undefined, "control: a done row says no status");
-  assert.equal(tradeCard({ ...base, status: "sending" }).status, "Sending…");
+  assert.equal(tradeCard({ ...base, status: "sending" }).status, "Sending");
   assert.equal(tradeCard({ ...base, status: "failed" }).status, "Didn't go through");
   assert.equal(tradeCard({ ...base, status: "sending", hashes: [] }).steps[0]!.label, "Paid from your SOL wallet", "T2-6 (the copy review's walk): a buy pays from its wallet, by name");
   assert.equal(tradeCard({ ...base, kind: "sell", status: "sending", hashes: [] }).steps[0]!.label, "Sent to Solana", "control: a sale names the network (Copywriter row 68)");
@@ -78,7 +78,7 @@ test("finding 14: a search that can't be an address says so at once and asks the
   assert.match(src, /\{badAddress && <p className="dc-quiet" role="status">\{NOT_AN_ADDRESS\}<\/p>\}/);
 });
 
-test("product decision, 5 Nov: on All the line is the coin's name and worth, the chain is the logo's badge, spoken (webd-money2: CASHCAT's row must still say ETH (RH)); control: one chain's own list has no badge", () => {
+test("product decision, 5 Nov: on All the line is the coin's name and worth, the chain is the logo's badge, spoken (webd-money2: CASHCAT's row must still say Robinhood); control: one chain's own list has no badge", () => {
   // 53, 6 Nov, item 9 (fix/trade-list-coin): the name is its own line, whole; the worth moved beside the symbol
   assert.match(src, /<span className="dc-sub dc-sub--name"><span className="dc-name dc-name--whole">\{words\.name\}<\/span>/);
   assert.ok(!/dc-name">\{showChain/.test(src), "no chain words pushing the name off the line");
@@ -86,7 +86,7 @@ test("product decision, 5 Nov: on All the line is the coin's name and worth, the
   // audit 5 Nov: the worth is its own span that never shrinks, so the name gives way, never the number
   assert.match(src, /<span className="dc-cap">\{words\.cap\}<\/span>/);
   assert.match(src, /showChain=\{chain === "all"\}/, "control: only on All");
-  assert.match(src, /hood: "ETH \(RH\)"/);
+  assert.match(src, /hood: "Robinhood"/);
 });
 
 test("feel (5 Nov): each coin row is the one LiveRow, its press the row's wash; its words, figures and hooks kept", async () => {

@@ -15,7 +15,7 @@ export const ROOT = new URL("../../", import.meta.url).pathname;
 
 /** Where people's words live. Tests, test helpers, robots and fakes are not shown to anyone. */
 const DIRS = ["apps/web/src", "apps/ios/ZeroFee", ...readdirSync(join(ROOT, "packages")).map((p) => `packages/${p}/src`)];
-const SKIP = /(recorded-data|chat\/src\/places|\.test\.ts$|\/testing\/|\/robot\/|\/fake-|\.d\.ts$|DebugProbe|PartnerScripts|PartnerRobot|\/vectors?\b|\/evm\/abi|\/known-chains|\/sol\/jup-programs)/;
+const SKIP = /(recorded-data|chat\/src\/places|\.test\.ts$|\/testing\/|\/sim\/agent-(fixtures|injections|suite)\.ts$|\/robot\/|\/fake-|\.d\.ts$|DebugProbe|PartnerScripts|PartnerRobot|\/vectors?\b|\/evm\/abi|\/known-chains|\/sol\/jup-programs)/;
 
 export function sourceFiles(): string[] {
   const out: string[] = [];

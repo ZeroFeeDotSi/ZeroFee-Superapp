@@ -9,7 +9,7 @@
 export const LEAD_TITLE = "What it does";
 /** One line per feature, each one idea (the copy bar: a 5-year-old reads it). */
 export const LEAD_COPY = "Copies a wallet's trades on pump.fun.";
-export const LEAD_SIGN_IN = "Signs you in to your sites.";
+export const LEAD_SIGN_IN = "Signs you in to pump.fun and GMGN.";
 export const LEAD_POCKET = "Spends only what you put in its wallet.";
 export const LEAD_RECEIPT = "Shows a receipt for every move.";
 /** The fee line. */

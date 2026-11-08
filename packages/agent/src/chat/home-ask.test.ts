@@ -5,12 +5,12 @@ import assert from "node:assert/strict";
 import { chatSystem as relaySystem } from "../../../../apps/quotes/agentzero-chat.mjs";
 import { chatSystem, CHAT_TOOLS } from "./tools.ts";
 import { chatTurn, type ChatEvent, type ChatOptions } from "./turn.ts";
-import { addSheet, chainOf, moveSheet, NOT_SAID, putLine, requestSheet, sendSheet, swapSheet, tradeSheet, tradeWant, WHO_ANY, HOW_MUCH, BNB_CLOSED } from "./home-ask.ts";
+import { addSheet, chainOf, moveSheet, NOT_SAID, putLine, requestSheet, sendSheet, swapSheet, tradeSheet, tradeWant, WHO_ANY, HOW_MUCH } from "./home-ask.ts";
 
 const SOL = "Do1RHZV32j5V7oAEb3PKVwzUxc2XQPBGGwpf6MrC7vcy";
 const EVM = "0x7D06e272b5305a4b9D40e872C7950D3437547e3D";
 
-test("the address's chain is read by its shape: Solana base58 32-44, ETH (RH) 0x+40 hex, a NEAR name or 64 hex; nothing else", () => {
+test("the address's chain is read by its shape: Solana base58 32-44, Robinhood 0x+40 hex, a NEAR name or 64 hex; nothing else", () => {
   assert.equal(chainOf(SOL), "sol");
   assert.equal(chainOf(EVM), "hood");
   assert.equal(chainOf("kim.near"), "near");
@@ -27,22 +27,23 @@ test("a multi-turn send: \"sol pls, like 5$\" then the pasted Solana address is 
   // ETH (RH) and NEAR, from a wallet
   const e = sendSheet({ to: EVM, usd: 2, coin: "ETH", from: "hood" }, `send $2 of ETH to ${EVM}`);
   assert.ok(typeof e !== "string");
-  assert.equal(e.line, "Send $2.00 in ETH (RH) to 0x7D…7e3D, from your ETH (RH) wallet.");
+  assert.equal(e.line, "Send $2.00 in ETH to 0x7D…7e3D, from your Robinhood wallet.");
   const n = sendSheet({ to: "Kim.near", usd: 3 }, "send $3 to kim.near");
   assert.ok(typeof n !== "string");
   assert.deepEqual(n.ask, { kind: "send", to: "kim.near", chain: "near", usd: "3.00" });
 });
 
 test("never Claude's guess: a wrong shape, an address not in the person's words, a coin the chain can't take, an amount not said", () => {
-  assert.match(sendSheet({ to: "0x123", usd: 5 }, "send $5 to 0x123") as string, /isn't a whole ETH \(RH\) address.*Nothing moved/);
+  assert.match(sendSheet({ to: "0x123", usd: 5 }, "send $5 to 0x123") as string, /isn't a whole Robinhood address.*Nothing moved/);
   assert.equal(sendSheet({ to: "kim", usd: 5 }, "send $5 to kim"), WHO_ANY);
   // one letter changed by the model: not the person's address
   const changed = SOL.slice(0, -1) + "x";
   assert.equal(sendSheet({ to: changed, usd: 5 }, `send $5 to ${SOL}`), NOT_SAID);
-  assert.match(sendSheet({ to: SOL, usd: 5, coin: "ETH" }, `send $5 of ETH to ${SOL}`) as string, /Solana address, so it can't get ETH \(RH\)/);
+  assert.match(sendSheet({ to: SOL, usd: 5, coin: "ETH" }, `send $5 of ETH to ${SOL}`) as string, /Solana address, so it can't get ETH/);
   assert.equal(sendSheet({ to: SOL, usd: 50 }, `send $5 to ${SOL}`), HOW_MUCH);
   assert.equal(sendSheet({ to: SOL, usd: 5 }, `send five to ${SOL}`), HOW_MUCH);
-  assert.equal(sendSheet({ to: EVM, usd: 5, coin: "BNB" }, `send $5 of BNB to ${EVM}`), BNB_CLOSED);
+  // audit 18's I8 (b22 item 14): BNB is no coin here: the coins the app has, never BNB's name
+  assert.equal(sendSheet({ to: EVM, usd: 5, coin: "BNB" }, `send $5 of BNB to ${EVM}`), "Which coin? SOL, ETH, NEAR or USDC. Nothing moved.");
   // control: the same asks, right, pass
   assert.equal(typeof sendSheet({ to: SOL, usd: 5 }, `send $5 to ${SOL}`), "object");
 });
@@ -92,13 +93,13 @@ test("trade: the coin by chain and address only, found in Trade's market and sho
   assert.equal(tradeWant({ side: "buy", coin: BONK.address, usd: 5 }, "buy $5 of bonk"), NOT_SAID);
 });
 
-test("prompt words (product decision, 3 Nov): ETH (RH), your Safe, your SOL wallet; never ETH on RH or Robinhood, Hidden, row, Trading or Spending (both copies, wallet on and off)", () => {
+test("prompt words (product decision, 3 Nov): Robinhood, your Safe, your SOL wallet; never ETH on RH or Robinhood, Hidden, row, Trading or Spending (both copies, wallet on and off)", () => {
   const OLD = /ETH on (?:RH|Robinhood)|\b(?:Hidden|Trading|Spending)\b|\brows?\b/;
   for (const on of [false, true]) {
     const app = chatSystem(on);
     assert.equal(app, relaySystem(on), "the relay's copy is word for word");
     assert.deepEqual(app.split("\n").filter((l) => OLD.test(l)), []);
-    for (const w of ["ETH (RH)", "your Safe", "your SOL wallet", "your ETH (RH) wallet", "your NEAR wallet"]) assert.ok(app.includes(w), w);
+    for (const w of ["Robinhood", "your Safe", "your SOL wallet", "your Robinhood wallet", "your NEAR wallet"]) assert.ok(app.includes(w), w);
   }
   const home = CHAT_TOOLS.filter((t) => ["send", "swap", "move", "add", "request", "trade"].includes(t.name));
   assert.equal(home.length, 6);

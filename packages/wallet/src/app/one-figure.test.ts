@@ -77,20 +77,20 @@ test("Swap's You pay is the same figure as Send's and Home's; Max stays what one
   assert.equal(one.part, undefined, "control: one part pays all of it, no line");
   const sheet = readFileSync(new URL("./money/SwapSheet.tsx", import.meta.url), "utf8");
   assert.match(sheet, /paysHere\(\{ networks: status\.networks, reserveUsd: status\.reserveUsd, roomUsd: status\.roomUsd, safe: balances, pocket: pocket\?\.available \? pocket\.rows : null, earning \}\)/);
-  assert.match(sheet, /part: nothing \? SWAP_WORDS\.none : pay\?\.part \?\? null/, "the one sub-line slot says it (swap-floor.test.ts)");
+  assert.match(sheet, /part: rests \? null : nothing \? SWAP_WORDS\.none : pay\?\.part \?\? null/, "the one sub-line slot says it (swap-floor.test.ts); none while the keypad rests (S6)");
 });
 
 test("the coin page shows the same figure (readSafeHeld), Sell keeps its own part with its line (control: no screen sums its own)", async () => {
   const { readSafeHeld } = await import("./balance-parts.ts");
   const calls: Record<string, unknown> = { "ledger.balances": SAFE, "ledger.tokens": [], "earn.positions": [], "ledger.private": pocket, "account.state": { kid: false } };
   const bridge = { call: async (m: string) => (m in calls ? { ok: calls[m] } : { problem: { code: "x" } }) } as never;
-  assert.deepEqual(await readSafeHeld(bridge, ROW_USDC), { amount: "1367.6", usd: "1367.60", symbol: "USDC" });
+  assert.deepEqual(await readSafeHeld(bridge, ROW_USDC), { amount: "1367.6", usd: "1367.60", symbol: "USDC", rest: ["private"] }, "b22 item 5: part of it is in Private");
   assert.equal((await readSafeHeld(bridge, "nep141:wrap.near"))?.amount, "326.9", "wrapped NEAR's page is NEAR's line");
   assert.equal(await readSafeHeld(bridge, "nep141:doge.omft.near"), null, "control: a coin the Safe doesn't hold");
   const page = readFileSync(new URL("../../../trade/src/native/NativeScreens.tsx", import.meta.url), "utf8");
   assert.match(page, /m\.readSafeHeld\(bridge, assetId\)/);
-  assert.match(page, /W\.youHold\(trimAmount\(shownHeld\.amount\), symbol\)/);
-  assert.match(page, /\{partOnly && <p className="zf-small nc-part" data-testid="native-part">\{W\.sellPart\(trimAmount\(held!\), symbol\)\}<\/p>\}/);
+  assert.match(page, /W\.youHold\(amountOf\(shownHeld\.amount, symbol, row\?\.decimals\), symbol\)/);
+  assert.match(page, /\{partOnly && <p className="zf-small nc-part" data-testid="native-part">\{W\.sellPart\(amountOf\(held!, symbol, row\?\.decimals\), symbol, figure\?\.rest\)\}<\/p>\}/);
   assert.doesNotMatch(page, /usd\(heldN \* px\)/, "control: its own market-price figure is gone");
   assert.match(page, /<span>\{W\.paysFrom\}<\/span><span>\{W\.safeCash\}<\/span>/);
 });

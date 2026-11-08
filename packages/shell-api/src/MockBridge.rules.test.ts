@@ -120,7 +120,7 @@ test("subwallet.export: through the sheet, a key-shaped string no wallet app can
   const out = await mock.call<{ secretKey: string }>("subwallet.export", { id: "sw-trade-sol" });
   assert.ok("ok" in out, JSON.stringify(out));
   assert.equal(out.ok.secretKey, SAMPLE_KEY, "the key-shaped string no chain can read (MockBridge.addresses.test.ts)");
-  assert.match(sheets[0].words.title, /Show the key of your Solana wallet/);
+  assert.match(sheets[0].words.title, /Show the key of your SOL wallet/, "the wallet's one name (audit 12 C8)");
   assert.doesNotMatch(sheets[0].words.lines.join(" "), /sample|not a real/i);
   const unknown = await mock.call("subwallet.export", { id: "nope" });
   assert.ok("problem" in unknown && unknown.problem.code !== "mock.unknown");

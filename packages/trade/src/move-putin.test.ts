@@ -35,10 +35,10 @@ test("one Approve names every leg: \"Move $25.00 from your Safe · SOL $15.00 ·
   const approve = s.asked.filter((a) => a.method === "ledger.toTrading");
   assert.equal(approve.length, 1, "one Approve");
   // privacy audit (4 Nov): $25 is rounded up to the grid's $26 too (its rest stays hidden in the NEAR wallet)
-  assert.equal(approve[0]!.params.label, "Move $26.00 from your Safe · SOL $15.00 · ETH (RH) $10.00");
+  assert.equal(approve[0]!.params.label, "Move $26.00 from your Safe · SOL $15.00 · Robinhood $10.00");
   // the sheet's last line names where it ends (integration walk, 3 Nov), the app's words, never signed
   // audit H1: only what's true, never "privately" (an amount and time can still be matched)
-  assert.equal(approve[0]!.params.onward, "it goes on to your SOL and ETH (RH) wallets. The rest stays in Private.");
+  assert.equal(approve[0]!.params.onward, "it goes on to your SOL and Robinhood wallets. The rest stays in Private.");
   // D137: each leg goes on the moment the Add is in Trading, no gap
   await settle(); await s.f.refresh(); await s.f.refresh(); await settle(); await s.f.refresh();
   const outs = s.asked.filter((a) => a.method === "subwallet.float.out").map((a) => [a.params.chain, a.params.to]);

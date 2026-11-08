@@ -42,8 +42,10 @@ test("at the bottom, above the app row, never at the top; hidden while a sheet o
   assert.match(rule(".ah--bar .zf-notice"), /bottom: calc\(var\(--bar-h\) \+ env\(safe-area-inset-bottom, 0px\) \+ 8px\)/, "just above the app row, never over it");
   assert.match(base, /z-index: 26/, "over the page, under every sheet (45), the tray (40) and a Problem screen (46)");
   assert.match(css, /\.ah:has\(\.zf-sheet:not\(\[data-under\]\)\) \.zf-notice, \.ah:has\(\.ah-problem\) \.zf-notice \{ display: none; \}/, "a full-screen sheet says its own line");
-  assert.match(css, /\.ah--bar:has\(> \.zf-notice\) \.ah-page \{ --zf-safe-bottom: calc\(var\(--bar-h\) \+ env\(safe-area-inset-bottom, 0px\) \+ 62px\); \}/, "a page's end is never under it");
-  assert.match(rule(".zf-notice__line"), /white-space: nowrap; overflow: hidden; text-overflow: ellipsis/, "one line");
+  assert.match(css, /\.ah--bar:has\(> \.zf-notice\) \.ah-page \{ --zf-safe-bottom: calc\(var\(--bar-h\) \+ env\(safe-area-inset-bottom, 0px\) \+ 104px\); \}/, "a page's end is never under it, a wrapped card too (changed pin, after B3)");
+  // (changed pin, audit 11's B3, 8 Nov: the line wraps and is never cut mid-word; "one line" cut "Your money stays in your Safe.")
+  assert.match(rule(".zf-notice__line"), /white-space: normal;/, "it wraps");
+  assert.doesNotMatch(rule(".zf-notice__line"), /nowrap|overflow: hidden|text-overflow/, "never cut [before: nowrap; overflow: hidden]");
   assert.match(rule(".zf-notice__x"), /width: 44px; height: 44px/, "an × a finger can hit");
   const oldBanner = ".zf-status { position: absolute; left: 12px; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 6px); z-index: 43; }";
   assert.match(oldBanner, /(^|[;\s{])top:/, "control: the old banner at the top is caught by the same check");

@@ -30,6 +30,8 @@ test("T14: the facts start unknown, and Recovery and Quantum read them through t
   assert.match(src, /function RecoveryTab\(\{ account, actions, checkDue = null,/);
   // Your account's Recovery row: "Check" only when due; unknown is its plain name, never a tick
   const base = { web: false, quantumOn: true, protection: true, pending: false };
-  assert.equal(accountRowWords({ ...base, checkDue: null }).recovery.value, "Backup words");
+  // QA 16's S12: a state, never the row's name; not said yet: nothing
+  assert.equal(accountRowWords({ ...base, checkDue: null }).recovery.value, "");
+  assert.equal(accountRowWords({ ...base, checkDue: false }).recovery.value, "Written down");
   assert.equal(accountRowWords({ ...base, checkDue: true }).recovery.value, "Check");
 });

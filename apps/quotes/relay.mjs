@@ -23,6 +23,8 @@
 //   POST /v0/agentzero/job    {words}: AgentZero's rule box (agentzero.mjs). Claude reads one person's words into at
 //                             most one job's terms; the app's own origins only, 10 a minute per address. Signs nothing,
 //                             holds no wallet key, never logs or keeps the words (D76 amended, D78)
+//   POST /v0/agentzero/browse {input}: AgentZero's browser's next step (agentzero-browse.mjs, audit 14 E1), on the chat's
+//                             own paid path (token, AgentZero's wallet, the id's batch); prompt and schema fixed here
 //   POST /v0/agentzero/sim    {messages, today?}: AgentZero in the Sim (agentzero-sim.mjs, D157): Claude Sonnet 5.5 for
 //                             the Sim's real chat, free to the visitor; the web app's origins only, 6 a minute and
 //                             AGENTZERO_SIM_PER_IP_USD a day per address, AGENTZERO_SIM_DAILY_USD relay-wide; only on
@@ -437,13 +439,13 @@ function marketOf(url) {
 
 /** The email alerts' routes (alerts.mjs): /v0/alerts/<action>, rewritten as ?route=alerts&action=<action>. */
 /**
- * AgentZero's routes ("job", "signup", "chat", and with per-reply payment on "pay"), or null. Payment off, its path is
+ * AgentZero's routes ("job", "signup", "chat", "browse", and with per-reply payment on "pay"), or null. Payment off, its path is
  * not AgentZero's: it reaches the 404 it always did. (D152 dropped the $1 credit: its routes are gone.)
  */
 const agentZeroRoute = (url, pay = false) => {
   const r = url.searchParams.get("route") ?? url.pathname.replace(/^\/v0\//, "").replace("/", "-");
   if (pay && r === "agentzero-pay") return "pay";
-  return r === "agentzero-job" ? "job" : r === "agentzero-signup" ? "signup" : r === "agentzero-chat" ? "chat" : null;
+  return r === "agentzero-job" ? "job" : r === "agentzero-signup" ? "signup" : r === "agentzero-chat" ? "chat" : r === "agentzero-browse" ? "browse" : null;
 };
 /** AgentZero in the Sim (agentzero-sim.mjs): /v0/agentzero/sim, rewritten as ?route=agentzero-sim. */
 const isSim = (url) => (url.searchParams.get("route") ?? url.pathname.replace(/^\/v0\//, "").replace("/", "-")) === "agentzero-sim";
@@ -462,6 +464,8 @@ const ALERTS_MAX = 5;
 /** Audit H2: the relay's quotes for the UTC day are spent (QUOTES_RELAY_DAY); the app reads the code. */
 export const QUOTES_DAY_SPENT = "quotes.day.spent";
 export const QUOTES_DAY_LINE = "ZeroFee's quotes for today are used up. Nothing moved. Try again tomorrow.";
+/** A paid route this relay isn't set up for (a setting missing or not the app's): the person's words; the code says which. */
+export const SERVER_NOT_SET_UP = "ZeroFee's server isn't set up for this yet.";
 const problem = (status, code, whatHappened, extra = {}) => ({ status, body: { code, whatHappened, money: { state: "not-involved" }, next: { kind: "nothing", label: "OK" }, ...extra } });
 
 const FLOAT_ASSET = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
@@ -1057,14 +1061,18 @@ export function createRelay({ key, secret, origins, market = {}, helius, fastnea
         if (network > AGENTZERO_SIGNUPS_PER_NETWORK && !tester) return answer(problem(429, "quotes.rate.limited", "Too many sign-ups from here today."));
         return agentZero.signup(request, { answer, problem, light: network <= AGENTZERO_SIGNUPS_LIGHT_NETWORK });
       }
-      if (az === "pay" && !payReply && storeKeyUnset) return answer(problem(503, "agentzero.pay.store-key-unset", "AGENTZERO_STORE_KEY isn't set: per-reply payment stays off and nothing new is stored."));
-      if (az === "pay" && !payReply) return answer(problem(503, "agentzero.pay.receive-mismatch", "AGENTZERO_RECEIVE_ACCOUNT isn't the app's pinned receiving account: per-reply payment stays off."));
+      // audit 15 FQ1: a person reads whatHappened, so it never names a setting; which one is off is the code's (deploy.sh
+      // reads it; this relay writes no logs)
+      if (az === "pay" && !payReply && storeKeyUnset) return answer(problem(503, "agentzero.pay.store-key-unset", SERVER_NOT_SET_UP));
+      if (az === "pay" && !payReply) return answer(problem(503, "agentzero.pay.receive-mismatch", SERVER_NOT_SET_UP));
       if (az === "pay") return payReply(request, { answer, problem });
       if (az === "chat") {
         // AgentZero's chat (D122): Anthropic's stream relayed as events, with this request's own headers.
         const stream = (body) => new Response(body, { status: 200, headers: { "content-type": "text/event-stream", "cache-control": "no-store", "x-content-type-options": "nosniff", ...cors } });
         return agentZero.chat(request, { answer, problem, stream, ip });
       }
+      // AgentZero's browser (audit 14 E1): its next step, on the chat's own paid path
+      if (az === "browse") return agentZero.browse(request, { answer, problem, ip });
       return agentZero.job(request, { answer, problem });
     }
     const pairId = pairIdOf(url);

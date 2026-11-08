@@ -37,7 +37,7 @@ test("a wallet leg's plain throw in a money call (Check Activity): the next leg 
   assert.deepEqual(called.map((c) => c.m), ["spending.move"], "only the first leg was asked");
   const [t] = starting();
   assert.equal(t?.state, "failed");
-  assert.equal(t?.detail, `$10.00 from your SOL wallet to NEAR: ${UNKNOWN.whatHappened} $5.00 from your BNB wallet to NEAR didn't start. It's still in your BNB wallet. $4.00 from your ETH (RH) wallet to your Safe didn't start. It's still in your ETH (RH) wallet.`);
+  assert.equal(t?.detail, `$10.00 from your SOL wallet to NEAR: ${UNKNOWN.whatHappened} $5.00 from your BNB wallet to NEAR didn't start. It's still in your BNB wallet. $4.00 from your Robinhood wallet to your Safe didn't start. It's still in your Robinhood wallet.`);
   assert.doesNotMatch(t?.detail ?? "", /didn't go/);
 });
 

@@ -42,7 +42,7 @@ test("Sim re-check (5 Nov): Trade's done Buy of a Safe coin is one row, its swap
   assert.deepEqual(earlierOf([buy, sell, bad, meme], true).map((x) => x.id), [bad.id, meme.id]);
   assert.deepEqual(earlierOf([buy, sell], false).map((x) => x.id), [buy.id, sell.id], "control: no history, both cards");
   const src = readFileSync(new URL("../../trade/src/native/NativeScreens.tsx", import.meta.url), "utf8");
-  assert.match(src, /taskId: `native-\$\{side\}-/, "the Trade side names its Safe swaps this way");
+  assert.match(src, /taskId = ownRowJob\(`native-\$\{side\}-/, "the Trade side names its Safe swaps this way");
 });
 
 test("lap FAIL 4 (QA, 5 Nov: each trade listed twice, a task row under Earlier and a trade row under Trade): while Trade's own history is drawn, its done tasks leave Earlier (controls: Trade's history not drawn, they stay; a trade that didn't finish stays, it has no trade row)", () => {

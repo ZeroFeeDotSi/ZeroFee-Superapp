@@ -41,7 +41,7 @@ export function asksSend(words: string): boolean {
   return /\b(?:send|transfer)\b/i.test(words) && !NOT_A_SEND.test(words) && !readPayOnce(words) && !readRoutine(words);
 }
 
-const COIN_WORDS: Readonly<Record<string, HomeCoin>> = { SOL: "SOL", SOLANA: "SOL", ETH: "ETH", ETHER: "ETH", ETHEREUM: "ETH", NEAR: "NEAR", USDC: "USDC", BNB: "BNB" };
+const COIN_WORDS: Readonly<Record<string, HomeCoin>> = { SOL: "SOL", SOLANA: "SOL", ETH: "ETH", ETHER: "ETH", ETHEREUM: "ETH", NEAR: "NEAR", USDC: "USDC" };
 /** What the words say, read by our own code (the fields Claude would give the chat's send_money; sendSheet checks them
  *  against the same words). */
 export function sendFields(words: string): { to?: string; coin?: HomeCoin; usd?: number } {

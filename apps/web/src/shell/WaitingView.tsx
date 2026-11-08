@@ -11,6 +11,7 @@ import type { Bridge } from "@zerofee/core/bridge";
 import type { Problem } from "@zerofee/core/problem";
 import type { TxOutcome } from "@zerofee/core/signer";
 import { Mark } from "@zerofee/design/Mark.tsx";
+import { StepMark, type JobStep } from "@zerofee/design/JobTracker.tsx";
 import { Back } from "@zerofee/design/icons.tsx";
 import { More } from "@zerofee/design/More.tsx";
 import { useBack } from "@zerofee/design/back.ts";
@@ -164,8 +165,9 @@ export function WaitingView({ bridge, held, onClose, onOpen }: { bridge: Bridge;
         <div className="rc-center zf-enter">
           <Mark size={96} mode="loading" />
           <div className="zf-label" style={{ marginTop: 32 }}>Waiting</div>
-          <h1 id="held-title" className="zf-title" style={{ marginTop: 18 }}>Looking it up…</h1>
-          <p className="zf-body" style={{ marginTop: 14 }}>A payment or change is held. Finding it…</p>
+          <h1 id="held-title" className="zf-title" style={{ marginTop: 18 }}>Looking it up</h1>
+          <p className="zf-body" style={{ marginTop: 14 }}>{HELD_WORDS.held}</p>
+          <p className="zf-small" role="status" style={{ marginTop: 6 }}>{HELD_WORDS.finding}</p>
         </div>
         <div className="zf-fill" />
         <div className="zf-floor">
@@ -226,7 +228,17 @@ export function WaitingView({ bridge, held, onClose, onOpen }: { bridge: Bridge;
       </div>
       <div className="zf-fill" />
       <div className="zf-floor">
-        {phase && <p className="zf-small" role="status" style={{ textAlign: "center", margin: "0 0 10px" }}>{phaseWords(phase, item.change === true)}</p>}
+        {phase && (
+          <>
+            {/* builder 22's item 8: the tap's steps (the sheet, the person's yes, NEAR's transaction) and one clock */}
+            <ol className="zf-job__steps held-steps" aria-label="Steps">
+              {phaseSteps(phase, item.change === true).map((st) => (
+                <li key={st.key} className={`zf-job__step is-${st.state}`} data-step={st.key}><StepMark state={st.state} /><span className="zf-job__label">{st.label}</span><span /></li>
+              ))}
+            </ol>
+            <p className="zf-small" role="status" style={{ textAlign: "center", margin: "8px 0 10px" }}>{phaseWords(phase, item.change === true)}</p>
+          </>
+        )}
         {item.ready && !item.needsSecondDevice
           ? <button className="zf-btn" disabled={busy} onClick={() => act("account.waiting.run")}>{item.change ? "Finish it now" : "Send it now"}</button>
           : <button className="zf-btn" onClick={onClose}>Done</button>}
@@ -252,7 +264,29 @@ export { endsWords } from "../screens/countdown.ts";
 
 /** The status line under a tap on the Waiting screen: before the sheet, then after Approve. */
 export function phaseWords(phase: { run: boolean; approved: boolean }, change: boolean): string {
-  if (!phase.approved) return phase.run ? `Getting it ready to approve…` : "Getting the cancel ready for you to approve…";
-  if (!phase.run) return "Cancelling it…";
-  return change ? "Finishing it. This takes a few seconds…" : "Sending it…";
+  // audit 17's H11: the step, no ellipsis; builder 22's item 8: who does it and one clock (a NEAR transaction lands in
+  // about 2 s, the NEAR bar). Before Approve it is the person's turn next: no clock.
+  if (!phase.approved) return phase.run ? "Getting it ready for you to approve." : "Getting the cancel ready for you to approve.";
+  if (!phase.run) return HELD_WORDS.cancelling;
+  return change ? HELD_WORDS.finishing : HELD_WORDS.sending;
+}
+
+/** The held screen's own words (builder 22's item 8): who does each wait, with one clock. */
+export const HELD_WORDS = {
+  held: "A payment or change is held.",
+  /** account.waiting, looked up every LOOK_MS until the nodes list it. */
+  finding: `NEAR is finding it. About ${LOOK_MS / 1000} s.`,
+  sending: "NEAR is sending it. About 2 s.",
+  finishing: "NEAR is making the change. About 2 s.",
+  cancelling: "NEAR is cancelling it. About 2 s.",
+} as const;
+
+/** A tap's three steps on the held screen: the approval sheet, the person's yes, NEAR's transaction. */
+export function phaseSteps(phase: { run: boolean; approved: boolean }, change: boolean): JobStep[] {
+  const last = !phase.run ? "NEAR cancels it" : change ? "NEAR makes the change" : "NEAR sends it";
+  return [
+    { key: "sheet", label: "Your sheet opens", state: phase.approved ? "done" : "doing" },
+    { key: "approve", label: "You approve it", state: phase.approved ? "done" : "waiting" },
+    { key: "near", label: last, state: phase.approved ? "doing" : "waiting" },
+  ];
 }

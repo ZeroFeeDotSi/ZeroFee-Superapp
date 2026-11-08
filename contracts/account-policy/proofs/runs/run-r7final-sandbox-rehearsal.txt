@@ -1,4 +1,5 @@
-Release 7 final (Hackathon fafdad4, wasm 013ee2b5…b978, code hash 5s2Poz7T…CaXx1V), 30 Oct: bash tools/mainnet/rehearse.sh on the pinned near-sandbox 2.13.4 (292cbc73…eec). Commit: fafdad4a521d03ead9d86793a5970d4b9989c64e
+Names and labels rewritten for the public export; the results are unchanged.
+Release 7 final (the repo at fafdad4, wasm 013ee2b5…b978, code hash 5s2Poz7T…CaXx1V), 30 Oct: bash tools/mainnet/rehearse.sh on the pinned near-sandbox 2.13.4 (292cbc73…eec). Commit: fafdad4a521d03ead9d86793a5970d4b9989c64e
 0/4 the contract's release constants (built without short-waits: a day is the least delay)
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.03s
 1/4 sandbox near-sandbox (sha256 pinned) on 127.0.0.1:61450, home <tmp>

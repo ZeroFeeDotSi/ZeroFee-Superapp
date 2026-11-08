@@ -163,6 +163,10 @@ export interface Movement {
   held?: { id: string; readyAtIso: string; needsSecondDevice: boolean };
   /** The app that asked for it. ledger.movementUpdated reaches only that app and Wallet; other apps never see its label. */
   caller?: string;
+  /** M12-5 (8 Nov): the page's own key for the job that asked for it (ledger.toPrivate's `key`), made at the tap and kept
+   *  on the job's carry. A page reloaded before the core answered finds its job's movement in ledger.activity by it, so
+   *  the job ends as the movement ended, never "Check Activity". Optional; a call with no key (or a bad one) has none. */
+  jobKey?: string;
   /** Which key signed it, from the account's record: "This phone", "Your backup words", "Another device", … */
   by?: string;
   /** Paid from Private (D27): Activity says so. */
@@ -196,6 +200,9 @@ export interface Movement {
   minOut?: string;
   /** A swap in place: where it ran ("safe": the Safe's intents.near balance; "private": the NEAR wallet's). */
   source?: "safe" | "private";
+  /** A Safe Swap through NEAR Confidential (builder 15, 8 Nov): when its leg into Private read SUCCESS on 1Click's own
+   *  status, so its job's first step ("into Private") ticks on that read, and only then. */
+  inPrivateAtIso?: string;
   /** A Safe swap in place: the relay's tag for its deposit address, so 1Click's status says what arrived. Kept on this
    *  device only, never passed to an app (the ledger strips it). */
   statusTag?: string;

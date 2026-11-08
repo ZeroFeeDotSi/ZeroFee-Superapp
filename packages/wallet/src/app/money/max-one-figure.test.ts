@@ -22,9 +22,10 @@ test("the one figure: what one send pays at Max (maxSend), down to the cent; Hom
   const rest = withKept({ privateUsd: 25, elsewhereUsd: 120.1, stakedUsd: 0 }, readyUsd(SHOT.max, 1), ready);
   assert.equal(rest?.keptUsd, 75.46);
   const line = restStaysLine({ ...SHOT, max: can, rest })!;
-  assert.equal(line, "$25.00 more is in Private. $120.10 more is elsewhere in your Safe. $75.46 more stays with you, so this send is harder to trace.");
-  const parts = [...line.matchAll(/\$([\d,]+\.\d\d)/g)].map((m) => Number(m[1]!.replace(/,/g, "")));
-  assert.equal(Math.round((ready + parts.reduce((a, b) => a + b, 0)) * 100), 138560, "ready + the parts = Home's $1,385.60");
+  // QA 16's MUST 3 (b8's): one idea from the person's side, never three figures in one breath nor a privacy claim
+  assert.equal(line, "Your Safe holds $1,385.60 in USDC, $25.00 of it in Private. One send can't take it all.");
+  assert.equal(Math.round((ready + rest!.privateUsd + rest!.elsewhereUsd + (rest!.keptUsd ?? 0)) * 100), 138560, "ready + the parts = Home's $1,385.60, the figure the line says");
+  assert.doesNotMatch(line, /harder to trace|more is/);
   // "Up to $X can go in one send." says the one figure, so it is the From row's own and said once (partShown)
   const part = onePart("Up to $1,240.50 can go in one send.", "$1,165.04");
   assert.equal(part, "Up to $1,165.04 can go in one send.");

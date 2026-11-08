@@ -153,6 +153,8 @@ export interface WalletView {
   spending: SpendingStatus | null;
   spendingStale: "all" | string[];
   spendingAt: number | null;
+  /** Builder 22's item 3: when Trading last answered in full (kept or this read), stale or not: offline Hot says "As of". */
+  tradingAt: number | null;
   held: HeldCoin[] | null;
   nearCoins: NearCoin[] | null;
   wallets: SpendingWallet[] | null;
@@ -165,11 +167,28 @@ export interface WalletView {
   tradingUncounted: boolean;
   settled: boolean;
   complete: boolean;
+  /** Audit 11's B1 (8 Nov): the Safe's own parts are in (its balances, Earn's NEAR, Private): a chain that is down for Hot
+   *  never keeps the Safe's figure "Updating…". */
+  safeComplete?: boolean;
   /** The total as kept on this phone (shown at once while the parts are read). */
   lastTotal: string | null;
 }
 
 const NO_TOKENS = new Map<string, Token>();
+
+/** Audit 13's D7 (8 Nov): Solana down, Hot said "Can't see it now" twice for pump.fun and GMGN, read $27.47 minutes before,
+ *  and left them out of its number. A wallet that can't be read now shows its last read figure from the kept copy, with
+ *  that read's time (`asOf`), and counts as of then, as the Safe does with NEAR down (M12-3). Never read: unread, as before. Pure. */
+export function keptReads(fresh: SpendingWallet[] | null, kept: readonly SpendingWallet[] | undefined): SpendingWallet[] | null {
+  if (!fresh || !kept?.length || !fresh.some((w) => w.unread)) return fresh;
+  return fresh.map((w) => {
+    if (!w.unread) return w;
+    const k = kept.find((x) => x.id === w.id && !x.unread && typeof x.readAt === "number");
+    if (!k) return w;
+    const { unread: _u, readAt: _r, ...base } = w;
+    return { ...base, cashUsd: k.cashUsd, coinsUsd: k.coinsUsd, ...(k.holds ? { holds: k.holds } : {}), asOf: k.readAt! };
+  });
+}
 
 /**
  * One view of the money. With no copy and no kept answer it is the fresh reads exactly (what every money check uses);
@@ -179,7 +198,8 @@ const NO_TOKENS = new Map<string, Token>();
 export function viewOf(f: FreshReads, cache: HomeSnapshot | null, kept: { at: number; s: SpendingStatus } | null = null): WalletView {
   // each part not read yet this session is the copy's (home-keep.ts withCopy, loaded with the copy)
   const m = cache && loaded.keep ? loaded.keep.withCopy(f, cache) : f;
-  const { balances, chains, tokens, positions, pocket, held, wallets } = m;
+  const { balances, chains, tokens, positions, pocket, held } = m;
+  const wallets = keptReads(m.wallets, cache?.wallets);
   const live = m.tradingRead ? m.spending : null;
   const k = kept ?? cache?.spending ?? null;
   const { s: spending, stale } = withKept(live, k?.s ?? null);
@@ -191,9 +211,10 @@ export function viewOf(f: FreshReads, cache: HomeSnapshot | null, kept: { at: nu
   return {
     balances, balancesAt: m.balancesAt, chains: chains ?? [], tokens: tokens ?? NO_TOKENS, earning, pocket, spending, spendingStale: stale,
     spendingAt: stale === "all" || stale.length ? k?.at ?? null : null,
+    tradingAt: k?.at ?? null,
     // money between the Safe and the wallets is counted once, by the engine: its totalUsd holds a move on its way (an Add
     // until the wallets have it, a move home until it lands: trade float-core.ts inFlight, addsOnWay), so it is never added here
-    held, nearCoins: m.nearCoins, wallets, heldFailed: f.heldFailed, trading: parts ? parts.usd : null, tradingPartial, nearOwn, tradingUncounted: !!parts?.uncounted, settled, complete,
+    held, nearCoins: m.nearCoins, wallets, heldFailed: f.heldFailed, trading: parts ? parts.usd : null, tradingPartial, nearOwn, tradingUncounted: !!parts?.uncounted, settled, complete, safeComplete: settled && positions !== null && pocket !== null,
     lastTotal: cache?.total ?? null,
   };
 }

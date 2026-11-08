@@ -25,7 +25,7 @@ test("finding 65: 999999 on NEAR is not taken and says the most the Safe can giv
   const base = today(TESTER);
   const big = typeOp(TESTER, base, [], "near", 999999);
   assert.equal(big.over, true);
-  assert.equal(big.most, 500, "what the Safe can give, never SOL's or ETH (RH)'s");
+  assert.equal(big.most, 500, "what the Safe can give, never SOL's or Robinhood's");
   assert.equal(big.safeGives, 500);
   assert.equal(MOVE_WORDS.safeMost("$500"), "Your Safe can move at most $500 at once.", "the Copywriter's line");
   const held = typeOp(TESTER, today(TESTER), [], "sol", 999999);

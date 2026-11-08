@@ -19,6 +19,7 @@ import { WalletProvider, useWallet } from "../runtime.tsx";
 import { potsOf } from "./pots.ts";
 import { followSwap } from "./swap-follow.ts";
 import { codeGate, didntLoad } from "./code-gate.ts";
+import { chunkOffline, whenOnline } from "@zerofee/shell-api/chunk-reload.ts";
 import { later } from "../later.tsx";
 import { TEST_SHEETS, TEST_WORDS, testAccount } from "./dead-ends.ts";
 import { webWallet } from "@zerofee/shell-api/release.ts";
@@ -215,7 +216,10 @@ function useLater<T>(code: ReturnType<typeof codeGate<T>>) {
     if (!here) code.load().then((c) => live && setHere(() => c), () => live && setFailed(true));
     return () => { live = false; };
   }, [tries]);
-  return { here, failed: failed ? { retry: () => { setFailed(false); setTries((n) => n + 1); } } : null };
+  // offline (audit 12 C1): the sheet says so (didntLoad) and asks again by itself once the phone is back
+  useEffect(() => (failed && !here ? whenOnline(() => { setFailed(false); setTries((n) => n + 1); }) : undefined), [failed, here]);
+  // offline there is nothing to try (QA 16 on audit 12's C1 shot): no Try again; the sheet asks again by itself when back
+  return { here, failed: failed ? (chunkOffline() ? {} : { retry: () => { setFailed(false); setTries((n) => n + 1); } }) : null };
 }
 
 const addCode = codeGate(() => import("./AddSheet.tsx").then((m) => m.AddSheet));

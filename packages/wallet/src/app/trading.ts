@@ -17,7 +17,7 @@ const num = (x: string | undefined) => (x && /^\d+(\.\d+)?$/.test(x) ? Number(x)
 const engineAwayUsd = (s: SpendingStatus): number => Math.round((num(s.totalUsd) - num(s.reserveUsd) - s.networks.filter((n) => !n.closed).reduce((n, x) => n + num(x.cashUsd) + num(x.coinsUsd), 0)) * 100) / 100;
 
 /** A wallet Hot money goes to, as Move names it (move-split.ts WHERE). */
-export const MOVING_TO: Record<string, string> = { sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+export const MOVING_TO: Record<string, string> = { sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 
 /** Where a person's move on its way lands, by name; null: a leg the person never asked for (the engine's own rebalance or
  *  refill), never a row. Home (a put-away, the over-cap's return) and a site's wallet count too (D140, D128: a Move never

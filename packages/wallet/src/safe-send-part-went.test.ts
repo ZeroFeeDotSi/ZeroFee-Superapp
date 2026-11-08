@@ -123,3 +123,24 @@ for (const [name, tapped, opens] of [
     assert.deepEqual(went, opens);
   });
 }
+
+// K2 (audit 13, 8 Nov): a Send's key (SendSheet's `job`) is stamped on every movement the Safe's Send makes (Movement.jobKey,
+// kept on its ledger.activity rows), as ledger.toPrivate's (M12-5): a page reloaded before the answer finds the job by it.
+// Fails on main: the Send's movements carry no key.
+const SEND_KEY = "home-send-0123456789abcdef01234567";
+test("K2: a Send from the Safe keeps the page's key on each of its movements and their ledger.activity rows; a key of another shape is left off", async () => {
+  for (const pocketUnits of ["9000000", "2000000"]) {
+    const s = setup(pocketUnits, 9);
+    const r = await s.ledger.call<{ id: string; jobKey?: string }[]>("ledger.sendFromSafe", { tokenId: USDC, amount: "5", fill: true, job: SEND_KEY, to: { kind: "chain", chain: "sol", address: STRANGER_SOL } });
+    assert.ok("ok" in r, JSON.stringify(r));
+    assert.ok(r.ok.length >= 1);
+    for (const m of r.ok) assert.equal(m.jobKey, SEND_KEY, `pocket ${pocketUnits}: ${m.id}`);
+    const rows = await s.ledger.call<{ id: string; jobKey?: string }[]>("ledger.activity", { limit: 50 });
+    assert.ok("ok" in rows);
+    for (const m of r.ok) assert.equal(rows.ok.find((x) => x.id === m.id)?.jobKey, SEND_KEY, "on its activity row");
+  }
+  const bare = setup("9000000", 9);
+  const r = await bare.ledger.call<{ jobKey?: string }[]>("ledger.sendFromSafe", { tokenId: USDC, amount: "5", fill: true, job: "bad key!", to: { kind: "chain", chain: "sol", address: STRANGER_SOL } });
+  assert.ok("ok" in r, JSON.stringify(r));
+  assert.equal(r.ok[0]?.jobKey, undefined, "control: not a key's shape");
+});

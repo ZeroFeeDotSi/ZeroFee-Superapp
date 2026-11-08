@@ -1,5 +1,6 @@
-// Swap in place (intents-swap.ts): the Safe's swap is ONE mt_transfer inside intents.near (no withdraw, no ORIGIN_CHAIN
-// deposit, no bridge), the NEAR wallet's ONE intent; what arrived is the settled figure, never the quote's.
+// Swap in place (intents-swap.ts): the Safe's swap goes through NEAR Confidential only (product decision, 8 Nov: safe-send.ts
+// swapFromSafe, the Send's own two legs), never a public mt_transfer of its own; the NEAR wallet's ONE intent; what arrived
+// is the settled figure, never the quote's.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Bridge } from "@zerofee/core/bridge";
@@ -28,7 +29,13 @@ function setup(now: () => number = Date.now) {
     },
   } as unknown as Bridge;
   const asked: { dep: string; tag?: string }[] = [];
+  const through: { o: { from: string; to: string; units: bigint; least: bigint; key?: string }; caller: string }[] = [];
   const swaps = createIntentsSwap({
+    throughPrivate: async (o, caller) => {
+      through.push({ o, caller });
+      const at = new Date(now()).toISOString();
+      return { id: "safe-send:abc", kind: "swap", status: "moving", from: o.from, to: o.to, amount: "10", startedAtIso: at, updatedAtIso: at, explorerUrls: [], private: true, source: "safe", caller };
+    },
     bridgeFor: () => bridge,
     // 1Click: done on its second read, 2950 arrived (never the quote's 3000)
     status: async (dep, tag) => (asked.push({ dep, ...(tag ? { tag } : {}) }), asked.length >= 2 ? { status: "SUCCESS", amountOut: "2950" } : { status: "PROCESSING" }),
@@ -44,42 +51,39 @@ function setup(now: () => number = Date.now) {
     now, iso: () => new Date(now()).toISOString(),
     sleep: async () => undefined,
   });
-  return { swaps, calls, signed, dry, kept, asked };
+  return { swaps, calls, signed, dry, kept, asked, through };
 }
 const settle = () => new Promise((r) => setTimeout(r, 20));
 
-test("the Safe: one dry INTENTS quote, then ONE signed call: a single mt_transfer to the core's quote address; no withdraw, no ORIGIN_CHAIN", async () => {
+test("the Safe: one dry quote, then the job goes ONLY through NEAR Confidential (swapFromSafe: the units and the least shown), never a public mt_transfer of its own", async () => {
   const s = setup();
   const q = await s.swaps.swapQuote({ from: SWAP_USDC, to: NEAR, amountIn: "10", source: "safe" }, "trade");
   assert.match(q.feeNote, /^NEAR Intents prices it\. Fees about \$0\.05 \(0\.50%\)/, "the fee line names NEAR Intents, from the quote's own dollars");
   assert.equal(q.etaSeconds, 10, "1Click's own time");
-  assert.deepEqual([s.dry[0]!.depositType, s.dry[0]!.recipientType, s.dry[0]!.refundType, s.dry[0]!.recipient, s.dry[0]!.confidentiality], ["INTENTS", "INTENTS", "INTENTS", "kim.near", "basic"]);
-  const job = await s.swaps.swap({ quoteId: q.id }, "trade");
-  assert.equal(job.kind, "swap");
-  assert.equal(job.status, "moving", "the job at once");
-  const core = s.calls.find((c) => c.method === "subwallet.safeSwapQuote")!;
-  assert.deepEqual(core.params, { from: SWAP_USDC, to: NEAR, amount: "10000000", atLeast: "2970" }, "the core's own quote, held to the figure shown");
-  assert.equal(s.signed.length, 1, "one approval");
-  assert.equal(s.signed[0]!.length, 1, "one transaction");
-  const tx = s.signed[0]![0]!;
-  assert.equal(tx.receiverId, "intents.near");
-  assert.deepEqual(tx.actions.map((a) => (a as { method?: string }).method), ["mt_transfer"]);
-  assert.deepEqual((tx.actions[0] as { args: Record<string, unknown> }).args, { receiver_id: DEP, token_id: SWAP_USDC, amount: "10000000", approval: null });
-  const all = JSON.stringify([s.signed, s.dry, s.calls]);
-  assert.ok(!/ft_withdraw|ORIGIN_CHAIN|WITHDRAW_TO/.test(all), "no withdraw, no deposit from a chain, no bridge");
+  // the least said is what leg 2 can promise through Private: 99% of the market's least (leg 1 keeps 1Click's 1% room)
+  assert.equal(q.minOut, "0.00000000000000000000294", "2970 x 99/100 = 2940 units");
+  const job = await s.swaps.swap({ quoteId: q.id, key: "native-buy-1234567" }, "trade");
+  assert.deepEqual([job.kind, job.status, job.private, job.source], ["swap", "moving", true, "safe"], "the job at once, a Swap through Private");
+  assert.deepEqual(s.through.map((t) => [t.o.from, t.o.to, t.o.units, t.o.least, t.o.key, t.caller]), [[SWAP_USDC, NEAR, 10_000_000n, 2940n, "native-buy-1234567", "trade"]], "into Private, swapped there, back to the Safe: once");
+  assert.equal(s.signed.length, 0, "no transaction of its own (the Send legs sign it, one Face ID)");
+  assert.equal(s.calls.some((c) => c.method === "subwallet.safeSwapQuote"), false, "never the public swap's quote");
+  await assert.rejects(s.swaps.swap({ quoteId: q.id }, "trade"), (e: any) => e?.problem?.code === "ledger.quote.expired", "a quote is used once");
 });
 
-test("the Safe: done on 1Click's SUCCESS for ITS deposit address (with the quote's tag), amountOut 1Click's settled figure (not the quote's 3000)", async () => {
-  const s = setup();
-  const q = await s.swaps.swapQuote({ from: SWAP_USDC, to: NEAR, amountIn: "10", source: "safe" }, "wallet");
-  const job = await s.swaps.swap({ quoteId: q.id }, "wallet");
-  assert.equal(job.depositAddress, DEP);
-  await settle();
-  const done = s.kept.find((m) => m.status === "done")!;
-  assert.ok(done, "ended done");
-  assert.deepEqual(s.asked[0], { dep: DEP, tag: "tag-of-this-deposit-0001" }, "1Click's status for this swap's own address, with its tag");
-  assert.equal(done.amountOut, "0.00000000000000000000295", "1Click's swapDetails.amountOut, 2950 units, never the quoted 3000");
-  assert.ok(typeof done.settledMs === "number" && done.settledMs >= 0, "measured from the tap");
+test("the Safe with NEAR Confidential's path off (SAFE_SWAP_PRIVATE false, or no way through): refused by name before any price, nothing asked", async () => {
+  for (const d of [{ open: false }, { throughPrivate: undefined }]) {
+    const dry: unknown[] = [];
+    const swaps = createIntentsSwap({ ...(setupDeps(dry)), ...d } as never);
+    await assert.rejects(swaps.swapQuote({ from: SWAP_USDC, to: NEAR, amountIn: "10", source: "safe" }, "trade"), (e: any) => e?.problem?.code === "ledger.swap.not-yet");
+    assert.equal(dry.length, 0, "1Click never asked");
+  }
+});
+const setupDeps = (dry: unknown[]) => ({
+  bridgeFor: () => ({ call: async () => ({ problem: { code: "x", whatHappened: "x" } }) }) as never, status: async () => null, myAccount: async () => ({ accountId: "kim.near" }),
+  coin: async (t: string) => COINS[t] ?? null, ledgerBalance: async () => 50_000_000n, canChain: async () => true,
+  dryQuote: async (r: unknown) => (dry.push(r), { quote: { amountIn: "1", amountOut: "3000", minAmountOut: "2970" } }) as never,
+  signAll: async () => ({ txHash: "t", explorerUrls: [] }), approvals: (x: unknown) => x, remember: async () => undefined, follow: () => undefined,
+  now: Date.now, iso: () => new Date().toISOString(), throughPrivate: async () => { throw new Error("never"); },
 });
 
 test("the Safe swaps only coins it can also pay out with Face ID today (safeCanSell): an unlisted coin is refused before anything is asked, either way", async () => {
@@ -125,7 +129,7 @@ test("control: a pair the NEAR wallet can't swap in one intent is refused before
   const q = await s.swaps.swapQuote({ from: SWAP_USDC, to: NEAR, amountIn: "10", source: "safe" }, "wallet");
   await s.swaps.swap({ quoteId: q.id }, "wallet");
   await assert.rejects(s.swaps.swap({ quoteId: q.id }, "wallet"), "the same quote never pays twice");
-  assert.equal(s.signed.length, 1);
+  assert.equal(s.through.length, 1, "one job through Private");
 });
 
 // Privacy P7 (QA): the Safe's dry quote asks 1Click for a deadline on a 5-minute mark (quoteDeadline), never

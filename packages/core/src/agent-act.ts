@@ -27,7 +27,7 @@ export type ActPlace = (typeof ACT_PLACES)[number] | (typeof AGENT_ACT_PLACES)[n
 /** The places an act may name: AgentZero's own wallet only once its wallet is on; today's places until then. */
 export const actPlaces = (wallet: boolean): readonly ActPlace[] => (wallet ? AGENT_ACT_PLACES : ACT_PLACES);
 // D124/D128/D129: the product money words (Trading's cash is the NEAR wallet; every move is private, so no Hidden).
-const PLACE_NAME: Record<ActPlace | "safe", string> = { agent: "AgentZero's wallet", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet", spending: "your NEAR wallet", hidden: "your NEAR wallet", safe: "your Safe" };
+const PLACE_NAME: Record<ActPlace | "safe", string> = { agent: "AgentZero's wallet", sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet", bsc: "your BNB wallet", spending: "your NEAR wallet", hidden: "your NEAR wallet", safe: "your Safe" };
 const MAX_DAY_USD = ACT_MAX_USD;
 const SCOPE_KEY = "agent-act-scope"; // ACT_SCOPE_KEY below
 

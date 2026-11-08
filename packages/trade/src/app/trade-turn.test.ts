@@ -88,7 +88,8 @@ test("followTurn: follows the record by id while it is checking, calls the turn 
 test("the sheet and the list row hand every landed trade to followTurn, and the sheet's 1.6 s done never ends a turned task", () => {
   const sheet = readFileSync(new URL("./screens/TradeSheet.tsx", import.meta.url), "utf8");
   const disc = readFileSync(new URL("./screens/Discover.tsx", import.meta.url), "utf8");
-  assert.match(sheet, /followTurn\(svc, rec\.id, \(r, t\) => \{ turned = true; turnTask\(tasks, taskId, t, \{ taskAt, wallet: walletStep \}\);/);
+  // changed pin (S6, QA 16): the sheet's writes go through its job (withLead: a sale after its fee keeps that step first)
+  assert.match(sheet, /followTurn\(svc, rec\.id, \(r, t\) => \{ turned = true; turnTask\(job, taskId, t, \{ taskAt, wallet: walletStep \}\);/);
   assert.match(sheet, /setTimeout\(\(\) => \{ if \(turned\) return; /);
   assert.match(disc, /followTurn\(svc, rec\.id, \(_r, t\) => \{ turnTask\(tasks, taskId, t, \{ taskAt, wallet: walletStep \}\); onState\(\{ phase: t\.row\.phase, at, got, \.\.\.\(t\.row\.why \? \{ why: t\.row\.why \} : \{\}\) \}\); \}\);/);
 });

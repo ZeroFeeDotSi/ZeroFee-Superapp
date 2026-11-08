@@ -12,9 +12,9 @@ test("a new amount is quoted at once, unless a key was just typed (control: typi
 test("the button keeps the trade's words while it is checked; only offline, sending and a kept press say otherwise (controls)", () => {
   const base = { online: true, busy: false, queued: false, side: "buy" as const, label: "Buy $25 of DOPE" };
   assert.equal(buttonWords(base), "Buy $25 of DOPE");
-  assert.equal(buttonWords({ ...base, queued: true }), "Buying when it's checked…", "a press kept until the check ends");
-  assert.equal(buttonWords({ ...base, side: "sell", queued: true, label: "Sell $9.94 of DOPE" }), "Selling when it's checked…");
-  assert.equal(buttonWords({ ...base, busy: true }), "Sending…");
+  assert.equal(buttonWords({ ...base, queued: true }), "Buys once it's checked", "a press kept until the check ends");
+  assert.equal(buttonWords({ ...base, side: "sell", queued: true, label: "Sell $9.94 of DOPE" }), "Sells once it's checked");
+  assert.equal(buttonWords({ ...base, busy: true }), "Sending");
   assert.equal(buttonWords({ ...base, online: false }), "You're offline");
   // control: the old flip is gone from the sheet
   const sheet = readFileSync(new URL("./TradeSheet.tsx", import.meta.url), "utf8");

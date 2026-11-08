@@ -101,7 +101,17 @@ export function tokensHomeUses(tokens: Map<string, Token>, s: Pick<HomeSnapshot,
  * The copy to keep after a fresh read: each part this session read replaces the kept one; a part that didn't answer
  * keeps the copy's. Trading is kept only as a full answer (both chains read). The total only when complete.
  */
-export function nextSnapshot(f: FreshReads, was: HomeSnapshot | null, full: { at: number; s: SpendingStatus } | null, kid: boolean | null, total: string | null, activity?: Movement[] | null): HomeSnapshot {
+/** Audit 13's D7: each wallet as kept: a fresh read with its time; one that can't be read now keeps its last read figure
+ *  and that read's time, so Home can say it "as of" then. Pure. */
+export function keepReads(fresh: readonly SpendingWallet[], was: readonly SpendingWallet[] | undefined, now: number): SpendingWallet[] {
+  return fresh.map((w) => {
+    if (!w.unread) { const { asOf: _a, ...x } = w; return { ...x, readAt: now }; }
+    const last = was?.find((k) => k.id === w.id && !k.unread && typeof k.readAt === "number");
+    return last ?? w;
+  });
+}
+
+export function nextSnapshot(f: FreshReads, was: HomeSnapshot | null, full: { at: number; s: SpendingStatus } | null, kid: boolean | null, total: string | null, activity?: Movement[] | null, now: number = Date.now()): HomeSnapshot {
   const c: HomeSnapshot = was ?? { v: 1 };
   const s: HomeSnapshot = { v: 1 };
   const balances = f.balances && f.balancesAt ? { at: f.balancesAt, rows: f.balances } : c.balances;
@@ -122,7 +132,7 @@ export function nextSnapshot(f: FreshReads, was: HomeSnapshot | null, full: { at
     if (sp) s.spending = sp;
     const held = f.held ?? c.held;
     if (held) s.held = held;
-    const wallets = f.wallets ?? c.wallets;
+    const wallets = f.wallets ? keepReads(f.wallets, c.wallets, now) : c.wallets;
     if (wallets) s.wallets = wallets;
   }
   const t = total ?? c.total;

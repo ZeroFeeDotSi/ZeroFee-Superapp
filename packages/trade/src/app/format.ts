@@ -57,7 +57,7 @@ export function rowUsd(n: number): string {
 /** What a price under a millionth of a dollar reads (T2-3): never "$0.000000", never a dust price rounded up. */
 export const PRICE_FLOOR_WORDS = "under $0.000001";
 /** A coin's price (the copy review's walk, T2-3, 8 Nov: no subscript form anywhere: "$0.0" with a small 4 and "57" read as a typo): $1,000 and up with
- *  commas and cents, $10 and up cents, $1 to $10 up to four decimals, under $1 up to six decimals cut toward zero with
+ *  commas and cents, $1 and up cents (audit 17's H1), under $1 up to six decimals cut toward zero with
  *  trailing zeros dropped ("$0.000057", "$0.0007"), under $0.000001 "under $0.000001". Never exponent form. The list,
  *  the coin page's header and the receipt all read this one function. */
 export function price(n: number): string {
@@ -65,12 +65,15 @@ export function price(n: number): string {
   if (n >= 1000) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
   // $10 and up: cents, as every dollar figure reads (e2e walk 3 Nov: "$70.204")
   if (n >= 10) return `$${n.toFixed(2)}`;
-  if (n >= 1) return `$${n.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")}`;
+  // audit 17's H1: $1 and up reads to the cent, as money does ("$3.14", never "$3.1416"); more digits only under $1
+  if (n >= 1) return `$${n.toFixed(2)}`;
   if (n < 1e-6) return PRICE_FLOOR_WORDS;
   // six decimals, cut toward zero so a price never reads more than it is ("$0.0000569" is "$0.000056")
   const cut = Math.floor(n * 1e6 + 1e-9) / 1e6;
-  return `$${cut.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
+  return `$${atLeastCents(cut.toFixed(6))}`;
 }
+/** Trailing zeros go, never past the cents (audit 12's C4: "$3.7" reads "$3.70"; "$3.1416" stays). */
+const atLeastCents = (s: string): string => s.replace(/(\.\d\d\d*?)0+$/, "$1");
 /** A list row's price: the one price() (T2-3: the list's subscript form is gone). The name stays so the
  *  list rows, the coin page's header and the receipt keep reading one formatter. */
 export const listPrice = (n: number): string => price(n);

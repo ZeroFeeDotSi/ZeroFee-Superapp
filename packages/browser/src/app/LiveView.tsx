@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import type { Bridge } from "@zerofee/core/bridge";
-import { LIVE_ORIGINS, liveFrameUrl, liveLine, readTask, touchable } from "../agent/live.ts";
+import { LIVE_ORIGINS, NEVER_HERE, liveFrameUrl, liveLine, readTask, touchable } from "../agent/live.ts";
 import { OPEN_ON_IPHONE, forgetSite } from "../agent/phone.ts";
 import { useLiveSession } from "../agent/use-live-session.ts";
 import "./live.css";
@@ -49,7 +49,7 @@ export default function LiveView({ onClose }: { onClose: () => void }) {
           <button type="submit" className="zf-btn">Go</button>
         </form>
         {said && <p className="zf-note br-note" role="status">{said}</p>}
-        <p className="zf-small">AgentZero can sign in and read. It never trades here and never pays here.</p>
+        <p className="zf-small">{NEVER_HERE}</p>
       </div>
     );
   }

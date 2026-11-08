@@ -56,7 +56,7 @@ test("a Swap's receipt says \"Swapping\" while its job goes, \"swapped: about â€
     tasks.end("move:swap-1", "done");
     await runtime.settle();
     const landed = runtime.text();
-    assert.match(landed, /^\$10\.00\nJob created\.\n\$10\.00 swapped: about 0\.0952 SOL is in your SOL wallet\.\nIt goes through NEAR Confidential\.\nDone in (?:under a second|\d+ seconds?)\.\nDone\n?$/, "landed: the landed words and how long, whatever the machine's speed");
+    assert.match(landed, /^\$10\.00\nDone\.\n\$10\.00 swapped: about 0\.0952 SOL is in your SOL wallet\.\nIt went there through NEAR Confidential\.\nTook (?:under a second|\d+ s)\.\nDone\n?$/, "landed (M12-1): Done., the landed words, the past and how long it took, whatever the machine's speed");
   } finally { runtime.unmount(); }
 });
 
@@ -94,15 +94,15 @@ test("the audit's MUST, mounted: a going job's receipt keeps \"Sending\" while a
     await runtime.settle();
     const early = runtime.text();
     assert.match(early, /\nSending \$25\.00 to bob\.near\.\nIt goes through NEAR Confidential\.\nAbout 1 min left\.\nYou can close this\. It keeps going\.\n/, "A: its own words, going");
-    assert.doesNotMatch(early, /NEAR said no|Sent \$25|Done in/, "never B's stop words, never C's landing");
+    assert.doesNotMatch(early, /NEAR said no|Sent \$25|Done in|Took /, "never B's stop words, never C's landing");
     // A answered, its row going, still nothing of B's or C's
     row("send:a83-1", "Send $25.00 to bob.near"); a.made(["send:a83-1"]);
     await runtime.settle();
-    assert.doesNotMatch(runtime.text(), /NEAR said no|Sent \$25|Done in/);
+    assert.doesNotMatch(runtime.text(), /NEAR said no|Sent \$25|Done in|Took /);
     // control: A's own row lands
     tasks.end("send:a83-1", "done");
     await runtime.settle();
-    assert.match(runtime.text(), /\nSent \$25\.00 to bob\.near\.\n[\s\S]*Done in (?:under a second|\d+ seconds?)\./, "control: its own landing says Sent");
+    assert.match(runtime.text(), /\nSent \$25\.00 to bob\.near\.\n[\s\S]*Took (?:under a second|\d+ s)\./, "control: its own landing says Sent");
   } finally { runtime.unmount(); }
   try {
     const stopped = await shown({ amount: "$30.00", testid: "send-sent", etaSec: 60, said: "Sending $30.00 to carol.near.", landedSaid: "Sent $30.00 to carol.near.", job: b.id });

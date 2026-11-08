@@ -98,3 +98,22 @@ test("Move to your Safe, as it runs: made at the tap with no approval step, even
   assert.ok("refused" in second && second.refused.code === "shell.job.taken");
   assert.equal(called, 0);
 });
+
+test("rule 2 (b9, 8 Nov): no busy line with an ellipsis on Send, Swap, a site's Add, Private, Trade's button, its fee and Rhea lines, or its job cards (control: each screen still has its own button words)", () => {
+  const files: [string, RegExp][] = [
+    ["../money/SendSheet.tsx", /sayWent\(/],
+    ["../money/SwapSheet.tsx", /sayWent\(/],
+    ["../money/SiteMoney.tsx", /`Add \$\{usdText\(usd\)\}`/],
+    ["./Private.tsx", /to Private`/],
+    ["../../../../trade/src/app/screens/buy-button.ts", /"Sending"/],
+    ["../../../../trade/src/app/screens/TradeSheet.tsx", /Getting the fee ready/],
+    ["../../../../trade/src/app/job-cards.ts", /"Checking with Rhea"/],
+  ];
+  const BUSY = /Getting it ready…|"Moving…"|Moving…<|Getting a price…"|"Sending…"|when it's checked…|Getting the fee ready…|ready…<|NEAR to Rhea…|Checking with Rhea…/;
+  for (const [f, control] of files) {
+    const s = src(f);
+    const code = s.replace(/\/\*\*[^]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    assert.doesNotMatch(code, BUSY, `${f}: a state, never an ellipsis`);
+    assert.match(code, control, `control: ${f}`);
+  }
+});

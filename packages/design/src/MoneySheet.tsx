@@ -9,7 +9,7 @@
 // after AWAY_SLOW_MS it says so in one line. Whoever hosts the sheet makes closing safe: nothing it asked for answers it
 // after that, and nothing unsigned is signed (MoneyHost, core money-closed.ts).
 import { useEffect, useState, type ReactNode } from "react";
-import { SERVICES, SERVICE_NAMES, STATUS_LINKS } from "@zerofee/core/services";
+import { statusLinkOf } from "@zerofee/core/services";
 import { Sheet } from "./Sheet.tsx";
 import "./moneysheet.css";
 
@@ -112,12 +112,22 @@ export function MoneyAmount({ usd, onUsd, label, coin }: { usd: string; onUsd: (
 /** The one line on the screen the person came from: "Getting it ready…", then "Sent $5.00 to alex.near". */
 /** One quiet line on a sheet (B28): a service that failed or is down, by name, with where the money is. Never a screen
  *  and never a button: the app reads again by itself. */
+/** A sheet's problem (a service down, offline): ON TOP of the sheet, full width, its status link under it, never squeezed
+ *  beside it at the floor (builder 10's A4, builder 14's D4; audit 16 re-grade of b19's g3-solana-move). */
+export function SheetTop({ text, testid, offline = false }: { text: string | null | undefined; testid: string; offline?: boolean }) {
+  if (!text) return null;
+  const link = offline ? undefined : statusLinkOf(text);
+  return (
+    <div role={offline ? "status" : "alert"} data-testid={testid} className="zf-money__top" style={{ display: "grid", gap: 8, margin: "4px 0 16px" }}>
+      <p className="zf-body">{text}</p>
+      {link && <a className="zf-link" href={link} target="_blank" rel="noopener noreferrer" style={{ justifySelf: "start" }}>See their status</a>}
+    </div>
+  );
+}
+
 export function SheetLine({ text }: { text: string | null | undefined }) {
   if (!text) return null;
-  // B30: the service the line names gets its own status page, from the app's allow-list only (never a link from outside)
-  // the longest name first: "NEAR AI Cloud" before "NEAR" (review, Low)
-  const named = [...SERVICES].sort((a, b) => SERVICE_NAMES[b].length - SERVICE_NAMES[a].length).find((s) => text.startsWith(SERVICE_NAMES[s]));
-  const link = named ? STATUS_LINKS[named] : undefined;
+  const link = statusLinkOf(text);
   return (
     <p className="zf-small zf-money__line" role="status">
       <span className="zf-money__line-text">{text}</span>

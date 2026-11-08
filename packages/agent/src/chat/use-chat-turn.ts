@@ -17,7 +17,8 @@ import { memoryStore } from "../zero/memory.ts";
 import { chatStore, newChatId, type ChatMeta } from "./chats.ts";
 import { DEFAULT_CHOICE, modelStore } from "./model.ts";
 import type { SkillHands } from "./skills.ts";
-import { webTools } from "./tools.ts";
+import { phoneTools, webTools } from "./tools.ts";
+import { AGENT_BROWSER } from "@zerofee/shell-api/agent-browser.ts";
 import { LIMITS, Stopped, isTimedOut, timedOutLine, within, withinOr } from "./wait.ts";
 import { chatTurn, type ChatEvent, type ChatFact, type ChatHands, type ChatMessage, type ChatSheet, type NeedsKey, type StepState } from "./turn.ts";
 import { dropPlan, live, reopened, type Plan, type PlanTag, type StepEnd, type TaggedSheet } from "./plan.ts";
@@ -406,6 +407,8 @@ export function useChatTurn(bridge: Bridge, o: { relayBase?: string | null; acti
         const [ownKey, choice, , mail] = await Promise.all([OWN_KEY_ON && !o.sim ? secret(CHAT_SECRETS.ownKey) : null, models.known() ?? withinOr(models.get(), LIMITS.core, "This phone's store", DEFAULT_CHOICE, ctrl.signal), memoryRead, o.sim ? undefined : mailHands(bridge).catch(() => undefined)]);
         // the person's own key goes straight to Anthropic; without one, the relay's allowance event says which reading
         if (ownKey) setVia("own");
+        // E2: the phone offers "browse" only where AgentZero's browser is on (the flag the Browser reads too)
+        const phoneOffered = o.web ? null : phoneTools(AGENT_BROWSER);
         for await (const e of chatTurn(history.current, said_, {
           relayBase: relay,
           ownKey,
@@ -439,7 +442,7 @@ export function useChatTurn(bridge: Bridge, o: { relayBase?: string | null; acti
             skills,
             ...(mail ? { mail } : {}),
             // W7: the web wallet offers only the tools that work there (tools.ts webTools)
-            ...(o.web ? { offered: webTools(!!mail) } : {}),
+            ...(o.web ? { offered: webTools(!!mail), web: true } : phoneOffered ? { offered: phoneOffered, web: false } : {}),
           },
         })) {
           if (e.kind === "allowance") {

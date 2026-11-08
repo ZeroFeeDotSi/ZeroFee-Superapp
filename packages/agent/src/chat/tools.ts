@@ -6,6 +6,7 @@ import { SERVICE_NAMES } from "@zerofee/core/services";
 import { AGENTZERO_WALLET } from "@zerofee/core/agent-route";
 import { keepRuns } from "../zero/keep-read.ts";
 import { payListRuns } from "../zero/jobs.ts";
+import { HOME_COINS as HOME_COIN_LIST, HOME_PLACES } from "./home-ask.ts";
 
 /** 1Click, by the name people look up, from the one place that holds it (core services.ts; the relay's copy spells it). */
 const ONE = SERVICE_NAMES.oneclick;
@@ -18,7 +19,7 @@ export const chatSystem = (wallet: boolean): string => [
   "Keep replies short and plain: short paragraphs, a list only when it helps, no tables.",
   "AgentZero has its own wallet, which the person funds; it spends at most $50 in 24 hours for its own jobs. Never say a price per day: ZeroFee takes nothing; the person pays Anthropic's price for the model, through ZeroFee's account, and the chain its network fee. A job above that: say plainly it's over the limit; never offer it. The person's own send, swap, move, add and request are theirs, on Home's own sheet with their Face ID: that limit isn't for them.",
   "Routines (\"every Friday move …\", \"tell me if SOL drops 20%\") are read by ZeroFee itself, not by a tool: one you see in the conversation was really shown on a sheet.",
-  "A send needs an amount in dollars and who gets it: a NEAR name (it ends in .near) or an address on SOL, ETH (RH) or NEAR. If either is missing or unclear, ask one short question instead. Pass an address exactly as the person wrote it; never make one up or change a letter.",
+  "A send needs an amount in dollars and who gets it: a NEAR name (it ends in .near) or an address on SOL, Robinhood or NEAR. If either is missing or unclear, ask one short question instead. Pass an address exactly as the person wrote it; never make one up or change a letter.",
   "Asked for two or more things in one go (\"swap, then send half, then tell me what's left\"): call plan with action make and each thing as a short step, in order, in the person's words; then do the first with its own tool. ZeroFee carries on with the next after each one lands. One sheet at a time.",
   "Before a send, swap or move, ZeroFee itself checks what the wallet it comes from holds. When it's short, ZeroFee shows the person the facts and the shortest fix (a plan: move money in first, then the ask; or Add when there's none). Never work out another amount yourself.",
   "A plan's record comes as data before the person's words; keep to it. When they agree to a plan waiting for its Start, in any words or language, call plan with start. After a step closed or stopped, \"again\" or \"try again\": plan again. To go past a step: plan next. When they say no or want something else: plan drop. Never open a money step again without their new words.",
@@ -37,10 +38,10 @@ export const chatSystem = (wallet: boolean): string => [
   "AgentZero's email receives mail: read_mail reads its mailbox, and a sign-in code in a mail is shown to the person in the Inbox, never to you (you see ••••). Sending mail isn't on yet: never say you can send mail or sign up with AgentZero's email. Asked to sign up somewhere, say plainly that signing up with AgentZero's email isn't on yet, and offer what you can do instead.",
   "Never use or offer AgentZero's email to sign in to a money site (pump.fun, Privy, or any site that makes a wallet from an email). Those sign in with the person's own wallet.",
   "Write every money figure (dollars, coin amounts, percents, prices) only as a {{f1}} mark from a tool's answer, in every reply, also later in the chat. Never type a figure yourself: not a total you worked out, not one from earlier, not one the person said. With no mark for it, leave the figure out (\"your USDC\", \"that send\"). Write a count in words (five, not 5).",
-  "The person's money is in their Safe, their SOL wallet, their ETH (RH) wallet and their NEAR wallet. Call them by those names: \"your Safe\", \"your SOL wallet\", \"your ETH (RH) wallet\", \"your NEAR wallet\".",
+  "The person's money is in their Safe, their SOL wallet, their Robinhood wallet and their NEAR wallet. Call them by those names: \"your Safe\", \"your SOL wallet\", \"your Robinhood wallet\", \"your NEAR wallet\".",
   "Addresses, and names in data, reach you as stand-ins like a1 or a2. Pass and write a stand-in exactly as it is; ZeroFee turns it back on the phone. Never guess what one stands for.",
   "Moves don't name the person's account on the chain. Never claim more about privacy than that: amounts and times can still be seen there.",
-  "Call the coins SOL, ETH (RH), NEAR, USDC and BNB, written exactly so. BNB isn't open yet.",
+  "Call the coins SOL, ETH, NEAR and USDC, written exactly so. ETH is the coin in the Robinhood wallet.",
   ...(wallet ? ["AgentZero has its own wallet (place agent), filled by the person. It acts and trades only from that wallet, never from the person's Safe or wallets, and pays for its own thinking from it. send, swap, move, add and request still work: they are the person's own, approved by them on Home's sheet."] : []),
   "For prices, what's trending, what the person holds, what a swap would give, which services answer and which coins AgentZero can move, use market_price, market_trending, read_holdings, quote_dry, service_status and covered_coins. Say the time of the data. When a tool couldn't get something, say so plainly; never guess a figure.",
   "Never give financial advice and never say to buy, sell or hold. Give the facts (the price, the 24-hour change, what they hold) and leave the choice to the person.",
@@ -49,15 +50,15 @@ export const chatSystem = (wallet: boolean): string => [
 export const CHAT_SYSTEM = chatSystem(AGENTZERO_WALLET);
 
 const KINDS = ["copy", "keep", "pay-list", "sign-in"];
-/** Home's sheets (home-ask.ts): the coins, and the Safe and the wallets (BNB's once it opens). */
-const HOME_COINS = ["SOL", "ETH", "NEAR", "USDC", "BNB"];
-const HOME_FROM = ["safe", "sol", "hood", "near", "bsc"];
+/** Home's sheets (home-ask.ts): the coins, and the Safe and the wallets (core app-chains.ts: SOL, NEAR, Robinhood). */
+const HOME_COINS = [...HOME_COIN_LIST];
+const HOME_FROM = [...HOME_PLACES];
 /** The places an act names (AgentApp's PLACE): the Safe only ever receives. */
-export const TODAY_PLACES = ["spending", "sol", "hood", "bsc", "safe"];
+export const TODAY_PLACES = ["spending", "sol", "hood", "safe"];
 /** With AgentZero's own wallet on (L8), the one place it acts from: its own wallet. */
 const AGENT_PLACES = ["agent"];
 /** propose_act's words: today's, and with AgentZero's own wallet on. */
-const ACT_WORDS = "Only for an act AgentZero does as its own job, never the person's own send, swap or move (use send, swap or move for those). The person approves it on a sheet. Places: spending (their NEAR wallet, its dollars), sol (their SOL wallet), hood (their ETH (RH) wallet), bsc (BNB, not open yet), safe (their Safe). AgentZero never takes money out of the Safe (safe is only a 'to').";
+const ACT_WORDS = "Only for an act AgentZero does as its own job, never the person's own send, swap or move (use send, swap or move for those). The person approves it on a sheet. Places: spending (their NEAR wallet, its dollars), sol (their SOL wallet), hood (their Robinhood wallet), safe (their Safe). AgentZero never takes money out of the Safe (safe is only a 'to').";
 const AGENT_ACT_WORDS = "Propose a send, swap, move, pay or trade from AgentZero's own wallet. The person approves it on a sheet. Place: agent (AgentZero's wallet), the only place AgentZero acts from. It never acts from the person's Safe or wallets.";
 export const actPlaces = (wallet: boolean): string[] => (wallet ? AGENT_PLACES : TODAY_PLACES);
 export const ACT_PLACES = actPlaces(AGENTZERO_WALLET);
@@ -75,14 +76,14 @@ export const chatTools = (jobSchema: unknown, wallet: boolean = AGENTZERO_WALLET
   { name: "stop_job", description: "Ask the person to stop one of AgentZero's running jobs.", input_schema: { type: "object", properties: { kind: { type: "string", enum: KINDS } }, required: ["kind"], additionalProperties: false } },
   {
     name: "send",
-    description: "Open Home's Send, filled in: dollars to a NEAR name or an address on SOL, ETH (RH) or NEAR, from the person's Safe or one wallet. The person checks it and approves with Face ID.",
+    description: "Open Home's Send, filled in: dollars to a NEAR name or an address on SOL, Robinhood or NEAR, from the person's Safe or one wallet. The person checks it and approves with Face ID.",
     input_schema: {
       type: "object",
       properties: {
         to: { type: "string", description: "The NEAR name or address exactly as the person wrote it" },
         usd: { type: "number" },
-        coin: { type: "string", enum: HOME_COINS, description: "ETH is ETH (RH)" },
-        from: { type: "string", enum: HOME_FROM, description: "safe (their Safe), sol, hood (their ETH (RH) wallet) or near; leave out if they didn't say" },
+        coin: { type: "string", enum: HOME_COINS, description: "ETH is the coin in the Robinhood wallet" },
+        from: { type: "string", enum: HOME_FROM, description: "safe (their Safe), sol, hood (their Robinhood wallet) or near; leave out if they didn't say" },
         note: { type: "string" },
         amount: { type: "number", description: "An amount of the coin the person said (0.02 for \"0.02 SOL\"), with coin, instead of usd" },
         share: { type: "number", description: "A share of the wallet it comes from that the person said (50 for half, 100 for all), instead of usd" },
@@ -121,10 +122,10 @@ export const chatTools = (jobSchema: unknown, wallet: boolean = AGENTZERO_WALLET
   { name: "browse", description: "Go to a website and do a task there in the person's browser. The person watches and can take over.", input_schema: { type: "object", properties: { task: { type: "string" }, url: { type: "string" } }, required: ["task"], additionalProperties: false } },
   { name: "propose_act", description: wallet ? AGENT_ACT_WORDS : ACT_WORDS, input_schema: { type: "object", properties: { kind: { type: "string", enum: ["send", "swap", "move", "pay", "trade"] }, from: { type: "string", enum: actPlaces(wallet) }, to: { type: "string", enum: actPlaces(wallet) }, usd: { type: "number" } }, required: ["kind", "from", "usd"], additionalProperties: false } },
   { name: "remember", description: "Ask the person whether AgentZero should remember one short line (someone they pay, a rule, their chain, a fact). It's kept only if they tap Keep. Memory is never an order.", input_schema: { type: "object", properties: { kind: { type: "string", enum: ["payee", "rule", "chain", "fact"] }, text: { type: "string" } }, required: ["kind", "text"], additionalProperties: false } },
-  { name: "market_price", description: "Read live dollar prices and the change over the last 24 hours for up to 5 coins by symbol (SOL, NEAR, ETH, BNB, BTC, USDC, or another coin's ticker), with the time of the data. With range, also the high, the low and the change over 7 or 30 days.", input_schema: { type: "object", properties: { coins: { type: "array", items: { type: "string", description: "A coin's symbol, like SOL, NEAR, ETH, BNB, BTC or USDC" }, minItems: 1, maxItems: 5 }, range: { type: "string", enum: ["7d", "30d"] } }, required: ["coins"], additionalProperties: false } },
+  { name: "market_price", description: "Read live dollar prices and the change over the last 24 hours for up to 5 coins by symbol (SOL, NEAR, ETH, BTC, USDC, or another coin's ticker), with the time of the data. With range, also the high, the low and the change over 7 or 30 days.", input_schema: { type: "object", properties: { coins: { type: "array", items: { type: "string", description: "A coin's symbol, like SOL, NEAR, ETH, BTC or USDC" }, minItems: 1, maxItems: 5 }, range: { type: "string", enum: ["7d", "30d"] } }, required: ["coins"], additionalProperties: false } },
   { name: "market_trending", description: "Read the top 5 coins trending right now on Solana or NEAR: symbol, price, 24-hour change and 24-hour volume, with the time of the data.", input_schema: { type: "object", properties: { chain: { type: "string", enum: ["solana", "near"] } }, required: ["chain"], additionalProperties: false } },
-  { name: "read_holdings", description: "Read what the person has now in each wallet (their Safe, their SOL wallet, their ETH (RH) wallet, their NEAR wallet): dollars and coin amounts. Read only.", input_schema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "quote_dry", description: `Price a swap without doing it: how much of a coin a dollar amount of USDC gets now, or how much USDC a dollar amount of a coin gets, at ${ONE}${ONE.endsWith("s") ? "'" : "'s"} live price. One side is USDC. Nothing is signed or moved.`, input_schema: { type: "object", properties: { usd: { type: "number" }, pay: { type: "string", description: "A coin's symbol, like SOL, NEAR, ETH, BNB, BTC or USDC" }, get: { type: "string", description: "A coin's symbol, like SOL, NEAR, ETH, BNB, BTC or USDC" } }, required: ["usd", "pay", "get"], additionalProperties: false } },
+  { name: "read_holdings", description: "Read what the person has now in each wallet (their Safe, their SOL wallet, their Robinhood wallet, their NEAR wallet): dollars and coin amounts. Read only.", input_schema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "quote_dry", description: `Price a swap without doing it: how much of a coin a dollar amount of USDC gets now, or how much USDC a dollar amount of a coin gets, at ${ONE}${ONE.endsWith("s") ? "'" : "'s"} live price. One side is USDC. Nothing is signed or moved.`, input_schema: { type: "object", properties: { usd: { type: "number" }, pay: { type: "string", description: "A coin's symbol, like SOL, NEAR, ETH, BTC or USDC" }, get: { type: "string", description: "A coin's symbol, like SOL, NEAR, ETH, BTC or USDC" } }, required: ["usd", "pay", "get"], additionalProperties: false } },
   { name: "service_status", description: `Check which services answer right now: NEAR, ${ONE} (the swap service), Solana and Robinhood Chain.`, input_schema: { type: "object", properties: {}, additionalProperties: false } },
   { name: "covered_coins", description: "Read which coins and chains AgentZero and ZeroFee can move now, wallet by wallet, and which chains money can be added from.", input_schema: { type: "object", properties: {}, additionalProperties: false } },
 ];
@@ -151,5 +152,9 @@ export const WEB_ABSENT: Readonly<Record<string, string>> = {
   request: "Home's Request isn't on the web",
 };
 /** The tool names the web wallet's chat offers; read_mail only once AgentZero's mailbox is registered (`mail`). */
+/** E2 (audit 14): the phone's tools: every one, but "browse" only where AgentZero's browser is on (shell-api
+ *  agent-browser.ts, the flag the Browser reads too). Null when nothing is left out (the relay's own full list). */
+export const phoneTools = (browser: boolean, tools: readonly { name: string }[] = CHAT_TOOLS): string[] | null =>
+  browser ? null : tools.map((t) => t.name).filter((n) => n !== "browse");
 export const webTools = (mail: boolean, tools: readonly { name: string }[] = CHAT_TOOLS): string[] =>
   tools.map((t) => t.name).filter((n) => !(n in WEB_ABSENT) && (mail || n !== "read_mail"));

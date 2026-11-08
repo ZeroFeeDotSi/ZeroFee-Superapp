@@ -33,8 +33,14 @@ export const clockWords = (at: number, locale?: string): string => shortTime(at,
 /** "Checked 8:15 am": the row's time as a screen reader says it. */
 export const checkedWords = (at: number, locale?: string): string => `Checked ${clockWords(at, locale)}`;
 
-/** The sheet's first line: what the app uses when nothing is wrong. */
-export const usingDefault = (relay: boolean): string => (relay ? `Using ${SERVICE_NAMES.relay}` : "Using each service's public servers");
+/** The sheet's first line: what the app uses now. Audit 11's B12 (8 Nov): it agrees with the rows under it ("Using ZeroFee's
+ *  server" stood over "ZeroFee's server · Partly down" and "Chain servers · Down"): ZeroFee's server down, each service's
+ *  public servers; its chain doors down, the chains' public servers; else ZeroFee's server. */
+export const usingDefault = (relay: boolean, rows: readonly Pick<StatusRow, "id" | "state" | "doors">[] = []): string => {
+  const own = rows.find((r) => r.id === "relay");
+  if (!relay || own?.state === "down") return "Using each service's public servers";
+  return own?.doors?.chains === "down" ? "Using public servers for the chains" : `Using ${SERVICE_NAMES.relay}`;
+};
 
 /** Whose public servers a row went to when ZeroFee's server didn't answer for it (or this build has none). */
 const PUBLIC_OF: Partial<Record<StatusId, string>> = { near: "NEAR", solana: "Solana", hood: "Robinhood Chain", price: "CoinGecko" };
@@ -50,14 +56,15 @@ export function usingLine(row: StatusRow, relay: boolean): string | null {
 }
 export const USING_OWN = "Using your server";
 
-/** Down: what waits and what still works, in the banner's own words. */
+/** Down: what can't go now and what still works, in the banner's own words. */
 export const DOWN_WORDS: Record<StatusId, string> = {
   relay: `${SERVICE_EFFECTS.relay.blocks} ${SERVICE_EFFECTS.relay.works}`,
   near: `${SERVICE_EFFECTS.near.blocks} ${SERVICE_EFFECTS.near.works}`,
   solana: `${SERVICE_EFFECTS.solana.blocks} ${SERVICE_EFFECTS.solana.works}`,
-  hood: `${SERVICE_NAMES.hood} sends and trades wait. ${SERVICE_EFFECTS.hood.works}`,
+  hood: `${SERVICE_NAMES.hood} sends and trades can't go now. ${SERVICE_EFFECTS.hood.works}`,
   price: `${SERVICE_EFFECTS.gecko.blocks} ${SERVICE_EFFECTS.gecko.works}`,
   oneclick: `${SERVICE_EFFECTS.oneclick.blocks} ${SERVICE_EFFECTS.oneclick.works}`,
+  confidential: `${SERVICE_EFFECTS.confidential.blocks} ${SERVICE_EFFECTS.confidential.works}`,
   jupiter: "Some Solana coins can't be traded. Money still moves.",
   agentzero: `${SERVICE_EFFECTS.nearai.blocks} ${SERVICE_EFFECTS.nearai.works}`,
 };
@@ -73,10 +80,11 @@ export function rowLines(row: StatusRow, relay: boolean): string[] {
 }
 
 /** Partly down (the relay answers, its chain doors don't): what the app did instead, and that money still moves. */
-export const PARTLY_WORDS = "Each chain uses its own public servers for now. Money still moves.";
+/** (B12: "Money still moves" only where it does: a chain that is down says what waits on its own row) */
+export const PARTLY_WORDS = "Each chain uses its own public servers for now.";
 
 /** The sheet's line while the first look runs, and when it couldn't run (ZeroFee's code didn't load). */
-export { SUMMARY_CHECKING as CHECKING, SUMMARY_NOT_CHECKED as NOT_CHECKED } from "./status-summary.ts";
+export { CHECKING_LINE as CHECKING, SUMMARY_NOT_CHECKED as NOT_CHECKED } from "./status-summary.ts";
 export const NOT_CHECKED_LINE = "ZeroFee's code didn't load, so nothing was checked. Close and open Status to try again.";
 
 export type { StatusReport };

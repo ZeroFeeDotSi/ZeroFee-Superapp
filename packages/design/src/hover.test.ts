@@ -44,7 +44,7 @@ test("ui.css carries the hover rule set under the hover media query, for the sha
   }
   assert.match(block, /--hover-film: color-mix\(in srgb, var\(--ink\) 6%, transparent\)/, "the film is 6 % ink, a token mix, no new colour");
   assert.match(block, /\.zf-btn:hover:not\(:disabled\):not\(\.zf-btn--quiet\):not\(\.is-busy\) \{ filter: brightness\(1\.06\); \}/, "the lit button brightens (a16: 1.04 did not show)");
-  assert.match(block, /\.wl-buy:hover:not\(:disabled\) \{ background-image: linear-gradient\(color-mix\(in srgb, var\(--bg\) 14%, transparent\)/, "Home's ink Buy pill takes a film in the ground's colour");
+  assert.match(block, /\.wl-buy:hover:not\(:disabled\) > span \{ background-image: linear-gradient\(color-mix\(in srgb, var\(--bg\) 14%, transparent\)/, "Home's ink Buy pill takes a film in the ground's colour");
   assert.match(block, /\.wl-act:hover:not\(:disabled\) \.wl-act__dot \{ background-image: linear-gradient\(var\(--hover-film\), var\(--hover-film\)\); \}/, "Home's action discs take the film");
   assert.match(block, /transition-duration: var\(--dur-fast\); transition-timing-function: var\(--ease-out\);/, "the shared timing");
   assert.equal(bareHovers(css).length, 0, "ui.css has no bare :hover");

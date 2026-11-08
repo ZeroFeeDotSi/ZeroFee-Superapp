@@ -250,7 +250,7 @@ test("a price that never answers: it counts the seconds and says \"1Click didn't
     // the move itself hangs (1Click's quote inside it never answers): after 5 s the sheet says so, and Close still closes
     runtime.press(/^Add \$/);
     await settled();
-    assert.ok(/Getting it ready…/.test(runtime.text()), "the move is getting ready");
+    assert.ok(!/Getting it ready…/.test(runtime.text()), "rule 2 (b9): no waiting button while the move is made");
     assert.ok(!runtime.text().includes(consts.AWAY_SLOW_LINE), "control: not at once");
     await wait(5_000);
     assert.ok(runtime.text().includes(consts.AWAY_SLOW_LINE), runtime.text());

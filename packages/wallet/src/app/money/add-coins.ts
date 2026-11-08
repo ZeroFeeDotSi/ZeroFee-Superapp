@@ -22,7 +22,7 @@ export interface AddRow {
 }
 export const ADD_ROWS: readonly AddRow[] = [
   { chain: "sol", symbol: "SOL", name: "SOL", icon: "sol", network: "Solana" },
-  { chain: "hood", symbol: "ETH", name: "ETH (RH)", icon: "eth", badge: "hood", network: "Robinhood Chain" },
+  { chain: "hood", symbol: "ETH", name: "Robinhood", icon: "eth", badge: "hood", network: "Robinhood Chain" },
   { chain: "near", symbol: "NEAR", name: "NEAR", icon: "near", network: "NEAR" },
   { chain: "bsc", symbol: "BNB", name: "BNB", icon: "bsc", network: "BNB Chain" },
 ];
@@ -255,7 +255,7 @@ export function untilWords(iso: string, nowMs: number = Date.now()): string {
 /** Our rows' own coins, in Home's order: the chain in 1Click's list, and the row's name (Swap's list). */
 export const ROW_COINS: readonly { chain: string; symbol: string; row: string; network?: "sol" | "hood" | "bsc" }[] = [
   { chain: "sol", symbol: "SOL", row: "SOL", network: "sol" },
-  { chain: "hood", symbol: "ETH", row: "ETH (RH)", network: "hood" },
+  { chain: "hood", symbol: "ETH", row: "Robinhood", network: "hood" },
   { chain: "near", symbol: "NEAR", row: "NEAR" },
   { chain: "bsc", symbol: "BNB", row: "BNB", network: "bsc" },
 ];

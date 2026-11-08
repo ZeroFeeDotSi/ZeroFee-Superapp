@@ -23,7 +23,7 @@ test("control: set-up ok, or the person said no: no line", async () => {
   assert.equal(await fundTap(async () => ({ ok: true })), null);
   assert.equal(await fundTap(async () => ({ declined: true })), null);
 });
-test("the card: the tapped amount says Opening… at once, the others wait, the line is an alert above the amounts; the chat hands the result back", () => {
+test("the card: the tapped amount says Opening at once, the others wait, the line is an alert above the amounts; the chat hands the result back", () => {
   const card = readFileSync(new URL("./AgentWallet.tsx", import.meta.url), "utf8");
   const fund = card.slice(card.indexOf("export function FundCard("), card.indexOf("/** The one line above the box"));
   assert.match(fund, /setBusy\(usd \?\? "other"\);\s*setLine\(null\);\s*const said = await fundTap/, "busy is set before set-up starts");

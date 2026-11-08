@@ -59,6 +59,10 @@ export interface ChainView {
   closed?: true;
   /** A wallet on it has no figure (its read failed, none before it): its dollars are unread, never $0. */
   unread?: true;
+  /** When its wallets last answered (all of them): the time a kept figure is from (audit 18, S18-4). */
+  readAt?: number;
+  /** A wallet on it didn't answer now: its figure is the last one read, as of `readAt`. */
+  kept?: true;
   wallets: WalletView[];
 }
 export type MoveKind = "add" | "out" | "in" | "home";

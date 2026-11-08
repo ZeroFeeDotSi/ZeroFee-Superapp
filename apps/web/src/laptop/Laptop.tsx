@@ -2,7 +2,7 @@
 // code the phone scans and the key's fingerprint; once paired, what the account's rules are holding for its yes, read
 // from the chain in the phone's own words, and its own approval sheet for each answer. It never holds money and never
 // sees the phone's key.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BridgeResult } from "@zerofee/core/bridge";
 import type { PlainWords } from "@zerofee/core/signer";
 import type { Problem } from "@zerofee/core/problem";
@@ -18,9 +18,9 @@ import { LAPTOP_SAME_BROWSER, MAINNET, laptopRefusedHere, laptopVaultName } from
 import { requireActivation } from "../unlock/activation.ts";
 import { browserDevice } from "../unlock/device.ts";
 import { LaptopRequestList, SAID_YES } from "./RecoveryRequest.tsx";
-import { withinDeadline } from "./laptop-load.ts";
+import { keptLines, pollOutcome, withinDeadline } from "./laptop-load.ts";
 import { Loading } from "./LaptopLoading.tsx";
-import { LAPTOP_START } from "../unlock/laptop-lock-words.ts";
+import { LAPTOP_START, LAPTOP_PAIR } from "../unlock/laptop-lock-words.ts";
 import type { TxOutcome } from "@zerofee/core/signer";
 import "./laptop.css";
 
@@ -92,9 +92,20 @@ function LaptopPage() {
     }
     return res.ok;
   };
+  // FL3: once the page has shown its state, a poll NEAR doesn't answer keeps it (and any open sheet), with its time
+  const shown = useRef(false);
+  const [lastRead, setLastRead] = useState<number | null>(null);
+  const [late, setLate] = useState(false);
+  const poll = <T,>(res: BridgeResult<T>): T | null => {
+    const o = pollOutcome(res, shown.current);
+    if ("ok" in o) return o.ok;
+    if ("late" in o) setLate(true);
+    else setProblem(o.problem);
+    return null;
+  };
   const refresh = async () => {
     // a read that never answers ends as "NEAR didn't answer" with Try again (laptop-load.ts), never an endless mark
-    const s = take(await withinDeadline(() => core.call<State>("secondDevice.state")));
+    const s = poll(await withinDeadline(() => core.call<State>("secondDevice.state")));
     if (!s) return;
     // Just added (D9): said at once, by name, so the laptop never still says "Scan this" after the phone's yes.
     setState((before) => {
@@ -103,9 +114,13 @@ function LaptopPage() {
       return s;
     });
     if (s.accounts.length) {
-      const w = take(await core.call<Waiting[]>("secondDevice.requests"));
-      if (w) setWaiting(w);
+      const w = poll(await withinDeadline(() => core.call<Waiting[]>("secondDevice.requests")));
+      if (!w) return;
+      setWaiting(w);
     }
+    shown.current = true;
+    setLate(false);
+    setLastRead(Date.now());
   };
   const [added, setAdded] = useState<string | null>(null);
   const unpaired = !state || state.accounts.length === 0;
@@ -139,16 +154,17 @@ function LaptopPage() {
   return (
     <div className="lp">
       <header className="lp-top"><Mark size={28} mode="still" /><span className="zf-label" style={{ color: "var(--ink)" }}>ZeroFee on this laptop</span></header>
+      {late && lastRead !== null && <div className="lp-late" role="status" data-testid="laptop-late">{keptLines(lastRead).map((l) => <p key={l} className="zf-small">{l}</p>)}</div>}
       {!paired ? (
         <main className="lp-main lp-center zf-enter">
-          <h1 className="zf-title">Scan this with your main device</h1>
+          <h1 className="zf-title">{LAPTOP_PAIR.scan}</h1>
           <p className="zf-body" style={{ marginTop: 10, maxWidth: 380 }}>{LAPTOP_START.pairOn}</p>
-          <More label="What this laptop will do" lines={["Payments above the amount you choose there need its yes too.", "So does moving your account to a new device."]} />
+          <More label="What this laptop will do" lines={LAPTOP_PAIR.willDo} />
           <div className="lp-qr" data-code={state.code}><QrCode value={state.code} size={740} label="Pairing code" /></div>
-          <button className="zf-link" style={{ marginTop: 10 }} onClick={copyCode}>{copied ? "Copied" : "Or copy the code and paste it on your main device"}</button>
+          <button className="zf-link" style={{ marginTop: 10 }} onClick={copyCode}>{copied ? "Copied" : LAPTOP_PAIR.copy}</button>
           <div className="zf-label" style={{ marginTop: 22 }}>This laptop's key</div>
           <div className="lp-fp">{state.fingerprint}</div>
-          <p className="zf-small" style={{ marginTop: 8 }}>Your main device shows these letters too. If they differ, stop.</p>
+          <p className="zf-small" style={{ marginTop: 8 }}>{LAPTOP_PAIR.letters}</p>
           <p className="zf-small" role="status" style={{ marginTop: 14 }}>This page updates by itself once you approve.</p>
         </main>
       ) : (
@@ -161,9 +177,10 @@ function LaptopPage() {
           {open.length === 0 && <p className="zf-small" style={{ marginTop: 10 }}>Nothing right now. This page checks every 15 seconds.</p>}
           <LaptopRequestList requests={open} busy={busy} onAnswer={(accountId, id, approve, freeze) => void answer(accountId, id, approve, freeze)} />
           <p className="zf-small" style={{ marginTop: 30 }}>This laptop only says yes or no.</p>
-          <More label="What it answers" lines={["What your main device asks. Also any move of your account to a new device.", "It can't start a payment or change your rules."]} />
+          <More label="What it answers" lines={LAPTOP_PAIR.answers} />
         </main>
       )}
+      <p className="zf-small lp-soon" data-testid="laptop-soon">{LAPTOP_START.soon}</p>
       {sheet && (
         <div className="lp-sheet">
           <ApprovalSheetView key={sheet.id} id={sheet.id} words={sheet.words} onAnswer={(approve) => { void core.call("approval.answer", { id: sheet.id, approve }); setSheets((q) => q.filter((x) => x.id !== sheet.id)); }} />

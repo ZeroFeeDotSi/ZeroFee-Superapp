@@ -9,7 +9,7 @@ import { Inbox } from "./Inbox.tsx";
 import { AppFrame, PushedFrame, useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { MODE } from "../mode.ts";
 import { webWallet } from "@zerofee/shell-api/release.ts";
-import { OPEN_MODELS_LINE, registerMailbox } from "./az-web.ts";
+import { registerMailbox } from "./az-web.ts";
 import { AzMark, type MarkMood } from "./AzMark.tsx";
 // the Sim's chat (D157): the real engine on the Sim's bridge, loaded with this tab (never in Home's first load)
 const SimChat = lazy(() => import("./SimChat.tsx").then((m) => ({ default: m.SimChat })));
@@ -66,8 +66,7 @@ function ChatRoot() {
   const m: Menu = { menu: menu && section === "chat", onMenu: setMenu, onJobs: () => setSection("settings"), onMood: setMood };
   const chatShown = section === "chat";
   // the chat stays mounted under the other sections, so a reply in progress is never lost
-  // W7 (product decision, 5 Nov): the page's one line on the models, above the chat (words via the copy review)
-  const thread = <div hidden={section === "settings" || !chatShown} style={{ height: "100%", flexDirection: "column", ...(section === "settings" || !chatShown ? {} : { display: "flex" }) }}><p className="zf-small azc-note azc-models">{OPEN_MODELS_LINE}</p><div style={{ flex: 1, minHeight: 0 }}>{SAMPLE ? <Suspense fallback={<p className="zf-small azc-note">Opening…</p>}><SimChat shown={chatShown} {...m} /></Suspense> : !liveHere() ? <WebSoon /> : <Suspense fallback={<p className="zf-small azc-note">Opening…</p>}><LiveChat shown={chatShown} {...m} /></Suspense>}</div></div>;
+  const thread = <div hidden={section === "settings" || !chatShown} style={{ height: "100%", flexDirection: "column", ...(section === "settings" || !chatShown ? {} : { display: "flex" }) }}><div style={{ flex: 1, minHeight: 0 }}>{SAMPLE ? <Suspense fallback={null}><SimChat shown={chatShown} {...m} /></Suspense> : !liveHere() ? <WebSoon /> : <Suspense fallback={null}><LiveChat shown={chatShown} {...m} /></Suspense>}</div></div>;
   return (
     <div className="azc-app">
       <AppFrame name="AgentZero" top={<AzMark mood={chatShown ? mood : "rest"} shown={active !== false && section !== "settings"} />} tray={sections} tab={section === "settings" ? "chat" : section} onTab={(t) => setSection(t)} menu={{ label: "Menu", open: () => (setSection("chat"), setMenu(true)) }}>
@@ -75,7 +74,7 @@ function ChatRoot() {
         {section === "inbox" && inboxShown(address) && <Inbox bridge={bridge} />}
       </AppFrame>
       {/* Jobs and limits over the chat, with Back (the chat stays mounted under it) */}
-      {section === "settings" && <div className="azc-pushed"><PushedFrame name="Jobs and limits" onBack={() => setSection("chat")}><Suspense fallback={<p className="zf-small azc-note">Opening…</p>}><AgentZeroSettings bridge={bridge} /></Suspense></PushedFrame></div>}
+      {section === "settings" && <div className="azc-pushed"><PushedFrame name="Jobs and limits" onBack={() => setSection("chat")}><Suspense fallback={null}><AgentZeroSettings bridge={bridge} /></Suspense></PushedFrame></div>}
     </div>
   );
 }

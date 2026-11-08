@@ -49,6 +49,9 @@ import type { Candle } from "../../market/types.ts";
 
 /** wallet v1's ranges: LIVE (the last hour, the price now on its newest candle), then a day to everything it has traded. */
 const RANGES: [Range, string][] = [["1H", "LIVE"], ["1D", "1D"], ["1W", "1W"], ["1M", "1M"], ["1Y", "1Y"], ["ALL", "ALL"]];
+/** Audit 11's B10 (8 Nov, rule 2): a trade on its way on the coin page says what it does and its time, no ellipsis, no
+ *  spinner: "Selling · under a second" (Solana), "Buying · under 2 seconds" (NEAR, Robinhood, BNB: rule 3's bar). */
+export const goingWords = (kind: string, chain: string): string => `${kind === "sell" ? "Selling" : "Buying"} · ${chain === "sol" ? "under a second" : "under 2 seconds"}`;
 /** The range tabs' words: with recorded prices (?demo) the first is "1H", never "LIVE" (grade 30 Oct, item 3). */
 export const rangeTabs = (recorded: boolean): [Range, string][] => (recorded ? RANGES.map(([r, l]) => [r, r === "1H" ? "1H" : l]) : RANGES);
 /** The coin's page on a known explorer, built from its address alone (never a link from the coin's own data). */
@@ -105,7 +108,8 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
   }, [active, market, range, seed.chain, seed.address]);
   const held = useLive(() => svc.held(seed.chain, seed.address).catch(() => "0"), [seed.chain, seed.address]);
   // a trade of this coin on its way (the sheet stepped aside for Face ID): Buy says so until it lands
-  const sending = useLive(() => svc.activity().then((rs) => rs.some((r) => r.chain === seed.chain && r.coin === seed.address && (r.status === "sending" || r.status === "confirming") && Date.now() - r.startedAt < 120_000)), [seed.chain, seed.address]).value;
+  // the trade on its way on this coin, by its kind (audit 11's B10: the button says what it does and how long, no spinner)
+  const sending = useLive(() => svc.activity().then((rs) => rs.find((r) => r.chain === seed.chain && r.coin === seed.address && (r.status === "sending" || r.status === "confirming") && Date.now() - r.startedAt < 120_000)?.kind ?? null), [seed.chain, seed.address]).value;
   // this coin's recorded cost, priced here with the page's own price: no market call of its own (the chart needs the budget)
   // null: Trade has no record of it; undefined: not read yet (T-5 review 2, M1)
   const position = useLive(() => svc.position(seed.chain, seed.address).then((p) => p ?? null), [seed.chain, seed.address]).value;
@@ -338,7 +342,7 @@ export function CoinPage({ seed, onBuy, onSell, auto, onAuto, onAutoFail }: { se
             : <div className="tr-pair cp-pair">
                 {holds && d && <button className="tr-btn2" onClick={() => onSell(d)} aria-label={`Sell ${symbol}: you hold ${amount(held.value!, d.decimals ?? 6)}`}>Sell</button>}
                 {sending
-                  ? <button className="zf-btn" disabled><Mark size={18} mode="loading" />Sending…</button>
+                  ? <button className="zf-btn" disabled>{goingWords(sending, seed.chain)}</button>
                   : <button className={`zf-btn${buyable && online && canTrade ? " zf-sweep" : ""}`} disabled={!buyable || !online} onClick={() => buyable && onBuy(buyable)}>Buy</button>}
               </div>}
       </div>}

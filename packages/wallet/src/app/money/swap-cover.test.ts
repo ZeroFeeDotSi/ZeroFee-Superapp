@@ -79,7 +79,7 @@ test("the screen after the tap, Private short (refused before anything is signed
 test("the sheet: the button is off while Private is short with no cover, the sub-line slot carries Top up Private (Send's door, private/add), and every refusal passes swapRefusal", () => {
   const sheet = readFileSync(new URL("./SwapSheet.tsx", import.meta.url), "utf8");
   assert.match(sheet, /const cover = route\?\.kind === "topup" && !block \? swapCover\(\{ coin: route\.coin, usd: amount,/);
-  assert.match(sheet, /disabled=\{busy \|\| \(on\.tap === "swap" && \(nothing \|\| !!short \|\|/);
+  assert.match(sheet, /disabled=\{busy \|\| rests \|\| \(on\.tap === "swap" && \(nothing \|\| !!short \|\|/);
   assert.match(sheet, /if \(!pay \|\| !get \|\| !route \|\| busy \|\| block \|\| short\) return;/);
   assert.match(sheet, /sub\.id === "swap-short" && <> <button type="button" className="zf-link" onClick=\{\(\) => \{ onClose\(\); shell\.openApp\("wallet", "private\/add"\); \}\} data-testid="swap-top-up">\{TOP_UP_PRIVATE\}<\/button>/);
   assert.equal(sheet.match(/problem\(swapRefusal\(end\.(refused|problem)\), onUsd\)/g)?.length, 2);

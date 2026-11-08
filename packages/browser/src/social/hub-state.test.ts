@@ -18,8 +18,9 @@ test("the rows: pump.fun and GMGN first, always; another site only while its wal
     w({ id: "trade-sol-a", role: "chain", cashUsd: "99.00" }),
     w({ id: "site-gmgn-base-a", site: "gmgn", network: "base", cashUsd: "7.00" }),
   ]);
-  // ST13: GMGN's tile is ONE number, all its wallets together (Solana $4.20 + Base $7.00); its Add fills the Solana one
-  assert.deepEqual(rows.map((r) => [r.site, r.usd, r.wallet ?? null]), [["pump", 0, null], ["gmgn", 11.2, "site-gmgn-sol-a"], ["jupiter", 12, "site-jupiter-sol-a"]]);
+  // ST13: GMGN's tile is ONE number, its wallets together; builder 25 (J8): on the app's chains only (core app-chains.ts),
+  // so GMGN's Base $7.00 is never in it (V1: SOL, NEAR and Robinhood); its Add fills the Solana one
+  assert.deepEqual(rows.map((r) => [r.site, r.usd, r.wallet ?? null]), [["pump", 0, null], ["gmgn", 4.2, "site-gmgn-sol-a"], ["jupiter", 12, "site-jupiter-sol-a"]]);
   // a wallet that can't be read is no figure, never $0
   assert.equal(hubRows([w({ id: "site-pump-sol-a", site: "pump", unread: true })])[0]!.usd, null);
 });
@@ -47,7 +48,8 @@ test("ST13: the tile's one number; an unread wallet Spending fills makes it unkn
   assert.equal(gmgn([{ id: "s", cashUsd: "10.00" }, { id: "b", network: "base", holds: "0.0012 ETH" }]).usd, 10, "Base's ETH has no price: adds nothing");
   assert.equal(gmgn([{ id: "s", cashUsd: "10.00" }, { id: "b", network: "base", unread: true }]).usd, 10, "Base unread never blanks the tile");
   assert.equal(gmgn([{ id: "s", unread: true }, { id: "b", network: "base", holds: "0 ETH" }]).usd, null, "Solana unread: never a smaller number");
-  assert.equal(gmgn([{ id: "s", cashUsd: "0.10" }, { id: "b", network: "base", cashUsd: "0.20" }]).usd, 0.3, "summed in cents");
+  assert.equal(gmgn([{ id: "s", cashUsd: "0.10" }, { id: "b", network: "base", cashUsd: "0.20" }]).usd, 0.1, "builder 25 (J8): Base's figure is never in it");
+  assert.equal(gmgn([{ id: "s", cashUsd: "0.10", coinsUsd: "0.20" }]).usd, 0.3, "summed in cents");
   // review ST13 M1: SOL's price not read ("0.5 SOL", no dollars) is unknown, never $0.00 (no "empty" ask, no Add over money)
   const unpriced = gmgn([{ id: "s", holds: "0.5 SOL" }]);
   assert.deepEqual([unpriced.usd, unpriced.solUsd], [null, null]);
@@ -55,48 +57,47 @@ test("ST13: the tile's one number; an unread wallet Spending fills makes it unkn
   assert.equal(gmgn([{ id: "s", holds: "0 SOL" }]).usd, 0, "an empty Solana wallet with no price is still $0.00");
   // review ST13 M2: the Solana wallet's own dollars drive Take out, the window's pill and an Add landing
   const both = gmgn([{ id: "s", cashUsd: "0.00" }, { id: "b", network: "base", cashUsd: "7.00" }]);
-  assert.deepEqual([both.usd, both.solUsd, solOf(both)], [7, 0, 0]);
+  assert.deepEqual([both.usd, both.solUsd, solOf(both)], [0, 0, 0], "builder 25 (J8): GMGN's Base wallet isn't shown in V1");
   assert.equal(solOf({ site: "pump", name: "pump.fun", usd: 3 }), 3, "a row kept on the device (no solUsd yet): the tile's own");
   const t0 = 5_000_000;
   const a = landing([{ site: "gmgn", usd: "5" }], {}, [both], t0).moving;
   assert.equal(a.gmgn!.from, 0, "an Add's start is the Solana wallet's, not the sum");
 });
 
-test("ST13: the wallet sheet lists only the wallets with money, Solana first", () => {
+test("ST13: the wallet sheet lists only the wallets with money, Solana first; builder 25 (J8): the app's chains only", () => {
   const r = (wallets: HubRow["wallets"]): HubRow => ({ site: "gmgn", name: "GMGN", usd: 0, wallet: "s", wallets });
-  assert.equal(fundedLine(r([{ network: "base", usd: 2.4, id: "b", address: "0x" }, { network: "sol", usd: 10, id: "s", address: "A" }])), "Solana $10.00 · Base $2.40");
+  assert.equal(fundedLine(r([{ network: "base", usd: 2.4, id: "b", address: "0x" }, { network: "sol", usd: 10, id: "s", address: "A" }])), "Solana $10.00");
   assert.equal(fundedLine(r([{ network: "sol", usd: 0, id: "s", address: "A" }, { network: "base", usd: null, holds: "0 ETH", id: "b", address: "0x" }])), "", "nothing with money: no line");
-  assert.equal(fundedLine(r([{ network: "sol", usd: 1234.5, id: "s", address: "A" }, { network: "base", usd: null, holds: "0.0012 ETH", id: "b", address: "0x" }])), "Solana $1,234.50 · Base 0.0012 ETH");
+  assert.equal(fundedLine(r([{ network: "sol", usd: 1234.5, id: "s", address: "A" }, { network: "base", usd: null, holds: "0.0012 ETH", id: "b", address: "0x" }])), "Solana $1,234.50");
 });
 
 test("ST13: the question shows only when two or more networks fill (the auditor's rule); the last pick is kept per site, Solana the first time", () => {
   assert.deepEqual(SPENDING_FILLS, ["sol"], "today Spending fills Solana only (BNB closed until D13; Base and Ethereum never filled)");
   assert.deepEqual(pickable("gmgn"), ["sol"], "so GMGN's sheet goes straight to Solana");
   assert.deepEqual(pickable("pump"), ["sol"]);
-  // the day BNB opens, the question switches on by itself, with only the networks that fill, in GMGN's order
-  assert.deepEqual(pickable("gmgn", ["sol", "bsc"]), ["sol", "bsc"]);
-  assert.deepEqual(pickable("gmgn", ["bsc", "sol", "base", "eth"]), ["sol", "bsc", "base", "eth"]);
+  // builder 25 (J8): V1 shows the app's chains only (core app-chains.ts): even a fill switched on for BNB asks nothing;
+  // the question switches on by itself the day app-chains.ts lists a second chain GMGN trades on
+  assert.deepEqual(pickable("gmgn", ["sol", "bsc"]), ["sol"]);
+  assert.deepEqual(pickable("gmgn", ["bsc", "sol", "base", "eth"]), ["sol"]);
   const box = new Map<string, string>();
   const store = { getItem: (k: string) => box.get(k) ?? null, setItem: (k: string, v: string) => void box.set(k, v) };
   assert.equal(readPick("gmgn", store, ["sol", "bsc"]), "sol", "the first time: Solana");
   savePick("gmgn", "bsc", store);
-  assert.equal(readPick("gmgn", store, ["sol", "bsc"]), "bsc", "fund BNB and come back: BNB pre-picked");
+  assert.equal(readPick("gmgn", store, ["sol", "bsc"]), "sol", "a chain V1 doesn't show is never kept or read back");
   assert.equal(readPick("pump", store, ["sol", "bsc"]), "sol", "per site");
   assert.equal(readPick("gmgn", store, ["sol"]), "sol", "a pick that no longer fills is never read back");
   savePick("pump", "eth", store);
-  assert.equal(JSON.parse(box.get("zf.hub.pick.v1")!).pump, undefined, "a network the site doesn't trade on isn't kept");
+  assert.equal(box.get("zf.hub.pick.v1"), undefined, "a network the site doesn't trade on isn't kept (nor one V1 doesn't show)");
   assert.equal(readPick("gmgn", { getItem: () => "{nonsense" }, ["sol", "bsc"]), "sol");
 });
 
-test("ST13: the words: 'your GMGN Solana wallet', never 'chain'; a network Spending can't fill says so, the same in the window (Swift) and here", () => {
+test("ST13: the words: 'your GMGN Solana wallet', never 'chain'; a network Spending can't fill says what V1 does (web alone)", () => {
   assert.equal(goesTo("GMGN", "sol"), "Goes to your GMGN Solana wallet.");
-  assert.equal(notCarried("base"), "Base isn't in ZeroFee yet.");
-  assert.equal(notCarried("eth"), "Ethereum isn't in ZeroFee yet.");
-  assert.equal(notCarried("bsc"), "ZeroFee can't move BNB under $1,000 yet.");
-  const rules = readFileSync(new URL("../../../../apps/ios/ZeroFee/HostRules.swift", import.meta.url), "utf8");
-  for (const c of ["bsc", "base", "eth"] as const) assert.ok(rules.includes(`case "${c}": return "${notCarried(c)}"`), c);
-  assert.ok(rules.includes(`case "tron": return "Tron isn't in ZeroFee yet."`));
-  for (const s of [goesTo("GMGN", "sol"), notCarried("bsc"), notCarried("base")]) assert.doesNotMatch(s, /\bchain\b/i);
+  // builder 25 (J8, product decision, 8 Nov: no BNB in V1): the web line names no chain V1 doesn't show and no $1,000 limit. The
+  // phone's window says its own (apps/ios HostRules.swift notCarriedLine), changed by its owner (handoff "## builder 25"),
+  // so this pins the web string alone
+  for (const c of ["bsc", "base", "eth"] as const) assert.equal(notCarried(c), "GMGN pays from its SOL wallet.", c);
+  for (const s of [goesTo("GMGN", "sol"), notCarried("bsc"), notCarried("base")]) assert.doesNotMatch(s, /\bchain\b|BNB|Base|\$1,000/i);
   const view = readFileSync(new URL("../../../../apps/ios/ZeroFee/PartnerView.swift", import.meta.url), "utf8");
   assert.match(view, /title\.text = "AgentZero: your \\\(site\)\\\(network\.map \{ " \\\(\$0\)" \} \?\? ""\) wallet is empty\. Put money in\?"/);
   // the window's ask never over a network Spending can't fill

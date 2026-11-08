@@ -3,10 +3,13 @@
 // v2): "Solana down", "Jupiter slow", and "+1" when more than one isn't working ("Solana down +2").
 // Only a type and services.ts's names (already in Home's first load, the status banner's): the checks and the sheet load
 // when it opens.
-import type { StatusId, StatusReport } from "./status-probe.ts";
-import { SERVICE_NAMES } from "./services.ts";
+import type { StatusId, StatusReport, StatusRow } from "./status-probe.ts";
+import { SERVICE_NAMES, noticeShows, type ServiceStatus } from "./services.ts";
 
-export const SUMMARY_CHECKING = "Checking…";
+// builder 22 (audit 18's I1): no ellipsis. The Settings row's value is one word; the sheet's line says who and its
+// clock (PROBE_MS, at most 5 s)
+export const SUMMARY_CHECKING = "Checking";
+export const CHECKING_LINE = "ZeroFee checks each one now. Up to 5 s.";
 export const SUMMARY_ALL = "All working";
 export const SUMMARY_NOT_CHECKED = "Not checked";
 
@@ -19,9 +22,24 @@ export const STATUS_NAMES: Record<StatusId, string> = {
   hood: SERVICE_NAMES.hood,
   price: "Price feed",
   oneclick: SERVICE_NAMES.oneclick,
+  confidential: SERVICE_NAMES.confidential,
   jupiter: "Jupiter",
   agentzero: "AgentZero",
 };
+
+/**
+ * Audit 13's D6 (8 Nov): Status said "All working" with no NEAR Confidential row while the banner said it was down. Its
+ * row, after NEAR Intents': down when the app's own record says so as the banner does (ledger.status, noticeShows), else
+ * NEAR Intents' own check's state (Confidential Intents run on NEAR Intents, so its check stands for both). Pure.
+ */
+export function withConfidential(report: StatusReport, health: readonly Pick<ServiceStatus, "service" | "state" | "seen">[]): StatusReport {
+  if (!Array.isArray(report?.rows) || report.rows.some((r) => r.id === "confidential")) return report;
+  const intents = report.rows.find((r) => r.id === "oneclick");
+  const down = health.some((h) => h.service === "confidential" && noticeShows(h));
+  const row: StatusRow = { id: "confidential", state: down ? "down" : intents?.state ?? "working", via: "direct", ms: down ? null : intents?.ms ?? null };
+  const at = intents ? report.rows.indexOf(intents) + 1 : report.rows.length;
+  return { ...report, rows: [...report.rows.slice(0, at), row, ...report.rows.slice(at)] };
+}
 
 /** null: not answered yet; "failed": the look couldn't run. */
 export function statusSummary(report: StatusReport | null | "failed"): string {
@@ -37,5 +55,6 @@ export function statusSummary(report: StatusReport | null | "failed"): string {
   const name = STATUS_NAMES[worst.id] ?? "A service";
   const word = down.length ? (worst.state === "down" ? "down" : "partly down") : "slow";
   const more = down.length + slow.length - 1;
-  return `${name} ${word}${more > 0 ? ` +${more}` : ""}`;
+  // audit 11's B12 (8 Nov): a sentence, never "Solana down +1": one service by name, more by their count
+  return more > 0 ? `${more + 1} services have trouble` : `${name} is ${word}`;
 }

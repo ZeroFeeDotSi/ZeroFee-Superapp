@@ -21,6 +21,7 @@ import { addCardStore, addCardsSealed, sealAddCards } from "./add-keep.ts";
 import { addressQr } from "./request-money.ts";
 import { CoinMark } from "./CoinMark.tsx";
 import { HOME_PROOF_OFF, homeProof } from "./home-proof.ts";
+import { addDown, useHealth } from "../services.ts";
 // the web wallet's own Add: loaded only on the web build's first Add (Home's JS budget, speed-budget.test.ts)
 const WebAddSheet = lazy(() => import("./WebAddSheet.tsx").then((m) => ({ default: m.WebAddSheet })));
 import { webWallet } from "@zerofee/shell-api/release.ts";
@@ -72,9 +73,13 @@ function AddList({ onClose, wallet, coin, request, ready }: { onClose: () => voi
   const kept = (slot: CardSlot) => ({ slot, initialKey: cardKey(store(), slot, new Set()), onAddress: (k: string, a: AddAddress) => keepCardKey(store(), slot, k, Date.parse(a.untilIso), a.depositAddress) });
   const order = addOrder(wallet, addRows());
   useEffect(() => RequestSheet.preload(), []);
+  // audit 13's D5: a service Add needs is down (the notice's rule): what, where money sent before waits, when to send; no
+  // address to send to now (every Add goes through it), Request's link neither
+  const down = addDown(useHealth(bridge));
   // a coin filled in (AgentZero's "receive SOL"): that coin's address page at once, never the list; ✕ goes back
   const direct = addOpensOn(coin, wallet, !!request, addRows());
   if (direct && !asking && !ready) return <Sheet title={W.title} onClose={onClose}><div className="wl-qrfull" data-testid="qr-asking"><div className="wl-qrfull__who"><Mark row={direct.row} to={direct.to} size={40} /><h2 className="wl-qrfull__name">{W.rowName(direct.row.name, direct.to)}</h2></div><div className="wl-qrfull__code wl-qrfull__code--blank" aria-hidden="true" /></div></Sheet>;
+  if (down && !asking) return <Sheet title={W.title} onClose={onClose}><AddDownLines lines={down.lines} /></Sheet>;
   if (direct && !asking) return <CoinPage bridge={bridge} row={direct.row} to={direct.to} {...kept(direct.to === "safe" ? `safe-${direct.row.chain}` : direct.row.chain)} onClose={onClose} />;
   if (asking) return <RequestSheet onClose={onClose} onBack={() => setAsking(false)} {...(request ? { start: request } : {})} />;
   // before the sealed copy is here (rarely: Home reads it at boot): the row itself, its name and "Getting it…", no key yet
@@ -99,6 +104,11 @@ function AddList({ onClose, wallet, coin, request, ready }: { onClose: () => voi
       {qr && <QrSheet row={qr.row} to={qr.to} a={qr.a} onClose={() => setQr(null)} />}
     </>
   );
+}
+
+/** Audit 13's D5: Add while a service it needs is down, said on top, one idea per line. */
+function AddDownLines({ lines }: { lines: readonly string[] }) {
+  return <div role="alert" data-testid="add-down" style={{ display: "grid", gap: 8, margin: "4px 0 24px" }}>{lines.map((l) => <p className="zf-body" key={l}>{l}</p>)}</div>;
 }
 
 /** A row whose key isn't read yet: the same frame as AddressRow (logo, name, its sub-line), nothing to tap. */

@@ -71,6 +71,7 @@ every code there is listed here. The ledger also passes on these from the Securi
 | `ledger.swap.not-yet` | You can't swap this coin from your Safe yet. Nothing moved. | safe: in your Safe | Go back (nothing) |
 | `ledger.quote.near-closed` | NEAR Intents said no to this payout, so nothing was sent. | safe: in your Safe | Try again (retry) |
 | `ledger.quote.expired` | NEAR Intents' price ran out before you approved. Nothing moved. | safe: in your Safe | Get a new price (retry) |
+| `ledger.quote.mismatch` | NEAR Intents priced it differently than asked. Nothing moved. | safe: in your Safe (Private's own share: in Private) | Get a new price (retry) |
 | `ledger.method.unknown` | This part of Wallet isn't ready yet. | not involved | Go back (nothing) |
 | `ledger.unexpected` | ZeroFee hit a problem on its side. Nothing moved. | safe: in your Safe | Try again (retry) |
 | `ledger.unexpected.money` | ZeroFee hit a problem on its side. Check Activity before you try again. | unsure: in your own wallets, or on its way | See what happened (open → activity) |

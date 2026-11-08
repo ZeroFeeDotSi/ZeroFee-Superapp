@@ -45,9 +45,9 @@ test("a Buy page opens on the Quick buy amount from Settings (product decision, 
 test("the sheet wires it: opens via openAmount, a chip marks the figure picked, the keypad types over a picked figure", () => {
   const src = readFileSync(new URL("./TradeSheet.tsx", import.meta.url), "utf8");
   assert.match(src, /const quick = useQuickBuy\(bridge\);\n  const \[value, setValue\] = useState\(openAmount\(side, start, quick\)\)/);
-  assert.match(src, /new Set\(\[\.\.\.BUY_CHIPS, String\(quick\)\]\)/, "the setting's amount is always a chip, so it shows picked");
+  assert.match(src, /new Set\(\[\.\.\.BUY_CHIPS, \.\.\.\(quick === undefined \? \[\] : \[String\(quick\)\]\)\]\)/, "the setting's amount is always a chip once read, so it shows picked");
   assert.ok(!/lastBuy|\?\? "25"/.test(src), "no $25 or last amount to open on");
   assert.match(src, /<Keypad value=\{padBase\(value, fresh\)\}/);
   assert.ok(!src.includes("setFresh(false); instant.current = true"), "no chip leaves its figure open to appending");
-  assert.match(src, /chips\.map\(\(\[l, v\]\) => <button[^>]*onClick=\{\(\) => \{ feel\.key\(\); setFresh\(true\);/);
+  assert.match(src, /chips\.map\(\(\[l, v\]\) => <button[^>]*onClick=\{\(\) => \{ feel\.key\(\); chose\.current = true; setFresh\(true\);/);
 });

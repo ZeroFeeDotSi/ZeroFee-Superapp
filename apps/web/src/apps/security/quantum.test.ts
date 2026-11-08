@@ -100,7 +100,10 @@ test("the head says \"replace\" when no Remove is offered, \"remove\" only when 
   const leftover = quantumOf([PHONE, LEFTOVER]);
   assert.equal(QUANTUM_WORDS.oldCount(leftover.old), "One old key to remove", "control: a Remove is offered, so it says remove");
   assert.equal(QUANTUM_WORDS.oldCount(quantumOf([PHONE, LEFTOVER, { ...WORDS, handle: "ed25519:W1" }]).old), "2 old keys to fix");
-  assert.match(QUANTUM_WORDS.lineOn, /^Its keys use the new standard made to resist quantum computers\.$/);
+  // QA 16's S12: plain words (was "the new standard made to resist quantum computers")
+  assert.equal(QUANTUM_WORDS.lineOn, "Its keys are a new kind, built so future computers can't break them.");
+  assert.equal(QUANTUM_WORDS.lineOld, "Its other keys are the new kind. An old key can be broken by the computers of the future.");
+  for (const l of [QUANTUM_WORDS.lineOn, QUANTUM_WORDS.lineOld]) assert.doesNotMatch(l, /standard|resist|quantum/i);
   const src = readFileSync(new URL("./SecurityApp.tsx", import.meta.url), "utf8");
   assert.match(src, /QUANTUM_WORDS\.oldCount\(quantum\.old\)/, "the Account row uses the same words as the head");
 });

@@ -90,7 +90,8 @@ subscribed account's name beside its emails in plain Redis (below, "Not under th
   (`x-zf-agent-bind`). Neither is logged; the store keeps only the HMAC above.
 - **Without `AGENTZERO_STORE_KEY`**, nothing new goes to the shared store: every limit counts in the instance's own
   memory (so a relay-wide budget is per instance), and per-reply payment stays off; its route answers 503
-  `agentzero.pay.store-key-unset`. The Sim's AgentZero (`POST /v0/agentzero/sim`) is off too: 503 `agentzero.sim.off`. The relay writes no logs, so that answer (and deploy.sh) is where it says so.
+  `agentzero.pay.store-key-unset`. The Sim's AgentZero (`POST /v0/agentzero/sim`) is off too: 503 `agentzero.sim.off`. The relay writes no logs, so that answer's code (and deploy.sh) is where it says so; its words to a person are only
+  "ZeroFee's server isn't set up for this yet." (audit 15 FQ1: never a setting's name).
 - **Not under this rule yet:** the email alerts' own store (`ALERTS_REDIS_*`, alerts.mjs) keeps, per subscribed account,
   its name and the emails, as above; and a computer's pairing mailbox (pair.mjs) for its few minutes. Both are
   linkable by design; turn the alerts off, or give them their own Redis, where that matters.

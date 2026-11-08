@@ -9,7 +9,8 @@ const css = readFileSync(new URL("./agent.css", import.meta.url), "utf8");
 test("the job sheet is a scroll box and a floor, as Send: its card ends above the button whatever it holds; AgentZero's styles still leave the Sheet alone (D135) (control: the other sheets keep their sticky floor)", () => {
   const sheet = app.slice(app.indexOf("function JobSheet("), app.indexOf("function ComputerSheet("));
   assert.match(sheet, /<Sheet title=\{s\.title\} onClose=\{onClose\}>\n[^\n]*\n\s*<div className="ag-sheet-column">\n\s*<div className="ag-sheet-scroll">/);
-  assert.match(sheet, /<\/div>\n\s*<div className="ag-sheet-floor">\n\s*\{isRunning && running/);
+  // audit 14 E9: the job's cost line sits in the floor above the button
+  assert.match(sheet, /<\/div>\n\s*<div className="ag-sheet-floor">\n(?:\s*\{\/\*[\s\S]*?\*\/\}\n)?\s*\{!isRunning && <p className="zf-small ag-cost">\{jobCostLine\(\)\}<\/p>\}\n\s*\{isRunning && running/);
   assert.match(sheet, /<\/div>\n\s*<\/div>\n\s*<\/Sheet>/);
   assert.match(css, /\.ag-sheet-column \{[^}]*height: 100%;[^}]*display: flex;[^}]*flex-direction: column;/);
   assert.match(css, /\.ag-sheet-scroll \{[^}]*flex: 1 1 auto;[^}]*min-height: 0;[^}]*overflow-y: auto;[^}]*padding-bottom: 20px;/);

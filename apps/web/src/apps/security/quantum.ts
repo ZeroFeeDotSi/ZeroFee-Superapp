@@ -57,14 +57,15 @@ export const QUANTUM_WORDS = {
   },
   fix: "Fix",
   headOn: "Your Safe is quantum-safe",
-  lineOn: "Its keys use the new standard made to resist quantum computers.",
+  // QA 16's S12 (8 Nov): plain words, the five-year-old bar (was "the new standard made to resist quantum computers")
+  lineOn: "Its keys are a new kind, built so future computers can't break them.",
   /** the copy review's S1 (7 Nov): the title says "Quantum-safe" once; the On state's headline folds into this one body line. */
   bodyOn: "Your Safe's keys are built to resist the computers of the future.",
   /** the copy review's S1: on the web, a row whose key lives only on the iPhone (this device, AgentZero): never a tick. */
   onIphone: "On iPhone",
   /** the copy review's S1: the backup words' row on the web (ticked only when the words were checked). */
   wordsDown: "Written down",
-  lineOld: "Its other keys use the new standard made to resist quantum computers. An old key can be broken by future computers.",
+  lineOld: "Its other keys are the new kind. An old key can be broken by the computers of the future.",
   notYet: "Not yet",
   oldRow: "An older kind of key",
   oldLine: "Future computers could break it.",

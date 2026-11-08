@@ -32,8 +32,9 @@ test("read and write go through device.store under trade.quickbuy; a store that 
 test("the chip reads the setting: Discover's RowBuy uses useQuickBuy, never the constant, for the amount, the label and the ready check", () => {
   const src = readFileSync(new URL("./Discover.tsx", import.meta.url), "utf8");
   assert.match(src, /const quick = useQuickBuy\(bridge\);/);
-  assert.match(src, /svc\.quote\("buy", r\.chain, r\.address, \{ usd: quick \}\)/);
+  assert.match(src, /svc\.quote\("buy", r\.chain, r\.address, \{ usd \}\)/);
+  assert.match(src, /chipQuotes\.take\(key, \(\) => quoteNow\(quick\)\)/);
   assert.match(src, /ready < quick\)/);
-  assert.match(src, /aria-label=\{`Buy \$\$\{quick\} of \$\{r\.symbol\}`\}/);
+  assert.match(src, /aria-label=\{!online \? OFFLINE_CHIP_LABEL : down \? downLabel\(r\.chain\) : quick === undefined \? `Buy \$\{r\.symbol\}` : `Buy \$\$\{quick\} of \$\{r\.symbol\}`\}/);
   assert.doesNotMatch(src, /QUICK_BUY_USD/, "the constant is gone from the screen");
 });

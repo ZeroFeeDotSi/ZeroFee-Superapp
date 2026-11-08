@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 /** True mid-trade too (break row, 2 Nov): a trade already handed over finishes (or comes back) without the phone, so the
  *  line never says "nothing moves" beside its "Bought". */
-export const OFFLINE_WORDS = "You're offline. Your money is safe: a trade already sent still finishes, and nothing new moves until you're back.";
+export const OFFLINE_WORDS = "You're offline. Your money is safe. A trade you sent still finishes. Nothing new moves until you're back.";
 /** What a failed read says while offline, in place of "busy". */
 export const OFFLINE_SHORT = "You're offline.";
 

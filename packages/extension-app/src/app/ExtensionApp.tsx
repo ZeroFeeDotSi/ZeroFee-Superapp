@@ -178,7 +178,7 @@ function Home({ onAdd, onProblem }: { onAdd: () => void; onProblem: (e: unknown)
       <div className="zf-fill" />
       <div className="ea-floor">
         <button className="zf-btn" onClick={onAdd}>Add money</button>
-        {!empty && <button className="zf-link" disabled={bringing} onClick={() => void bring()}>{bringing ? "Bringing it back…" : "Bring the SOL back"}</button>}
+        {!empty && <button className="zf-link" disabled={bringing} onClick={() => void bring()}>Bring the SOL back</button>}
         {!empty && <p className="zf-small">Sell coins in the panel first to bring them back too.</p>}
       </div>
     </div>
@@ -208,7 +208,7 @@ function AddSheet({ onClose, onProblem }: { onClose: () => void; onProblem: (e: 
         <div className="ea-kv"><span>From</span><span>Your Safe{main.value ? ` · ${usd(main.value.usd)}` : ""}</span></div>
       </div>
       <div className="ea-floor">
-        <button className="zf-btn" disabled={busy} onClick={() => void add()}><Face />{busy ? "Adding…" : `Add $${value}`}</button>
+        <button className="zf-btn" disabled={busy} onClick={() => void add()}><Face />{`Add $${value}`}</button>
         <p className="zf-small">Face ID, then it lands in the panel on your laptop.</p>
       </div>
     </Sheet>

@@ -9,7 +9,7 @@ import { SETUP_COINS, setupCoin } from "./setup-coins.ts";
 
 const here = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 
-test("the coins: every chain's own coin NEAR Intents lists with no memo, the likely ones first, then by name; public builds keep NEAR, SOL and ETH (RH) (control: off, none of the others)", () => {
+test("the coins: every chain's own coin NEAR Intents lists with no memo, the likely ones first, then by name; public builds keep NEAR, SOL and Robinhood (control: off, none of the others)", () => {
   const on = fundOffered(true), off = fundOffered(false);
   assert.deepEqual(on.slice(0, 5).map((c) => c.id), ["near", "btc", "eth", "sol", "bsc"], "the likely ones first, in FUND_LIKELY's order");
   assert.deepEqual(FUND_LIKELY, ["near", "btc", "eth", "sol", "bsc"]);

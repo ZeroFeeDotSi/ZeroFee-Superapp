@@ -8,7 +8,7 @@ import { makeOffer, pairWords, readOffer, sealSeed, trayBearer } from "@zerofee/
 import { SoftwareKey } from "@zerofee/core/device-key";
 import { keyHandle } from "@zerofee/core/key-handle";
 import type { Chain, ChainPermission } from "@zerofee/core/chain";
-import { agentKeyOnChain, runPair } from "./pair-flow.ts";
+import { PAIR_WORDS, agentKeyOnChain, runPair } from "./pair-flow.ts";
 import { memoryStore, stopHashOf } from "./store.ts";
 
 const RELAY = "https://relay.example";
@@ -39,7 +39,7 @@ function chainWith(seed: Uint8Array, permission: ChainPermission | null, { down 
 }
 
 /** The phone (seals once it has read the offer) behind a fake relay that answers 404 a few times first. */
-function world(opts: { box?: (offerText: string, seed: Uint8Array) => string; permission?: ChainPermission | null; down?: boolean; never?: boolean; typed?: string[] } = {}) {
+function world(opts: { box?: (offerText: string, seed: Uint8Array) => string; permission?: ChainPermission | null; down?: boolean; never?: boolean; typed?: string[]; relay?: (read: number) => "throw" | 503 | null } = {}) {
   const typed = [...(opts.typed ?? ["", "yes"])];
   const asked: string[] = [];
   const lines: string[] = [];
@@ -52,6 +52,9 @@ function world(opts: { box?: (offerText: string, seed: Uint8Array) => string; pe
     reads++;
     if (linesAtFirstRead < 0) linesAtFirstRead = lines.length;
     assert.equal(String(url), `${RELAY}/v0/pair/${readOffer(offerText())!.mailbox}`, "only the relay's mailbox is asked");
+    const r = opts.relay?.(reads);
+    if (r === "throw") throw new TypeError("fetch failed");
+    if (r === 503) return new Response("", { status: 503 });
     if (opts.never || reads <= 3) return Response.json({ code: "pair.mailbox.empty" }, { status: 404 });
     return Response.json({ box: opts.box ? opts.box(offerText(), seed) : sealSeed(readOffer(offerText())!, seed, ACCOUNT) });
   }) as unknown as typeof fetch;
@@ -178,4 +181,31 @@ test("the relay must be an https address", async () => {
   const ok = await runPair({ relay: "http://relay.example", store: memoryStore(), chainFor: () => assert.fail("never asked"), print: (l) => void lines.push(l), ask: async () => "", fetchFn: (async () => assert.fail("never asked")) as never });
   assert.equal(ok, false);
   assert.match(lines[0]!, /https/);
+});
+
+// Audit 15 FL4: a down relay was said as the phone ("Your phone didn't answer in 10 minutes.") and the wait line had an ellipsis.
+test("FL4: the relay down for the whole wait is named as ZeroFee's relay, said once while waiting, never as the phone; the wait line has no ellipsis", async () => {
+  const w = world({ never: true, relay: () => "throw" });
+  assert.equal(await w.run(), false);
+  assert.ok(w.lines.includes(PAIR_WORDS.waiting) && !w.lines.some((l) => l.includes("…")), "plain wait words");
+  assert.equal(w.lines.filter((l) => l === PAIR_WORDS.relayDown).length, 1, "said once, while it keeps checking");
+  assert.match(w.lines.at(-1)!, /^ZeroFee's server didn't answer\. Your yes didn't reach this Mac\. Nothing was saved\. Start again/);
+  assert.ok(!w.lines.some((l) => l.startsWith(PAIR_WORDS.phoneLate)), "never blames the phone");
+  assert.equal(w.store.value, null);
+  const five = world({ never: true, relay: () => 503 });
+  assert.equal(await five.run(), false);
+  assert.match(five.lines.at(-1)!, /^ZeroFee's server didn't answer/, "a 5xx is the relay too");
+});
+
+test("FL4: a relay blip that ends is said and unsaid; the pairing goes on; a lone failed ask says nothing; a quiet phone is still the phone", async () => {
+  const blip = world({ relay: (n) => (n <= 4 ? "throw" : null) });
+  assert.equal(await blip.run(), true, "the box came once the relay was back");
+  assert.ok(blip.lines.includes(PAIR_WORDS.relayDown));
+  const one = world({ relay: (n) => (n === 1 ? "throw" : null) });
+  assert.equal(await one.run(), true);
+  assert.ok(!one.lines.includes(PAIR_WORDS.relayDown), "one failed ask is not an outage");
+  const late = world({ never: true, relay: (n) => (n <= 5 ? "throw" : null) });
+  assert.equal(await late.run(), false);
+  assert.deepEqual(late.lines.filter((l) => l === PAIR_WORDS.relayDown || l === PAIR_WORDS.relayBack), [PAIR_WORDS.relayDown, PAIR_WORDS.relayBack], "said, then unsaid");
+  assert.match(late.lines.at(-1)!, /^Your phone didn't answer in 10 minutes\./, "the relay came back: the phone is what didn't answer");
 });

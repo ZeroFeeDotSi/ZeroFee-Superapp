@@ -2,13 +2,16 @@
 // and above "It goes through NEAR Confidential." (the product rule: the protocol by name) and the time.
 
 import type { ReceiptState } from "@zerofee/shell-api/job-steps.ts";
+import { JOB_WORDS } from "@zerofee/shell-api/job-start.ts";
 
 /** A receipt line in both tenses: `going` while the job goes, `landed` only once its chain read says it landed. */
-export type SaidWords = { going: string; landed: string };
+export type SaidWords = { going: string; landed: string; stopped?: string };
 /** The one choice (QA's MUST, 7 Nov): going, the present; landed, the past; stopped or unsure, the present and
  *  the job's own stop words, never the past. */
 export function receiptSaid(w: SaidWords, s: Pick<ReceiptState, "state"> & { words?: string }): string {
   if (s.state === "landed") return w.landed;
+  // the audit's Send S2 (8 Nov): a stopped receipt leads with the stop, never "Sending $25.00 to bob.near. NEAR said no."
+  if (s.state === "stopped" && w.stopped) return s.words ? `${w.stopped} ${s.words}` : w.stopped;
   if (s.state === "stopped" || s.state === "unsure") return s.words ? `${w.going} ${s.words}` : w.going;
   return w.going;
 }
@@ -16,13 +19,14 @@ export function receiptSaid(w: SaidWords, s: Pick<ReceiptState, "state"> & { wor
 /** Send: "Sending it to bob.near." then "Sent to bob.near." `to`: whom, as the job says it. The figure is the receipt's
  *  hero, said once (the audit's Send audit M8, 7 Nov: "$5.00" over "Sending $5.00 to bob.near."). */
 export const sentLine = (to: string): string => `Sent to ${to}.`;
-export const sendWords = (to: string): SaidWords => ({ going: `Sending it to ${to}.`, landed: sentLine(to) });
+export const sendWords = (to: string): SaidWords => ({ going: `Sending it to ${to}.`, landed: sentLine(to), stopped: `Not sent to ${to}.` });
 
 /** Swap, landed: "About 0.2419 SOL is in your SOL wallet." `gets`: the figure the sheet priced at the tap ("0.2419 SOL"),
  *  `where` the wallet it lands in ("your SOL wallet"). Unpriced: "It's in your SOL wallet.", never a made-up figure. The
  *  dollars are the receipt's hero, said once (the audit's M8). */
-export const swappedLine = (gets: string | undefined, where: string): string =>
-  gets ? `About ${gets} is in ${where}.` : `It's in ${where}.`;
+/** `read` (audit 11's B5): the figure is what landed, read off its record, so no "About". */
+export const swappedLine = (gets: string | undefined, where: string, read = false): string =>
+  gets ? `${read ? "" : "About "}${gets} is in ${where}.` : `It's in ${where}.`;
 
 /** A site wallet's Add: "Added $10.00 to your pump.fun wallet." (`network`: a site with more than one, "Solana"). */
 export const addedLine = (usd: string, site: string, network?: string): string => `Added ${usd} to your ${site}${network ? ` ${network}` : ""} wallet.`;
@@ -47,6 +51,15 @@ export function moveWhere(names: readonly string[]): string {
   const parts = [...(u.includes("Safe") ? ["your Safe"] : []), ...(u.includes("Private") ? ["Private"] : []), ...(wallets.length ? [`your ${list(wallets)} wallet${wallets.length > 1 ? "s" : ""}`] : [])];
   return parts.length ? parts.join(" and ") : "your wallets";
 }
-/** Move's first line (the copy review's J5): "Moving it to your SOL and ETH (RH) wallets."; once its legs landed, "Moved to …"
+/** Move's first line (the copy review's J5): "Moving it to your SOL and ETH (RH) wallets."; once its legs landed, "It's now in …"
  *  (provisional). The figure is the receipt's hero, said once (the audit's way-home audit M6, 7 Nov; Send's M8). */
-export const movingLine = (where: string, landed: boolean): string => (landed ? `Moved to ${where}.` : `Moving it to ${where}.`);
+export const movingLine = (where: string, landed: boolean): string => (landed ? `It's now in ${where}.` : `Moving it to ${where}.`);
+/** Audit 13's D1 (8 Nov): Move's receipt in one tense. `legs`: its legs read landed off Activity (madeState); `rows`: its
+ *  Jobs rows landed (the clock TimeLeft reads). Either one landed it: one rule, so "Done." never sits beside "Job created.".
+ *  Landed: "Done." / "It's now in your SOL wallet." / "It went there through NEAR Confidential."; going: "Job created." / "Moving it
+ *  to your SOL wallet." / who does the work ("NEAR Confidential moves it. Solana lands it."). */
+/** Builder 24, item 2: `steps`, the job's steps are on screen (JobRowSteps): they say who does what, so no who line. */
+export function moveReceiptWords(o: { legs: boolean; rows: boolean; where: string; who: string; steps?: boolean }): { landed: boolean; head: string; title: string; who: string | null } {
+  const landed = o.legs || o.rows;
+  return { landed, head: landed ? JOB_WORDS.landed : JOB_WORDS.created, title: movingLine(o.where, landed), who: o.steps ? null : landed ? "It went there through NEAR Confidential." : o.who };
+}

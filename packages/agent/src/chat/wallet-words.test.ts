@@ -43,9 +43,9 @@ test("on: propose_act offers only AgentZero's wallet, from and to; the prompt sa
 test("on (product decision, 3 Nov): the shipped places, prompt and tools are the wallet's; explicitly off they are as they were", () => {
   assert.deepEqual(ACT_PLACES, ["agent"]);
   assert.equal(CHAT_SYSTEM, chatSystem(true));
-  assert.deepEqual(actPlaces(false), ["spending", "sol", "hood", "bsc", "safe"]);
+  assert.deepEqual(actPlaces(false), ["spending", "sol", "hood", "safe"]);
   assert.deepEqual(act(CHAT_TOOLS as never).input_schema.properties.from.enum, ["agent"]);
   assert.doesNotMatch(chatSystem(false), /its own wallet \(place agent\)/);
-  assert.deepEqual(act(chatTools(JOB_SCHEMA, false) as never).input_schema.properties.from.enum, ["spending", "sol", "hood", "bsc", "safe"]);
+  assert.deepEqual(act(chatTools(JOB_SCHEMA, false) as never).input_schema.properties.from.enum, ["spending", "sol", "hood", "safe"]);
   assert.match(act(chatTools(JOB_SCHEMA, false) as never).description, /Places: spending \(their NEAR wallet, its dollars\)/);
 });

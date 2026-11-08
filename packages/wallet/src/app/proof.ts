@@ -23,6 +23,9 @@ export interface ProofPage {
   done?: true;
   /** How it ended, when its own words say more than Finished / Done (a swap, copy review 6 Nov). null: no card while it runs. */
   ended?: { label: string; line: string; check?: string } | null;
+  /** G7: no transaction to show at all yet (no link, no swap order, no private step) while it goes: the page says so
+   *  once. Ended with none (audit 17's H5): nothing, never a placeholder line under "Finished". */
+  noLink?: true;
   /** Its steps shown even when it has one (a swap in place: a tap on its running row opens its steps). */
   stepsShown?: true;
 }
@@ -39,6 +42,8 @@ export const PROOF_WORDS = {
   private: "This step is private. It has no public record.",
   notYet: "Not finished yet.",
   doneNoLink: "Done.",
+  /** G7: a record with no transaction to show yet, while it still goes (audit 17's H5: never on one that ended). */
+  noLink: "No receipt link yet.",
   done: "Done",
   going: "Going",
   stopped: "Stopped",
@@ -99,7 +104,8 @@ const fromProof = (p: MoveProof | undefined, side: "start" | "end"): ProofEnd | 
  * there), then out of it to the payee; paid from the private balance alone ("pocket-send:"), one step that starts there.
  */
 export function movementPage(m: Movement): ProofPage {
-  const txs = m.explorerUrls.map(txFromUrl).filter((t): t is TxProof => !!t);
+  // audit 16's G7: a record with no links read yet (an older or another build's record) never throws; it says so
+  const txs = (Array.isArray(m.explorerUrls) ? m.explorerUrls : []).map(txFromUrl).filter((t): t is TxProof => !!t);
   const done = m.status === "done" || m.status === "refunded";
   const landed = fromProof(m.proof, "end");
   const swaps = [...new Set([m.proof?.deposit, m.depositAddress].filter((d): d is string => !!d && swapIdOk(d)))];
@@ -107,7 +113,7 @@ export function movementPage(m: Movement): ProofPage {
   const page = (all: ProofStep[]): ProofPage => {
     const steps = endSteps(all, m.status === "done");
     const started = steps[0]?.start, finished = done ? steps.at(-1)?.end : undefined;
-    return { ...(started ? { started } : {}), ...(finished ? { finished } : {}), steps, swaps, ...(done ? { done: true as const } : {}) };
+    return { ...(started ? { started } : {}), ...(finished ? { finished } : {}), steps, swaps, ...(done ? { done: true as const } : {}), ...(!done && !txs.length && !landed && !swaps.length && !all.some((x) => x.start || x.end) ? { noLink: true as const } : {}) };
   };
   const at = { atIso: m.startedAtIso };
   if (m.private && m.kind === "pay" && m.id.startsWith("pocket-send:")) return page([{ label: "NEAR wallet → who you paid", ...at, start: { private: true }, ...(landed ? { end: landed } : {}) }]);
@@ -122,7 +128,7 @@ export function movementPage(m: Movement): ProofPage {
 }
 
 /** One step's words, by where it went: "Safe → NEAR wallet", "NEAR wallet → SOL wallet". */
-const PLACE: Record<string, string> = { sol: "SOL wallet", hood: "ETH (RH) wallet", near: "NEAR wallet", bsc: "BNB wallet", safe: "Safe" };
+const PLACE: Record<string, string> = { sol: "SOL wallet", hood: "Robinhood wallet", near: "NEAR wallet", bsc: "BNB wallet", safe: "Safe" };
 function stepLabel(r: SpendingActivity, first: boolean): string {
   const net = r.network ? PLACE[r.network] ?? "wallet" : "";
   if (r.kind === "top-up") return `Safe → ${PLACE.near}`;

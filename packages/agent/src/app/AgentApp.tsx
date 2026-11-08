@@ -25,7 +25,8 @@ import { ThisDevice, onPhone, thisDevice } from "@zerofee/shell-api/approval-wor
 import { askUnderLine } from "./ask-words.ts";
 import { USDC_ID, WNEAR_ID } from "../agent-pay.ts";
 import { zeroBudget } from "../zero/budget.ts";
-import { MODEL, NearAiError, attest, type Proof } from "../nearai.ts";
+import { ATTEST_MS, MODEL, NearAiError, attest, type Proof } from "../nearai.ts";
+import { READ_WORDS, useLeft } from "./read-left.ts";
 import { doWords, routineDry, routineLines, whenWords, type RoutineTerms } from "../zero/routines.ts";
 import { cannotJobLine, JOB_ORDER, KEEP_WALLET, KEEP_WALLETS, noPayLine, NO_POCKET_LINE, NOT_OFFERED_LINE, POCKET_UPDATE_TITLE, pocketUpdateLine, OPEN_LINE, jobOffered, jobStarts, jobsLine, offeredJobs, overPocketLine, OVER_DAY_LINE, POCKET_CHOICES, POCKET_DEFAULT, defaultTerms, dollars, fitLine, jobLine, listWaiting, pocketFix, pocketWaitLine, pocketAtOnce, pausedLine, parseList, runningList, safeKeyOffered, COPY_DAY_MOST, jobTitle, newJobId, startSheet, termsProblem, type Job, type JobKind, type JobTerms } from "../zero/jobs.ts";
 import { spentToday, type Event } from "../zero/runner.ts";
@@ -49,8 +50,8 @@ import { startJob as startMoneyJob, watchShown, type JobHandle } from "@zerofee/
 /** What the chat's card says for something AgentZero can't do yet (an act while AGENT_ACT is off). */
 const CANT_YET = "AgentZero can't do this yet.";
 // D124/D128/D129: the product money words. Trading's cash (USDC on NEAR Intents) is "your NEAR wallet"; every move is
-// private, so there is no Hidden; BNB is named only once it opens (float-moves.ts bsc open: false).
-const PLACE: Record<string, string> = { spending: "your NEAR wallet", hidden: "your NEAR wallet", safe: "your Safe", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+// private, so there is no Hidden; the app's chains only (core app-chains.ts, audit 18's I8).
+const PLACE: Record<string, string> = { spending: "your NEAR wallet", hidden: "your NEAR wallet", safe: "your Safe", sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet" };
 /** The chat's act in a few words, e.g. "Move $5 from your NEAR wallet to your SOL wallet". */
 export function actWords(a: { act: string; from: string; to: string | null; usd: number }): string {
   const verb = { move: "Move", swap: "Swap", trade: "Trade", send: "Send", pay: "Pay" }[a.act] ?? "Do";
@@ -65,7 +66,7 @@ import { AppBrowser, AppHome, Check, Copy } from "@zerofee/design/icons.tsx";
 import { LeaderCard } from "./LeaderCard.tsx";
 import { LeaderField } from "./LeaderField.tsx";
 import { AzLead } from "./AzLead.tsx";
-import { offersTurnOn, pausedUntil, pocketFrom, readWithin, type PocketRead } from "./pocket-read.ts";
+import { POCKET_READ_MS, offersTurnOn, pausedUntil, pocketFrom, readWithin, type PocketRead } from "./pocket-read.ts";
 /** Concept v3.1: a soft glyph per job on the start page (design icons; a glyph, never a logo). */
 const JOB_GLYPH: Readonly<Record<JobKind, ReactNode>> = { copy: <Copy />, keep: <AppHome />, "pay-list": <Check />, "sign-in": <AppBrowser /> };
 import "./agent.css";
@@ -208,6 +209,11 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
   const [why, setWhy] = useState<Receipt | null>(null);
   const [proof, setProof] = useState<Proof | null>(null);
   const [checking, setChecking] = useState(false);
+  // item 6: the pocket read and the proof read count down from their own start to their deadline (read-left.ts)
+  const [pocketAt, setPocketAt] = useState<number>(() => Date.now());
+  const [proofAt, setProofAt] = useState<number | null>(null);
+  const pocketLeft = useLeft(pocket.k === "reading" ? pocketAt : null, POCKET_READ_MS);
+  const proofLeft = useLeft(checking ? proofAt : null, ATTEST_MS);
   const [words, setWords] = useState("");
   const [reading, setReading] = useState(false);
   const [fault, setFault] = useState<RuleFault | null>(null);
@@ -267,6 +273,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
   // S2: every read ends with an answer. The view gets POCKET_READ_MS; a slow price or engine never holds it up.
   const read = useCallback(async () => {
     setPocketRead((r) => (r.k === "unread" ? { k: "reading" } : r));
+    setPocketAt(Date.now());
     const [view, tokens] = await Promise.all([
       readWithin(bridge.call("account.agent.view")),
       readWithin(bridge.call<{ assetId: string; priceUsd?: string }[]>("ledger.tokens")),
@@ -611,6 +618,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
 
   const showProof = async () => {
     setChecking(true);
+    setProofAt(Date.now());
     try {
       setProof(await attest(MODEL));
     } catch (e) {
@@ -690,7 +698,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
               <div className="ag-row"><span><span className="t">{why.check.verdict === "allow" ? "Checked before it paid ✓" : why.check.verdict === "warn" ? "Checked before it paid" : "Refused by the check"}</span><span className="d">{`${why.check.line} ${sealed?.proof ? SEALED : `Checked on ${thisDevice()}.`}`}</span></span></div>
             )}
             {sealed?.proof && (
-              <div className="ag-row"><span><span className="t">The proof</span><span className="d">{`Signed by ${sealed.proof.model}: ${sealed.proof.signature.slice(0, 18)}…`}</span></span></div>
+              <div className="ag-row"><span><span className="t">The proof</span><span className="d">{`Signed by ${sealed.proof.model}.`}</span></span></div>
             )}
             {why.txHash && !why.txHash.startsWith("sample") && (
               <a className="ag-row" href={`https://nearblocks.io/txns/${why.txHash}`} target="_blank" rel="noreferrer"><span className="t">See it on NEAR's public record</span><span className="v">›</span></a>
@@ -698,7 +706,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
             {why.txHash?.startsWith("sample") && <div className="ag-row"><span className="t">Sample money. Nothing real moved.</span></div>}
             {logLine(why, receipts) && <div className="ag-row"><span className="t">{logLine(why, receipts)}</span></div>}
             <button className="ag-row" disabled={checking} onClick={() => void showProof()}>
-              <span><span className="t">Checks on a locked computer</span><span className="d">{checking ? "Getting the proof…" : "Not even ZeroFee can look inside. Tap to see proof."}</span></span><span className="v">›</span>
+              <span><span className="t">Checks on a locked computer</span><span className="d">{checking && proofLeft ? READ_WORDS.proof(proofLeft) : "Not even ZeroFee can look inside. Tap to see proof."}</span></span><span className="v">›</span>
             </button>
           </div>
         </div>
@@ -722,7 +730,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
           <textarea aria-label="Give AgentZero a job" rows={1} value={words} placeholder="Give AgentZero a job" onChange={(e) => setWords(e.target.value)} />
           <button className="ag-send" type="submit" disabled={!words.trim() || reading} aria-label="Read my job"><Send /></button>
         </form>
-        <p className="zf-small ag-under">{reading ? "Claude is reading your job…" : fault ? fault.line : readBy === "own-key" ? "Read by Claude with your own key." : readBy === "allowance" && allowance ? `Read by Claude. Free reading used: ${dollars(allowance.usedUsd)} of ${dollars(allowance.limitUsd)}.` : "Say a job in your words. You get one sheet to check."}</p>
+        <p className="zf-small ag-under">{reading ? "Claude is reading your job." : fault ? fault.line : readBy === "own-key" ? "Read by Claude with your own key." : readBy === "allowance" && allowance ? `Read by Claude. Free reading used: ${dollars(allowance.usedUsd)} of ${dollars(allowance.limitUsd)}.` : "Say a job in your words. You get one sheet to check."}</p>
         </>)}
         {settles && (<>
 
@@ -770,7 +778,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
           <button className="ag-row" onClick={() => setSheet({ kind: "computer" })}>
             <span>
               <span className="t">{computerAt ? "AgentZero on a computer" : "Use AgentZero on a computer"}</span>
-              <span className="d">{computerAt ? `Paired ${new Date(computerAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}. Stop AgentZero to stop it there too.` : "Claude Code on your computer can use AgentZero, from its own wallet."}</span>
+              <span className="d">{computerAt ? `Paired ${new Date(computerAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}. Stop AgentZero to stop it there too.` : PAIR_SHEET.rowLine}</span>
             </span>
             <span className="v">›</span>
           </button>
@@ -813,7 +821,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
           <button className="ag-row" disabled={pocket.k === "reading"} onClick={() => (pocket.k === "unread" ? void read() : offersTurnOn(pocket) ? setSheet({ kind: "pocket" }) : undefined)}>
             <span>
               <span className="t">{walletRow(on ? agent.heldUsd ?? Math.max(0, Math.round((pocketUsd - Math.max(today, agent.spentUsd)) * 100) / 100) : 0)}</span>
-              <span className="d">{pocket.k === "reading" ? "Looking at your account…" : pocket.k === "unread" ? (pocket.problem?.whatHappened ?? POCKET_UNREAD_LINE) : on && raiseShown(raise, on, pocketUsd) ? `Goes up to ${dollars(raise!.usd)} on ${new Date(raise!.atIso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}. Spent so far: ${dollars(Math.max(today, agent.spentUsd))}.` : on && agent.pausedUntilIso ? pausedLine(agent.pausedUntilIso) : on ? `Spent so far: ${dollars(Math.max(today, agent.spentUsd))}.${ownWalletWords().row ? ` ${ownWalletWords().row}` : ""}` : startsAt ? `AgentZero starts ${new Date(startsAt).toLocaleString("en-US", { weekday: "long", hour: "numeric", minute: "2-digit" })}.` : "Off. Fund it to turn AgentZero on."}</span>
+              <span className="d">{pocket.k === "reading" ? READ_WORDS.pocket(pocketLeft ?? "") : pocket.k === "unread" ? (pocket.problem?.whatHappened ?? POCKET_UNREAD_LINE) : on && raiseShown(raise, on, pocketUsd) ? `Goes up to ${dollars(raise!.usd)} on ${new Date(raise!.atIso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}. Spent so far: ${dollars(Math.max(today, agent.spentUsd))}.` : on && agent.pausedUntilIso ? pausedLine(agent.pausedUntilIso) : on ? `Spent so far: ${dollars(Math.max(today, agent.spentUsd))}.${ownWalletWords().row ? ` ${ownWalletWords().row}` : ""}` : startsAt ? `AgentZero starts ${new Date(startsAt).toLocaleString("en-US", { weekday: "long", hour: "numeric", minute: "2-digit" })}.` : "Off. Fund it to turn AgentZero on."}</span>
             </span>
             <span className="v">›</span>
             {on && pocketUsd > 0 && <span className="ag-meter" aria-hidden="true"><i style={{ "--w": `${Math.min(100, (today / pocketUsd) * 100)}%` } as CSSProperties} /></span>}
@@ -933,7 +941,8 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
         <Sheet title={FUND_TITLE} onClose={() => setFunded(null)}>
           <div className="zf-receipt zf-receipt--job" data-state="away" role="status" aria-live="polite" data-testid="az-fund-made">
             <p className="zf-receipt__amount">{funded.amount}</p>
-            <p className="zf-receipt__head">{JOB_WORDS.created}</p>
+            {/* QA 16 (8 Nov): the same head as Wallet's receipt, whose clock it shares (receiptLeft's "Took N s.") */}
+            <p className="zf-receipt__head" data-testid="az-fund-head">{funded.landedAt !== undefined && !funded.slow ? JOB_WORDS.landed : JOB_WORDS.created}</p>
             <p className="zf-receipt__line" data-testid="az-fund-said">{funded.slow ? fundSlowLine(funded.amount) : agentFundLine(funded.amount, funded.landedAt !== undefined)}</p>
             <p className="zf-receipt__line" data-testid="az-fund-from">{funded.from}</p>
             <p className="zf-receipt__line" data-testid="job-time-left">{funded.slow ? TIME_WORDS.slow : receiptLeft(funded.endsAt, Date.now(), funded.startAt, funded.landedAt)}</p>
@@ -1036,7 +1045,7 @@ function AgentZeroScreens({ bridge: given, part = "all", onClose, open, below }:
             const at = new Date().toISOString();
             setComputerAt(at);
             void bridge.call("device.store.set", { key: COMPUTER_KEY, value: JSON.stringify({ atIso: at }) });
-            setSheet({ kind: "computer", said: "Paired. Your computer finishes by itself in a few seconds." });
+            setSheet({ kind: "computer", said: PAIR_SHEET.paired });
           }}
           onClose={() => setSheet(null)}
         />
@@ -1143,10 +1152,11 @@ function JobSheet({ sheet, running, agentOn, sample, pocketUsd, busy, onStart, o
         </div>
       )}
       {moved && <p className="zf-small ag-under">{moved}</p>}
-      {/* test: every job says its rough cost before it runs, at the model's own price (fund-words.ts) */}
-      {!isRunning && <p className="zf-small ag-under ag-cost">{jobCostLine()}</p>}
       </div>
       <div className="ag-sheet-floor">
+        {/* test: every job says its rough cost before it runs, at the model's own price (fund-words.ts); in the
+            floor above Start, so it is never under the scroll's fade (audit 14 E9: it read clipped at rest) */}
+        {!isRunning && <p className="zf-small ag-cost">{jobCostLine()}</p>}
         {isRunning && running ? (
           <button className="zf-btn" onClick={() => void onStop(running)}>Stop this job</button>
         ) : (
@@ -1159,6 +1169,16 @@ function JobSheet({ sheet, running, agentOn, sample, pocketUsd, busy, onStart, o
 }
 
 /** Your own Claude key: kept in this phone's keychain, sent to Anthropic only through the call you start (D82). */
+/** b23 (audit 18 Tray: the Tray's phone path, words at grade 5, one idea, the button says what happens): the words of
+ *  "Use AgentZero on a computer" that a grade-5 reader failed (the wallet row 7.0,
+ *  the row line 6.8, "Continue" before the words check). */
+export const PAIR_SHEET = {
+  rowLine: "Let Claude Code on your computer use it.",
+  wallet: "The computer pays from AgentZero's wallet. It can't touch your Safe.",
+  go: "Check the words",
+  paired: "Paired. Your computer is done in a few seconds.",
+} as const;
+
 /** "Use AgentZero on a computer": paste the computer's code; the core's own sheet shows the check code before anything leaves. */
 function ComputerSheet({ said, busy, onPair, onClose }: { said?: string; busy: boolean; onPair: (offer: string) => void; onClose: () => void }) {
   const [code, setCode] = useState("");
@@ -1167,12 +1187,12 @@ function ComputerSheet({ said, busy, onPair, onClose }: { said?: string; busy: b
       <div className="ag-rows">
         <div className="ag-row"><span className="t">On your computer, run AgentZero and copy its code. Paste it here.</span></div>
         <div className="ag-row"><span className="t">Next, check that the 6 words on your computer match the ones on this phone.</span></div>
-        <div className="ag-row"><span className="t">The computer can spend from AgentZero's wallet, like AgentZero here. Your Safe's key stays here.</span></div>
+        <div className="ag-row"><span className="t">{PAIR_SHEET.wallet}</span></div>
         <div className="ag-row"><span className="t">Stop AgentZero here any time. It stops on the computer too.</span></div>
         {said && <div className="ag-row alert"><span className="t">{said}</span></div>}
       </div>
-      <textarea className="ag-paste" aria-label="The computer's code" rows={3} value={code} placeholder="zf-pair:2:…" onChange={(e) => setCode(e.target.value)} />
-      <div className="ag-sheet-floor"><button className="zf-btn" disabled={busy || !code.trim().startsWith("zf-pair:")} onClick={() => onPair(code.trim())}>Continue</button></div>
+      <textarea className="ag-paste" aria-label="The computer's code" rows={3} value={code} placeholder="zf-pair:2:" onChange={(e) => setCode(e.target.value)} />
+      <div className="ag-sheet-floor"><button className="zf-btn" disabled={busy || !code.trim().startsWith("zf-pair:")} onClick={() => onPair(code.trim())}>{PAIR_SHEET.go}</button></div>
     </Sheet>
   );
 }
@@ -1190,7 +1210,7 @@ function KeySheet({ has, onSave, onRemove, onClose }: { has: boolean; onSave: (k
       {!has && (
         <label className="ag-field">
           <span className="zf-small">Your key from Anthropic</span>
-          <input type="password" value={k} placeholder="sk-ant-…" autoComplete="off" spellCheck={false} onChange={(e) => setK(e.target.value)} />
+          <input type="password" value={k} placeholder="sk-ant-" autoComplete="off" spellCheck={false} onChange={(e) => setK(e.target.value)} />
         </label>
       )}
       {!has && k.trim() !== "" && !ok && <p className="zf-small ag-under">That isn't a Claude key. It starts with sk-ant-.</p>}

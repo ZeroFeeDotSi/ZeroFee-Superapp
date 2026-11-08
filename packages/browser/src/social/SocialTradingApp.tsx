@@ -13,7 +13,8 @@ import { usd } from "@zerofee/trade/app/format.ts";
 import { PRESET_LOGO } from "../app/chains.tsx";
 import { LISTED } from "./catalog.ts";
 import { Mark, initialOf } from "./Favourites.tsx";
-import { readHub } from "./hub-state.ts";
+import { keptHub, readHub, saveHub } from "./hub-state.ts";
+import { chainDown, keptLine, useDownRows } from "@zerofee/trade/app/chain-down.ts";
 import { SiteWalletApp } from "./SiteWalletApp.tsx";
 import { SOCIAL_TRADING, siteFigures, siteOf } from "./social-trading.ts";
 import "./social.css";
@@ -34,16 +35,25 @@ export function SocialTradingApp({ page, browser, web = false }: { /** this page
   }, [requestSeq, requestedTab]);
   // the figures: what the hub read last on this phone at once, then Spending's list while this list is on screen
   const [figures, setFigures] = useState<Record<string, number | null>>(() => Object.fromEntries(readHub().map((r) => [r.site, r.usd])));
+  // audit 18 (S18-4): a site Solana couldn't read now shows its last figure (hub-state keptHub) with its time and who is
+  // down, once under the list, in Home's Hot words (trade chain-down keptLine); never a blank row
+  const [unread, setUnread] = useState<readonly string[]>([]);
+  const [kept, setKept] = useState(() => keptHub());
+  const down = chainDown(useDownRows(bridge), "sol");
   useEffect(() => {
     if (!active || site || web) return;
     let live = true;
     void bridge.call<SpendingWallet[]>("spending.wallets").then((r) => {
       if (!live || !("ok" in r) || !Array.isArray(r.ok)) return;
       const read = siteFigures(r.ok, IDS);
+      saveHub(IDS.map((id) => ({ site: id, name: LISTED.find((a) => a.id === id)?.preset.name ?? id, usd: read[id] ?? null })));
+      setKept(keptHub());
+      setUnread(IDS.filter((id) => read[id] === null));
       setFigures((prev) => Object.fromEntries(IDS.map((id) => [id, read[id] ?? prev[id] ?? null])));
     }, () => undefined);
     return () => { live = false; };
   }, [active, site, web, bridge]);
+  const keptAt = unread.flatMap((id) => (kept[id] ? [kept[id]!.at] : []));
 
   if (site && !web) return <SiteWalletApp site={site} page={page} {...(browser ? { browser } : {})} onBack={() => setSite(null)} />;
   const shownSite = site ? LISTED.find((a) => a.id === site) : undefined;
@@ -58,7 +68,7 @@ export function SocialTradingApp({ page, browser, web = false }: { /** this page
       <section className="sh-recent" aria-label={SOCIAL_TRADING.name} data-testid="social-trading">
         <ul className="zf-group sh-group">
           {LISTED.map((a) => {
-            const n = figures[a.id];
+            const n = unread.includes(a.id) ? kept[a.id]?.usd : figures[a.id];
             return (
               <li key={a.id}>
                 <button className="zf-row sh-recent-row" data-testid={`social-trading-${a.id}`} onClick={() => setSite(a.id)}>
@@ -73,6 +83,7 @@ export function SocialTradingApp({ page, browser, web = false }: { /** this page
             );
           })}
         </ul>
+        {keptAt.length > 0 && <p className="zf-small st-as-of" data-testid="social-as-of">{keptLine("sol", down, unread.length > 1 ? "Site wallets are" : `Your ${LISTED.find((a) => a.id === unread[0])?.preset.name ?? "site"} wallet is`, Math.min(...keptAt))}</p>}
       </section>
       {web && shownSite && active && <OnYourPhone reason="site" name={shownSite.preset.name} icon={<img src={PRESET_LOGO[shownSite.id]} alt="" width={48} height={48} />} onClose={() => setSite(null)} />}
     </AppFrame>

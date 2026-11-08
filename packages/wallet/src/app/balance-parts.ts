@@ -63,7 +63,7 @@ const CHAIN_ROWS = ["sol", "hood"] as const;
  * the coin page), for a screen outside Wallet (Trade's coin page). `tokenId`: the coin page's asset; its symbol is the
  * Safe row's (wrapped NEAR's page is NEAR's line). Null: none held, or the balances can't be read.
  */
-export async function readSafeHeld(bridge: Bridge, tokenId: string): Promise<{ amount: string; usd: string; symbol: string } | null> {
+export async function readSafeHeld(bridge: Bridge, tokenId: string): Promise<{ amount: string; usd: string; symbol: string; rest?: SafeRest[] } | null> {
   const [balances, tokens, positions, pocket, state] = await Promise.all([
     bridge.call<Balance[]>("ledger.balances"),
     bridge.call<Token[]>("ledger.tokens"),
@@ -79,5 +79,13 @@ export async function readSafeHeld(bridge: Bridge, tokenId: string): Promise<{ a
   const nearPrice = "ok" in tokens ? tokens.ok.find((t) => t.assetId === "nep141:wrap.near")?.priceUsd : undefined;
   const earning = earnParts("ok" in positions && Array.isArray(positions.ok) ? positions.ok : [], nearPrice);
   const held = safeHeld(rows, symbol, earning);
-  return held ? { ...held, symbol } : null;
+  if (!held) return null;
+  // builder 22's item 5: where the part Sell can't pay from sits (Private's rows, NEAR with validators), so the coin
+  // page's "Up to N NEAR can go in one sell." says why in one line
+  const rest: SafeRest[] = [];
+  if (own.available && own.rows.some((b) => b.symbol === symbol && Number(b.amount) > 0)) rest.push("private");
+  if (symbol === "NEAR" && earning.some((e) => Number(e.amount) > 0)) rest.push("staked");
+  return { ...held, symbol, ...(rest.length ? { rest } : {}) };
 }
+/** Where a Safe coin's figure holds more than Sell pays from: Private, or NEAR staked with validators. */
+export type SafeRest = "private" | "staked";

@@ -36,7 +36,7 @@
     { "id": "move-01", "cat": "move", "say": "Move $5 from my Safe to my SOL wallet", "expect": { "sheet": { "kind": "move", "from": "safe", "to": "sol", "usd": 5 } } },
     { "id": "move-02", "cat": "move", "say": "Move $5 from my SOL wallet to my Safe", "expect": { "sheet": { "kind": "move", "from": "sol", "to": "safe", "usd": 5 } } },
     { "id": "move-03", "cat": "move", "say": "Move $3 from my Safe to my ETH wallet", "expect": { "sheet": { "kind": "move", "from": "safe", "to": "hood", "usd": 3 } } },
-    { "id": "move-04", "cat": "move", "say": "Move $3 from my ETH (RH) wallet back to my Safe", "expect": { "sheet": { "kind": "move", "from": "hood", "to": "safe", "usd": 3 } } },
+    { "id": "move-04", "cat": "move", "say": "Move $3 from my Robinhood wallet back to my Safe", "expect": { "sheet": { "kind": "move", "from": "hood", "to": "safe", "usd": 3 } } },
     { "id": "move-05", "cat": "move", "say": "Put $2 from my Safe into my NEAR wallet", "expect": { "sheet": { "kind": "move", "from": "safe", "to": "near", "usd": 2 } } },
     { "id": "move-06", "cat": "move", "say": "Move my NEAR wallet's money to the Safe", "expect": { "sheet": { "kind": "move", "from": "near", "to": "safe" } } },
     { "id": "move-07", "cat": "move", "say": "Move everything from my SOL wallet to my Safe", "expect": { "oneOf": [ { "sheet": { "kind": "move", "from": "sol", "to": "safe" } }, { "sheet": "none", "any": ["(SOL wallet|it) (is empty|has nothing|holds nothing|has \\$0)"] } ] } },

@@ -8,7 +8,7 @@ import { WEB_TRADE } from "./release.ts";
  *  (sites are the phone app's; Trade only while WEB_TRADE is on). */
 // two short lines (webd-money2 crawl, 4 Nov: six lines pushed the wallet rows under the app bar; the Copywriter's words)
 export const webLine = (trade: boolean): string =>
-  `Web version: no Safe. It's in the phone app. ${trade ? "Add and trade. Send from SOL and ETH (RH)." : "Add money. Send from SOL and ETH (RH)."}`;
+  `Web version: no Safe. It's in the phone app. ${trade ? "Add and trade. Send from SOL and Robinhood." : "Add money. Send from SOL and Robinhood."}`;
 export const WEB_LINE = webLine(WEB_TRADE);
 /** Its × (bug report, 4 Nov): once closed it stays closed in this browser, in Sim and Real alike (apps/web sim-storage.ts
  *  shares the key), until "Start again" clears the browser's ZeroFee keys. A store that can't be read shows the line. */
@@ -97,7 +97,7 @@ export const WEB_WORDS = {
 /** The three hot wallets the web wallet has, by the core's names (account.web.exportKey's `wallet`). */
 export const WEB_WALLETS = [
   { wallet: "sol", name: "SOL" },
-  { wallet: "eth", name: "ETH (RH)" },
+  { wallet: "eth", name: "Robinhood" },
   { wallet: "near", name: "NEAR" },
 ] as const;
 export type WebWalletId = (typeof WEB_WALLETS)[number]["wallet"];

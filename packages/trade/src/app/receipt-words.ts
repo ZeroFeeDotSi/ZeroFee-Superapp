@@ -26,8 +26,13 @@ export const SEE_PROOF = "See proof";
  * only gap line (copy review, 8 Nov: a second one under the holding read as two prices for one coin). No quote: nothing is said.
  */
 export function buyCostLine(q: Pick<Quote, "payUsd" | "getUsd" | "feeUsd"> | undefined, feeUsd: number | undefined): string | null {
+  return tradeCostLine("buy", q, feeUsd);
+}
+/** the audit's Trade S3 (8 Nov): a sale's receipt names its gap the same way, under the market price ("About $0.07 under the
+ *  market price. Fee $0.002."), as the Sell sheet's own line does (marketGapLine "sell"). */
+export function tradeCostLine(side: "buy" | "sell", q: Pick<Quote, "payUsd" | "getUsd" | "feeUsd"> | undefined, feeUsd: number | undefined): string | null {
   if (!q) return null;
-  const gap = marketGapLine("buy", q);
+  const gap = marketGapLine(side, q);
   const fee = feeUsd !== undefined && Number.isFinite(feeUsd) && feeUsd > 0 ? `Fee ${usd(feeUsd)}.` : null;
   return [gap, fee].filter(Boolean).join(" ") || null;
 }

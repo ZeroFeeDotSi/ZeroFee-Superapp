@@ -86,12 +86,12 @@ test("(b) Approve makes exactly one ledger.fromPrivate call and one job; a secon
 
 test("(c) \"Job created. … Watch it in Activity.\" stays once its job is made, when the refresh reads Private empty [before: gone with the rows]", () => {
   const made = renderToStaticMarkup(createElement(P.HomeRow, { step: "sent", has: false, onOpen: () => {} }));
-  assert.match(made, /data-testid="private-home-made">Job created\. It goes through NEAR Confidential\. Watch it in Activity\.<\/p>/);
+  assert.match(made, /data-testid="private-home-made">Job created\.<br\/>It goes through NEAR Confidential\. Watch it in Activity\.<\/p>/);
   assert.doesNotMatch(src, /rows\.length > 0 && \(moving === "sent"/, "fails before: the line was under rows.length > 0");
   // control: before the job, the trigger shows only while Private holds money, a 44 px quiet capsule (copy review)
   assert.equal(renderToStaticMarkup(createElement(P.HomeRow, { step: "no", has: false, onOpen: () => {} })), "");
   assert.match(renderToStaticMarkup(createElement(P.HomeRow, { step: "no", has: true, onOpen: () => {} })), /<button class="zf-btn zf-btn--quiet wl-capsule" data-testid="private-home-open">Move it all to your Safe<\/button>/);
-  assert.match(renderToStaticMarkup(createElement(P.HomeRow, { step: "asking", has: true, onOpen: () => {} })), /disabled="" data-testid="private-home-open">Moving…<\/button>/);
+  assert.match(renderToStaticMarkup(createElement(P.HomeRow, { step: "asking", has: true, onOpen: () => {} })), /disabled="" data-testid="private-home-open">Move it all to your Safe<\/button>/);
   const css = readFileSync(new URL("../wallet.css", import.meta.url), "utf8");
   assert.match(css, /\.zf-btn\.wl-capsule \{ width: auto; height: 44px; min-height: 44px;/, "the capsule is 44 px");
 });

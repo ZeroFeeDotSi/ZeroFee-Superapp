@@ -58,7 +58,7 @@ export type WalletChain = "sol" | "hood" | "bsc" | "near";
  */
 export const NETWORK_FEE_USD: Readonly<Record<WalletChain, number>> = { sol: 0.3, hood: 0.3, bsc: 0.3, near: 0 };
 /** A Home name for a wallet ("your SOL wallet") to its chain; null for any other. */
-const CHAIN_OF_NAME: Readonly<Record<string, WalletChain>> = { "your SOL wallet": "sol", "your ETH (RH) wallet": "hood", "your BNB wallet": "bsc", "your NEAR wallet": "near" };
+const CHAIN_OF_NAME: Readonly<Record<string, WalletChain>> = { "your SOL wallet": "sol", "your Robinhood wallet": "hood", "your ETH (RH) wallet": "hood", "your BNB wallet": "bsc", "your NEAR wallet": "near" };
 export const walletChainOf = (wallet: string): WalletChain | null => CHAIN_OF_NAME[wallet.replace(/^Your /, "your ")] ?? null;
 /**
  * The least a wallet's part to another wallet brings, by the core's own floors (move-split.ts leastOf; its move in brings

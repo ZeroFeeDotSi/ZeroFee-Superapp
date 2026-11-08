@@ -778,6 +778,7 @@
 .wl-home .wl-coin:not(.wl-pick) { cursor: default; -webkit-tap-highlight-color: transparent; }
 .wl-home .wl-coin:not(.wl-pick):active { background: none; box-shadow: none; }
 /* First-time hunt (5 Nov): one plain line under each part's head says what it is; quiet, one line, never cut */
+.wl-home .wl-offline { margin: 4px 0 12px; text-align: center; color: var(--ink); }
 .wl-home .wl-what { margin: 0 0 16px; font: 400 13px/18px var(--font); color: var(--mute); white-space: nowrap; }
 
 /* ── A-home 4 (5 Nov, theme v3.1): Home on the materials. Row figures in the money face (tabular); the four round actions
@@ -883,10 +884,11 @@
 .wl-addline__icon:active:not(:disabled) { transform: scale(var(--press-scale, .98)); opacity: .6; }
 .wl-addline__icon:disabled { opacity: .25; cursor: default; }
 .wl-addrow.has-why .wl-addline__addr:first-of-type { color: var(--ink-2); }
-/* 53, 6 Nov, item 12 (fix/trade-list-coin): the Safe row's Buy stays a 32 pt pill to the eye and taps at 44: an inert
-   hit box 6 over and under it (targets.test.ts measures it) */
-.wl-buy { position: relative; }
-.wl-buy::after { content: ""; position: absolute; inset: -6px 0; }
+/* 53, 6 Nov, item 12 (fix/trade-list-coin): the Safe row's Buy stays a 32 pt pill to the eye and taps at 44 (targets.test.ts
+   measures it). Audit 10's A3 (8 Nov): the button itself is the 44 pt box (a tap check reads the element, not a pseudo), its
+   6 over and under taken back by negative margins so the row keeps its height; the pill (ink, 32 tall) is drawn on its words */
+.wl-buy { position: relative; min-height: 44px; margin-top: -6px; margin-bottom: -6px; padding: 0; background: none; border-radius: 0; display: inline-flex; align-items: center; }
+.wl-buy > span { display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 16px; background: var(--ink); color: var(--bg); }
 
 /* Private's way home (the audit's MUSTs, 8 Nov): the trigger is a 44 px quiet capsule; its Check this says the head, the row, the
    privacy line, then Approve (lit, 56 px) and Not now (44 px) */
@@ -903,3 +905,8 @@
 .wl-explain.wl-private-made { margin: 16px 0; }
 /* the copy review's J2-3 (8 Nov, MUST): the QR page's Copy a 44 pt tap (65 x 32 before) */
 .zf-btn.wl-qrfull__copy { height: 44px; min-height: 44px; border-radius: 22px; }
+
+/* audit 11's B13 (8 Nov): Max beside a sheet's figure (pump.fun's Take out, a site's Add) was 54 x 32; its hit area is 44 tall,
+   the pill it shows stays 32, drawn on ::before (as audit 10's A3 drew Home's Buy) */
+.wl-swap-slide .wl-swap-all { position: relative; z-index: 0; height: 44px; min-height: 44px; background: none; }
+.wl-swap-slide .wl-swap-all::before { content: ""; position: absolute; z-index: -1; left: 0; right: 0; top: 6px; bottom: 6px; border-radius: 16px; background: var(--act-fill); }

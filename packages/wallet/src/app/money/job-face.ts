@@ -7,7 +7,7 @@
 import { checkpointAt, type CheckpointAt } from "@zerofee/design/checkpoints.ts";
 import { LANDED_UNREAD, unsureIn } from "@zerofee/core/private-route";
 import { JOB_WORDS } from "@zerofee/shell-api/job-start.ts";
-import { doneIn } from "@zerofee/shell-api/job-steps.ts";
+import { tookIn } from "@zerofee/shell-api/job-steps.ts";
 import { endLine, type LiveTrack, type MoneyAt, type StopGo, type StopNext } from "./live-steps.ts";
 
 /** How the job stands: going; slow (still followed); done; late (it went, the last read hasn't shown it); unknown (stopped,
@@ -37,7 +37,7 @@ export interface JobFace {
   out: "x";
   /** Each step once, with its one word: "Done", "Stopped here", "Not yet" (none on the step going now). */
   steps: { label: string; word?: string }[];
-  /** A done Send's or Move's time, the receipt's own words ("Done in 6 seconds."; the copy review's J2-4, 8 Nov): from its start to
+  /** A done Send's or Move's time, the receipt's own words ("Took 6 s.", QA 16, 8 Nov; was "Done in 6 seconds.", the copy review's J2-4): from its start to
    *  its end, both its own; none when either is unknown. */
   took?: string;
 }
@@ -83,7 +83,7 @@ const LOST = /\s*Nothing is lost\.?/g;
 export const stopLine = (w: string, proven: boolean): string => (proven ? w : w.replace(LOST, "")).replace(KEEPS, "").trim();
 
 /** Home's names for a place, in a sentence (copy review: never a chain name as the place). */
-export const PLACE: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+export const PLACE: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 const andList = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 export const placeWords = (at: readonly string[]): string => andList([...new Set(at)].map((w) => PLACE[w] ?? "your wallet"));
 
@@ -96,10 +96,10 @@ export const plainLine = (w: string | undefined): w is string => !!w && w.length
 const whoOf = (label: string | undefined): string | undefined => (label ? /^(.+?) (?:is|are) \w+ing\b/.exec(label)?.[1] : undefined);
 
 /** The money of a job its builder didn't place (an Add, a Send, a job's starting row): by its end only. */
-const SAID_PLACE: Record<string, string> = { Private: "private", "your Safe": "safe", "your SOL wallet": "sol", "your ETH (RH) wallet": "hood", "your NEAR wallet": "near", "your BNB wallet": "bsc" };
+const SAID_PLACE: Record<string, string> = { Private: "private", "your Safe": "safe", "your SOL wallet": "sol", "your Robinhood wallet": "hood", "your ETH (RH) wallet": "hood", "your NEAR wallet": "near", "your BNB wallet": "bsc" };
 /** The core's unsure words (private-route unsureIn, any place: "either in your Safe or still with NEAR Intents", a Safe
  *  swap's convertFailed; 83, 7 Nov: not Private alone). */
-const UNSURE_SAID = /either in (Private|your Safe|your SOL wallet|your ETH \(RH\) wallet|your NEAR wallet|your BNB wallet) or still with /;
+const UNSURE_SAID = /either in (Private|your Safe|your SOL wallet|your Robinhood wallet|your ETH \(RH\) wallet|your NEAR wallet|your BNB wallet) or still with /;
 /** the audit's (B), the copy review's words (7 Nov): the job waits on the Safe's Face ID (going, its step not begun), or the person said no
  *  there ("You said no, so nothing moved.": the money never left the Safe). */
 const facing = (t: LiveTrack): boolean => !t.end && t.steps.some((x) => x.label === JOB_WORDS.faceIdWait && x.state === "waiting");
@@ -109,7 +109,7 @@ function moneyOf(t: LiveTrack): MoneyAt {
   if (saidNo(t)) return { at: ["safe"], proven: true, from: ["safe"], to: [] };
   if (t.end?.ok) return { at: [], proven: true, from: [], to: [] };
   // a job its builder didn't place (a Send, a Swap in place): only its own end's words name a place ("back in Private")
-  const said = t.end && /(?:back in|is in|still in) (Private|your Safe|your SOL wallet|your ETH \(RH\) wallet|your NEAR wallet|your BNB wallet)/.exec(t.end.line)?.[1];
+  const said = t.end && /(?:back in|is in|still in) (Private|your Safe|your SOL wallet|your Robinhood wallet|your ETH \(RH\) wallet|your NEAR wallet|your BNB wallet)/.exec(t.end.line)?.[1];
   if (said && !t.end?.slow) return { at: [SAID_PLACE[said]!], proven: true, from: [], to: [] };
   const unsure = t.end && UNSURE_SAID.exec(t.end.line)?.[1];
   if (unsure) return { at: [SAID_PLACE[unsure]!], unknown: true, unsure: true, from: [], to: [] };
@@ -266,7 +266,7 @@ export function jobFace(t: LiveTrack): JobFace {
   // a Send says its figure once (the copy review's J2-4): the figure's own line has it, so the line under it is "Send to alice.near"
   const once = t.kind === "send" && !stopped;
   const what = once && figure ? t.title.replace(` ${figure} `, " ") : t.title;
-  const took = s === "done" && (t.kind === "send" || t.kind === "move") && t.endMs !== undefined && Number.isFinite(t.endMs) && Number.isFinite(t.startMs) && t.endMs >= t.startMs ? doneIn(t.endMs - t.startMs) : undefined;
+  const took = s === "done" && (t.kind === "send" || t.kind === "move") && t.endMs !== undefined && Number.isFinite(t.endMs) && Number.isFinite(t.startMs) && t.endMs >= t.startMs ? tookIn(t.endMs - t.startMs) : undefined;
   return {
     state: s,
     bar: stopped ? t.end?.head ?? FACE_WORDS.stopped(verb) : once ? FACE_WORDS.sendBar : verb,
@@ -296,7 +296,7 @@ export function stepWord(state: LiveTrack["steps"][number]["state"], face: "goin
 
 /** The From and To card's words (Home's names, no "your"): "Safe", "ETH (RH) wallet". */
 export const FACE_CARD = { from: "From", to: "To" } as const;
-const CARD_NAME: Record<string, string> = { safe: "Safe", private: "Private", sol: "SOL wallet", hood: "ETH (RH) wallet", near: "NEAR wallet", bsc: "BNB wallet" };
+const CARD_NAME: Record<string, string> = { safe: "Safe", private: "Private", sol: "SOL wallet", hood: "Robinhood wallet", near: "NEAR wallet", bsc: "BNB wallet" };
 const cardWords = (ws: readonly string[]) => [...new Set(ws)].map((w) => CARD_NAME[w] ?? "Wallet").join(", ");
 /** The job page's From and To card: a job's own ends (money.from / money.to, a Move's and a Swap's). A Send's page has the
  *  same card (QA QA's SHOULD, 8 Nov; the copy review's spec: every job kind draws the same face): From the place its money left by

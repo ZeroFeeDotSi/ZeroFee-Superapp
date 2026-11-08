@@ -6,6 +6,7 @@
 //
 // An app reads it as useShell().tasks: publish, update and end its OWN tasks only. The shell stamps the app from the
 // caller (forApp), as prefill's asker is stamped: an app can't write, update or end another app's task.
+import { tookIn } from "./job-steps.ts";
 
 /** The apps the centre groups by. "perps": Trade's perpetuals, or the Browser's host of them; either may name it. */
 export type TaskApp = "home" | "trade" | "agentzero" | "browser" | "chat" | "perps";
@@ -135,7 +136,39 @@ export interface TaskStore {
   keep(next: Kv): void;
 }
 
-export function createTaskStore({ kv, now = Date.now }: { kv?: Kv | undefined; now?: () => number } = {}): TaskStore {
+/** b18: an end written ahead, in this tab's own session storage, the moment it happens. Home's sealed store takes a
+ *  moment to write (an async call; measured under 200 ms in the Sim), so a reload right after a job ended read the row
+ *  back pending, and the row then said the job was cut off. The record holds no words, no site and no figures (the
+ *  the review's ruling, 8 Nov): only the job's id as a number (a hash of its app and id), its state, its end time and
+ *  how long it took. The next load's keep() applies it to a row still pending: the row's own line comes from the sealed
+ *  store when its final line landed there first (it ends "Took N s."), else "Done. Took N s." with no
+ *  report (a stop: the plain ended words), never a wrong line. Then the record is dropped. */
+export const TASK_ENDS_KEY = "zf.tasks.ends.v1";
+type Ahead = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+export type EndAhead = { jobId: number; state: "done" | "stopped" | "failed"; endedAt: number; tookMs: number };
+/** A job's id in the record: FNV-1a of its app and id, a number (no letters leave the sealed store). */
+export const jobNumber = (app: string, id: string): number => {
+  let h = 0x811c9dc5;
+  for (const c of `${app}\u0001${id}`) h = Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0;
+  return h;
+};
+const sessionOr = (): Ahead | undefined => {
+  try {
+    return typeof sessionStorage === "undefined" ? undefined : sessionStorage;
+  } catch {
+    return undefined;
+  }
+};
+const readEnds = (ahead: Ahead | undefined): EndAhead[] => {
+  try {
+    const raw = JSON.parse(ahead?.getItem(TASK_ENDS_KEY) ?? "[]") as unknown;
+    return Array.isArray(raw) ? raw.filter((e): e is EndAhead => !!e && typeof e === "object" && Number.isInteger(e.jobId) && ["done", "stopped", "failed"].includes(e.state) && Number.isFinite(e.endedAt) && Number.isFinite(e.tookMs) && e.tookMs >= 0) : [];
+  } catch {
+    return [];
+  }
+};
+
+export function createTaskStore({ kv, now = Date.now, ahead = sessionOr() }: { kv?: Kv | undefined; now?: () => number; ahead?: Ahead | undefined } = {}): TaskStore {
   let tasks: Task[] = [];
   try {
     const raw = JSON.parse(kv?.getItem(TASKS_KEY) ?? "[]") as unknown;
@@ -188,8 +221,20 @@ export function createTaskStore({ kv, now = Date.now }: { kv?: Kv | undefined; n
       save();
     },
     keep(next) {
-      tasks = [...tasks, ...createTaskStore({ kv: next, now }).list().filter((t) => find(t.app, t.id) < 0)];
+      tasks = [...tasks, ...createTaskStore({ kv: next, now, ahead: undefined }).list().filter((t) => find(t.app, t.id) < 0)];
       kv = next;
+      // b18: ends written ahead (a reload came before the sealed write): a row still pending here had ended
+      const ends = readEnds(ahead);
+      tasks = tasks.map((t) => {
+        const e = ends.find((x) => x.jobId === jobNumber(t.app, t.id));
+        if (t.state !== "pending" || !e) return t;
+        // its final line (it ends "Took …"), when it reached the sealed store before the end did; else no report, never a
+        // wrong line
+        const line = e.state === "done" ? (t.detail && /\bTook [^.]+\.$/.test(t.detail) ? t.detail : `Done. ${tookIn(e.tookMs)}`) : undefined;
+        const { detail: _old, ...rest } = t;
+        return { ...rest, state: e.state, endedAt: e.endedAt, steps: t.steps.map((x) => (x.state === "doing" ? { ...x, state: "waiting" as TaskStepState } : x)), ...(line ? { detail: line } : {}) };
+      });
+      try { ahead?.removeItem(TASK_ENDS_KEY); } catch { /* nothing to drop */ }
       save();
     },
     forApp(shellApp) {
@@ -224,6 +269,14 @@ export function createTaskStore({ kv, now = Date.now }: { kv?: Kv | undefined; n
           // an ended task has nothing going on: a step still "doing" waits (no "…" under Done, Stopped or Didn't finish)
           const steps = tasks[at]!.steps.map((x) => (x.state === "doing" ? { ...x, state: "waiting" as TaskStepState } : x));
           tasks[at] = { ...tasks[at]!, state, steps, endedAt: now(), ...(detail ? { detail: detail.slice(0, 300) } : {}) };
+          // b18: written ahead, at once (numbers and the state word only), so a reload before the sealed write keeps it
+          try {
+            const t = tasks[at]!;
+            if (state === "done" || state === "stopped" || state === "failed") {
+              const rec: EndAhead = { jobId: jobNumber(t.app, t.id), state, endedAt: t.endedAt!, tookMs: Math.max(0, t.endedAt! - t.startedAt) };
+              ahead?.setItem(TASK_ENDS_KEY, JSON.stringify([...readEnds(ahead).filter((x) => x.jobId !== rec.jobId), rec].slice(-20)));
+            }
+          } catch { /* no tab storage: the sealed write alone, as before */ }
           save();
           return true;
         },

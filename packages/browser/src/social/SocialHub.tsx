@@ -27,7 +27,7 @@ import { usd } from "@zerofee/trade/app/format.ts";
 import { PRESET_LOGO } from "../app/chains.tsx";
 import { LISTED } from "./catalog.ts";
 import { addLanded, addNotSeen } from "../site-tasks.ts";
-import { readAddTasks, saveAddTasks } from "./site-wallet.ts";
+import { READING, readAddTasks, saveAddTasks } from "./site-wallet.ts";
 import { SiteApp } from "./SiteApp.tsx";
 import { AddressBar, addressDeps } from "./AddressBar.tsx";
 import { goAddress } from "./address.ts";
@@ -36,6 +36,7 @@ import { HistoryPage, HistoryRow } from "./History.tsx";
 import { PrivacyPage, PrivacyRow } from "./Privacy.tsx";
 import { Favourites } from "./Favourites.tsx";
 import { OpenPages } from "./OpenPages.tsx";
+import { BROWSER_OFFLINE, hubAsOf, useOnline } from "./offline.ts";
 import { OPEN_PAGES, closePage, readPages, showPage, type OpenPage } from "../tabs.ts";
 import { loadBookmarks, removeBookmark, type Bookmark } from "../bookmarks.ts";
 import { Recent } from "./Recent.tsx";
@@ -43,7 +44,7 @@ import { recentRows } from "./recent.ts";
 import { remember, startPageRead } from "./start-read.ts";
 import { loadHistory, recentOf, type Visit } from "../visits.ts";
 import { logoUrl } from "@zerofee/design/logos.ts";
-import { CHAIN_NAME, HUB_SITES, SITE_CHAINS, addEnded, addTaskAt, fundedLine, solOf, hubRows, landedLine, landing, walletTitle, notCarried, pickable, readHub, readLanding, readPick, saveHub, saveLanding, savePick, tileTap, type AddRecord, type HubRow, type Landing, type SiteChain } from "./hub-state.ts";
+import { CHAIN_NAME, HUB_SITES, SITE_CHAINS, addEnded, addTaskAt, fundedLine, solOf, hubRows, keptHub, landedLine, landing, walletTitle, notCarried, pickable, readHub, readLanding, readPick, saveHub, saveLanding, savePick, tileTap, type AddRecord, type HubRow, type Landing, type SiteChain } from "./hub-state.ts";
 import { stays, takeOutAlso, tooSmall } from "./take-out.ts";
 import { words as WALLETS } from "./your-wallets.ts";
 import "./social.css";
@@ -63,6 +64,8 @@ export function SocialHub({ browser }: { browser?: Bridge }) {
   const { bridge, active } = shell;
   const [rows, setRows] = useState<HubRow[]>(() => readHub());
   const [read, setRead] = useState<"first" | "ok" | "failed">("first");
+  /** When the tiles' dollars were last read (this open's read, else the kept copy's): offline they say "As of 7:40 AM". */
+  const [readAt, setReadAt] = useState<number | null>(() => { const k = Object.values(keptHub()); return k.length ? Math.max(...k.map((x) => x.at)) : null; });
   const [site, setSite] = useState<string | null>(null);
   /** The site whose wallet sheet is open (a long press on its tile, or its window's pill). */
   const [sheet, setSheet] = useState<string | null>(null);
@@ -79,6 +82,7 @@ export function SocialHub({ browser }: { browser?: Bridge }) {
   const [copied, setCopied] = useState(false);
   /** The hub's own one line (on its way, landed): the shell's "it went" line stays the money sheet's alone (Job 1, M1). */
   const [line, setLine] = useState("");
+  const online = useOnline();
   const lineTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const say = useCallback((text: string) => {
     setLine(text);
@@ -112,6 +116,7 @@ export function SocialHub({ browser }: { browser?: Bridge }) {
         setRows(next);
         saveHub(next);
         setRead("ok");
+        setReadAt(Date.now());
       } else setRead("failed");
       if (!("ok" in st)) return;
       const { moving: by, landed, stopped } = landing(st.ok.onItsWay, wasMoving.current, next, Date.now(), act && "ok" in act && Array.isArray(act.ok) ? act.ok : null);
@@ -273,7 +278,8 @@ export function SocialHub({ browser }: { browser?: Bridge }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
-  const dollarsOf = (r: HubRow) => (r.usd === null ? (read === "failed" ? "Solana didn't answer" : "…") : usd(r.usd));
+  // builder 22's item 3: no "…" while a tile's dollars are unread: its kept figure, else (builder 25, item 2) "Reading"
+  const dollarsOf = (r: HubRow) => (r.usd === null ? (read === "failed" ? "Solana didn't answer" : keptHub()[r.site] ? usd(keptHub()[r.site]!.usd) : READING) : usd(r.usd));
   // the listed sites, and any other site whose wallet still holds money or can't be read (hubRows): its sheet, to take it out
   // pump.fun and GMGN are apps of their own (product decision, 3 Nov): no tile here
   const tiles = rows.filter((r) => !ownApp(r.site));
@@ -282,7 +288,7 @@ export function SocialHub({ browser }: { browser?: Bridge }) {
     // address bar stays put while the page under it scrolls)
     <AppFrame name={SOCIAL_HUB_NAME} tray={[]} tab="all" onTab={() => {}} pinned={<AddressBar {...(browser ? { browser } : {})} listed={listedIds} onSite={onSiteId} onLine={say} />}>
       <div className="st-page">
-        <p className="zf-small sh-line" role="status" aria-live="polite">{line}</p>
+        <p className="zf-small sh-line" role="status" aria-live="polite" data-testid="sh-line">{online ? line : BROWSER_OFFLINE}</p>
         {browser && <OpenPages pages={pages} onShow={(id) => void showPage(browser, id).then((ok) => !ok && (say(OPEN_PAGES.gone), void readPages(browser).then(setPages)))} onClose={(id) => void closePage(browser, id, pages).then(setPages)} />}
         {tiles.length > 0 && <ul className="sh-tiles sh-grid" aria-label="Sites">
           {tiles.map((r) => (
@@ -291,11 +297,13 @@ export function SocialHub({ browser }: { browser?: Bridge }) {
             </li>
           ))}
         </ul>}
-        {read === "failed" && <p className="zf-small sh-note" role="status">Solana didn't answer, so these are from the last read. <button className="zf-link" onClick={refresh}>Retry</button></p>}
+        {/* builder 22's item 3: offline, the tiles are the last read with its time once, and no Retry (nothing can answer) */}
+        {!online && readAt !== null && rows.some((r) => r.usd !== null) && <p className="zf-small sh-note" data-testid="hub-as-of">{hubAsOf(readAt)}</p>}
+        {online && read === "failed" && <p className="zf-small sh-note" role="status">Solana didn't answer, so these are from the last read. <button className="zf-link" onClick={refresh}>Retry</button></p>}
         {/* D131: favourites (saved from History's star), opened the way the address bar opens a site */}
         {browser && <Favourites list={favs} onOpen={(url) => void goAddress(url, addressDeps(browser, listedIds, onSiteId, say))} onRemove={(url) => void removeBookmark(browser, url).then(setFavs)} />}
         {/* concept v3.1: Recent is one card, the signed-in sites (their own apps) with their wallet's dollars, then the pages */}
-        {browser && <Recent rows={recentRows(rows.filter((r) => ownApp(r.site)).map((r) => ({ site: r.site, name: r.name, usd: r.usd, ...(r.wallet ? { wallet: r.wallet } : {}), hosts: LISTED.find((a) => a.id === r.site)?.preset.hosts ?? [] })), recent)} onOpen={(url) => void goAddress(url, addressDeps(browser, listedIds, onSiteId, say))} onSite={onSiteId} />}
+        {browser && <Recent rows={recentRows(rows.filter((r) => ownApp(r.site)).map((r) => ({ site: r.site, name: r.name, usd: r.usd, ...(r.wallet ? { wallet: r.wallet } : {}), ...(r.usd === null && keptHub()[r.site] ? { kept: keptHub()[r.site]! } : {}), hosts: LISTED.find((a) => a.id === r.site)?.preset.hosts ?? [] })), recent)} onOpen={(url) => void goAddress(url, addressDeps(browser, listedIds, onSiteId, say))} onSite={onSiteId} />}
         <div className="zf-group sh-group sh-group--pages">
         {/* Your wallets: every site's own wallet, its money, and Move back to Safe */}
         <button className="zf-row sh-history-row" data-testid="browser-wallets-row" onPointerDown={() => void loadWallets()} onFocus={() => void loadWallets()} onClick={() => setWallets(true)}>
@@ -315,7 +323,7 @@ export function SocialHub({ browser }: { browser?: Bridge }) {
       {open && (
         <Sheet title={walletTitle(open.name)} onClose={() => setSheet(null)}>
           <p className="sh-sheet-usd">{dollarsOf(open)}</p>
-          {/* ST13: a site with a wallet per network lists the ones with money ("Solana $10.00 · BNB $2.40") */}
+          {/* ST13: a site with a wallet per network lists the ones with money ("Solana $10.00") */}
           {(SITE_CHAINS[open.site]?.length ?? 1) > 1 && fundedLine(open) && <p className="zf-small sh-sheet-note" data-testid="hub-funded">{fundedLine(open)}</p>}
           <div className="sh-sheet-acts">
             {/* product decision, 3 Nov: with money in it, Take out comes first (back to the Safe, privately) */}
@@ -326,7 +334,7 @@ export function SocialHub({ browser }: { browser?: Bridge }) {
               return canTakeOut ? [outBtn, addBtn] : [addBtn, outBtn];
             })()}
           </div>
-          {/* review ST13 L5: a funded wallet Take out can't move (GMGN's Base) is said, never swept silently */}
+          {/* review ST13 L5: a funded wallet Take out can't move is said, never swept silently */}
           {stays(open).map((c) => <p key={c} className="zf-small sh-sheet-note">{notCarried(c)} Take out leaves your {open.name} {CHAIN_NAME[c]} wallet as it is.</p>)}
           {tooSmall(open).map((c) => <p key={`small-${c}`} className="zf-small sh-sheet-note">Your {open.name} {CHAIN_NAME[c]} wallet has under $2, so Take out leaves it.</p>)}
           {open.address && (

@@ -42,8 +42,8 @@ export function KeyForm({ keys, onSaved }: { keys: KeysSource; onSaved?: () => v
         <input className="azc-field azc-keyfield" type="password" value={text} placeholder="sk-ant-…" aria-label="Your AI key" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} onChange={(e) => { setText(e.target.value); setLine(null); }} onKeyDown={(e) => { if (e.key === "Enter") void check(text); }} />
         <button type="button" className="zf-btn azc-paste" disabled={busy} onClick={() => void onPaste()}>Paste</button>
       </div>
-      {text.trim() !== "" && <button type="button" className="zf-btn" disabled={busy} onClick={() => void check(text)}>{busy ? "Checking with Claude…" : "Use this key"}</button>}
-      {busy && text.trim() === "" && <p className="zf-small azc-thinking" role="status">Checking with Claude…</p>}
+      {text.trim() !== "" && <button type="button" className="zf-btn" disabled={busy} onClick={() => void check(text)}>{busy ? "Checking it with Claude" : "Use this key"}</button>}
+      {busy && text.trim() === "" && <p className="zf-small azc-thinking" role="status">Checking your key with Claude. This takes a few seconds.</p>}
       {line && <p className="zf-small azc-keyline" role="alert">{line}</p>}
       <p className="zf-small azc-keyprivate">{PRIVATE}</p>
       <button type="button" className="azc-link" onClick={keys.getKey}>Get a Claude key at console.anthropic.com</button>

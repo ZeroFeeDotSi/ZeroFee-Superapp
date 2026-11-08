@@ -41,7 +41,7 @@ test("the copy review's rule (test, MUST 1): the engine's leg with no move to na
 test("\"This job has no time estimate.\" never reaches the screen: TimeLeft draws nothing without a time; Hot passes each row's end", () => {
   const made = readFileSync(new URL("./money/JobMade.tsx", import.meta.url), "utf8");
   // a16: Hot's row wraps the time in its own line ("On its way · About 29 s left.", MOVING_WORDS.sub); the receipt's is bare
-  assert.match(made, /if \(endsAt === undefined\) return watchLine;\n\s+const time = receiptLeft\(endsAt, now, startMs, landed\);\n\s+return <><p className="zf-receipt__line" data-testid="job-time-left">\{line \? line\(time\) : time\}<\/p>\{watchLine\}<\/>;/);
+  assert.match(made, /if \(endsAt === undefined\) return watchLine;\n\s+const time = receiptLeft\(endsAt, now, from, landed \?\? doneAt\);\n\s+return <><p className="zf-receipt__line" data-testid="job-time-left">\{line \? line\(time\) : time\}<\/p>\{watchLine\}<\/>;/);
   const home = readFileSync(new URL("./screens/Home.tsx", import.meta.url), "utf8");
   assert.match(home, /<Left etaSec=\{m\.etaSec\} endsAt=\{m\.endsAt\} follow=\{false\} line=\{movingWords\?\.sub\} \/>/);
   // control: the words still exist for the receipt's own pure function (a caller with no time gets null drawn, not them)

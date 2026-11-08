@@ -76,7 +76,7 @@ export function WalletSheet({ w, keys, chatUsd = 0, onClose, start = "details", 
           </div>
           <div className="azw-acts">
             <button type="button" className="zf-btn" onClick={() => setPane("fill")}>{ADD_MONEY}</button>
-            {(w.walletUsd ?? 0) > 0 && <button type="button" className="zf-btn azc-btn-quiet" disabled={busy} onClick={() => void moveAll()}>{busy ? "Asking…" : MOVE_ALL}</button>}
+            {(w.walletUsd ?? 0) > 0 && <button type="button" className="zf-btn azc-btn-quiet" disabled={busy} onClick={() => void moveAll()}>{MOVE_ALL}</button>}
           </div>
           {line && <p className="zf-small azw-quiet" role="status">{line}</p>}
           <p className="zf-small azw-quiet">{PUBLIC_LINE}</p>
@@ -159,7 +159,7 @@ export function FillSheet({ w, amount, other: otherFirst = false, onClose, onDon
             {line && <p className="zf-small azw-quiet" role="alert">{line}</p>}
             {/* who the fee goes to, right above the button (the copy review, 6 Nov): a fill leaves the NEAR wallet through NEAR Intents (core agent-wallet.ts toAgent) */}
             <div className="zf-fee"><p className="zf-small azw-quiet" data-testid="az-fill-paid">{intentsPaid()}</p></div>
-            <button type="button" className="zf-btn" disabled={!ok || short || busy} data-agentzero-fill={ok ? String(Math.round(usd * 1e6)) : undefined} onClick={(e) => void go(e.nativeEvent)}>{busy ? "Asking…" : ok ? fillButton(usd) : FILL_TITLE}</button>
+            <button type="button" className="zf-btn" disabled={!ok || short || busy} data-agentzero-fill={ok ? String(Math.round(usd * 1e6)) : undefined} onClick={(e) => void go(e.nativeEvent)}>{ok ? fillButton(usd) : FILL_TITLE}</button>
           </>
         )}
       </div>
@@ -191,7 +191,7 @@ function LimitSheet({ w, onClose }: { w: WalletSource; onClose: () => void }) {
         <p className="zf-small azw-quiet">{LIMIT_NOTE}</p>
         <input className="azc-field azw-other" inputMode="decimal" aria-label="New monthly limit in dollars" value={text} onChange={(e) => setText(e.target.value.replace(/[^\d.]/g, ""))} />
         {line && <p className="zf-small azw-quiet" role="alert">{line}</p>}
-        <button type="button" className="zf-btn" disabled={!valid || busy} onClick={() => void save()}>{busy ? "Asking…" : !valid ? CHANGE_LIMIT : usd > cap ? `${RAISE} to ${limit(usd)}` : `${LOWER} to ${limit(usd)}`}</button>
+        <button type="button" className="zf-btn" disabled={!valid || busy} onClick={() => void save()}>{!valid ? CHANGE_LIMIT : usd > cap ? `${RAISE} to ${limit(usd)}` : `${LOWER} to ${limit(usd)}`}</button>
       </div>
     </Sheet>
   );

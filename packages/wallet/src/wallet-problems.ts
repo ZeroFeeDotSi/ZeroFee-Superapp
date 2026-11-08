@@ -481,6 +481,15 @@ export const walletProblems = {
     money: inYourBalance,
     next: { kind: "retry", label: "Try again" },
   }),
+  /** Send S7 (audit, 8 Nov): a price that isn't the one asked for (another amount in, no deposit address, nothing out),
+   *  caught before anything is signed. It said quoteExpired's "ran out before you approved", which is a different thing.
+   *  `from`: where the money still is (Private's own share pays from Private). */
+  quoteMismatch: (from: "safe" | "private" = "safe"): Problem => ({
+    code: "ledger.quote.mismatch",
+    whatHappened: `${ONE_CLICK} priced it differently than asked. Nothing moved.`,
+    money: from === "private" ? { state: "safe", where: "in Private" } : inYourBalance,
+    next: { kind: "retry", label: "Get a new price" },
+  }),
   quoteExpired: (): Problem => ({
     code: "ledger.quote.expired",
     whatHappened: `${ONE_CLICK}${ONE_CLICK.endsWith("s") ? "'" : "'s"} price ran out before you approved. Nothing moved.`,

@@ -24,7 +24,7 @@ test("Move opens from Trade: the wallets' row has a Move button (the Copywriter'
 test("Trade's quick Move is Home's own: the tap makes the job and the sheet says \"Job created.\" with Done back to Trade (product decision, 5 Nov); a leg that didn't go is said on the job's row; the Safe's money still leaves only through its Approve", () => {
   assert.match(host, /if \(ask\.kind === "move"\) return <MoveSheet [^\n]*\{\.\.\.\(ask\.quick \? \{ quick: true \} : \{\}\)\}/, "the host hands quick to Home's Move sheet");
   assert.match(sheet, /const ran = await runMove\(legs, planOf\(legs, now\), \{/);
-  assert.match(sheet, /\{JOB_WORDS\.created\}/);
+  assert.match(sheet, /data-testid="move-made-head">\{said\.head\}/, "audit 13's D1: Job created. while it goes (moveReceiptWords)");
   // Done before the legs' ids are back: it went (the app that opened it hears so), never a Close that says nothing moved
   assert.match(sheet, /if \(!running\) return made !== null \? onDone\(""\) : onClose\(\);/);
   const run = readFileSync(new URL("../../../wallet/src/app/screens/move-run.ts", import.meta.url), "utf8");

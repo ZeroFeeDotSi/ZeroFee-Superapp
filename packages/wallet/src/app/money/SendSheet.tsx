@@ -14,6 +14,8 @@ import type { SpendingStatus, SpendingWallet } from "@zerofee/core/spending";
 import { MoneySheet, SheetLine, type Pot } from "@zerofee/design/MoneySheet.tsx";
 import { useShell } from "@zerofee/shell-api/AppFrame.tsx";
 import { runJob } from "@zerofee/shell-api/job-run.ts";
+import { carryTo } from "@zerofee/shell-api/job-carry.ts";
+import { jobKeyPart } from "@zerofee/shell-api/job-start.ts";
 import { sheetsHeard } from "@zerofee/shell-api/approval-answered.ts";
 import { sendSec } from "@zerofee/shell-api/job-steps.ts";
 import { mark } from "@zerofee/design/tap.ts";
@@ -35,14 +37,16 @@ import { SendForm, type SendAsk } from "./SendForm.tsx";
 import { shortLine, shortUsdOf } from "./send-said.ts";
 import { SAFE_SEND_OPEN, payeeOf, safeAmount, sendSources, siteSources, startSource } from "./send-sources.ts";
 import { privateFigure } from "../format.ts";
-import { DIDNT_LOAD, codeGate } from "./code-gate.ts";
+import { codeGate, didntLoad } from "./code-gate.ts";
+import { whenOnline } from "@zerofee/shell-api/chunk-reload.ts";
+import { useOffline } from "../didnt-open.tsx";
 import { rowCoins } from "./send-rows.ts";
 import type { HeldCoin } from "../trading.ts";
 import { buzz } from "./hold.ts";
 import { SEND_PROOF_OFF, homeProof } from "./home-proof.ts";
 import { SHEET_NEEDS, sheetLineOf, useServices } from "../services.ts";
 import { useWallet } from "../runtime.tsx";
-import { sendCash, sendHeadline } from "./send-cap.ts";
+import { ruleCap, sendCash, sendHeadline } from "./send-cap.ts";
 import "@zerofee/pay/app/pay.css";
 // The guard (packages/agent's judge, unitGuard, obfuscated) loads as the sheet opens, never in Home's first load; Hold
 // stays off until it is here, so no send can go before the guard (QA 3 Nov).
@@ -52,6 +56,9 @@ export const FACTS_FRESH_MS = 60_000;
 /** Under Hold while the guard loads, and after it failed (its own line and Try again are above): every off Hold says why. */
 export const GETTING_READY = "Send is getting ready.";
 export const GUARD_FAILED_WHY = "Tap Try again above.";
+/** Offline (QA 16 on audit 12's C1 shot): said once, at the top; nothing to try, so no Try again; the form rests until
+ *  the phone is back, and the sheet checks again by itself (whenOnline). */
+export const SEND_OFFLINE = "You're offline. Your money is safe. Send works again when you're back. It checks again by itself.";
 // H-5: the camera and the code reader load on the first tap of the scan glyph, never in Home's first load.
 const ScanSheet = lazy(() => import("./ScanSheet.tsx").then((m) => ({ default: m.ScanSheet })));
 // A link's reader (Chat's send, a pasted request, H-4) loads with the first link, never in Home's first load (speed budget)
@@ -120,11 +127,14 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
   // the guard's code: here, on its way (Hold stays off), or failed (one line and Try again; nothing can be sent)
   const [guard, setGuard] = useState(() => guardCode.here());
   const [guardFailed, setGuardFailed] = useState(false);
+  const offline = useOffline();
   const loadTheGuard = () => {
     setGuardFailed(false);
     guardCode.load().then((g) => setGuard(() => g), () => setGuardFailed(true));
   };
   useEffect(() => { if (!guard) loadTheGuard(); }, []);
+  // offline (audit 12 C1): the guard is asked for again by itself once the phone is back
+  useEffect(() => (guardFailed ? whenOnline(loadTheGuard) : undefined), [guardFailed]);
   useEffect(() => {
     if (!link || read.current || !ready || !flow.tokens) return;
     read.current = true;
@@ -187,7 +197,15 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
     void shell.bridge.call<HeldCoin[]>("trade.positions").then((r) => "ok" in r && Array.isArray(r.ok) && setHeld(r.ok), () => undefined);
     void shell.bridge.call<{ ready?: boolean; rows?: Balance[] }>("ledger.private").then((r) => "ok" in r && r.ok.ready && Array.isArray(r.ok.rows) && setPocket(r.ok.rows), () => undefined);
   }, [shell.bridge]);
-  const sources = useMemo(() => [...sendSources(rows, balances.filter((b) => b.held !== "private"), pocket, undefined, held, home.earning), ...siteSources(sites)], [rows, balances, pocket, held, sites, home.earning]);
+  // audit 10's A4 (8 Nov): what one Send from the Safe can still take today under its rules (the core's figure, the one
+  // its over-limit refusal says); each Safe coin's "ready" and Max are capped there (send-cap.ts ruleCap)
+  const [leftUsd, setLeftUsd] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    void shell.bridge.call<{ sendLeftUsd?: number }>("account.protection.get", { room: true }).then((r) => { if (live && "ok" in r && typeof r.ok?.sendLeftUsd === "number") setLeftUsd(r.ok.sendLeftUsd); }, () => undefined);
+    return () => { live = false; };
+  }, [shell.bridge]);
+  const sources = useMemo(() => [...sendSources(rows, balances.filter((b) => b.held !== "private"), pocket, undefined, held, home.earning).map((s) => ruleCap(s, leftUsd)), ...siteSources(sites)], [rows, balances, pocket, held, sites, home.earning, leftUsd]);
   // One wallet per chain (D55): a send to the person's own wallet is Move's, never Send's (it would link the two).
   const [ownChain, setOwnChain] = useState<Map<string, string>>(new Map());
   useEffect(() => {
@@ -222,7 +240,13 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
    *  refills at, "" for none tapped; undefined when it isn't that refusal. */
   const overLimitAgain = async (p: Problem): Promise<string | undefined> => {
     if (p.code !== "security.send.over-limit" || p.next2?.screen !== "security/protection") return undefined;
+    // the refusal's own figure caps Max from now on (A4), whatever is tapped
+    const left = p.next.kind === "open" && p.next.screen.startsWith(SEND_UP_TO) ? Number(p.next.screen.slice(SEND_UP_TO.length)) : 0;
+    setLeftUsd(Number.isFinite(left) ? left : 0);
     const next = await shell.showProblem(p);
+    // audit 10's A4 (8 Nov): "Protection" opens the Safe's rules inside Home, under this sheet; the Send sheet closes
+    // first, so the person lands on Protection, never back on an unchanged Send (shot b11)
+    if (next.kind === "open" && next.screen === "security/protection") { onClose(false); return ""; }
     return next.kind === "open" && next.screen.startsWith(SEND_UP_TO) ? next.screen.slice(SEND_UP_TO.length) : "";
   };
 
@@ -301,7 +325,7 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
     // sheet (its pocket's share can ask Face ID before the Safe's own: "Job created." never over an unanswered Face ID)
     const fromSafe = !a.source.row;
     setAsking(fromSafe);
-    if (fromSafe) sayWent("Getting it ready…", "busy");
+    // rule 2 (b9): no "Getting it ready…" line; the Safe's Check this covers the moment, then "Job created." and its time
     mark("tap");
     const shown = cash !== null ? cash : a.exactOut ? `${a.exactOut.amount} ${a.exactOut.symbol}` : `${a.amountIn} ${a.source.symbol}`;
     // its own key (the audit's MUST, 7 Nov): the Safe's sheet for it says approval.asked and job.signed with this key, never another's
@@ -320,7 +344,9 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
         ? shell.bridge.call<Movement>("ledger.hiddenFromRow", { chain: a.source.row, ...(a.source.coin ? { coin: a.source.coin } : {}), to: payee, toTokenId, ...amount, ...upTo, ...(a.note ? { label: a.note } : {}) })
         : shell.bridge.call<Movement[]>("ledger.sendFromSafe", { tokenId: a.source.tokenId, to: payee, toTokenId, ...amount, ...upTo, ...(a.source.privateOnly ? {} : { fill: true }), ...(a.note ? { label: a.note } : {}), job: key })).catch(() => ({ problem: payProblems.quoteFailed() })),
       declined: (r) => "problem" in r && /declined$/.test(r.problem.code),
-      made: (j) => { sayWent(""); setAsking(false); setBusy(false); buzz(shell.bridge, "success"); setSentSaid(sendWords(toWho)); setFlying(shown); setFlyingJob(j.id); },
+      // K2 (audit 13, 8 Nov): from the Safe the core stamps this key on its movements (Movement.jobKey); the job keeps it on
+      // its carry the moment it is made, so a reload before the core answers ends the job by it (reopenOf), never unsure
+      made: (j) => { if (fromSafe) carryTo([j.id], { parts: [jobKeyPart(key)] }); sayWent(""); setAsking(false); setBusy(false); buzz(shell.bridge, "success"); setSentSaid(sendWords(toWho)); setFlying(shown); setFlyingJob(j.id); },
       asking: setAsking,
     });
     setBusy(false);
@@ -422,6 +448,8 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
     }, () => undefined);
   };
   const waits = services.down ? services.line : null;
+  // audit 13's D4: a service down (two sources) is the sheet's Problem: said on top, once, as offline is; never under the keypad
+  const downTop = !offline && !flying && waits ? waits : null;
   return (
     <>
       {/* R3 (the design review §4.5): no "Safe $… · Wallets $…" line over the form; From says what it holds, once */}
@@ -429,9 +457,17 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
         {/* the sheet's line sits right above its button, the one place every money sheet uses (a Send test, 4 Nov
             00:57: at the top it read as about the address); with no form on screen (the sent screen), here */}
         {flying && <SheetLine text={line ?? services.line} />}
-        {guardFailed && (
+        {offline && !flying ? (
+          <div role="status" data-testid="send-offline" style={{ display: "grid", gap: 12, margin: "4px 0 24px" }}>
+            <p className="zf-body">{SEND_OFFLINE}</p>
+          </div>
+        ) : downTop ? (
+          <div role="alert" data-testid="send-down" style={{ display: "grid", gap: 12, margin: "4px 0 24px" }}>
+            <p className="zf-body">{downTop}</p>
+          </div>
+        ) : guardFailed && (
           <div role="alert" data-testid="send-didnt-load" style={{ display: "grid", gap: 12, margin: "4px 0 24px" }}>
-            <p className="zf-body">{DIDNT_LOAD}</p>
+            <p className="zf-body">{didntLoad("Send")}</p>
             <button className="zf-btn" onClick={loadTheGuard}>Try again</button>
           </div>
         )}
@@ -443,7 +479,7 @@ function SendBody({ link, wallet, coin, typed, onClose, onAddMoney, onMove }: { 
           <div className="wl-send">
             {reqLine && <p className="zf-small">{reqLine}</p>}
             <SendForm key={formKey} prefill={prefill} sources={sources} reading={rowsRead === "failed" ? "failed" : !rowsRead || (!balancesRead && home.balances === null)}
-              start={startSource(wallet, sources, coin)} history={history} {...(refill ? { typed: refill } : typed && formKey === 0 ? { typed } : {})} busy={busy} waits={waits} blocked={stop} notYet={guard ? null : guardFailed ? GUARD_FAILED_WHY : GETTING_READY} said={line ?? services.line} again={again} onEdit={edited}
+              start={startSource(wallet, sources, coin)} history={history} {...(refill ? { typed: refill } : typed && formKey === 0 ? { typed } : {})} busy={busy} waits={waits} topSaid={!!downTop} blocked={stop} offline={offline} notYet={guard ? null : guardFailed ? GUARD_FAILED_WHY : GETTING_READY} said={line ?? (downTop ? null : services.line)} again={again} onEdit={edited}
               onSend={(x) => void send(x)} onSwap={(s) => { onClose(false); if (s.swap) shell.openMoney({ kind: "swap", wallet: s.swap }); }} onBack={(s) => { onClose(false); if (s.back) shell.openMoney({ kind: "siteback", wallet: s.back.wallet, name: s.back.name }); }} feeOf={(a) => (a.source.row ? shell.bridge.call<{ inUsd: string; outUsd: string } | null>("ledger.sendFee", { chain: a.source.row, ...(a.source.coin ? { coin: a.source.coin } : {}), to: payeeOf(a), toTokenId: LANDS_AS[a.network].tokenId, amountIn: a.amountIn }).then((r) => ("ok" in r ? r.ok : null), () => null) : Promise.resolve(null))} onWho={knowWho} onScan={() => setScanning(true)} onAddMoney={() => onAddMoney("sol")} {...(onMove ? { onMove } : {})}
               onLink={onLink} ownWallets={ownChain} pickCoin={pickCoin}
               {...(SAFE_SEND_OPEN ? {} : { fillShut: { usd: privateFigure({ available: home.pocket?.available ?? true, ready: home.pocket?.ready ?? pocket.length > 0, rows: pocket }), onTopUp: () => { onClose(false); shell.openApp("wallet", "private/add"); } } })}

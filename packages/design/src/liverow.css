@@ -22,6 +22,9 @@ li:last-child > .zf-lrow::after { content: none; }
 .is-done .zf-lrow__badge    { opacity: 1; transform: none; background: var(--up);   color: var(--bg); }
 .is-stopped .zf-lrow__badge { opacity: 1; transform: none; background: var(--down); color: #fff; }
 .is-back .zf-lrow__badge    { opacity: 1; transform: none; background: var(--ink);  color: var(--bg); }
+/* audit 18's I5: the person stopped it, a calm mark, never the problem colour */
+.is-ended .zf-lrow__badge   { opacity: 1; transform: none; background: var(--mute); color: var(--bg); }
+.is-ended .zf-lrow__line { opacity: 0; }
 .zf-lrow__text { min-width: 0; display: grid; }
 .zf-lrow__t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   font: 500 17px/22px var(--font); letter-spacing: -.01em; text-wrap: balance; }

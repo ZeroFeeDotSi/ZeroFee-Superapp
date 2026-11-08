@@ -8,6 +8,9 @@
 // reload would fix nothing. Never under a job that is just starting (a "job:" row the page alone carries): that row would
 // end as closed, so the normal error shows and the job goes on. Every other job row is in Home's sealed store and
 // survives a reload (job-start.ts sealJobs); the reload waits for its last write first.
+// Never offline (audit 12 C1): a reload with no network is Chrome's own "No internet" page, and the person's app, Jobs
+// and figures are gone. Offline, the screen says so in the app's own words (offlineWords) and asks for the chunk again
+// once the phone is back (whenOnline); only a chunk still missing then is a deploy, and reloads.
 
 /** The sessionStorage key of the last reload: { build, at }. */
 export const CHUNK_RELOAD_KEY = "zf.chunk-reload.v1";
@@ -44,6 +47,8 @@ export interface ChunkReloadDeps {
   reload: () => void;
   /** The iPhone app's own files: never reloads. */
   native: () => boolean;
+  /** The page has a network (navigator.onLine): offline it never reloads. */
+  online: () => boolean;
   /** A job the page alone carries is starting: never reloads under it. */
   busy: () => boolean;
   /** Resolves once the job rows' last write is in (capped by SETTLE_CAP_MS). */
@@ -72,6 +77,7 @@ function pageDeps(): ChunkReloadDeps {
     build: () => g.document?.querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute("src") ?? "dev",
     reload: () => g.location?.reload(),
     native: () => g.location?.protocol === "zerofee-app:",
+    online: () => typeof navigator === "undefined" || navigator.onLine !== false,
     busy: () => false,
     settled: () => Promise.resolve(),
   };
@@ -79,14 +85,14 @@ function pageDeps(): ChunkReloadDeps {
 
 /**
  * On a chunk error: reload once, onto the new build. True if a reload is on its way (the caller can draw nothing);
- * false for any other error, on the phone, under a starting job, or when this build already reloaded within the window
+ * false for any other error, on the phone, offline, under a starting job, or when this build already reloaded within the window
  * (the caller shows its normal error).
  */
 export function reloadForChunk(e: unknown): boolean {
   if (reloading) return true;
   if (!isChunkError(e)) return false;
   const d = (deps ??= pageDeps());
-  if (d.native() || d.busy()) return false;
+  if (d.native() || d.busy() || !d.online()) return false;
   const build = d.build(), at = d.now();
   let last: { build?: unknown; at?: unknown } | null = null;
   try { last = JSON.parse(d.storage?.getItem(CHUNK_RELOAD_KEY) ?? "null"); } catch { last = null; }
@@ -105,4 +111,20 @@ export function installChunkReload(target: Pick<Window, "addEventListener" | "re
   const on = (ev: Event) => { reloadForChunk((ev as Event & { payload?: unknown }).payload ?? ev); };
   target.addEventListener("vite:preloadError", on);
   return () => target.removeEventListener("vite:preloadError", on);
+}
+
+/** True while the page has no network (the same answer reloadForChunk asks). */
+export function chunkOffline(): boolean { return !(deps ??= pageDeps()).online(); }
+
+/** What a screen whose code didn't arrive says while offline, in the app's own words: never Chrome's page. */
+export const offlineWords = (name?: string): string => `You're offline. Your money is safe. ${name ? `${name} opens` : "This opens"} when you're back.`;
+
+/** Calls `again` once when the phone is back online (the window's online event). Returns the way to stop waiting. */
+export function whenOnline(again: () => void): () => void {
+  const g = globalThis as { addEventListener?: Window["addEventListener"]; removeEventListener?: Window["removeEventListener"] };
+  if (typeof g.addEventListener !== "function") return () => undefined;
+  const on = () => { stop(); again(); };
+  const stop = () => g.removeEventListener?.("online", on);
+  g.addEventListener("online", on);
+  return stop;
 }

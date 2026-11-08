@@ -118,7 +118,7 @@ test("deploy-app.sh's release rules (D157, the Sim only): no key path, no Coming
   assert.match(code, /\[ -z "\$\(find "\$dist" -name 'account_policy\*\.wasm' -print -quit\)" \] \|\|/, "the account contract (the Safe) never ships");
   assert.match(code, /for gone in "PublicKeyCredential" "navigator\.credentials"; do\n  ! grep -rqF -- "\$gone" "\$dist\/assets" \|\|/, "no passkey ships");
   assert.match(code, /for here in "ZeroFee, on pretend money" "Sim: pretend money"; do/);
-  assert.match(code, /"Or copy the code and paste it on your main device"/, "the laptop page stays out");
+  assert.match(code, /"Or copy the code to paste on your phone"/, "the laptop page stays out");
   // control: the Sim | Real rule (the real vault must be in) is gone, or the Sim-only build could never pass
   assert.doesNotMatch(code, /for here in "zerofee-mainnet-vault"/);
   assert.match(sh, /#\s+vercel alias set <the checked preview URL> superapp\.zerofee\.si/);

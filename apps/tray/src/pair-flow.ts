@@ -20,6 +20,16 @@ const FAST_MS = 2_000;
 const FAST_FOR_MS = 2 * 60_000;
 const SLOW_MS = 10_000;
 const BUSY_MS = 30_000;
+/** Audit 15 FL4: a down relay is named as the relay, never as the phone. Said once after this many asks in a row fail. */
+const RELAY_DOWN_AFTER = 3;
+export const PAIR_WORDS = {
+  waiting: "Now approve on your phone. This computer checks for it by itself, for up to 10 minutes.",
+  // b23: grade 5, the server by name (was "relay", 8.8 / 12.5 / 7.8)
+  relayDown: "ZeroFee's server is down. This Mac keeps trying.",
+  relayBack: "ZeroFee's server is back. This Mac waits for your phone.",
+  relayGaveUp: "ZeroFee's server didn't answer. Your yes didn't reach this Mac.",
+  phoneLate: "Your phone didn't answer in 10 minutes.",
+} as const;
 
 /** Short, plain words a person can type: the stop phrase is three of them. */
 export const STOP_WORDS = [
@@ -97,17 +107,21 @@ export async function runPair(d: PairDeps): Promise<boolean> {
   if (dayLimitUsd === null) return again("No day limit was given.");
   const o = makeOffer();
   try {
-    d.print("On your phone: AgentZero, then Use AgentZero on a computer. Paste this:");
+    d.print("On your phone, open AgentZero. Tap Use AgentZero on a computer. It asks for this. Paste it there:");
     d.print("");
     d.print(o.offer);
     d.print("");
     d.print(`Your phone will show ${o.words.length} words. They must be: ${o.words.join(" ")}.`);
     d.print("Approve on your phone only if they match.");
-    d.print("Waiting for your phone…");
+    d.print(PAIR_WORDS.waiting);
     const start = now();
     let box: string | null = null;
+    // FL4: asks the relay itself failed (no answer, or a 5xx), in a row; said once when it starts and once when it ends
+    let failsInRow = 0;
+    let saidDown = false;
     while (now() - start < WAIT_MS) {
       let wait = now() - start < FAST_FOR_MS ? FAST_MS : SLOW_MS;
+      let failed = false;
       try {
         const r = await fetchFn(`${base}/v0/pair/${o.mailbox}`, { method: "GET", signal: AbortSignal.timeout(10_000) });
         if (r.status === 200) {
@@ -117,13 +131,18 @@ export async function runPair(d: PairDeps): Promise<boolean> {
           break;
         }
         if (r.status === 429) wait = BUSY_MS;
+        failed = r.status >= 500;
         await r.arrayBuffer().catch(() => undefined);
       } catch {
         // No answer this time: ask again.
+        failed = true;
       }
+      failsInRow = failed ? failsInRow + 1 : 0;
+      if (failsInRow >= RELAY_DOWN_AFTER && !saidDown) (saidDown = true, d.print(PAIR_WORDS.relayDown));
+      else if (!failed && saidDown) (saidDown = false, d.print(PAIR_WORDS.relayBack));
       await sleep(wait);
     }
-    if (box === null) return again("Your phone didn't answer in 10 minutes.");
+    if (box === null) return again(saidDown ? PAIR_WORDS.relayGaveUp : PAIR_WORDS.phoneLate);
     const opened = openSeed(box, o.mailbox, o.secret);
     if (!opened || opened.seed.length !== 32) return again("That didn't come from your phone.");
     try {
@@ -143,7 +162,7 @@ export async function runPair(d: PairDeps): Promise<boolean> {
         return again("The Keychain didn't keep it.");
       }
       d.print("");
-      d.print(`AgentZero is on this computer for ${opened.accountId}, up to $${dayLimitUsd} a day from here.`);
+      d.print(`AgentZero is on this computer for ${opened.accountId}. It spends up to $${dayLimitUsd} a day from here.`);
       d.print("Start it: node apps/tray/tray.ts serve");
       d.print("Then add it to Claude Code:");
       d.print(claudeLine(trayBearer(o.secret), d.port ?? PORT));

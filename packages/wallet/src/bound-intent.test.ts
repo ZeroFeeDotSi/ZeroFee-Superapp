@@ -14,7 +14,8 @@ import { signedBy1Click } from "@zerofee/core/quote-signature";
 import { signedQuote, TEST_QUOTE_KEY } from "@zerofee/core/quote-test-key";
 import type { BoundIntent, PlainWords, TxRequest } from "@zerofee/core/signer";
 import { FakeChain } from "@zerofee/core/testing/fake-chain";
-import { createIntentsSwap, SWAP_USDC } from "./intents-swap.ts";
+import { SWAP_USDC } from "./intents-swap.ts";
+import { mtTransfer } from "./moves.ts";
 import { fundingSteps } from "./convert.ts";
 import { saidOnSheet } from "./app/money/swap-corridor.ts";
 
@@ -92,28 +93,11 @@ const withArgs = (r: TxRequest, over: Record<string, unknown>): TxRequest => {
 
 // ── 2. Swap in the Safe (intents-swap.ts) ──────────────────────────────────────────────────────────────────────────────
 
-/** The Safe swap's steps, from intents-swap.ts's own swap(): the core's quote answers with the live deposit address. */
+/** The old public Safe swap's one step (an mt_transfer of exactly amountIn to the quote's deposit address), built here: the
+ *  ledger no longer makes it (product decision, 8 Nov: every Safe swap goes through NEAR Confidential, safe-send.ts swapFromSafe), but
+ *  the core's swap tag must still refuse a forged one if an app ever asks. */
 async function safeSwapSteps(): Promise<TxRequest[]> {
-  let steps: TxRequest[] = [];
-  const now = () => Date.now();
-  const swaps = createIntentsSwap({
-    bridgeFor: () => ({ call: async (method: string) => (method === "subwallet.safeSwapQuote" ? { ok: { depositAddress: LIVE_DEPOSIT, amountIn: LIVE.quote.amountIn, minAmountOut: LIVE.quote.minAmountOut } } : { problem: { code: "x" } }) }) as never,
-    myAccount: async () => ({ accountId: LIVE_ACCOUNT }),
-    coin: async (t) => (t === NEAR ? { decimals: 24, symbol: "NEAR" } : t === SWAP_USDC ? { decimals: 6, symbol: "USDC" } : null),
-    status: async () => null,
-    ledgerBalance: async () => 5n * 10n ** 24n,
-    canChain: async () => false,
-    dryQuote: async () => ({ quote: { amountIn: LIVE.quote.amountIn, amountOut: LIVE.quote.amountOut, minAmountOut: LIVE.quote.minAmountOut, amountInUsd: LIVE.quote.amountInUsd, amountOutUsd: LIVE.quote.amountOutUsd } }) as never,
-    signAll: async (s) => ((steps = s), { txHash: "h", explorerUrls: [], hold: { reason: "test" } as never }),
-    approvals: (s) => s,
-    remember: async () => {},
-    follow: () => {},
-    now, iso: () => new Date(now()).toISOString(),
-  });
-  const q = await swaps.swapQuote({ from: NEAR, to: SWAP_USDC, amountIn: "1", source: "safe" }, "wallet" as never);
-  await swaps.swap({ quoteId: q.id }, "wallet" as never);
-  assert.equal(steps.length, 1, "one mt_transfer");
-  return steps;
+  return [mtTransfer({ to: LIVE_DEPOSIT, tokenId: NEAR, units: BigInt(LIVE.quote.amountIn), why: "Swap 1 in your Safe" })];
 }
 const liveLookup: OneClickLookup = async (a) => (a === LIVE_DEPOSIT ? { status: "PENDING_DEPOSIT", quoteResponse: LIVE } : null);
 const safe = () => realCore({ accountId: LIVE_ACCOUNT, lookup: liveLookup, balances: { [NEAR]: (5n * 10n ** 24n).toString() } });

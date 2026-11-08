@@ -45,7 +45,7 @@ test("the sheet: the same tap as ever (the form's own Send), the refusal's line 
   assert.match(sheet, /return setLine\(sheetLineOf\(end\.refused\) \?\? end\.refused\.whatHappened\);/, "the line it holds is the one drawn: a saidOnSheet Problem names no service, so sheetLineOf is null");
   assert.match(sheet, /const again = stopped && line === stopped\.line \? stopped\.label : null;/, "any other line ends it");
   assert.match(sheet, /const edited = \(\) => \{ setLine\(null\); setStopped\(null\); \};/, "any edit ends the refusal (the reviewer's ruling); a service's own line isn't this state");
-  assert.match(sheet, /said=\{line \?\? services\.line\} again=\{again\} onEdit=\{edited\}/);
+  assert.match(sheet, /said=\{line \?\? \(downTop \? null : services\.line\)\} again=\{again\} onEdit=\{edited\}/);
   assert.match(form, /const editKey = JSON\.stringify\(\[sourceId, picked, amount, typed, exact\]\);/, "keypad, chips, Max, a paste, a coin, a network; never the sources' read settling");
   assert.match(form, /useLayoutEffect\(\(\) => \{ if \(lastEdit\.current !== editKey\) \{ lastEdit\.current = editKey; onEdit\?\.\(\); \} \}, \[editKey\]\);/, "before it paints");
   assert.match(sheet, /setStop\(null\);\n\s*setLine\(null\);/, "a new To ends it too");

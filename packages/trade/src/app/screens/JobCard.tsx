@@ -4,7 +4,8 @@
 // check and the time for a step done, a pulse and how long for the one happening now, a number for the next. Running and
 // waiting rows open by themselves. A held Add's row leads to the shell's Waiting screen, where its hold can run or be
 // cancelled (D17).
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { copyText } from "@zerofee/shell-api/copy-text.ts";
 import { CLAIM_PREFIX } from "../trade-tasks.ts";
 import { CoinIcon } from "@zerofee/design/CoinIcon.tsx";
 import { Check } from "@zerofee/design/icons.tsx";
@@ -49,7 +50,15 @@ function useKeptHeld(k: KeptFacts | undefined, n: number): string | null | undef
  */
 function KeptWay({ k, view, onClaim, running, said }: { k: KeptFacts; view: KeptView; onClaim: () => void; running: boolean; said?: string }) {
   const [details, setDetails] = useState(false);
-  const copy = (v: string) => { void navigator.clipboard?.writeText(v).catch(() => undefined); };
+  // QA 16's S8 (8 Nov): no raw wallet id, hash or contract on screen; each row is its name and Copy, which says "Copied"
+  // only when it copied (Moment's copyText), then Copy again
+  const [copied, setCopied] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = (label: string, v: string) => void copyText(v).then((ok) => {
+    if (!ok) return;
+    setCopied(label); clearTimeout(timer.current); timer.current = setTimeout(() => setCopied(null), 1500);
+  });
   return (
     <div className="tr-kept" data-testid="kept-way">
       {view.body && <p className="zf-small">{view.body}</p>}
@@ -59,8 +68,8 @@ function KeptWay({ k, view, onClaim, running, said }: { k: KeptFacts; view: Kept
       {view.details && (details
         ? <div className="tr-kept-details"><p className="zf-small">{view.details.head}</p>
             {view.details.rows.map((r) => (
-              <div key={r.label} className="tr-kept-row"><span className="l">{r.label}</span><span className="v">{r.value}</span>
-                <button className="zf-link tr-kept-copy" onClick={() => copy(r.value)}>Copy</button></div>
+              <div key={r.label} className="tr-kept-row"><span className="l">{r.label}</span>
+                <button className="zf-link tr-kept-copy" aria-label={copied === r.label ? `${r.label} copied` : `Copy ${r.label.toLowerCase()}`} onClick={() => copy(r.label, r.value)}>{copied === r.label ? "Copied" : "Copy"}</button></div>
             ))}</div>
         : <button className="zf-link tr-kept-more" onClick={() => setDetails(true)}>{view.details.open}</button>)}
     </div>
@@ -123,7 +132,8 @@ export function JobCard({ card }: { card: Card }) {
           {card.steps.map((s, i) => (
             <li key={s.label} className={`tr-step tr-step--${s.state}`}>
               <i aria-hidden="true">{s.state === "done" ? <Check /> : s.state === "now" ? <b className="zf-live" /> : i + 1}</i>
-              <span>{s.label}{s.note && <small>{s.note}</small>}</span>
+              {/* QA 16's S7 (8 Nov): an opened "Didn't go" card says its sentence once: the row's line, never again as its step's note */}
+              <span>{s.label}{s.note && s.note !== sub && <small>{s.note}</small>}</span>
               <small className="tr-step-at">{s.state === "done" && s.at ? clock(s.at) : s.state === "now" && s.etaSec !== undefined ? about(s.etaSec) : ""}</small>
             </li>
           ))}

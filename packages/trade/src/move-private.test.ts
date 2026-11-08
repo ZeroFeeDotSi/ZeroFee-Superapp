@@ -149,8 +149,8 @@ test("the fill open: the Safe fills Private first by a whole step over what was 
   assert.equal((await a.row(`mv-${KEY}`))!.fill, "done");
   assert.deepEqual(privateMoveSteps(["sol"], { fill: true }).map((w) => w.doing), ["NEAR Confidential is moving money from your Safe to Private.", "NEAR Confidential is paying your SOL wallet.", "Solana is landing it in your SOL wallet."]);
   // several chains: one landing line per chain, each named (the copy review's ruling, 5 Nov: never "Each chain")
-  assert.deepEqual(privateMoveSteps(["sol", "hood"]).map((w) => w.done), ["NEAR Confidential paid your wallets.", "It's in your SOL wallet.", "It's in your ETH (RH) wallet."], "Private covered: no fill");
-  assert.deepEqual(privateMoveSteps(["sol", "hood"]).map((w) => w.next), ["Then NEAR Confidential pays your wallets.", "Then Solana lands it in your SOL wallet.", "Then Robinhood Chain lands it in your ETH (RH) wallet."]);
+  assert.deepEqual(privateMoveSteps(["sol", "hood"]).map((w) => w.done), ["NEAR Confidential paid your wallets.", "It's in your SOL wallet.", "It's in your Robinhood wallet."], "Private covered: no fill");
+  assert.deepEqual(privateMoveSteps(["sol", "hood"]).map((w) => w.next), ["Then NEAR Confidential pays your wallets.", "Then Solana lands it in your SOL wallet.", "Then Robinhood Chain lands it in your Robinhood wallet."]);
 });
 
 test("a page closed mid-job finds the Move again under the same row id and follows it to its end by the ledger's own record of its payments", async () => {

@@ -202,7 +202,7 @@ test("each sheet's submit makes its job through runJob and draws the receipt (\"
   assert.match(send, /end\.job\.made\(moved\.filter\(\(m\) => m\.status !== "waiting"\)\.map\(\(m\) => `send:\$\{m\.id\}`\)\);/);
   assert.doesNotMatch(send, /setTimeout\(done/, "the receipt stays until closed (QA: never closes by itself)");
   const priv = src("../screens/Private.tsx");
-  assert.match(priv, /tasks, title: `Move \$\{what\} to Private`, safe: true, money: \["safe"\],/);
+  assert.match(priv, /tasks, title: `Add \$\{what\} to Private`, etaSec: eta, safe: true, money: \["safe"\],/);
   assert.match(priv, /tasks, title: "Move money from Private to your Safe", usd, safe: false, money: \["private"\],/);
   assert.match(priv, /<JobReceipt amount=\{made\} icon=\{<PrivateMark size=\{44\} \/>\} testid="private-add-made"/);
   const fill = src("../../../../../apps/web/src/agentzero/use-agent-wallet.ts");
@@ -210,7 +210,7 @@ test("each sheet's submit makes its job through runJob and draws the receipt (\"
   const az = src("../../../../../apps/web/src/agentzero/AgentWallet.tsx");
   assert.match(az, /data-testid="az-fill-made"[^]*?\{JOB_WORDS\.created\}/);
   const made = src("./JobMade.tsx");
-  assert.match(made, /data-state="away"[^]*?\{JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/);
+  assert.match(made, /data-state="away"[^]*?\{landed \? JOB_WORDS\.landed : JOB_WORDS\.created\}[^]*?<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/);
   const trade = src("../../../../trade/src/app/TradeApp.tsx");
   assert.doesNotMatch(trade, /runJob|startJob/, "control: Trade's buys and sells are not jobs");
 });
@@ -240,11 +240,11 @@ test("every job's receipt names NEAR Confidential under \"Job created.\", never 
   const made = readFileSync(new URL("./JobMade.tsx", import.meta.url), "utf8");
   assert.match(made, /export const THROUGH_CONFIDENTIAL = "It goes through NEAR Confidential\.";/);
   // the copy review's what-happened line sits under "Job created.", above the protocol's (7 Nov; the product's words stand above it)
-  assert.match(made, /\{JOB_WORDS\.created\}<\/p>\n\s*\{line && <p className="zf-receipt__line" data-testid=\{`\$\{testid\}-said`\}>\{line\}<\/p>\}\n\s*\{through && <p className="zf-receipt__line" data-testid=\{`\$\{testid\}-through`\}>\{through\}<\/p>\}\n\s*<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/, "under Job created, then the time left (Jobs hunt B3), above where to watch it");
+  assert.match(made, /\{landed \? JOB_WORDS\.landed : JOB_WORDS\.created\}<\/p>\n\s*\{line && <p className="zf-receipt__line" data-testid=\{`\$\{testid\}-said`\}>\{line\}<\/p>\}\n\s*\{through && <p className="zf-receipt__line" data-testid=\{`\$\{testid\}-through`\}>\{landed && through === THROUGH_CONFIDENTIAL \? WENT_CONFIDENTIAL : through\}<\/p>\}\n\s*\{steps\}\n\s*<TimeLeft etaSec=\{etaSec\} watch job=\{job\} \/>/, "under Job created, then the time left (Jobs hunt B3), above where to watch it");
   // NEAR Confidential by default; only a NEAR wallet move that isn't its route (Spending's, Trade's Add/Take out) says none
   assert.match(made, /through = THROUGH_CONFIDENTIAL/, "every job names NEAR Confidential unless its caller says it isn't the route");
   assert.doesNotMatch(made.replace(/\/\*\*[^]*?\*\//g, ""), /privately|keeps it private/i, "control: says only what's true");
-  assert.match(readFileSync(new URL("../screens/Private.tsx", import.meta.url), "utf8"), /\$\{JOB_WORDS\.created\} \$\{receiptLeft\(madeAt \+ HOME_ETA_SEC \* 1000, now, madeAt\)\} \$\{THROUGH_CONFIDENTIAL\} \$\{PRIVATE_JOB_WATCH\}/, "with its time left (B35, 8 Nov)");
+  assert.match(readFileSync(new URL("../screens/Private.tsx", import.meta.url), "utf8"), /\$\{JOB_WORDS\.created\} \$\{receiptLeft\(madeAt \+ HOME_ETA_SEC \* 1000, now, madeAt\)\}\\n\$\{THROUGH_CONFIDENTIAL\} \$\{PRIVATE_JOB_WATCH\}/, "with its time left (B35, 8 Nov), on two lines (the audit's Move S4)");
 });
 
 test("QA's SHOULD (5 Nov), since one Face ID (6 Nov): a Safe job is listed only once signed, its row already \"Approved\" with its tick, never a step that suggests money moving before the signature (control: a hot wallet's job starts at \"Getting ready\", no approval step)", async () => {

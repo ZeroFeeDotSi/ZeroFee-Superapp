@@ -18,7 +18,7 @@ const iso = (s: number) => new Date(T0 + s * 1000).toISOString();
 const ON_WAY = { money: { state: "on-the-way" } };
 const SAFE = { money: { state: "safe" } };
 /** Machine text the face never says: "Not signed", chain names, ";" or a bracket (the app's own "ETH (RH)" aside). */
-const MACHINE = /Not signed|Solana|Robinhood|;|\((?!RH\))|(?<!\(RH)\)/;
+const MACHINE = /Not signed|Solana|Robinhood(?! wallet)|;|\((?!RH\))|(?<!\(RH)\)/;
 
 // ---- 1. on its way to Private ----
 test("1: a part's end words follow its Problem's money state: on its way, back, or why it stopped (table)", () => {
@@ -131,8 +131,8 @@ test("4: moveStopFace: nothing moved only when every part never started or was r
   const next = [{ label: "Try again", go: { kind: "move" as const, to: "sol" } }, { label: "Open Private", go: { kind: "private" as const } }];
   const funds = "That wallet doesn't have that much.";
   const cases: [string, StopPart[], { body: string; cause?: string; buttons: string[]; nothing: boolean }][] = [
-    ["all not started", [{ at: "sol", state: "not-started" }, { at: "hood", state: "not-started" }], { body: "Nothing moved. Your money is still in your SOL wallet and your ETH (RH) wallet.", buttons: ["Try again", "Close"], nothing: true }],
-    ["refused for funds, two wallets", [{ at: "sol", state: "refused", why: `${funds} · it's on the chain` }, { at: "hood", state: "refused", why: funds }], { body: "Nothing moved. Your money is still in your SOL wallet and your ETH (RH) wallet.", cause: "Those wallets don't hold that much.", buttons: ["Try again", "Close"], nothing: true }],
+    ["all not started", [{ at: "sol", state: "not-started" }, { at: "hood", state: "not-started" }], { body: "Nothing moved. Your money is still in your SOL wallet and your Robinhood wallet.", buttons: ["Try again", "Close"], nothing: true }],
+    ["refused for funds, two wallets", [{ at: "sol", state: "refused", why: `${funds} · it's on the chain` }, { at: "hood", state: "refused", why: funds }], { body: "Nothing moved. Your money is still in your SOL wallet and your Robinhood wallet.", cause: "Those wallets don't hold that much.", buttons: ["Try again", "Close"], nothing: true }],
     ["refused for funds, one wallet", [{ at: "sol", state: "refused", why: funds }], { body: "Nothing moved. Your money is still in your SOL wallet.", cause: "Your SOL wallet doesn't hold that much.", buttons: ["Try again", "Close"], nothing: true }],
     ["refused, a machine reason", [{ at: "near", state: "refused", why: "Not signed: x (y); z" }], { body: "Nothing moved. Your money is still in your NEAR wallet.", buttons: ["Try again", "Close"], nothing: true }],
     ["one part went", [{ at: "sol", state: "went" }], { body: line, buttons: ["Open Private"], nothing: false }],
@@ -154,15 +154,15 @@ test("4: moveStopFace: nothing moved only when every part never started or was r
 });
 
 const leg = (o: Partial<SpendingActivity>): SpendingActivity => ({ id: "l1", kind: "move", usd: "149.78", status: "refused", shown: false, atIso: iso(0), words: "From your SOL wallet", network: "sol", note: "That wallet doesn't have that much. · it's on the chain", ...o } as SpendingActivity);
-const takeOut = (legs: SpendingActivity[]) => ({ id: "h1", kind: "put-away", usd: "179.00", status: "refused", shown: true, atIso: iso(0), words: "Didn't move $179.00 to your Safe", note: "$149.78 from Solana didn't come back (That wallet doesn't have that much.); $29.22 from Robinhood Chain didn't come back (That wallet doesn't have that much.) · it's still in your SOL wallet and still in your ETH (RH) wallet", legs } as unknown as SpendingActivity);
+const takeOut = (legs: SpendingActivity[]) => ({ id: "h1", kind: "put-away", usd: "179.00", status: "refused", shown: true, atIso: iso(0), words: "Didn't move $179.00 to your Safe", note: "$149.78 from Solana didn't come back (That wallet doesn't have that much.); $29.22 from Robinhood Chain didn't come back (That wallet doesn't have that much.) · it's still in your SOL wallet and still in your Robinhood wallet", legs } as unknown as SpendingActivity);
 
 test("4: the reviewer's on the real row: one title, the body, the cause, Try again then Close, no steps; a leg that went keeps the job's words (control)", () => {
-  const legs = [leg({}), leg({ id: "l2", usd: "29.22", network: "hood", words: "From your ETH (RH) wallet" })];
+  const legs = [leg({}), leg({ id: "l2", usd: "29.22", network: "hood", words: "From your Robinhood wallet" })];
   assert.deepEqual(stopPartsOf(takeOut(legs) as never, legs).map((p) => [p.at, p.state]), [["sol", "refused"], ["hood", "refused"]]);
   const t = moveTrack(takeOut(legs) as never)!;
   assert.equal(t.bar, "Move", "the sheet's head says Move; the title once, under it");
   assert.equal(t.end!.head, "Move stopped");
-  assert.equal(t.end!.line, "Nothing moved. Your money is still in your SOL wallet and your ETH (RH) wallet.");
+  assert.equal(t.end!.line, "Nothing moved. Your money is still in your SOL wallet and your Robinhood wallet.");
   assert.equal(t.end!.cause, "Those wallets don't hold that much.");
   assert.equal(t.end!.row, "Nothing moved. Your money is safe.");
   assert.deepEqual(t.next, [{ label: "Try again", go: { kind: "move", to: "safe" } }, { label: "Close", go: { kind: "close" } }], "two wallets: no from, no figure");

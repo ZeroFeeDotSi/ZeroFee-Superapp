@@ -24,7 +24,7 @@ test("(a) a running Swap's job shows every step, the protocol named in its own v
   ]);
   // never "Each chain": several wallets, one landing line per chain, each ticking on its own wallet's read
   const two = moveTrack(swapRow({ goesTo: ["sol", "hood"], paidDone: true, landed: ["hood"], words: "Moving $20.00 to your wallets", usd: "20.00" }) as Folded)!;
-  assert.deepEqual(two.steps.map((s) => [s.label, s.state]), [["NEAR Confidential paid your wallets.", "done"], ["Solana is landing it in your SOL wallet.", "doing"], ["It's in your ETH (RH) wallet.", "done"]]);
+  assert.deepEqual(two.steps.map((s) => [s.label, s.state]), [["NEAR Confidential paid your wallets.", "done"], ["Solana is landing it in your SOL wallet.", "doing"], ["It's in your Robinhood wallet.", "done"]]);
   assert.ok(two.steps.every((s) => !/Each chain/.test(s.label)), "control");
   // NEAR Confidential's word that it paid ticks the swap, never the landing (that waits on the SOL wallet's read)
   const paid = moveTrack(swapRow({ paidDone: true }) as Folded, SWAP, "0.0644 SOL")!;

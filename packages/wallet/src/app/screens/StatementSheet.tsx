@@ -8,7 +8,7 @@ import { onPhone } from "@zerofee/shell-api/approval-words.ts";
 import type { Movement } from "../../types.ts";
 import { useWallet } from "../runtime.tsx";
 import { ownRows } from "../format.ts";
-import { browserDownload, fileName, mayBeShort, monthName, saveStatement, statementRows, summaryLine, toCsv } from "../statement.ts";
+import { browserDownload, fileName, mayBeShort, monthName, nextRead, saveStatement, statementRows, summaryLine, toCsv } from "../statement.ts";
 
 /** How far back the month can go (two years), and how many moves it reads (Activity reads 50). */
 const MONTHS_BACK = 24;
@@ -34,10 +34,11 @@ export function StatementSheet({ onClose }: { onClose: () => void }) {
   const [moves, setMoves] = useState<{ ledger: Movement[]; spending: SpendingActivity[] } | "failed" | null>(null);
   const [line, setLine] = useState("");
   const [busy, setBusy] = useState(false);
+  const [limit, setLimit] = useState(READ_LIMIT);
   useEffect(() => {
     let live = true;
     void Promise.all([
-      bridge.call<Movement[]>("ledger.activity", { limit: READ_LIMIT }),
+      bridge.call<Movement[]>("ledger.activity", { limit }),
       spending ? bridge.call<SpendingActivity[]>("spending.activity") : Promise.resolve({ ok: [] as SpendingActivity[] }),
     ]).then(([l, s]) => {
       if (!live) return;
@@ -46,7 +47,10 @@ export function StatementSheet({ onClose }: { onClose: () => void }) {
       setMoves({ ledger: l.ok, spending: s.ok });
     }, () => live && setMoves("failed"));
     return () => { live = false; };
-  }, [bridge, spending]);
+  }, [bridge, spending, limit]);
+  // the month older than what came back: read more, never a note while more can be read
+  const short = !!moves && moves !== "failed" && mayBeShort(moves.ledger, limit, year, month);
+  useEffect(() => { const more = nextRead(short, limit); if (more !== null) setLimit(more); }, [short, limit]);
   const rows = useMemo(() => (moves && moves !== "failed" ? statementRows(moves.ledger, moves.spending, tokens, chains, year, month, ownRows(wallets)) : null), [moves, tokens, chains, year, month, wallets]);
   const phone = onPhone();
   const save = async () => {
@@ -66,7 +70,7 @@ export function StatementSheet({ onClose }: { onClose: () => void }) {
         <button className="zf-icon-btn" aria-label="Month after" disabled={back === 0} onClick={() => { setBack(back - 1); setLine(""); }}>›</button>
       </div>
       <p className="zf-body wl-st-sum" data-testid="statement-summary">{moves === "failed" ? STATEMENT_WORDS.failed : rows ? summaryLine(rows, year, month) : STATEMENT_WORDS.reading}</p>
-      {moves && moves !== "failed" && mayBeShort(moves.ledger, READ_LIMIT, year, month) && <p className="zf-small wl-st-note" role="status">{STATEMENT_WORDS.short}</p>}
+      {short && nextRead(short, limit) === null && <p className="zf-small wl-st-note" role="status">{STATEMENT_WORDS.short}</p>}
       <p className="zf-small wl-st-note">{STATEMENT_WORDS.private}</p>
       <button className="zf-btn" disabled={!rows || !rows.length || busy} onClick={() => void save()}>{STATEMENT_WORDS.save(phone)}</button>
       {line && <p className="zf-small wl-st-line" role="status">{line}</p>}

@@ -9,8 +9,8 @@ export const SOCIAL_TRADING = {
   name: "Social trading",
   /** Its short name, where a tile or a tab has room for one word (the tray at 390 cut "Social trading"). */
   short: "Social",
-  /** Its sub-line: the sites inside it, more to come. */
-  line: "pump.fun, GMGN, more soon",
+  /** Its sub-line: the sites inside it (b23: no "more soon", end to end or hidden). */
+  line: "pump.fun and GMGN",
 } as const;
 
 /** Each site's dollars: the sum of its current site wallets (Spending's one figure each); null while any of them can't be

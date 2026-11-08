@@ -13,7 +13,7 @@ test("J3-2: Send's keypad is pinned on the floor with its button, never in the s
   const scroll = body.slice(0, body.indexOf('<div className="wl-send2__floor">'));
   const floor = body.slice(body.indexOf('<div className="wl-send2__floor">'));
   assert.doesNotMatch(scroll, /<Keypad /, "fails on main: the keypad was the scroll box's last child, under the floor's fade");
-  assert.match(floor, /^<div className="wl-send2__floor">[\s\S]{0,400}<Keypad /, "the keypad heads the floor");
+  assert.match(floor, /^<div className="wl-send2__floor">[\s\S]{0,700}<Keypad /, "the keypad heads the floor");
   assert.ok(floor.indexOf("<Keypad ") < floor.indexOf('data-testid="send-go"'), "control: the button under the keypad, the floor's last");
   const css = readFileSync(new URL("./send.css", import.meta.url), "utf8");
   assert.match(css, /\.wl-send2__floor::before \{[^}]*bottom: 100%/, "control: the fade sits over the form's tail, above the floor (and the keypad)");

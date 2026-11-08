@@ -9,6 +9,7 @@
 import type { Chain } from "@zerofee/core/chain";
 import { codeOf } from "@zerofee/core/chain";
 import { AGENT_USDC, PAYEE_CHAIN_NAME, readPayee } from "@zerofee/core/agent-private";
+import { APP_CHAINS } from "@zerofee/core/app-chains";
 import { agentPayWithSeed } from "@zerofee/core/agent-sign";
 import type { OneClickQuoter } from "@zerofee/core/intents";
 import { ProblemError } from "@zerofee/core/problem";
@@ -76,6 +77,8 @@ export interface Meter {
 
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
 
+/** Audit 19's J7 (builder 24): the payees' chains Claude Code is told, V1's own (core app-chains.ts): "Solana, NEAR or Robinhood Chain". */
+const PAY_CHAINS = ((n: string[]) => `${n.slice(0, -1).join(", ")} or ${n[n.length - 1]}`)(APP_CHAINS.map((c) => PAYEE_CHAIN_NAME[c]));
 export const TOOLS = [
   {
     name: "balance",
@@ -94,7 +97,7 @@ export const TOOLS = [
   {
     name: "pay",
     title: "Pay someone on the list",
-    description: `Pay someone on the account's AgentZero list, privately: at most $${PER_CALL_USD} a call, within this computer's own day limit and the account's AgentZero limit. They may be on NEAR, Solana, Robinhood Chain or BNB Chain. Someone new, or anything the check doesn't like, must be asked on the phone.`,
+    description: `Pay someone on the account's AgentZero list, privately: at most $${PER_CALL_USD} a call, within this computer's own day limit and the account's AgentZero limit. They may be on ${PAY_CHAINS}. Someone new, or anything the check doesn't like, must be asked on the phone.`,
     inputSchema: obj(
       {
         to: { type: "string", description: "Their address: a NEAR account like kim.near, or an address on their chain." },

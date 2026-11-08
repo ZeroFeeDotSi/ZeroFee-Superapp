@@ -39,5 +39,5 @@ test("M8 controls: within the plan no head; a lone lead or a stray line is never
   assert.equal(costsMoreHead(["Nothing moved yet. It's still in your Safe.", lead, COSTS_MORE.next]), 0);
   assert.equal(costsMoreHead([lead, COSTS_MORE.still(["your Safe"]), COSTS_MORE.next]), 3);
   assert.equal(costsMoreHead([COSTS_MORE.lead("least", "$1,045.00", "$1,048.71"), COSTS_MORE.still(["your Safe"]), COSTS_MORE.next]), 3, "figures with a thousands comma");
-  assert.equal(COSTS_MORE.still(["your Safe", "Private", "your ETH (RH) wallet"]), "Nothing moved yet. It's still in your Safe, Private and your ETH (RH) wallet.");
+  assert.equal(COSTS_MORE.still(["your Safe", "Private", "your Robinhood wallet"]), "Nothing moved yet. It's still in your Safe, Private and your Robinhood wallet.");
 });

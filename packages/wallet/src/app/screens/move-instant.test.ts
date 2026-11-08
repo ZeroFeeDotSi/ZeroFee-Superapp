@@ -58,7 +58,7 @@ test("the sheet says \"Job created.\" before any chain work answers: a slow job 
   const sheet = readFileSync(new URL("./MoveSheet.tsx", import.meta.url), "utf8");
   // phone tests (5 Nov): the receipt never says "Still getting it ready" under "Job created." (no `away`)
   assert.match(sheet, /if \(made !== null\) \{\n\s+return \(\n(\s+\/\/[^\n]*\n)?\s+<MoneySheet title=\{MOVE_WORDS\.title\} onClose=\{close\}>/);
-  assert.match(sheet, /\{JOB_WORDS\.created\}/);
+  assert.match(sheet, /data-testid="move-made-head">\{said\.head\}/, "audit 13's D1: Job created. while it goes (moveReceiptWords)");
 });
 
 test("the jobs icon pulses once per job made: two Moves, two pulses (control: a task published without a job, no pulse; the bell reads the count)", async () => {

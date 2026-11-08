@@ -30,7 +30,8 @@ test("the words never promise what nobody can, never advise, and never say the o
 });
 
 test("D110: the table holds exactly what the Sign-up Robot's planner uses, and nothing outside packages/agent's tests reaches the old Agent app's files", () => {
-  const think = readFileSync(new URL("./robot/think.ts", import.meta.url), "utf8");
+  // audit 14 E1: the browser's thinker (relay-think.ts) and the router (service.ts) use the table too
+  const think = ["./robot/think.ts", "./robot/relay-think.ts", "./robot/service.ts"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("\n");
   const used = new Set([...think.matchAll(/agentProblems\.([a-zA-Z]+)/g)].map((m) => m[1]));
   assert.deepEqual([...used].sort(), Object.keys(agentProblems).sort(), "every entry used, none missing");
   assert.doesNotMatch(think, /from "\.\.\/(service|prompt|plan|model|compile|words|types)\.ts"/, "the planner no longer pulls in the old service");

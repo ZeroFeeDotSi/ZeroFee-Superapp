@@ -21,7 +21,7 @@ const READ = { reserveUsd: 20, chains: [chain("sol", 5), chain("hood", 9.5), cha
 test("the audit's condition 4: the page's wallet parts are checked against the engine's own read; the page can only lower, never raise or add a wallet the read doesn't show", () => {
   has("confirmOthers");
   const rows: [string, unknown, OtherPart[] | null][] = [
-    ["the owner's Move: $3.94 and $5.52 from the ETH (RH) wallet's $9.50", [{ from: "hood", to: "sol", usd: 3.94 }, { from: "hood", to: "near", usd: 5.52 }], [{ from: "hood", to: "sol", cents: "394" }, { from: "hood", to: "near", cents: "552" }]],
+    ["the owner's Move: $3.94 and $5.52 from the Robinhood wallet's $9.50", [{ from: "hood", to: "sol", usd: 3.94 }, { from: "hood", to: "near", usd: 5.52 }], [{ from: "hood", to: "sol", cents: "394" }, { from: "hood", to: "near", cents: "552" }]],
     ["lower than the read: kept as the page said it", [{ from: "hood", to: "sol", usd: 1 }], [{ from: "hood", to: "sol", cents: "100" }]],
     ["higher than the read: none", [{ from: "hood", to: "sol", usd: 9.51 }], null],
     ["two parts together over the read: none", [{ from: "hood", to: "sol", usd: 5 }, { from: "hood", to: "near", usd: 5 }], null],
@@ -114,10 +114,10 @@ test("C2 on the real core's sheet: the whole Move's title from the core's figure
     "Your SOL wallet gets · about $12.33",
     "Your NEAR wallet gets · about $107.00",
     "From your Safe · $150.00",
-    "From your ETH (RH) wallet · about $9.46",
+    "From Robinhood wallet · about $9.46",
     "Private keeps the rest · about $40.13",
     "Fee · $0.00",
-    "Face ID approves the Safe's part. Your ETH (RH) wallet and Private send on their own.",
+    "Face ID approves the Safe's part. Your Robinhood wallet and Private send on their own.",
     "Anyone can see the Safe's part.",
   ], w.lines.join(" | "));
   // control: the Safe's side only (no kept parts) is today's sheet, word for word; the amount the sheet binds is the same
@@ -133,6 +133,6 @@ test("C2: a kept part the core can't read as a place and a figure: the Safe's si
   for (const bad of [[{ from: "hood", to: "mars", cents: "394" }], [{ from: "hood", to: "sol", cents: "-1" }], [{ from: "hood", to: "sol", cents: "3.94" }]] as OtherPart[][]) {
     const w = await sheet([...OWNER, ...bad]);
     assert.equal(w.title, "Move $109.87 to your SOL and NEAR wallets", JSON.stringify(bad));
-    assert.ok(!w.lines.some((l) => /ETH \(RH\)/.test(l)), w.lines.join(" | "));
+    assert.ok(!w.lines.some((l) => /Robinhood wallet|ETH \(RH\)/.test(l)), w.lines.join(" | "));
   }
 });

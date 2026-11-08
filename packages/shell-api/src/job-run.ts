@@ -43,7 +43,7 @@ export function claim(keys: readonly string[]): (() => void) | null {
 }
 
 /** Each hot wallet's money id, as the sheets name that wallet (Home's rows: SOL, ETH (RH), BNB, NEAR). */
-const HOT_WALLET: Readonly<Record<string, string>> = { "row:sol": "SOL", "row:hood": "ETH (RH)", "row:bsc": "BNB", "row:near": "NEAR" };
+const HOT_WALLET: Readonly<Record<string, string>> = { "row:sol": "SOL", "row:hood": "Robinhood", "row:bsc": "BNB", "row:near": "NEAR" };
 /**
  * The busy refusal's words, per the money asked for (the UI reviewer's ruling, 6 Nov): a hot wallet by its name, and "done",
  * since no one signs a hot wallet's job in its session; the Safe's own job (and any money that isn't a hot wallet's) "signed".

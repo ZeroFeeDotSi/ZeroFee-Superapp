@@ -2,6 +2,7 @@
 // (Back, no tray), and the Buy, Sell, Top up and Put away sheets. Its money is Spending's (D52): no set-up, the one engine
 // behind it, and the top line reads "Trading $X · per chain". Every Problem goes to the shell's Problem screen; its next
 // step is followed here.
+import { appChain } from "@zerofee/core/app-chains";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
 import { TrayActivity } from "@zerofee/design/icons.tsx";
@@ -350,7 +351,7 @@ function TradeScreens() {
         <Sheet title="Receive" onClose={() => setSheet(null)}>
           <div className="tr-movechoose">
             {/* H31: only chains Trade offers; a way in to BNB with no way out would be a one-way door */}
-            {(["sol", "hood", "bsc"] as const).filter(proven).map((c) => (
+            {(["sol", "hood", "bsc"] as const).filter((c) => appChain(c) && proven(c)).map((c) => (
               <button key={c} className="zf-row" onClick={() => { setSheet(null); setView({ kind: "receive", chain: c }); }}><span><span className="t">On {CHAINS[c].name}</span><span className="d">{CHAINS[c].symbol} to your Spending wallet on {CHAINS[c].name}</span></span><Forward /></button>
             ))}
             {!webWallet() && <button className="zf-row" onClick={() => { setSheet(null); shell.openMoney({ kind: "receive" }); }}><span><span className="t">To your Safe</span><span className="d">Any coin, on any network your Safe takes</span></span><Forward /></button>}

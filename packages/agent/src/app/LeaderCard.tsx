@@ -1,6 +1,7 @@
 // ST-C: the leader's report card on the copy sheet, under "The wallet to copy": that wallet's last 30 days of pump.fun
 // trades from Solana's own record (zero/leader-card.ts). Read-only; the copy itself stays the job sheet's. With sample
 // money there is no real wallet: one line, nothing read.
+import { READ_WORDS } from "./read-left.ts";
 import { useEffect, useState } from "react";
 import { isSolanaAddress } from "../zero/jobs.ts";
 import { NO_ANSWER_LINE, SAMPLE_LINE, cardNotes, cardRows, cardTitle, type Card } from "../zero/leader-card.ts";
@@ -59,7 +60,7 @@ export function LeaderCard({ wallet, sample }: { wallet: string; sample: boolean
           <button className="zf-link" onClick={() => setN((x) => x + 1)}>Try again</button>
         </>
       ) : !read ? (
-        <p className="zf-small ag-under">Reading its trades from Solana…</p>
+        <p className="zf-small ag-under">{READ_WORDS.leader}</p>
       ) : (
         <>
           <div className="ag-rows ag-rows--tight">

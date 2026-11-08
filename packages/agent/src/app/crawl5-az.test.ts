@@ -45,7 +45,8 @@ test("every job sheet says its rough cost before Start, the funding page's figur
   assert.ok(jobCostLine().includes(FUND_MODEL_NAME), "the model's name from the one table");
   assert.equal(Math.round(jobUsd() * 100) / 100, 0.06);
   assert.ok(fundLines().cost[0]!.includes("$0.06"), "the same figure as the funding page");
-  assert.match(app, /\{!isRunning && <p className="zf-small ag-under ag-cost">\{jobCostLine\(\)\}<\/p>\}\n\s*<\/div>\n\s*<div className="ag-sheet-floor">/);
+  // audit 14 E9: in the floor, above Start (it read clipped under the scroll's fade)
+  assert.match(app, /<div className="ag-sheet-floor">\n(?:\s*\{\/\*[\s\S]*?\*\/\}\n)?\s*\{!isRunning && <p className="zf-small ag-cost">\{jobCostLine\(\)\}<\/p>\}/);
 });
 
 test("the copy review's S14 words on AgentZero's own page: \"Its wallet · $12.00\" / \"Its wallet · empty\", as on Home's Hot row (control: never the old words)", () => {

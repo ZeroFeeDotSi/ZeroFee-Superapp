@@ -21,10 +21,12 @@ import { PRIVATE_HOME_TITLE } from "@zerofee/shell-api/job-start.ts";
 import { paidFrom } from "./paid-from.ts";
 export { paidFrom };
 import { LANDED_UNREAD, PRIVATE_KEEP_MS } from "@zerofee/core/private-route";
-import { LEG_SEC, MEASURED_SEC, etaLine, legsEndsAt, markStep, privateMoveSteps, safeMoveSteps, sendLegs, stepLabel } from "@zerofee/shell-api/job-steps.ts";
+import { LEG_SEC, MEASURED_SEC, tookIn, etaLine, legsEndsAt, markStep, privateMoveSteps, safeMoveSteps, sendLegs, stepLabel } from "@zerofee/shell-api/job-steps.ts";
 import { mark } from "@zerofee/design/tap.ts";
 import { SAFE_SWAP } from "@zerofee/shell-api/task-earlier.ts";
 import { isHomeSwapRow } from "./swap-ended.ts";
+import { readOut } from "./swap-follow.ts";
+import { coinFigure } from "./swap-corridor.ts";
 import { NEAR_SWAP_BACK, SWAP_AGAIN, swapEndOf } from "../../near-swap-words.ts";
 
 export type StepState = "waiting" | "doing" | "done" | "failed";
@@ -53,6 +55,11 @@ export interface LiveTrack {
   endMs?: number;
   /** No quote and no job's carry yet: when the route's measured time says it ends (withCarry makes it endsAt). */
   measuredEndsAt?: number;
+  /** A8 (audit 10): the whole job's end from its Approve (job-carry `whole`): the time left never says less than it, so it
+   *  never rises when the next leg is known. */
+  wholeEndsAt?: number;
+  /** A8: when the job's Approve was (job-carry `from`): "Done in" counts from it, never from the tap before the Check sheet. */
+  doneFrom?: number;
   /** The sheet's bar when it isn't the row's title, and "Job created." before it at the tap (a swap in place, copy review 6 Nov). */
   bar?: string;
   made?: true;
@@ -85,7 +92,8 @@ export interface MoneyAt { at: string[]; going?: true; unknown?: true; unsure?: 
  *  each step still to tick. Ended, or no legs: as it was. */
 export function onLegs(t: LiveTrack): LiveTrack {
   if (t.end || !t.legSec) return t;
-  const endsAt = legsEndsAt(t.startMs, t.steps, t.legSec);
+  const legs = legsEndsAt(t.startMs, t.steps, t.legSec);
+  const endsAt = legs !== undefined && t.wholeEndsAt !== undefined ? Math.max(legs, t.wholeEndsAt) : legs;
   return endsAt === undefined ? t : { ...t, endsAt };
 }
 
@@ -102,7 +110,7 @@ export const STOP_WORDS = {
   swapAgain: SWAP_AGAIN,
 } as const;
 
-const NAME: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+const NAME: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 const CHAIN: Record<string, string> = { sol: "Solana", hood: "Robinhood Chain", near: "NEAR", bsc: "BNB Chain" };
 const nameOf = (w: string | undefined) => NAME[w ?? ""] ?? "your wallet";
 const ms = (iso: string | undefined) => (iso ? Date.parse(iso) : NaN);
@@ -246,13 +254,15 @@ export function withCarry(t: LiveTrack, c: Carried | undefined): LiveTrack {
   // a Move is named by the dollars its job moved, the receipt's figure: one source (UI's Home audit, 5 Nov: the receipt
   // said $118.00, Home's row "Moving $130.00")
   const title = c?.usd && t.kind === "move" ? t.title.replace(/^Move \$[\d,.]+ /, `Move ${c.usd} `) : t.title;
-  const endsAt = t.end || t.endsAt !== undefined ? undefined : c?.endsAt ?? t.measuredEndsAt;
-  return { ...t, title, ...(endsAt !== undefined ? { endsAt } : {}) };
+  // the protocol's own quote wins over a carried time, except under the whole job's time from its Approve (A8: a floor)
+  const whole = !t.end && c?.whole && c.endsAt !== undefined ? c.endsAt : undefined;
+  const endsAt = t.end ? undefined : t.endsAt !== undefined ? (whole !== undefined && whole > t.endsAt ? whole : undefined) : c?.endsAt ?? t.measuredEndsAt;
+  return { ...t, title, ...(endsAt !== undefined ? { endsAt } : {}), ...(whole !== undefined ? { wholeEndsAt: whole } : {}), ...(c?.from !== undefined ? { doneFrom: c.from } : {}) };
 }
 
 /** The plan's order of places (move-split PLACES): one order on every screen (copy review, 7 Nov). */
 const PLACE_ORDER = ["safe", "private", "sol", "hood", "near", "bsc"];
-const BARE: Record<string, string> = { sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+const BARE: Record<string, string> = { sol: "SOL", hood: "Robinhood", near: "NEAR", bsc: "BNB" };
 /** Where a job ends, by name, in the plan's order (B13's walletsWords): "your SOL wallet", "your SOL and NEAR wallets",
  *  "your SOL, NEAR and ETH (RH) wallets" as ordered; the Safe beside wallets "your Safe and your SOL wallet". Pure. */
 export function placesSaid(places: readonly string[]): string {
@@ -293,7 +303,8 @@ export const JOB_PAGE_WORDS = {
   partFrom: (usd: string, from: string) => `${usd} of it from ${from}`,
   allFrom: (from: string) => `from ${from}`,
   done: "Done.",
-  doneIn: (sec: number) => `Done in ${sec} seconds.`,
+  /** QA 16 (8 Nov): how long it took, as the receipt and the Jobs row say it ("Took 6 s."). `ms`: its end from its start. */
+  doneIn: (ms: number) => tookIn(ms),
   notDone: "Then it's done.",
 } as const;
 /**
@@ -354,7 +365,7 @@ export function jobSteps(ts: readonly LiveTrack[], steps: readonly (readonly Liv
   // 6: done once every part ended done
   const ok = ts.every((t) => !!t.end && t.end.ok && !t.end.slow && !t.end.unshown);
   const end = ok ? lastAt(out) : undefined;
-  out.push(ok ? { label: end !== undefined && end > 0 ? W.doneIn(Math.round(end / 1000)) : W.done, state: "done", ...(end !== undefined ? { atMs: end } : {}) } : { label: W.notDone, state: "waiting" });
+  out.push(ok ? { label: end !== undefined && end > 0 ? W.doneIn(end) : W.done, state: "done", ...(end !== undefined ? { atMs: end } : {}) } : { label: W.notDone, state: "waiting" });
   return out;
 }
 
@@ -424,7 +435,15 @@ export function rowTrack(r: Folded & { own?: SpendingActivity["status"] }, swapW
  * the money is in the place they chose.
  */
 /** `lands`: a Swap's coin and figure as its sheet priced it ("0.0644 SOL"): its end says what came in (copywriter, 5 Nov). */
-export const swapCame = (lands: string, where: string): string => `About ${lands} came into ${where}.`;
+export const swapCame = (lands: string, where: string, read = false): string => `${read ? "" : "About "}${lands} came into ${where}.`;
+/** M12-2 (8 Nov): a done Swap's end line says what its record shows came in ("0.0101 ETH came into your Robinhood
+ *  wallet."), read off the row and its legs in the coin it promised (swap-follow readOut); with no figure on the record,
+ *  the sheet's estimate, said as one ("About …"). */
+export function swapCameRead(r: SpendingActivity, legs: readonly SpendingActivity[], lands: string, where: string): string {
+  const want = lands.split(" ").at(-1);
+  const read = readOut(r, legs, (n) => coinFigure(n, "down"), want);
+  return read ? swapCame(read, where, true) : swapCame(lands, where);
+}
 // a Swap's name and what it priced to come in: its sheet's, kept with the job rows (so after a reload too: job-carry.ts)
 export function moveTrack(r: Folded, swapWords = carried(`move:${r.id}`)?.words, lands = carried(`move:${r.id}`)?.lands): LiveTrack | null {
   if (!["move", "top-up", "put-away", "ready"].includes(r.kind)) return null;
@@ -511,7 +530,7 @@ export function moveTrack(r: Folded, swapWords = carried(`move:${r.id}`)?.words,
   const where = into;
   // S21: a move home NEAR Intents says is done that the Safe's read hasn't shown: the third state, its line, no clock
   const unshown = !bad && !arrived && r.kind === "put-away" ? all.find((x) => x.unshown && x.status === "on-its-way" && x.note) : undefined;
-  const end = bad ? { ok: false, line: unsigned ? notSigned(bad.note ?? bad.words) : bad.note ?? `${bad.words}.` } : arrived ? { ok: true, line: swapWords && lands ? swapCame(lands, where) : `In ${where}.` } : unshown ? { ok: false, slow: true as const, unshown: true as const, whole: true as const, line: unshown.note! } : undefined;
+  const end = bad ? { ok: false, line: unsigned ? notSigned(bad.note ?? bad.words) : bad.note ?? `${bad.words}.` } : arrived ? { ok: true, line: swapWords && lands ? swapCameRead(r, legs, lands, where) : `In ${where}.` } : unshown ? { ok: false, slow: true as const, unshown: true as const, whole: true as const, line: unshown.note! } : undefined;
   const kind: LiveKind = swapHome || swapWords ? "swap" : "move";
   const usd = r.pending && !r.askedUsd ? legs.reduce((n, l) => n + (Number(l.usd) || 0), 0).toFixed(2) : onTo(r);
   const title = swapWords ?? (swapHome || (site && r.kind === "top-up" && r.siteName) ? r.words : /^\d+(\.\d+)?$/.test(usd) ? `${site ? "Add" : "Move"} $${Number(usd).toFixed(2)} to ${where}` : r.words);
@@ -556,7 +575,7 @@ export const STOP_FACE = {
   close: "Close",
 } as const;
 /** A place by the app's name for it, in a sentence: "your SOL wallet", "your Safe", "Private". */
-const STOP_NAME: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+const STOP_NAME: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 const andList = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 /** A refusal that says the wallet hadn't enough (the core's and the Sim's words). */
 const FUNDS = /doesn't (have|hold) (that|enough)|not enough|too little|isn't enough/i;
@@ -672,7 +691,7 @@ function privateMove(r: Folded, to0: string[], at: (x: SpendingActivity) => numb
   const usd = /^\d+(\.\d+)?$/.test(onTo(r)) ? `$${Number(onTo(r)).toFixed(2)}` : null;
   const back = ended && (!r.note || /sent it back/i.test(r.note));
   // landed, and its reads failed to show it (float-private missedRead): still on its way, saying so (audit, 5 Nov)
-  const end = ended ? (back ? { ok: false, line: STOP_WORDS.movePaid(where, usd), whole: true as const } : { ok: false, line: plain(r) }) : done ? { ok: true, line: r.note ? plain(r) : swapWords && lands ? swapCame(lands, where) : `In ${where}.` } : r.note === LANDED_UNREAD ? { ok: false, slow: true as const, line: LANDED_UNREAD } : undefined;
+  const end = ended ? (back ? { ok: false, line: STOP_WORDS.movePaid(where, usd), whole: true as const } : { ok: false, line: plain(r) }) : done ? { ok: true, line: r.note ? plain(r) : swapWords && lands ? swapCameRead(r, r.legs ?? [], lands, where) : `In ${where}.` } : r.note === LANDED_UNREAD ? { ok: false, slow: true as const, line: LANDED_UNREAD } : undefined;
   // Try again only when a re-tap can't pay twice: never after a part whose money is unknown (`unsure`, the ledger's own
   // flag; the audit's ruling, 6 Nov), whose words already say "Check Activity before you try again."
   const again = ended && !r.unsure && !r.onWay && !site && !swapWords && onward.length === 1 ? [{ label: STOP_WORDS.tryAgain, go: { kind: "move" as const, to: onward[0]!, ...againUsd(r, onward[0]!) } }] : [];
@@ -697,8 +716,8 @@ function privateMove(r: Folded, to0: string[], at: (x: SpendingActivity) => numb
 /** The place unsureIn's words name ("either in your Safe or still with NEAR Intents"), as its wallet key (audit, 7 Nov: a
  *  Move whose Safe leg ended FAILED is unsure in the Safe, never "Private" by default). None: no such words. Pure. */
 export function unsureAt(note: string | undefined): string | undefined {
-  const said = note && /either in (Private|your Safe|your SOL wallet|your ETH \(RH\) wallet|your NEAR wallet|your BNB wallet) or still with /.exec(note)?.[1];
-  return said ? ({ Private: "private", "your Safe": "safe", "your SOL wallet": "sol", "your ETH (RH) wallet": "hood", "your NEAR wallet": "near", "your BNB wallet": "bsc" } as Record<string, string>)[said] : undefined;
+  const said = note && /either in (Private|your Safe|your SOL wallet|your Robinhood wallet|your ETH \(RH\) wallet|your NEAR wallet|your BNB wallet) or still with /.exec(note)?.[1];
+  return said ? ({ Private: "private", "your Safe": "safe", "your SOL wallet": "sol", "your Robinhood wallet": "hood", "your ETH (RH) wallet": "hood", "your NEAR wallet": "near", "your BNB wallet": "bsc" } as Record<string, string>)[said] : undefined;
 }
 export function privateMoney(r: Pick<SpendingActivity, "status" | "note" | "fill" | "paid" | "paidDone" | "unsure" | "onWay" | "landed" | "missed" | "missedUsd">, to: string[], o: { back: boolean; usd: string | null }): MoneyAt {
   const base = { from: paidFrom(r), to, ...(o.usd ? { usd: o.usd } : {}) };
@@ -768,16 +787,21 @@ export const legsFor = (legs: readonly number[], n: number): number[] => (legs.l
 /** A Send, from the ledger's movement: it left, it goes through NEAR privately, it's paid (1Click's status says). */
 /** `usd`: the dollars the Send was made for at the tap (job-carry.ts): its row keeps them to its end (Jobs hunt M5). */
 /** A coin's name from its Intents id ("nep141:sol.omft.near" is SOL), for a Send with no dollars said. */
-const coinOf = (id?: string): string | undefined => (id === "nep141:wrap.near" ? "NEAR" : /^nep141:([a-z]+)\.omft\.near$/.exec(id ?? "")?.[1]?.toUpperCase());
+const coinOf = (id?: string): string | undefined => (id === "nep141:wrap.near" ? "NEAR" : id === "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1" ? "USDC" : /^nep141:([a-z]+)\.omft\.near$/.exec(id ?? "")?.[1]?.toUpperCase());
 export function sendTrack(m: Movement, fromWallet?: string, payee = "them", usd = carried(`send:${m.id}`)?.usd): LiveTrack | null {
   if (!(m.kind === "pay" || m.kind === "withdraw" || m.kind === "transfer" || (m.kind === "private" && m.from !== "private" && m.from !== "oldWords"))) return null;
   if (m.status === "waiting") return null; // held by the account's rules: the Waiting screen says it, not a tracker
   const from = nameOf(fromWallet ?? sendFrom(m));
+  // audit 11's B8 (8 Nov): an Add into Private (kind "private", to "private") is the Add's own row, by its one name ("Add
+  // 10 USDC to Private"), never "Send to private"
+  const add = m.kind === "private" && m.to === "private";
+  if (add) payee = "Private";
   // to a NEAR account the protocol's payment IS the paying (the copy review's J2-4, 8 Nov: "Then NEAR Confidential pays alice.near." and
   // "Then NEAR pays alice.near." were one step said twice; bare "NEAR" never): one step, its own payer by name. To another
   // chain, that chain pays it on (its own step, named)
   const toNear = !m.toChain || m.toChain === "near";
-  const labels = toNear ? [`Leaving ${from}`, `Paid to ${payee}`] : [`Leaving ${from}`, m.private ? CONFIDENTIAL_STEP : "On its way", `Paid to ${payee}`];   // audit H1: only what's true
+  const paid = add ? "In Private" : `Paid to ${payee}`;
+  const labels = toNear ? [`Leaving ${from}`, paid] : [`Leaving ${from}`, m.private ? CONFIDENTIAL_STEP : "On its way", `Paid to ${payee}`];   // audit H1: only what's true
   const startMs = ms(m.startedAtIso);
   // D137 honest: it left once the chain has its transaction (an explorer link), never on the ask alone; a problem with
   // nothing sent and the money where it was is a step never signed
@@ -788,23 +812,23 @@ export function sendTrack(m: Movement, fromWallet?: string, payee = "them", usd 
   const by = m.private ? "NEAR Confidential" : "NEAR Intents";
   // (the copy review's ruling, 5 Nov: "NEAR Confidential is paying 0x7D06…7e3D."; a step not begun, "Then …")
   const lands = toNear ? undefined : CHAIN[m.toChain!] ?? "That chain";
-  const named: Record<number, { doing: string; next: string }> = { 1: { doing: `${by} is paying ${payee}.`, next: `Then ${by} pays ${payee}.` } };
+  const named: Record<number, { doing: string; next: string }> = { 1: add ? { doing: `${by} is moving it to Private.`, next: `Then ${by} moves it to Private.` } : { doing: `${by} is paying ${payee}.`, next: `Then ${by} pays ${payee}.` } };
   if (lands) named[2] = { doing: `${lands} is paying ${payee}.`, next: `Then ${lands} pays ${payee}.` };
   const steps = firstStep(m.status === "done" ? progress(labels, labels.length) : m.status === "moving" ? progress(labels, sent ? 1 : 0) : progress(labels, stayed ? 0 : 1, true), from)
     .map((s, i) => (!named[i] || s.state === "done" ? s : { ...s, label: s.state === "waiting" ? named[i]!.next : named[i]!.doing }));
   if (steps[0]!.state === "done") steps[0]!.atMs = 0;
   if (m.status === "done" && Number.isFinite(ms(m.updatedAtIso))) steps.at(-1)!.atMs = Math.max(0, ms(m.updatedAtIso) - startMs);
-  const end = m.status === "done" ? { ok: true, line: `Paid to ${payee}.` }
+  const end = m.status === "done" ? { ok: true, line: `${paid}.` }
     // rule 8 (Sim test: "Your money is where it left from."): who didn't pay, the figure, the place by name. A private
     // payment's refund lands in Private (private-pay.ts refundTo: the pocket); any other where it left from
     : m.status === "refunded" ? { ok: false, line: STOP_WORDS.sendPaid(m.private ? "NEAR Confidential" : "NEAR Intents", usd ?? null, m.private ? "Private" : from), whole: true as const }
       : stayed ? { ok: false, line: notSigned(m.problem?.whatHappened ?? "it didn't go") }
-      : m.status === "problem" ? { ok: false, line: [m.problem?.whatHappened, m.problem?.money && "where" in m.problem.money && m.problem.money.where ? `Your money is ${m.problem.money.where}.` : null].filter(Boolean).join(" ") || "It didn't go. Activity shows where the money is." } : undefined;
+      : m.status === "problem" ? { ok: false, line: [m.problem?.whatHappened, m.problem?.money && "where" in m.problem.money && m.problem.money.where ? `Your money is ${m.problem.money.where}.` : null].filter(Boolean).join(" ") || sendStopped({ by, payee, ...(lands ? { lands } : {}) }) } : undefined;
   // the time left: NEAR Intents' own quote where the movement has one, else the Send's legs (job-steps.ts sendLegs, the
   // receipt's own sum), re-counted as each step ticks on its read (QA's Sim re-check: "58 s left", then Done at once)
   const row = fromWallet && fromWallet !== "safe" && fromWallet !== "private" ? fromWallet : undefined;
   const eta = end ? {} : typeof m.etaSeconds === "number" && m.etaSeconds > 0 && Number.isFinite(startMs) ? { endsAt: startMs + m.etaSeconds * 1000 } : { legSec: legsFor(sendLegs({ row, toNear }), steps.length) };
-  return { id: `send:${m.id}`, kind: "send", title: m.label ?? (usd ? `Send ${usd} to ${payee}` : coinOf(m.from) && m.amount ? `Send ${m.amount} ${coinOf(m.from)} to ${payee}` : `Send to ${payee}`), wallets: [fromWallet ?? "safe"], startMs, steps, ...(end ? { end } : {}), ...(payee && payee !== "them" ? { payee } : {}),
+  return { id: `send:${m.id}`, kind: "send", title: m.label ?? (add ? (usd ? `Add ${usd} to Private` : coinOf(m.from) && m.amount ? `Add ${m.amount} ${coinOf(m.from)} to Private` : "Add to Private") : usd ? `Send ${usd} to ${payee}` : coinOf(m.from) && m.amount ? `Send ${m.amount} ${coinOf(m.from)} to ${payee}` : `Send to ${payee}`), wallets: [fromWallet ?? "safe"], startMs, steps, ...(end ? { end } : {}), ...(payee && payee !== "them" ? { payee } : {}),
     ...(m.status === "refunded" ? { next: [m.private ? { label: STOP_WORDS.openPrivate, go: { kind: "private" as const } } : { label: STOP_WORDS.sendAgain, go: { kind: "send" as const, wallet: fromWallet ?? "safe" } }] } : {}), ...eta };
 }
 
@@ -822,6 +846,15 @@ export const HOME_TRACK_WORDS = {
   stayed: "It's still in Private.",
   part: "Part of it is in your Safe. The rest is still in Private.",
 } as const;
+/** the audit's S13 (8 Nov): a Send that stopped with no words of its own said only "It didn't go." and sent the person to
+ *  Activity. It names the step that stopped (the one after Leaving, the protocol's own), then where the money is now: this
+ *  end is reached only once the money left the wallet with no read of where it is now (still with the protocol, or on its
+ *  way back), so it says that Activity shows it, never a past-tense "left" alone (QA 16). */
+export const SEND_WHERE = "Activity shows where your money is.";
+export function sendStopped(o: { by: string; payee: string; lands?: string }): string {
+  return `${o.lands ? `${o.by} didn't move it to ${o.lands}.` : `${o.by} didn't pay ${o.payee}.`} ${SEND_WHERE}`;
+}
+
 /** A movement out of Private to the Safe (the ledger's private-pay.ts fromPrivate and the Sim's own). */
 export const isHomeMove = (m: Pick<Movement, "kind" | "from">): boolean => m.kind === "private" && m.from === "private";
 export function homeTracks(movements: readonly Movement[], jobOf: (id: string) => string | undefined = (id) => carried(`send:${id}`)?.job, usdOf: (job: string) => string | undefined = (job) => carried(job)?.usd): LiveTrack[] {

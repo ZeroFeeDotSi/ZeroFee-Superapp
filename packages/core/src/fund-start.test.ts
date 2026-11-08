@@ -571,7 +571,7 @@ test("the deposit watcher: less than the least is 'some arrived'; money already 
 
 // D123 (dead ends row 3): set-up offers each chain's own coin only, so the watcher is walked on what is offered (SOL, and
 // ETH on Robinhood Chain as the chain's own coin); USDC and USDT are never given an address.
-test("the deposit watcher reads each coin where it lives: SOL and ETH (RH) as their chains' own coins; USDC and USDT on Solana get no address", async () => {
+test("the deposit watcher reads each coin where it lives: SOL and Robinhood as their chains' own coins; USDC and USDT on Solana get no address", async () => {
   for (const [coin, key] of [["sol", (a: string) => a], ["hood-eth", (a: string) => a]] as const) {
     const { core, net } = phone();
     ok(await core.call("account.create"));
@@ -623,7 +623,7 @@ test("words first, review L2 under O-2c: a check's mark written outside recovery
   core.close();
 });
 
-test("D115 + D123: set-up offers each trading chain's own coin only (NEAR, SOL, ETH (RH)), never USDC or USDT, and only where the private route reaches (control: the full list holds them all, and the filter drops them)", () => {
+test("D115 + D123: set-up offers each trading chain's own coin only (NEAR, SOL, Robinhood), never USDC or USDT, and only where the private route reaches (control: the full list holds them all, and the filter drops them)", () => {
   assert.equal(FUND_EVERY_CHAIN, false);
   assert.deepEqual(fundOffered().map((c) => c.id), ["near", "sol", "hood-eth"]);
   for (const id of ["usdc-sol", "usdt-sol", "eth", "base-eth", "arb-eth", "usdc-base", "usdc-eth", "usdc-arb", "usdt-eth"]) assert.ok(!fundOffered().some((c) => c.id === id), id);

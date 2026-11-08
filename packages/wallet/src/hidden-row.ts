@@ -87,7 +87,7 @@ export function createHiddenRow(x: HiddenRowDeps) {
     await myAccount(true);
     if (!d.privateQuotes) throw new ProblemError(walletProblems.privateUnavailable());
     const own = p.chain === "sol" || p.chain === "hood" ? ROW_COINS[p.chain] : undefined;
-    if (!own) throw new ProblemError(walletProblems.quoteUnavailable("A private send goes only from your SOL wallet or your ETH (RH) wallet."));
+    if (!own) throw new ProblemError(walletProblems.quoteUnavailable("A private send goes only from your SOL wallet or your Robinhood wallet."));
     // `coin` (the Send review, 5 Nov): a token the wallet holds, by 1Click's id; only a coin the core pins (hidden-coins.ts)
     const token = p.coin === undefined ? null : hiddenCoin(p.coin, p.chain);
     if (p.coin !== undefined && !token) throw new ProblemError(walletProblems.quoteUnavailable("Private can't take this yet."));

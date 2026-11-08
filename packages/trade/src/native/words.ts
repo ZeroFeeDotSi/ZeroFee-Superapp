@@ -32,7 +32,10 @@ export const NATIVE_COPY = {
   youHold: (amount: string, symbol: string) => `You hold ${amount} ${symbol}`,
   /** Under the held row, when Sell can pay only part of the Safe coin's one figure (product decision, 5 Nov: one figure
    *  per Safe coin). the copy review's words. */
-  sellPart: (amount: string, symbol: string) => `Up to ${amount} ${symbol} can go in one sell.`,
+  /** builder 22's item 5: its why in one sentence, where the rest sits (`rest`, balance-parts readSafeHeld); none known,
+   *  the cap alone. */
+  sellPart: (amount: string, symbol: string, rest: readonly ("private" | "staked")[] = []) =>
+    [`Up to ${amount} ${symbol} can go in one sell.`, rest.length === 2 ? "The rest is in Private and staked." : rest[0] === "private" ? "The rest is in Private." : rest[0] === "staked" ? "The rest is staked." : ""].filter(Boolean).join(" "),
   inYourSafe: "In your Safe",
   since: (move: string) => `${move} since you bought`,
   // the page's "Your Safe" rows: where the money comes from and goes, who swaps it, what ZeroFee takes, the time
@@ -46,17 +49,30 @@ export const NATIVE_COPY = {
   zeroFee: "ZeroFee takes",
   nothing: "Nothing",
   takes: "Takes about",
+  /** Every Buy and Sell from the Safe goes through NEAR Confidential (product decision, 8 Nov): the page's row says so. */
+  goesThrough: "Goes through",
+  confidential: "NEAR Confidential",
   secs: (eta: number) => `${eta} s`,
   about_: "About this coin",
   network: "Network",
   pools: "Where it trades",
   liquidityOf: (dollars: string) => `${dollars} liquidity`,
   source: "Prices and charts from CoinGecko and GeckoTerminal.",
+  /** C9 (audit 12): the chart's source that didn't answer, by name; the Try again link follows. */
+  didntAnswer: (who: string) => `${who} didn't answer.`,
+  /** Where the page's figures come from: the price is NEAR Intents' when the ledger has one (one-price.ts, C3); the
+   *  charts and the figures under them, the market's, only where the build has its price server. */
+  sourceOf: (intentsPrice: boolean, market: boolean) => intentsPrice ? (market ? "NEAR Intents prices it. CoinGecko and GeckoTerminal draw the chart." : "NEAR Intents prices it.") : market ? "Prices and charts from CoinGecko and GeckoTerminal." : "NEAR Intents prices it.",
   notice: (eta?: number) => `Buys and sells happen inside your Safe${eta ? ` · about ${eta} s today` : ""}`,
   // the sheet
   about: (amount: string, symbol: string) => `About ${amount} ${symbol}`,
   aboutCash: (dollars: string) => `About ${dollars}`,
-  atLeast: (what: string, eta?: number) => `At least ${what}${eta ? ` · about ${eta} s` : ""}`,
+  /** S16-7 (audit 16): a Sell says once how much of the coin leaves, beside what comes back ("79.5101 NEAR for about $351.88"). */
+  aboutSell: (amount: string, symbol: string, dollars: string) => `${amount} ${symbol} for about ${dollars}`,
+  /** `time`: the job's whole time from its legs (swap.ts legsTime: "40 s", "2 min"). */
+  atLeast: (what: string, time?: string) => `At least ${what}${time ? ` · about ${time}` : ""}`,
+  /** Offline on the sheet (Swap's SWAP_OFFLINE, Send's SEND_OFFLINE): once, on top. */
+  offline: (verb: string) => `You're offline. Your money is safe. ${verb} works again when you're back. It checks again by itself.`,
   paysWith: "Pays with USDC in your Safe",
   paysInto: "The dollars go to your Safe as USDC",
   stays: (eta?: number) => `Stays in your Safe${eta ? ` · about ${eta} s` : ""}`,
@@ -69,8 +85,13 @@ export const NATIVE_COPY = {
   close: "Close",
   /** A coin the Safe can't sell yet (band-coins.ts safeCanSell): no Buy, this line on its page instead. */
   soonLine: "Your rules would make selling this wait a day. So you can't buy it from your Safe yet.",
-  /** QA's condition 3: who can see a swap in the Safe (it is the one public move). */
-  who: "Anyone can see your Safe's coins change on NEAR. This swap doesn't link your Safe to Private or your wallets.",
+  /** The job's receipt (builder 15, 8 Nov): what happens while it goes, and what came in once read (no figure: unread). */
+  buying: (symbol: string) => `Buying ${symbol}.`,
+  selling: (symbol: string) => `Selling ${symbol}.`,
+  // builder 24, item 2: what happened, once; the last step ("It's in your Safe.") says where, so this line never does
+  boughtIn: (got: string | null, symbol: string) => `Bought ${got ?? symbol}.`,
+  // audit 17's H4: the done screen's big figure is the landed one, so this line names no second figure
+  soldIn: (symbol: string) => `Sold ${symbol}.`,
   /** Over the Safe's Face ID limit: said before the tap, never a day-long wait. */
   overFaceId: (most: string) => `Face ID alone can swap up to ${most} at a time. Pick less.`,
   noFaceId: "Your rules make every move from your Safe wait. So you can't swap from it.",

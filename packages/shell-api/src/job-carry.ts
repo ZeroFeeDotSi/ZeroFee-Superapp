@@ -20,7 +20,9 @@ export const SEALED_CARRY = "job-carry.v1";
  *  "$101.48"), so the job's page gives each leg its own step, its figure and its wallet (the audit's M4, 7 Nov). */
 /** `parts`: on a job's own key, its core moves' ids the moment the core answered (Private's way home, the audit's ruling, 8 Nov):
  *  a reopened page finds them by id, never by time or amount. */
-export type Carried = { usd?: string; endsAt?: number; words?: string; lands?: string; job?: string; to?: string[]; legs?: { to: string; usd: string }[]; parts?: string[]; at: number };
+/** `whole` (audit 10's A8): `endsAt` is the whole job's time from its Approve, a floor under a row's own leg estimate (its
+ *  first frame knew only the first leg: "27 s left", then "59 s left"). */
+export type Carried = { usd?: string; endsAt?: number; whole?: true; /** A8: when its Approve was (ms): "Done in" counts from it */ from?: number; words?: string; lands?: string; job?: string; to?: string[]; legs?: { to: string; usd: string }[]; parts?: string[]; at: number };
 /** move-split PLACES keys. */
 const PLACE = /^(safe|sol|hood|near|bsc|private)$/;
 const str = (x: unknown, ok: RegExp) => (typeof x === "string" && ok.test(x) ? x : undefined);
@@ -48,12 +50,13 @@ export function createJobCarry(all = new Map<string, Carried>(), now: () => numb
           if (all.has(id) || !c || typeof c.at !== "number" || now() - c.at >= KEPT_MS) continue;
           const usd = str(c.usd, /^\$[\d,]+(\.\d+)?$/), words = str(c.words, /^Swap /), lands = str(c.lands, /\S/), job = str(c.job, /^[\w:.-]{1,200}$/);
           const endsAt = typeof c.endsAt === "number" && Number.isFinite(c.endsAt) ? c.endsAt : undefined;
+          const from = typeof c.from === "number" && Number.isFinite(c.from) ? c.from : undefined;
           // the plan's place keys only (the audit's SHOULD, 7 Nov): anything else in a kept copy is dropped, never carried
           const to = Array.isArray(c.to) ? c.to.filter((p): p is string => typeof p === "string" && PLACE.test(p)) : [];
           // a leg is a place key and a dollar figure, nothing else (as `to`)
           const legs = Array.isArray(c.legs) ? c.legs.filter((l): l is { to: string; usd: string } => !!l && typeof l === "object" && !!str(l.to, PLACE) && !!str(l.usd, /^\$[\d,]+\.\d{2}$/)).map((l) => ({ to: l.to, usd: l.usd })) : [];
           const parts = Array.isArray(c.parts) ? c.parts.filter((x): x is string => typeof x === "string" && /^[\w:.-]{1,200}$/.test(x)) : [];
-          all.set(id, { at: c.at, ...(parts.length ? { parts } : {}), ...(usd ? { usd } : {}), ...(endsAt !== undefined ? { endsAt } : {}), ...(words ? { words } : {}), ...(words && lands ? { lands } : {}), ...(job ? { job } : {}), ...(to.length ? { to } : {}), ...(legs.length ? { legs } : {}) });
+          all.set(id, { at: c.at, ...(parts.length ? { parts } : {}), ...(usd ? { usd } : {}), ...(endsAt !== undefined ? { endsAt, ...(c.whole === true ? { whole: true as const } : {}) } : {}), ...(from !== undefined ? { from } : {}), ...(words ? { words } : {}), ...(words && lands ? { lands } : {}), ...(job ? { job } : {}), ...(to.length ? { to } : {}), ...(legs.length ? { legs } : {}) });
         }
       } catch { /* a damaged copy is no copy */ }
       write = w;

@@ -14,7 +14,7 @@ export const WEB_ACCOUNT_ROWS: readonly { place: AccountPlace; title: string; li
   { place: "protection", title: "Protection", line: "Limits, holds and a second approval on big sends.", value: ON_IPHONE, icon: "shield" },
   { place: "devices", title: "Devices", line: "Your phone, your laptop, and what each may do.", value: ON_IPHONE, icon: "phone" },
   // the web wallet's words are 24 (packages/core/src/web-wallet.ts: account.web.new, its import check)
-  { place: "recovery", title: "Recovery", line: "Your 24 backup words, behind your password.", value: "Backup words", icon: "words" },
+  { place: "recovery", title: "Recovery", line: "Your 24 backup words, behind your password.", value: "Locked", icon: "words" },
 ];
 
 /** An "On iPhone" page: its title and its one line. */

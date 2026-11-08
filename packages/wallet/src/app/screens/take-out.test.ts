@@ -48,7 +48,7 @@ test("the least is never above what was picked, and never a made-up fee (control
     assert.ok(least < usd && least >= 0, `${usd}: ${least}`);
   }
   assert.ok(takeOutLeast([{ from: "sol", name: "SOL", usd: 20, all: false }]) <= 19.88);
-  for (const line of takeOutLines([{ from: "hood", name: "ETH (RH)", usd: 7, all: false }])) assert.doesNotMatch(line, /fee of|\$0\.\d\d fee|about \$\d+\.\d\d in fees/i);
+  for (const line of takeOutLines([{ from: "hood", name: "Robinhood", usd: 7, all: false }])) assert.doesNotMatch(line, /fee of|\$0\.\d\d fee|about \$\d+\.\d\d in fees/i);
 });
 
 test("the core holds its moves to the same floors the sheet reads (one source: float-floors.ts)", () => {
@@ -65,7 +65,7 @@ test("Move's sliders say the least that reaches the Safe from the core's own flo
   assert.match(split, /import \{ HOME_LEG_MIN_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, leastHome, leastIn, planLeastUsd, walletLegLeastUsd \} from "@zerofee\/core\/float-floors";/);
   assert.match(sheet, /const cost = costLine\(legs\);/);   // one figure per Move: what was typed leaves (QA test)
   // REVAMP P0 (3 Nov): the same figures as one grouped block, its sentence (costLine) what a screen reader hears
-  assert.match(sheet, /const costed = costRows\(legs\);/);
+  assert.match(sheet, /const costed = costRows\(legs, fillsFirst\);/);
   assert.match(sheet, /data-testid="move-least" aria-label=\{cost\}>/);
   assert.doesNotMatch(sheet, /`About \$\{dollars\(total\.toFixed\(2\)\)\} is on its way/);
   assert.doesNotMatch(sheet, /"[^"\n]*comes back whole[^"\n]*"|`Hidden is on its way/, "never \"Hidden comes back whole.\"");

@@ -45,6 +45,8 @@ interface Kept { depositAddress: string; tag?: string; atMs: number }
 
 const refused = (why: string) => new ProblemError(securityProblems.subwalletRefused(why));
 
+/** Send S8 (audit, 8 Nov): "The price changed. Nothing moved." said no who, no where, no next tap. */
+export const SAFE_SWAP_LOWER = "NEAR Intents priced it lower than you saw. Nothing moved. It's still in your Safe. Swap again for a new price.";
 /** Why a signed quote isn't the one asked for (the audit's condition 2), or null. Exported for its tests. */
 export function safeSwapRefusal(q: QuoteFacts | null, o: { from: string; to: string; amount: string; atLeast: string; account: string; nowMs: number }): string | null {
   if (!q) return "NEAR Intents didn't sign this price. Nothing moved.";
@@ -55,7 +57,7 @@ export function safeSwapRefusal(q: QuoteFacts | null, o: { from: string; to: str
   if (q.amountIn !== o.amount) return "NEAR Intents priced a different amount. Nothing moved.";
   if (q.recipient !== o.account || q.recipientType !== "INTENTS") return "This price doesn't pay into your Safe. Nothing moved.";
   if (q.refundTo !== o.account || q.refundType !== "INTENTS") return "This price doesn't refund to your Safe. Nothing moved.";
-  if (!UNITS.test(q.minAmountOut) || BigInt(q.minAmountOut) < BigInt(o.atLeast)) return "The price changed. Nothing moved.";
+  if (!UNITS.test(q.minAmountOut) || BigInt(q.minAmountOut) < BigInt(o.atLeast)) return SAFE_SWAP_LOWER;
   return null;
 }
 

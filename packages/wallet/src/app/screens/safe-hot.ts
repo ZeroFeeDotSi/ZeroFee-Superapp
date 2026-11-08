@@ -60,7 +60,7 @@ export function siteSymbol(s: unknown): string | null {
 }
 /** `mark`: its network's logo key (packages/design logos.ts) when one is bundled. `opens`: Trade has pages for its chain's
  *  coins, so its rows tap; off, `noPage` says why they don't (UI audit, 5 Nov: GMGN on Base had no mark and dead rows). */
-export interface SiteSection { key: string; site?: string; name: string; network: string; mark?: string; opens: boolean; noPage?: string; usd: string | null; holds?: string; agent?: true; coins: HotCoin[] }
+export interface SiteSection { key: string; site?: string; name: string; network: string; mark?: string; opens: boolean; noPage?: string; usd: string | null; holds?: string; agent?: true; /** B1: it can't be read now */ unread?: true; /** D7: its figure is its last read, as of then */ asOf?: number; coins: HotCoin[] }
 
 /** A site wallet's row on Home, nested under its site (bug report, 5 Nov; the copy review's ruling, 5 Nov):
  *  it opens THAT site's wallet page (its figure, its coins, Add / Take out, "Open pump.fun"), whether or not Trade has a
@@ -120,15 +120,31 @@ export function siteSections(wallets: readonly SpendingWallet[] | null | undefin
     // the figure is the rows shown when every row has a price (QA's MUST, Sim test: Hot's total and its rows
     // disagreed); a row without one keeps spending.wallets' figure
     const shownUsd = usd !== null && coins.length > 0 && coins.every((c) => c.usd !== null) ? sum(coins.map((c) => c.usd)) : usd;
-    return [{ key: w.id, ...(w.site ? { site: w.site } : {}), name: w.label, network, ...(mark ? { mark } : {}), opens, ...(!opens && coins.length ? { noPage: SITE_WORDS.noPage(NETWORK_NAME[network] ?? network.toUpperCase()) } : {}), usd: shownUsd, ...(w.holds ? { holds: w.holds } : {}), ...(agent ? { agent: true as const } : {}), coins }];
+    return [{ key: w.id, ...(w.site ? { site: w.site } : {}), name: w.label, network, ...(mark ? { mark } : {}), opens, ...(!opens && coins.length ? { noPage: SITE_WORDS.noPage(NETWORK_NAME[network] ?? network.toUpperCase()) } : {}), usd: shownUsd, ...(w.holds ? { holds: w.holds } : {}), ...(agent ? { agent: true as const } : {}), ...(w.unread ? { unread: true as const } : {}), ...(w.asOf ? { asOf: w.asOf } : {}), coins }];
   });
+}
+
+/** Audit 12 C7: the site wallets a list shows, by Hot's own rule (siteGroups: a site's wallets with money; none yet, its
+ *  first), so Details says the same count as Hot ("GMGN · 1 wallet" over Details' two). Every other wallet stays. */
+export function siteWalletsShown<W extends Pick<SpendingWallet, "id" | "role" | "site" | "cashUsd" | "coinsUsd" | "holds" | "unread">>(wallets: readonly W[]): W[] {
+  const bySite = new Map<string, W[]>();
+  for (const w of wallets) if (w.role === "site" && w.site && w.site !== "agentzero") bySite.set(w.site, [...(bySite.get(w.site) ?? []), w]);
+  const keep = new Set<string>();
+  for (const ws of bySite.values()) {
+    // Hot's figure for it (siteSections: unread is null), then Hot's test (siteGroups)
+    const funded = ws.filter((w) => siteWalletFunded(w.unread || (w.holds && !(Number(w.cashUsd ?? 0) + Number(w.coinsUsd ?? 0) >= 0.01)) ? null : Number(w.cashUsd ?? 0) + Number(w.coinsUsd ?? 0), w.holds));
+    for (const w of funded.length ? funded : ws.slice(0, 1)) keep.add(w.id);
+  }
+  return wallets.filter((w) => !(w.role === "site" && w.site && w.site !== "agentzero") || keep.has(w.id));
 }
 
 /** One row per site on Hot (S14, 5 Nov: GMGN's SOL and Base wallets were two cards, and so were pump.fun's):
  *  its name, its figure and its wallets, shown once it is opened. AgentZero's pocket is its own. The figure is the sum of
  *  its wallets' figures (the rows inside), so Hot's number still adds up; a wallet that can't be read adds nothing, and a
  *  site none of whose wallets can be read says so (null), never $0. */
-export interface SiteGroup { key: string; site?: string; name: string; usd: string | null; agent?: true; wallets: SiteSection[] }
+/** `unseen` (audit 11's B1, 8 Nov): one of its wallets can't be read (its chain is down): its figure is null, never the
+ *  read part alone ("GMGN · $0.00" while its SOL wallet held $27.47), and Home says "Can't see it now". */
+export interface SiteGroup { key: string; site?: string; name: string; usd: string | null; agent?: true; unseen?: true; /** D7: the oldest of its wallets' kept reads */ asOf?: number; wallets: SiteSection[] }
 export function siteGroups(sections: readonly SiteSection[], sum: (xs: (string | null | undefined)[]) => string): SiteGroup[] {
   const by = new Map<string, SiteSection[]>();
   for (const x of sections) {
@@ -140,10 +156,26 @@ export function siteGroups(sections: readonly SiteSection[], sum: (xs: (string |
     const read = wallets.filter((w) => w.usd !== null);
     // its wallets as its page counts them (core site-funded.ts; test: "GMGN / 2 wallets" over a page of one): the ones
     // with money; none yet, its first, so the site still has its row. AgentZero's pocket is its own row, empty or not
-    const funded = first.agent ? wallets : wallets.filter((w) => siteWalletFunded(w.usd === null ? null : Number(w.usd), w.holds));
-    return { key, ...(first.site ? { site: first.site } : {}), name: first.agent ? "AgentZero" : first.name.replace(/ wallet$/, ""), usd: read.length ? sum(read.map((w) => w.usd)) : null, ...(first.agent ? { agent: true as const } : {}), wallets: funded.length ? funded : [first] };
+    // a wallet with no dollar figure, only what it holds ("0.004 ETH" on Base), is funded by what it holds (audit 12 C7)
+    const funded = first.agent ? wallets : wallets.filter((w) => siteWalletFunded(w.usd === null || (w.holds && !(Number(w.usd) >= 0.01)) ? null : Number(w.usd), w.holds));
+    return { key, ...(first.site ? { site: first.site } : {}), name: first.agent ? "AgentZero" : first.name.replace(/ wallet$/, ""), usd: read.length && !wallets.some((w) => w.unread) ? sum(read.map((w) => w.usd)) : null, ...(first.agent ? { agent: true as const } : {}), ...(wallets.some((w) => w.unread) ? { unseen: true as const } : {}), ...(wallets.some((w) => w.asOf) ? { asOf: Math.min(...wallets.flatMap((w) => (w.asOf ? [w.asOf] : []))) } : {}), wallets: funded.length ? funded : [first] };
   });
 }
+
+/** Audit 13's D7: a chain wallet whose chain can't be read now: the time of the figure it shows (its kept read), else none. */
+export const chainAsOf = (wallets: readonly Pick<SpendingWallet, "role" | "network" | "current" | "asOf" | "unread">[] | null | undefined, chain: string): number | undefined =>
+  wallets?.find((w) => w.role === "chain" && w.current && w.network === chain && (w.asOf || w.unread))?.asOf;
+/** Hot's one time (QA's SHOULD on builder 14, 8 Nov): a chain down, the oldest kept read Hot counts, said once under Hot's
+ *  total ("As of 10:47 AM"), never on each row; none when every wallet read now. */
+export const hotAsOf = (wallets: readonly Pick<SpendingWallet, "current" | "asOf">[] | null | undefined): number | undefined => {
+  const t = (wallets ?? []).flatMap((w) => (w.current !== false && w.asOf ? [w.asOf] : []));
+  return t.length ? Math.min(...t) : undefined;
+};
+/** A site's line on Hot (audit 13's D7): "1 wallet · $27.47"; its figure kept from a read before its chain went down,
+ *  "1 wallet" (the figure is the row's own; the time is said once, under Hot's total: hotAsOf); can't be read and never
+ *  read, "1 wallet" (the row says "Can't see it now" once). */
+export const siteDetail = (g: Pick<SiteGroup, "wallets" | "usd" | "unseen" | "asOf">, $: (usd: string | null) => string): string =>
+  `${g.wallets.length} ${g.wallets.length === 1 ? "wallet" : "wallets"}${g.unseen || g.asOf ? "" : ` · ${$(g.usd)}`}`;
 
 /**
  * Private's place on Home (QA's gates re-crawl, 5 Nov, MUST: Private was open but Home had no door to it). On the

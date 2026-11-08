@@ -85,7 +85,7 @@ export type StepEnd =
   | { kind: "held" };
 
 const usdText = (n: number): string => `$${n.toFixed(2)}`;
-const PLACE_NAME: Record<HomePlace, string> = { safe: "Your Safe", sol: "Your SOL wallet", hood: "Your ETH (RH) wallet", near: "Your NEAR wallet", bsc: "Your BNB wallet" };
+const PLACE_NAME: Record<HomePlace, string> = { safe: "Your Safe", sol: "Your SOL wallet", hood: "Your Robinhood wallet", near: "Your NEAR wallet" };
 let seq = 0;
 export const planId = (nowMs: number = Date.now()): string => `p-${nowMs.toString(36)}-${(seq++).toString(36)}`;
 
@@ -106,7 +106,7 @@ export function sourceOf(a: HomeAsk): HomePlace | null {
 export const fundUsd = (gap: number): number => Math.ceil(gap + Math.max(1, gap * 0.05));
 
 /** The coin Add offers for a place (Home's Add on that wallet). */
-const ADD_COIN: Record<HomePlace, "SOL" | "ETH" | "NEAR" | "USDC"> = { safe: "USDC", sol: "SOL", hood: "ETH", near: "USDC", bsc: "USDC" };
+const ADD_COIN: Record<HomePlace, "SOL" | "ETH" | "NEAR" | "USDC"> = { safe: "USDC", sol: "SOL", hood: "ETH", near: "USDC" };
 
 export type Fit =
   | { kind: "ok" }
@@ -133,7 +133,7 @@ export function moveStep(from: HomePlace, to: HomePlace, usd: number): HomeSheet
 export function addStep(place: HomePlace): HomeSheet {
   const coin = ADD_COIN[place];
   const to: HomePlace = coin === "SOL" ? "sol" : coin === "ETH" ? "hood" : coin === "NEAR" ? "near" : "safe";
-  return { ask: { kind: "receive", coin, wallet: to }, usd: null, line: `Add ${coin === "ETH" ? "ETH (RH)" : coin} to ${PLACE_WORD[to]}: a one-time private address.` };
+  return { ask: { kind: "receive", coin, wallet: to }, usd: null, line: `Add ${coin} to ${PLACE_WORD[to]}: a one-time private address.` };
 }
 
 /**
@@ -145,7 +145,7 @@ export function fit(s: HomeSheet, b: Balances | null, nowMs: number = Date.now()
   if (!b) return { kind: "ok" };
   const place = sourceOf(s.ask);
   const need = s.usd;
-  if (!place || place === "bsc") return { kind: "ok" };
+  if (!place) return { kind: "ok" };
   const have = b[place];
   if (have === null) return { kind: "ok" };
   // a move of everything from an empty place, or any amount over what it has
@@ -172,7 +172,7 @@ export function fit(s: HomeSheet, b: Balances | null, nowMs: number = Date.now()
 }
 
 /** The person named where a move comes from ("from my Safe", "out of my SOL wallet"); else ZeroFee picks it. */
-export const fromSaid = (words: string): boolean => /\b(?:from|out of)\s+(?:my |the |your )?(?:safe|sol|solana|eth|rh|robinhood|near|bnb|wallet)/i.test(words);
+export const fromSaid = (words: string): boolean => /\b(?:from|out of)\s+(?:my |the |your )?(?:safe|sol|solana|eth|rh|robinhood|near|wallet)/i.test(words);
 /** Where a move the person didn't give a source for comes from (a phone ask, 3 Nov: a $10 move to ETH (RH) with
  *  more in the Safe than in the NEAR wallet went from the NEAR wallet): the Safe first, then the NEAR wallet,
  *  then the fullest wallet, the first that holds it all. null: none does (the check then says what there is). */
@@ -186,7 +186,7 @@ export function pickSource(to: HomePlace, usd: number, b: Balances | null): Home
 export function coinAmountSaid(words: string, amount: number, coin: string): boolean {
   if (!Number.isFinite(amount) || amount <= 0) return false;
   const c = coin.toUpperCase().replace(/\s*\(RH\)$/, "");
-  const names: Record<string, string> = { SOL: "sol|solana", NEAR: "near", ETH: "eth|ether", USDC: "usdc", BNB: "bnb" };
+  const names: Record<string, string> = { SOL: "sol|solana", NEAR: "near", ETH: "eth|ether", USDC: "usdc" };
   if (!names[c] || !new RegExp(`\\b(?:${names[c]})\\b`, "i").test(words)) return false;
   const nums = [...words.replace(/(?<=\d),(?=\d{3}\b)/g, "").matchAll(/(?<![\d.])\d*\.?\d+/g)].map((m) => Number(m[0]));
   return nums.some((n) => Math.abs(n - amount) < 1e-9);

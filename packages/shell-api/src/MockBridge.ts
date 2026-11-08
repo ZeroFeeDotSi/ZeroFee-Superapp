@@ -16,7 +16,7 @@ import type { Problem } from "@zerofee/core/problem";
 import type { AccountInfo, PlainWords, RecoveryPending, TxOutcome, TxRequest } from "@zerofee/core/signer";
 import { KNOWN_COINS, NATIVE as WALLET_NATIVE } from "@zerofee/core/evm";
 import type { EvmWalletChain } from "@zerofee/core/evm";
-import { createFloatMock, SAMPLE_NEAR_COINS, type FloatMockOptions, type FloatMove, type FloatSnapshot } from "./mock-float.ts";
+import { createFloatMock, SAMPLE_NEAR_COINS, SIM_PRICE, type FloatMockOptions, type FloatMove, type FloatSnapshot } from "./mock-float.ts";
 import { approvalWords } from "./approval-words.ts";
 import { SIM_KEY_KIND } from "./key-place.ts";
 import { needWords } from "@zerofee/core/rule-words";
@@ -420,14 +420,14 @@ const DEFAULT_TOKENS: MockToken[] = [
   { assetId: USDC_NEAR, chain: "near", symbol: "USDC", decimals: 6, contract: "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", priceUsd: "1", name: "USD Coin", icon: "usdc" },
   { assetId: USDC_SOL, chain: "sol", symbol: "USDC", decimals: 6, contract: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", priceUsd: "1", name: "USD Coin", icon: "usdc" },
   { assetId: USDC_BASE, chain: "base", symbol: "USDC", decimals: 6, contract: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", priceUsd: "1", name: "USD Coin", icon: "usdc" },
-  { assetId: "nep141:wrap.near", chain: "near", symbol: "NEAR", decimals: 24, contract: "wrap.near", priceUsd: "4.43", name: "NEAR", icon: "near" },
-  { assetId: "nep141:sol.omft.near", chain: "sol", symbol: "SOL", decimals: 9, contract: null, priceUsd: "101.75", name: "Solana", icon: "sol" },
-  { assetId: "nep141:eth.omft.near", chain: "eth", symbol: "ETH", decimals: 18, contract: null, priceUsd: "2347.51", name: "Ether", icon: "eth" },
+  { assetId: "nep141:wrap.near", chain: "near", symbol: "NEAR", decimals: 24, contract: "wrap.near", priceUsd: String(SIM_PRICE.NEAR), name: "NEAR", icon: "near" },
+  { assetId: "nep141:sol.omft.near", chain: "sol", symbol: "SOL", decimals: 9, contract: null, priceUsd: String(SIM_PRICE.SOL), name: "Solana", icon: "sol" },
+  { assetId: "nep141:eth.omft.near", chain: "eth", symbol: "ETH", decimals: 18, contract: null, priceUsd: String(SIM_PRICE.ETH), name: "Ether", icon: "eth" },
   // A euro stablecoin, so a SEPA bank code has a rate in the demo (Pay's M3); 1Click lists EURe on mainnet.
   { assetId: "nep141:gnosis-0x420ca0f9b9b604ce0fd9c18ef134c705e5fa3430.omft.near", chain: "gnosis", symbol: "EURe", decimals: 18, contract: "0x420ca0f9b9b604ce0fd9c18ef134c705e5fa3430", priceUsd: "1.12", name: "EURe", icon: "eure" },
   // DAI on Ethereum, so Agent's "Add DAI" lands on a DAI network in the demo (Wallet picks the first network that receives it).
   { assetId: "nep141:eth-0x6b175474e89094c44da98b954eedeac495271d0f.omft.near", chain: "eth", symbol: "DAI", decimals: 18, contract: "0x6b175474e89094c44da98b954eedeac495271d0f", priceUsd: "0.9998", name: "Dai", icon: "dai" },
-  { assetId: "nep141:btc.omft.near", chain: "btc", symbol: "BTC", decimals: 8, contract: null, priceUsd: "80456", name: "Bitcoin", icon: "btc" },
+  { assetId: "nep141:btc.omft.near", chain: "btc", symbol: "BTC", decimals: 8, contract: null, priceUsd: String(SIM_PRICE.BTC), name: "Bitcoin", icon: "btc" },
   // BNB Chain's own coin (1Click's id), at the recorded market's price, so a BNB trading wallet's coin has dollars in the demo.
   { assetId: "nep245:v2_1.omni.hot.tg:56_11111111111111111111", chain: "bsc", symbol: "BNB", decimals: 18, contract: null, priceUsd: "744.17", name: "BNB", icon: "bnb" },
   // The NEAR coins Home's Swap buys in place (mock-float.ts SAMPLE_NEAR_COINS, at its prices): Home names and prices what
@@ -491,6 +491,8 @@ const payee = (to: unknown): { to?: string } => {
 /** n × (1 + bps/10000), rounded up to the micro unit (a quote's "at most" never understates). */
 const plusBps = (x: string, bps: number) => decimal((micro(x) * BigInt(10000 + bps) + 9999n) / 10000n);
 
+/** Audit 17's H10: what approved a Safe Buy or Sell (the Safe signs with Face ID, every signature). */
+export const SAFE_TRADE_APPROVED = "Your Safe approved it with Face ID.";
 // Sample rows link to no explorer: there is nothing on any chain to see.
 const ACTIVITY = [
   { atIso: iso(-4 * 60e3), title: "Removed a key, so it can't sign for you any more", lines: [], by: "This device", ok: true, txHash: "sample1" },
@@ -577,13 +579,16 @@ export const SEND_MATCHED = "The amount and time can still be matched.";
 const SIM_PAYOUT_KEEPS = 0.99;
 const LANDS_ID: Record<string, string> = { sol: "nep141:sol.omft.near", eth: "nep141:eth.omft.near", base: "nep141:base.omft.near" };
 const SEND_LANDS: Record<string, { coin: string; network: string }> = {
-  sol: { coin: "SOL", network: "Solana" }, hood: { coin: "ETH (RH)", network: "Robinhood Chain" }, eth: { coin: "ETH", network: "Ethereum" },
+  sol: { coin: "SOL", network: "Solana" }, hood: { coin: "ETH", network: "Robinhood Chain" }, eth: { coin: "ETH", network: "Ethereum" },
   base: { coin: "ETH", network: "Base" }, bsc: { coin: "BNB", network: "BNB Chain" }, near: { coin: "wNEAR", network: "NEAR" },
 };
 // D143 (core approval-policy.ts): only what the Safe's own account signs asks. A hot key's signature (a chain wallet's
 // Send from Home, a site's transaction, a session, a NEAR wallet swap, a Move back) never does, as in the core.
 /** A sheet's job, as the core reads it (dev-signer.ts TxRequest.job): a request's `job`, or a ledger call's own `job` (a
  *  Move's or Swap's key, private-move.ts), well formed only (16 to 64 letters, digits, - or _). Pure. */
+/** K2 (audit 13, 8 Nov): the page's key for its job (a Send's, Swap's or Move's `job`) on each movement it makes, as the
+ *  real ledger stamps it (safe-send.ts, ledger.ts toTrading: Movement.jobKey): a reload before the answer finds it. */
+export const keyedBy = (job: unknown): { jobKey?: string } => (typeof job === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(job) ? { jobKey: job } : {});
 export function jobKeyOf(method: string, params: Record<string, unknown>): string | undefined {
   const k = method === "tx.request" ? (params.request as { job?: unknown } | undefined)?.job : params.job;
   return typeof k === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(k) ? k : undefined;
@@ -663,9 +668,9 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
   // public Sim, so its screens could say "secure chip"): SIM_KEY_KIND, whatever account is given.
   const account: AccountInfo = { ...ACCOUNT, ...(options.accountId ? { accountId: options.accountId } : {}), ...(options.account ?? {}), keys: [...ACCOUNT.keys.map((k) => (k.role === "device" ? { ...k, kind: SIM_KEY_KIND } : { ...k })), ...(options.oldKey ? OLD_KEYS : [])] };
   const subwallets: { id: string; kind: string; chain: string; address: string; label: string; site?: string; slot?: number; current?: boolean }[] = [
-    { id: "sw-trade-sol", kind: "trade", chain: "sol", address: SAMPLE_ADDRESS.sol, label: "Solana wallet", slot: 0, current: true },
+    { id: "sw-trade-sol", kind: "trade", chain: "sol", address: SAMPLE_ADDRESS.sol, label: "SOL wallet", slot: 0, current: true },
     // ?demo seeds every chain's trading wallet (option), so all three chains trade at once; tests keep Solana alone.
-    ...(options.tradeChains ?? []).filter((c) => c !== "sol").map((c) => ({ id: `sw-trade-${c}`, kind: "trade", chain: c, address: SAMPLE_ADDRESS[c] ?? SAMPLE_ADDRESS.base, label: c === "hood" ? "Robinhood Chain wallet" : c === "bsc" ? "BNB Chain wallet" : `${c} wallet`, slot: 0, current: true })),
+    ...(options.tradeChains ?? []).filter((c) => c !== "sol").map((c) => ({ id: `sw-trade-${c}`, kind: "trade", chain: c, address: SAMPLE_ADDRESS[c] ?? SAMPLE_ADDRESS.base, label: c === "hood" ? "Robinhood wallet" : c === "bsc" ? "BNB wallet" : `${c} wallet`, slot: 0, current: true })),
   ];
   /** Finding 63: SOL's one price in this bridge: the float's (an Add's SOL was bought at it), for a site wallet's coins,
    *  its Take out and its sample trades alike. Valued at another, $2.91 that arrived read $4.43. */
@@ -1042,7 +1047,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       const $c = (c: bigint | number) => `$${(Number(c) / 100).toFixed(2)}`;
       const nameOf = (wallet: unknown) => {
         const to = wallet === "near" ? { kind: "trade", chain: "near" } : subwallets.find((w) => w.id === wallet && !(w as { keyExported?: true }).keyExported);
-        return { to, name: to ? (to.kind === "trade" ? ({ sol: "your SOL wallet", hood: "your ETH (RH) wallet", bsc: "your BNB wallet", near: "your NEAR wallet" } as Record<string, string>)[to.chain] : undefined) : undefined };
+        return { to, name: to ? (to.kind === "trade" ? ({ sol: "your SOL wallet", hood: "your Robinhood wallet", bsc: "your BNB wallet", near: "your NEAR wallet" } as Record<string, string>)[to.chain] : undefined) : undefined };
       };
       const going = n.fills.filter((x) => x.fromPrivate > 0 || x.rest > 0).sort((a, b) => a.part - b.part).map((x) => ({ ...nameOf(parts[x.part]?.wallet), priv: BigInt(Math.round(x.fromPrivate * 100)), pay: BigInt(Math.round(x.rest * 100)) }));
       const bound = going.some((x) => x.pay > 0n) && going.every((x) => !!x.name) && going.reduce((t, x) => t + x.pay, 0n) <= BigInt(safeC);
@@ -1205,12 +1210,12 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       // Home's Send from a wallet, both legs on one sheet (the core's hiddenFromRow words): where it lands, named once
       case "ledger.hiddenFromRow": {
         // the core's outside sheet (subwallets.ts OUTSIDE_WORDS): the full address, what they get and the fee, before Face ID
-        const { symbol, row } = p.chain === "hood" ? { symbol: "ETH", row: "ETH (RH) wallet" } : { symbol: "SOL", row: "SOL wallet" };
+        const { symbol, row } = p.chain === "hood" ? { symbol: "ETH", row: "Robinhood wallet" } : { symbol: "SOL", row: "SOL wallet" };
         const amount = String(p.amountIn ?? p.amountOut ?? "");
         const priced = amountOf(undefined, amount, symbol);
         const payee = p.to as { address?: string; accountId?: string } | undefined;
         const fee = sampleSendFee(p);
-        const coin = p.chain === "hood" ? "ETH (RH)" : "SOL";
+        const coin = p.chain === "hood" ? "ETH" : "SOL";
         const lands = SEND_LANDS[payee && "accountId" in payee && payee.accountId ? "near" : String((p.to as { chain?: string } | undefined)?.chain ?? p.chain)] ?? { coin: "its coin", network: "its network" };
         // and what a send hides and what it doesn't (privacy audit, 4 Nov): both steps are public, close in time
         // the network line after the fee, as the core's outsideLines (QA test: "Public on Solana." was missing);
@@ -1260,7 +1265,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       }
       case "ledger.swap": {
         const q = safeQuotes.get(String(p.quoteId ?? ""));
-        return { title: q ? `Swap ${roundedAmount(q.amountIn)} ${q.inSymbol} for ${quoted(`${roundedAmount(q.amountOut)} ${q.outSymbol}`)}` : "Swap in your Safe", lines: [], warnings: [], effect: [], ...hint };
+        return { title: q ? `Swap ${roundedAmount(q.amountIn)} ${q.inSymbol} for ${quoted(`${roundedAmount(q.amountOut)} ${q.outSymbol}`)}` : "Swap in your Safe", lines: ["It goes through NEAR Confidential."], warnings: [], effect: [], ...hint };
       }
       default: return { title: "Sign this", lines: [], warnings: [], effect: [], ...hint };
     }
@@ -1691,15 +1696,22 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
   /** A Send from the Safe over the day's Face ID limit (audit, 5 Nov: as the real core, refused before Face ID, never
    *  held: its quote can't wait), in the copy review's words: the day's limit and what one Send can still take today, its whole fill
    *  step included (the core's send-fill.ts sendRoom over the contract's band state). */
-  const sendOverLimit = (): Problem => {
+  /** What one Send from the Safe can still ask today, its whole fill step included (the core's send-fill.ts sendRoom);
+   *  null without a Face ID band. Audit 10's A4 (8 Nov): Send's "ready" and Max read it (account.protection.get's
+   *  sendLeftUsd), so they never offer what the refusal below would refuse. */
+  const sendLeft = (): { limitUsd: number; leftUsd: number } | null => {
     const first = appBands[0];
-    if (!first || first.level !== "faceid" || first.upToUsd === null) return securityProblems.quoteCantWait();
+    if (!first || first.level !== "faceid" || first.upToUsd === null) return null;
     const now = Date.now();
     const used = spent.filter((x) => x.heldId !== undefined || x.at + 86400e3 > now).reduce((n, x) => n + x.usd, 0);
     const room = Math.max(0, first.upToUsd - used);
     let lo = 0, hi = Math.floor(room * 100);
     while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (fillStepUsd(mid / 100) <= room + 1e-9) lo = mid; else hi = mid - 1; }
-    return securityProblems.sendOverLimit(first.upToUsd, lo / 100, ADD_LEAST_USD);
+    return { limitUsd: first.upToUsd, leftUsd: lo / 100 };
+  };
+  const sendOverLimit = (): Problem => {
+    const left = sendLeft();
+    return left ? securityProblems.sendOverLimit(left.limitUsd, left.leftUsd, ADD_LEAST_USD) : securityProblems.quoteCantWait();
   };
   const sendFill = (p: Record<string, unknown>, c: { raw: string; id: string; asked: number }): Record<string, unknown>[] => {
     const usdc = c.id === USDC_NEAR;
@@ -1712,7 +1724,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     const payee = p.to as { address?: string; accountId?: string } | undefined;
     const kept = Number((fill - c.asked).toFixed(usdc ? 6 : 9));
     const m: Record<string, unknown> = { id: `safe-send:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: String(p.amount), from: c.id, to: String(payee?.address ?? payee?.accountId ?? ""),
-      ...(kept > 0 ? { kept: String(kept) } : {}), private: true, debited: true, startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [] };
+      ...(kept > 0 ? { kept: String(kept) } : {}), private: true, debited: true, startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...keyedBy(p.job) };
     movements.unshift(m);
     // over the band: refused before the sheet (sendFillHeld, below); never "waits 1 day" for a quoted Send
     if (rules && holdFor("ledger.transfer", { tokenId: c.id, amount: fill.toFixed(usdc ? 6 : 9) })) { movements.shift(); throw sendOverLimit(); }
@@ -1820,6 +1832,15 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
     debit(m.from as string, m.amount as string);
     m.debited = true;
     emit("ledger.balancesChanged", {});
+  };
+  /** Audit 15's SA-2, audit 16's S4: the account made, Activity → Account said "Nothing yet.". The rows the real core reads
+   *  off a new account's set-up transaction (core activity.ts: its key, its backup words), once, when
+   *  the account is there (the Sim's boot asks account.create again: never twice). */
+  const setupRows = () => {
+    if (changeRows.some((r) => String(r.txHash).startsWith("sample-change-setup"))) return;
+    const at = Date.now();
+    const rows = ["Gave this device its key", "Added your backup words"];
+    rows.forEach((title, i) => changeRows.unshift({ atIso: new Date(at + i).toISOString(), title, lines: [], by: "This device", ok: true, txHash: `sample-change-setup-${i + 1}` }));
   };
   /** A change (protection, a second device, its limit), now that it may run: what it does on chain. */
   const applyChange = (method: string, p: Record<string, unknown>) => {
@@ -2026,7 +2047,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
           delayFixed = true;
         }
         const f = options.needsFunding;
-        if (!f || !waitingForNear()) return account;
+        if (!f || !waitingForNear()) { setupRows(); return account; }
         const call = createCalls++;
         return { stage: "needs-funding", accountId: "zf-sample0001.near", fundAddress: f.fundAddress ?? SAMPLE_FUND_ADDRESS, needYocto: f.needYocto, haveYocto: f.haveYocto[Math.min(call, f.haveYocto.length - 1)] };
       }
@@ -2263,7 +2284,11 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         return signed();
       }
       // The rules the demo saved (in the core's shape), so Security shows "Protection by amount: On" after Save.
-      case "account.protection.get": return { bands: protectionBands, usd: appBands.map((b) => ({ upToUsd: b.upToUsd, level: b.level, ...(b.level === "wait" || b.level === "both" ? { waitSeconds: Number(b.waitSeconds) > 0 ? Number(b.waitSeconds) : 86400 } : {}) })) };
+      case "account.protection.get": {
+        // `room`: Send's own read (A4): what one Send from the Safe can still take today, as the core's
+        const left = p.room === true ? sendLeft() : null;
+        return { bands: protectionBands, usd: appBands.map((b) => ({ upToUsd: b.upToUsd, level: b.level, ...(b.level === "wait" || b.level === "both" ? { waitSeconds: Number(b.waitSeconds) > 0 ? Number(b.waitSeconds) : 86400 } : {}) })), ...(left ? { sendLeftUsd: left.leftUsd } : {}) };
+      }
       case "account.protection.set": {
         if (options.holdSeconds) return hold({ receiverId: account.accountId, actions: [], why: "Change your protection rules" } as unknown as TxRequest);
         // Tighter or looser, a change to the rules waits the change wait on chain (lib.rs set_protection: strictest + floor).
@@ -2565,7 +2590,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         const out = (buy ? a / px : a * px) * 0.999;
         const dec = (x: number) => String(Number(x >= 1 ? x.toFixed(6) : x.toPrecision(8)));
         const sym = String(p.symbol ?? row?.symbol ?? "coin");
-        const q = { id: `sq-${++safeQuoteN}`, from, to, amountIn, amountOut: dec(out), minOut: dec(out * 0.99), feeUsd: (usdIn * 0.001).toFixed(4), etaSeconds: 2, expiresAtIso: iso(30_000), source: "safe" as const,
+        const q = { id: `sq-${++safeQuoteN}`, from, to, amountIn, amountOut: dec(out), minOut: dec(out * 0.99), feeUsd: (usdIn * 0.001).toFixed(4), etaSeconds: 3, fillSeconds: 3, expiresAtIso: iso(30_000), source: "safe" as const,
           inSymbol: buy ? "USDC" : sym, outSymbol: buy ? sym : "USDC", px, name: String(p.name ?? row?.name ?? sym) };
         safeQuotes.set(q.id, q);
         const { inSymbol: _i, outSymbol: _o, px: _p, name: _n, ...shown } = q;
@@ -2575,21 +2600,36 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         const q = safeQuotes.get(String(p.quoteId ?? ""));
         if (!q || Date.parse(q.expiresAtIso) < Date.now()) throw { code: "ledger.swap.expired", whatHappened: "That price is too old. Nothing left your Safe. Tap again.", money: { state: "safe", where: "in your Safe" }, next: { kind: "retry", label: "Try again" } } as Problem;
         safeQuotes.delete(q.id);
-        const m: Record<string, unknown> = { id: `mv-swap-${movements.length + 1}`, kind: "swap", status: "moving", from: q.from, to: q.to, amount: q.amountIn, amountOut: q.amountOut, startedAtIso: iso(0), updatedAtIso: iso(0), etaSeconds: 2 };
+        // audit 16's G7: the real movement's shape (wallet safe-send.ts: explorerUrls [] until a leg's link is read)
+        // through NEAR Confidential (product decision, 8 Nov; wallet safe-send.ts swapFromSafe): the coin leaves the Safe into Private
+        // (its leg's read: inPrivateAtIso), NEAR Intents swaps it from there, and the coin got lands back in the Safe
+        const m: Record<string, unknown> = { id: `safe-send:sim-${movements.length + 1}`, kind: "swap", status: "moving", from: q.from, to: q.to, amount: q.amountIn, startedAtIso: iso(0), updatedAtIso: iso(0), etaSeconds: q.etaSeconds, explorerUrls: [], private: true, source: "safe" };
         movements.unshift(m);
         const t0 = Date.now();
-        const land = () => {
+        const inPrivate = () => {
           const take = balances.find((b) => b.tokenId === q.from && b.held === "ledger");
           if (take) { const per = Number(take.amount) > 0 ? Number(take.usd) / Number(take.amount) : 0; const left = Math.max(0, Number(take.amount) - Number(q.amountIn)); take.amount = String(Number(left.toFixed(8))); take.usd = (left * (q.from === USDC_NEAR ? 1 : per)).toFixed(2); }
+          Object.assign(m, { inPrivateAtIso: iso(0), updatedAtIso: iso(0) });
+          emit("ledger.movementUpdated", { movement: { ...m } });
+          emit("ledger.balancesChanged", {});
+        };
+        const land = () => {
           const outPx = q.to === USDC_NEAR ? 1 : q.px;
           const give = balances.find((b) => b.tokenId === q.to && b.held === "ledger");
           if (give) { const n = Number(give.amount) + Number(q.amountOut); give.amount = String(Number(n.toFixed(8))); give.usd = (n * outPx).toFixed(2); }
           else balances.push({ ...balances[0]!, tokenId: q.to, symbol: q.outSymbol, name: q.name, icon: q.outSymbol.toLowerCase(), chain: "near", amount: q.amountOut, usd: (Number(q.amountOut) * outPx).toFixed(2), bridged: false, held: "ledger", listed: true });
-          Object.assign(m, { status: "done", updatedAtIso: iso(0), settledMs: Date.now() - t0 });
+          Object.assign(m, { status: "done", updatedAtIso: iso(0), settledMs: Date.now() - t0, amountOut: q.amountOut });
+          // audit 17's H10: Activity → Account lists what approved it, as the real core reads the Safe's own signed
+          // transaction (core activity.ts: by this device's key); the Sim's row survives a reload with the rest (changeRows)
+          const sell = q.to === USDC_NEAR;
+          changeRows.unshift({ atIso: iso(0), title: `${sell ? "Sell" : "Buy"} of ${sell ? q.inSymbol : q.outSymbol}`, lines: [SAFE_TRADE_APPROVED, "It went through NEAR Confidential."], by: "This device", ok: true, txHash: `sample-change-trade-${String(m.id).replace(/\D/g, "")}` });
           emit("ledger.movementUpdated", { movement: { ...m } });
           emit("ledger.balancesChanged", {});
         };
-        setTimeout(land, options.latencyMs === 0 ? 0 : 1_800);
+        // the Sim's legs: into Private, then the swap and the landing (one 1Click answer); its quote says this pace
+        // (fillSeconds 3, etaSeconds 3: audit 18's I3, never the measured mainnet 30 s fill for a 6 s run)
+        setTimeout(inPrivate, options.latencyMs === 0 ? 0 : 3_000);
+        setTimeout(land, options.latencyMs === 0 ? 0 : 5_500);
         return { ...m };
       }
       case "ledger.balances": return balances.map((b) => ({ ...b }));
@@ -2816,7 +2856,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         }
         // As the core (float.ts FLOAT_MIN_USD): an Add worth under $2 would mostly go on fees, so it is refused.
         if (Number(usdc) < 2) throw { code: "security.request.not-allowed", whatHappened: "A move under $2 would mostly go on fees.", money: { state: "safe", where: "in your Safe" }, next: { kind: "nothing", label: "Go back" } } satisfies Problem;
-        const m = move("trading", amount, { from: coin ?? USDC_NEAR, to: "trading" }, "done", { method, p });
+        const m = move("trading", amount, { from: coin ?? USDC_NEAR, to: "trading", ...keyedBy(p.job) }, "done", { method, p });
         if (m.status !== "waiting") releaseToTrading(usdc, payWith);
         else { const hm = heldMoves.get((m.held as { id: string }).id); if (hm) { hm.toTrading = usdc; if (payWith) hm.payWith = payWith; } }
         // A swap inside the Add carries the swap service's own time estimate, as the core's quote does (sample: 20 s,
@@ -2850,7 +2890,9 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       case "ledger.toPrivate": {
         const q = privateQuotes.get(String(p.quoteId));
         if (!q) throw privateProblem("ledger.quote.expired", "This price ran out. Get a new one.");
-        const m = move("private", q.amount, { from: q.row.tokenId, to: "private" }, "done", { method, p });
+        // M12-5: the page's key for its job on the movement, as the real core (wallet to-private.ts jobKeyOf)
+        const jobKey = typeof p.key === "string" && /^[\w-]{8,64}$/.test(p.key) ? p.key : undefined;
+        const m = move("private", q.amount, { from: q.row.tokenId, to: "private", ...(jobKey ? { jobKey } : {}) }, "done", { method, p });
         privateQuotes.delete(String(p.quoteId));
         if (m.status !== "waiting") later({ kind: "private.land", amount: q.amount, rowIndex: balances.indexOf(q.row) }, settle);
         return m;
@@ -2923,7 +2965,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         const stopAt = movesStopAt.get(p);
         const pay = (usd: number, w: (typeof ws)[number], i: number, kind: "safe-send" | "pocket-send") => {
           const m: Record<string, unknown> = { id: `${kind}:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: units(usd), from: n.tokenId, to: w === "near" ? "your NEAR wallet" : w!.address,
-            private: true, debited: true, startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...(typeof p.job === "string" ? { job: p.job, part: i, partWallet: String(parts[i]!.wallet) } : {}) };
+            private: true, debited: true, startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...(typeof p.job === "string" ? { job: p.job, part: i, partWallet: String(parts[i]!.wallet) } : {}), ...keyedBy(p.job) };
           movements.unshift(m);
           later({ kind: "private.pay", movementId: m.id as string, wallet: w === "near" ? "near" : w!.id, usd }, kind === "safe-send" ? settle * 2 : settle);
           return m.id as string;
@@ -2940,7 +2982,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
           if (!safe || Number(safe.amount) + 1e-9 < fillUnits) throw usdc ? balanceLow(n.fill.toFixed(2), "USDC") : balanceLow(String(Math.ceil(fillUnits * 1e4) / 1e4), safe?.symbol ?? "NEAR");
           if (usdc) moveMainUsdc(-toMicro(n.fill.toFixed(6)));
           else { const left = Math.max(0, Number((Number(safe.amount) - fillUnits).toFixed(9))); Object.assign(safe, { amount: String(left), usd: (left * px).toFixed(2) }); }
-          const fm: Record<string, unknown> = { id: `mv-${movements.length + 1}`, kind: "private", status: "moving", amount: usdc ? n.fill.toFixed(2) : String(Number(fillUnits.toFixed(6))), from: n.tokenId, to: "private", startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...(typeof p.job === "string" ? { job: p.job, part: via[0]!.part, partWallet: String(parts[via[0]!.part]!.wallet) } : {}) };
+          const fm: Record<string, unknown> = { id: `mv-${movements.length + 1}`, kind: "private", status: "moving", amount: usdc ? n.fill.toFixed(2) : String(Number(fillUnits.toFixed(6))), from: n.tokenId, to: "private", startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], ...(typeof p.job === "string" ? { job: p.job, part: via[0]!.part, partWallet: String(parts[via[0]!.part]!.wallet) } : {}), ...keyedBy(p.job) };
           // with the part its id goes with (7 Nov): the status read (privateMoveStatus) keeps only movements with a part, so
           // the fill stays the Move's, never a second Activity row
           movements.unshift(fm);
@@ -2980,7 +3022,7 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
         const payee = p.to as { address?: string; accountId?: string } | undefined;
         // it leaves the private balance only, once (a web test: a $25 send took 25 USDC here and 25 more from the
         // Safe's own row when it settled, 1,385.60 -> 1,335.60): `debited`, and the row's dollars follow its coins
-        const m: Record<string, unknown> = { id: `pocket-send:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: String(p.amount), startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], from: id, to: String(payee?.address ?? payee?.accountId ?? ""), private: true, debited: true };
+        const m: Record<string, unknown> = { id: `pocket-send:sim-${movements.length + 1}`, kind: "pay", status: "moving", amount: String(p.amount), startedAtIso: iso(0), updatedAtIso: iso(0), explorerUrls: [], from: id, to: String(payee?.address ?? payee?.accountId ?? ""), private: true, debited: true, ...keyedBy(p.job) };
         if (id === USDC_NEAR) {
           const micro = toMicro(row.amount) - toMicro(String(p.amount));
           Object.assign(row, { amount: fromMicro(micro), usd: fromMicro(micro - (micro % 10_000n)) });
@@ -3271,7 +3313,9 @@ export function createMockBridge(options: MockOptions = {}): MockBridge {
       // a Send from the Safe through the fill: its whole fill counts on the band; over it, the copy review's refusal before the sheet
       // the audit's ruling (5 Nov), as the core's dev-signer: a fill whose payout coin can't be named stops before the sheet
       if (method === "ledger.sendFromSafe" && fillCase(params) && fillGets(params, 1) === null) return { problem: securityProblems.sendCoinUnknown() };
-      if (method === "ledger.sendFromSafe" && sendFillHeld(params)) return { problem: sendOverLimit() };
+      // audit 10's A4 shots (8 Nov): a Max Send is checked as it pays (maxedSend: core maxSend under its upTo, the "Send
+      // $430.09" on its button), never its raw upTo, whose whole fill step tipped over the rule it was capped to
+      if (method === "ledger.sendFromSafe" && sendFillHeld(maxedSend(params))) return { problem: sendOverLimit() };
       // The sheet comes first, as in the core: a "no" signs nothing and the method never runs. A request the protection
       // will hold says so on it, with the real wait.
       const sheetWords = (): PlainWords => {

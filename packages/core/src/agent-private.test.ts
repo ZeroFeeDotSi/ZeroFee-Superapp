@@ -206,7 +206,7 @@ test("pairing a computer: a No on the sheet sends nothing; a relay that doesn't 
   // D104: the sheet says the bounded loss plainly, with the account's own pocket money.
   let said: string[] = [];
   await agentPairComputer({ ...base, pocketUsd: 20, approve: async (w) => ((said = w.lines), false) });
-  assert.ok(said.includes("The computer can spend from AgentZero's wallet, the same as AgentZero on this phone: up to $20 in any 24 hours, anywhere, until you tap Stop."), said.join(" | "));
+  assert.ok(said.includes("The computer pays from AgentZero's wallet. It spends at most $20 in any 24 hours. It stops when you tap Stop."), said.join(" | "));
   assert.ok(said.includes("Your computer keeps its own day limit too. Your account's limit is the hard one."));
   // Control: yes (and Face ID yes) → one post, to that offer's mailbox.
   assert.equal((await agentPairComputer({ ...base, approve: async () => true, faceId: async () => true })).status, "paired");

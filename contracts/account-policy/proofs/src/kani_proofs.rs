@@ -503,7 +503,7 @@ fn p10_check_steps_bounds() {
     let n: usize = kani::any();
     kani::assume(n <= 2);
     let blocked: bool = kani::any();
-    // Memory bound (coordinator, 28 Oct): three concrete buffer sizes picked symbolically, not a symbolic length
+    // Memory bound (review, 28 Oct): three concrete buffer sizes picked symbolically, not a symbolic length
     // (a symbolic-length 4,097-byte buffer made CBMC use over 20 GB).
     // 29 Oct: even concrete 4,096-byte buffers timed out; args are 0 or 1 byte here, so the 4,096-byte limit itself
     // is not proven by Kani (it is a plain length compare, covered by the existing tests).

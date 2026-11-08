@@ -100,7 +100,7 @@ test("QA's ruling: the outside sheet's lines say what they get and the fee from 
     for (const out of [undefined, "2.71"]) assert.equal(outsideLines(STRANGER, "3", out, net).lines[0], `To ${STRANGER}`, `the full address first (${net}, ${out})`);
   }
   // and all three 1Click sheets hand the core the quote's full recipient (or the asked address), never a short form
-  assert.match(core, /outsideSheet\("private balance", quote!\.recipient,/);
+  assert.match(core, /outsideSheet\("Private", quote!\.recipient,/);
   assert.match(core, /outsideSheet\(row\.row, q2!\.recipient,/);
   assert.match(core, /outsideSheet\(row\.row, to, usd, q!\.amountOutUsd,/);
   assert.ok(!/outsideSheet\([^)]*(outsideShort|shortId)\(/.test(core), "control: no sheet is handed a short address");

@@ -16,7 +16,7 @@ import * as words from "./receipt-words.ts";
 
 const src = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 const f = format as unknown as { doneIn(ms: number): string; whenWords(at: number, now: number): string };
-const w = words as unknown as { receiptProof(chain: string, hash: string): { line: string; url?: string }; buyCostLine(q: unknown, fee: number | undefined): string | null };
+const w = words as unknown as { receiptProof(chain: string, hash: string): { line: string; url?: string }; tradeCostLine(side: "buy" | "sell", q: unknown, fee: number | undefined): string | null; buyCostLine(q: unknown, fee: number | undefined): string | null };
 const SIG = "27UckxmYVcsFiu4vJ2QUTV8mGwT8iyWPGGm6aq9BnkdwEDBfgwNyJ7h4V3cQkuGkV8b6aSE6cN3U5pvWkn5U7zEHLR";
 
 test("T2-6: the receipt's time is said done, \"Done in under a second.\" under 1 s, else \"Done in N seconds.\" (control: never \"Landed in\")", () => {
@@ -44,7 +44,7 @@ test("T2-6: a buy's first Activity step is \"Paid from your SOL wallet\" (its wa
   assert.equal(tradeCard(rec({ kind: "sell" })).steps[0]!.label, "Sent to Solana", "control");
   // the copy review (8 Nov): the second step never repeats the title ("Bought DOPE"): where the coins landed, that wallet by name
   assert.equal(tradeCard(rec({})).steps[1]!.label, "Landed in your SOL wallet");
-  assert.equal(tradeCard(rec({ chain: "hood" })).steps[1]!.label, "Landed in your ETH (RH) wallet");
+  assert.equal(tradeCard(rec({ chain: "hood" })).steps[1]!.label, "Landed in your Robinhood wallet");
   assert.equal(tradeCard(rec({ chain: "bsc" })).steps[1]!.label, "Landed in your BNB wallet");
   assert.ok(tradeCard(rec({})).steps.every((s) => s.label !== tradeCard(rec({})).title && s.label !== "Bought"), "never the title again");
   assert.equal(tradeCard(rec({ kind: "sell" })).steps[1]!.label, "Sold", "control: a sale's second step is unchanged");
@@ -78,9 +78,14 @@ test("QA QA's SHOULD: a buy's receipt names the gap once: its quote over the mar
   assert.equal(w.buyCostLine({ ...q, getUsd: 24.996 }, undefined), null, "control: nothing to name, no line");
   assert.equal(w.buyCostLine(undefined, 0.002), null, "control: no quote recorded, nothing said");
   assert.doesNotMatch(w.buyCostLine(q, 0.002)!.split("Fee")[0]!, /fee/i, "the gap is never called a fee");
+  // the audit's Trade S3 (8 Nov): a sale's receipt, the same way under the market price (the sale's quote: payUsd its market
+  // value, getUsd what it gets, the network fee inside saleNetUsd)
+  const sale = { payUsd: 25, getUsd: 24.93, feeUsd: 0.002 };
+  assert.match(w.tradeCostLine("sell", sale, 0.002) ?? "", /^About \$0\.0\d under the market price\. Fee \$0\.002\.$/);
+  assert.equal(w.tradeCostLine("buy", q, 0.002), w.buyCostLine(q, 0.002), "control: a buy as before");
   // the sheet reads it from the trade's own record: its quote, the chain's booked fee, else its quote's
   const sheet = src("./screens/TradeSheet.tsx");
-  assert.match(sheet, /const costOf = \(r: TradeRecord\): string \| null => \(r\.kind === "buy" \? buyCostLine\(r\.quote, r\.costs\?\.feeUsd \?\? r\.quote\?\.feeUsd\) : null\);/);
+  assert.match(sheet, /const costOf = \(r: TradeRecord\): string \| null => \(r\.kind === "buy" \|\| r\.kind === "sell" \? tradeCostLine\(r\.kind, r\.quote, r\.costs\?\.feeUsd \?\? r\.quote\?\.feeUsd\) : null\);/, "the audit's Trade S3: a sale's receipt names its gap too");
   assert.equal((sheet.match(/cost: costOf\(re?c?\)/g) ?? []).length, 2, "both landed receipts (at once, and after a late confirm)");
   // the receipt's one gap line (copy review, 8 Nov): none under the holding, so the coin has one price on the page
   assert.doesNotMatch(src("./screens/Moment.tsx"), /receipt-held-gap|held\.gap/);

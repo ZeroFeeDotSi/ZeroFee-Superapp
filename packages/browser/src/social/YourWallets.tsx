@@ -144,7 +144,7 @@ export function YourWalletsPage({ onClose }: { onClose: () => void }) {
         )}
         <p className="zf-small yw-line" role="status" aria-live="polite">{line}</p>
         {read === "failed" && <p className="zf-small yw-note">{words.readFailed} <button className="zf-link" onClick={refresh}>Look again</button></p>}
-        {read === "first" && !list.length && <p className="zf-small yw-note">{words.looking}</p>}
+        {read === "first" && !list.length && <p className="zf-small yw-note">{words.reading}</p>}
         {read !== "first" && !v.money.length && !v.empty.length && <p className="zf-small yw-note" data-testid="yw-none">{words.none}</p>}
         {v.money.length > 0 && <ul className="yw-list">{v.money.map(card)}</ul>}
         {allEmpty && <p className="zf-small yw-note">{words.allEmpty}</p>}

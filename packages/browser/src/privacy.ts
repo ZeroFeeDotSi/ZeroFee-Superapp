@@ -10,15 +10,21 @@ export type PrivacyView =
   /** The iPhone app. `built`: false while this build has no Tor in it (nothing private opens then). */
   | { kind: "phone"; private: boolean; normalSites: string[]; built: boolean; blockTrackers?: boolean };
 
+/**
+ * Audit 15 FB3 (rule 1, and the Sim never shows what the phone can't): does the phone build people have link Tor? The
+ * committed iOS project (apps/ios/ZeroFee.xcodeproj) links none, so PrivateBrowsing.swift's `built` is false there and the
+ * phone says "Private browsing isn't ready yet". The Sim reads this same switch instead of assuming Tor; a test pins it to
+ * the committed project. Turned on with the build that links Tor (tools/ios/build-tor.sh).
+ */
+export const TOR_IN_PHONE_BUILD = false;
+
 export const PRIVACY = {
   row: "Privacy",
-  rowLine: (v: PrivacyView | null) => (!v || v.kind === "web" ? "Private browsing, history and site data" : !v.built ? "Private browsing isn't ready yet" : v.private ? "Private browsing is on" : "Private browsing is off"),
+  // b23 (audit 18, "Browser: Private browsing ships or its row goes"; end to end or hidden): with no Tor in the
+  // build, Private browsing isn't named at all, never "isn't ready yet"; the row is what the page has
+  rowLine: (v: PrivacyView | null) => (!v || v.kind === "web" ? "History" : !v.built ? "Trackers, history and site data" : v.private ? "Private browsing is on" : "Private browsing is off"),
   switchTitle: "Private browsing",
   switchLine: "Sites can't see where you are. Pages open a bit slower.",
-  sampleOff: "Off. Sites can see your address.",
-  sampleOn: "On. Sites can't see where you are.",
-  notBuilt: "Private browsing isn't ready yet.",
-  web: "Private browsing isn't ready yet.",
   offTitle: "Turn off private browsing?",
   offLine: "Sites will see your phone's address.",
   offYes: "Turn off",

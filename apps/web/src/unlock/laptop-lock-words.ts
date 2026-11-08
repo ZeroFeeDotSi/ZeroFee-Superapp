@@ -10,6 +10,8 @@ export const LAPTOP_LOCK = {
   setupTitle: "Laptop chip",
   setupBody: "This laptop is your key. Approve with Touch ID or Windows Hello.",
   setupBodyLegacy: "Your account is here. Your keys stay in this browser, locked. Touch ID or Windows Hello unlocks them.",
+  /** Under the first screen's heading, which already says the laptop is a second key (LAPTOP_START.what): only how. */
+  setupHow: "Approve with Touch\u00a0ID or Windows\u00a0Hello.", // never "Touch / ID" on two lines (b20 shot i3)
   use: "Use this laptop",
   lockedBody: "Your keys are in this browser, locked. Touch ID or Windows Hello unlocks them.",
   unlock: "Unlock with this laptop",
@@ -30,13 +32,34 @@ export const LAPTOP_LOCK = {
 export const LAPTOP_START = {
   /** The heading: the first screen's, the loading mark's (no "…ing" line beside it) and the page's own HTML's. */
   what: "This page makes your laptop a second key for ZeroFee.",
-  next: "Next: tap Use this laptop. Then on your phone: ZeroFee, Security, Add my laptop.",
+  next: "Next: tap Use this laptop. Then on your phone: ZeroFee, Your account, Devices, Add my laptop.",
   /** The pairing code's screen: where the phone scans it. */
-  pairOn: "On your phone: ZeroFee, Security, Add my laptop.",
+  pairOn: "On your phone: ZeroFee, Your account, Devices, Add my laptop.",
   /** The laptop's key and its account list didn't load in time (Laptop.tsx LOAD_DEADLINE_MS): what failed, by name. */
   late: "NEAR didn't answer, so this laptop's key didn't load. Nothing changed on your phone.",
   /** The page's own HTML, shown before its script runs; this line appears only if the script still hasn't (index.html). */
   notLoaded: "This page hasn't loaded. Check your internet, then reload.",
+  /** A later read NEAR didn't answer (audit 15 FL3): the page keeps what it showed, with its time (laptop-load keptLines). */
+  stale: "NEAR isn't answering. This page checks again by itself.",
+  /** The product decision (5 Nov): this page is for now, an app comes. No date (no month is set). Under the first screen and
+   *  at the foot of the laptop page, paired or not (audit 15 FL2). */
+  soon: "A ZeroFee Desktop app is coming soon.",
+} as const;
+
+/**
+ * The pairing screen and the paired page, in the phone's own words (builder 22's item 7): the phone is "your phone"
+ * (LAPTOP_START.pairOn's), never "your main device" beside it; each place the phone has is named as its menu names it
+ * (SecurityApp: Your account's rows Protection and Devices; the laptop flow's "Letters to check"; pair-steps' "Scan").
+ */
+export const LAPTOP_PAIR = {
+  scan: "Scan this with your phone",
+  /** the phone's row for big payments is Protection (SecurityApp NavRow) */
+  willDo: ["Big payments need its yes too. You set how big in Protection.", "So does moving your account to a new device."],
+  /** the phone's box is "Or paste the code" (SecurityApp laptop flow); the marker deploy-app.sh keeps out of the public build */
+  copy: "Or copy the code to paste on your phone",
+  /** the phone's label over the same letters is "Letters to check" */
+  letters: "Your phone shows them under Letters to check. If they differ, stop.",
+  answers: ["What your phone asks. Also any move of your account to a new device.", "It can't start a payment or change your rules."],
 } as const;
 
 /** The laptop build's index.html #root before its script runs (vite.config.ts): what the page is at once, and, after 8 s

@@ -152,7 +152,7 @@ test("web wallet allowlist: every core method off the list is refused by name, w
   // the allowed ones, only as asked
   assert.equal(webAllows("subwallet.send", { app: "wallet", chain: "sol" }), false, "the public Send: never on the web, even Wallet's");
   assert.equal(webAllows("subwallet.sendPrivate", { app: "wallet", chain: "sol" }), true, "control: the private Send");
-  assert.equal(webAllows("subwallet.sendPrivate", { app: "wallet", chain: "bsc" }), false, "the private Send: SOL or ETH (RH) only");
+  assert.equal(webAllows("subwallet.sendPrivate", { app: "wallet", chain: "bsc" }), false, "the private Send: SOL or Robinhood only");
   assert.equal(webAllows("subwallet.sendPrivate", { app: "browser", chain: "sol" }), false, "the private Send: Wallet's own only");
   // W4: the web Send's tokens held, Wallet's own read only (control: Wallet's passes)
   assert.deepEqual([undefined, "trade", "browser", "wallet"].map((app) => webAllows("subwallet.sendCoins", app ? { app } : {})), [false, false, false, true], "subwallet.sendCoins");

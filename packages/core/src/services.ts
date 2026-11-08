@@ -11,10 +11,11 @@
 //   nearai    NEAR AI Cloud: the Agent's model; no money sheet uses it
 //   helius    Helius: Solana's sends for the site wallets go through it (the relay's /v0/sol/send)
 //   gecko     GeckoTerminal: Trade's coin prices and charts
+//   confidential  NEAR Confidential (Confidential Intents): every Send, Swap, Move and Add goes through it (product decision, 4 Nov)
 import { shortTime, weekdayName } from "./clock.ts";
 import type { MoneyState, Problem } from "./problem.ts";
 
-export const SERVICES = ["oneclick", "bridge", "near", "solana", "hood", "bsc", "relay", "nearai", "helius", "gecko"] as const;
+export const SERVICES = ["oneclick", "bridge", "near", "solana", "hood", "bsc", "relay", "nearai", "helius", "gecko", "confidential"] as const;
 export type Service = (typeof SERVICES)[number];
 /** down: the service answered 5xx (521: its host is down) or not at all; busy: 429; slow: no answer in time. */
 export type Fault = "down" | "busy" | "slow";
@@ -31,6 +32,7 @@ export const SERVICE_NAMES: Record<Service, string> = {
   nearai: "NEAR AI Cloud",
   helius: "Helius",
   gecko: "GeckoTerminal",
+  confidential: "NEAR Confidential",
 };
 
 /**
@@ -46,20 +48,40 @@ export const STATUS_LINKS: Partial<Record<Service, string>> = {
   helius: "https://helius.statuspage.io",
 };
 
-/** A wallet's own chain: its sends and trades wait; the Safe and the other wallets work. */
-const walletEffects = (coin: string) => ({ blocks: `${coin} sends and trades wait.`, works: "Your Safe and your other wallets work.", back: `${coin} sends and trades work again.` });
-/** B30: what a service failing holds up, and what still works, in a child's words (the banner's middle). */
+/** What can't go while NEAR Intents, NEAR Confidential or ZeroFee's server is down: every Safe money move, the Safe's Buy and
+ *  Sell among them (audit 16's G5); and what still goes: the trades in Hot. */
+export const SAFE_BLOCKS = "Sends, swaps, moves, Safe Buy and Sell can't go now.";
+export const SAFE_BACK = "Sends, swaps, moves, Safe Buy and Sell work again.";
+export const HOT_TRADES = "Trades in Hot work.";
+/** B30: the status page of the service a line names, from the allow-list above only (never a link from outside); the
+ *  longest name first: "NEAR AI Cloud" before "NEAR" (review, Low). */
+export function statusLinkOf(text: string): string | undefined {
+  const named = [...SERVICES].sort((a, b) => SERVICE_NAMES[b].length - SERVICE_NAMES[a].length).find((s) => text.startsWith(SERVICE_NAMES[s]));
+  return named ? STATUS_LINKS[named] : undefined;
+}
+
+/** A wallet's own chain: its sends and trades can't go now; the Safe and the other wallets work. */
+const walletEffects = (coin: string) => ({ blocks: `${coin} sends and trades can't go now.`, works: "Your Safe and your other wallets work.", back: `${coin} sends and trades work again.` });
+/** B30: what a service failing holds up, and what still works, in a child's words (the banner's middle). Audit 12 C6: what
+ *  is held says "can't go now", as the sheet under it does; never "wait" for a thing that won't queue. */
 export const SERVICE_EFFECTS: Record<Service, { blocks: string; works: string; back: string }> = {
-  bridge: { blocks: "Adding money from other chains waits.", works: "Sending, swaps and moves work.", back: "Adding money from other chains works again." },
-  oneclick: { blocks: "Swaps and moves wait.", works: "Sending on NEAR works.", back: "Swaps and moves work again." },
-  near: { blocks: "Payments wait.", works: "Your money stays in your Safe.", back: "Payments work again." },
-  solana: { blocks: "pump.fun and Solana trades wait.", works: "Your Safe and sending on NEAR work.", back: "pump.fun and Solana trades work again." },
-  hood: walletEffects("ETH (RH)"),
+  bridge: { blocks: "Adding money from other chains can't go now.", works: "Sending, swaps and moves work.", back: "Adding money from other chains works again." },
+  // audit 13's D4 (8 Nov): every Send goes on NEAR Intents' quotes through ZeroFee's server (wallet SHEET_NEEDS.send), so
+  // with either down a Send can't go: the banner says so, as the sheet under it does; trades go on their chains' own
+  // audit 16's G5 (8 Nov): the Safe's Buy and Sell on Trade's NEAR Intents tab are a confidential job on Send's own legs
+  // (builder 15; trade NativeScreens needs SHEET_NEEDS.swap), so with this down they can't go: "Trades work." said they
+  // could. Only the trades in Hot (the person's own wallets on their chains) still go.
+  oneclick: { blocks: SAFE_BLOCKS, works: HOT_TRADES, back: SAFE_BACK },
+  near: { blocks: "Payments can't go now.", works: "Your money stays in your Safe.", back: "Payments work again." },
+  solana: { blocks: "pump.fun and Solana trades can't go now.", works: "Your Safe and sending on NEAR work.", back: "pump.fun and Solana trades work again." },
+  hood: walletEffects("Robinhood"),
   bsc: walletEffects("BNB"),
-  relay: { blocks: "Swaps and moves wait.", works: "Sending on NEAR works.", back: "Swaps and moves work again." },
-  nearai: { blocks: "AgentZero waits.", works: "Everything else works.", back: "AgentZero works again." },
-  helius: { blocks: "Solana sends may wait.", works: "Your Safe and sending on NEAR work.", back: "Solana sends work again." },
-  gecko: { blocks: "Coin prices in Trade may be old.", works: "Payments work.", back: "Coin prices are fresh again." },
+  relay: { blocks: SAFE_BLOCKS, works: "Your money stays where it is.", back: SAFE_BACK },
+  nearai: { blocks: "AgentZero can't answer.", works: "Everything else works.", back: "AgentZero works again." },
+  helius: { blocks: "Solana sends are slow now.", works: "Your Safe and sending on NEAR work.", back: "Solana sends work again." },
+  gecko: { blocks: "Coin prices in Trade are not fresh.", works: "Payments work.", back: "Coin prices are fresh again." },
+  // every money move goes through it (the hard rule, 4 Nov), so none goes in public while it is down; trades stay direct
+  confidential: { blocks: SAFE_BLOCKS, works: HOT_TRADES, back: SAFE_BACK },
 };
 
 /** B30: one service's row of the relay's status table, as the app shows it. `since`: when this state began; `note`: the
@@ -73,6 +95,12 @@ export interface ServiceStatus {
    *  rule; bug 8) is an outage that holds a button; one source alone is said as "didn't answer", never "down". */
   seen?: "device" | "relay" | "both";
 }
+
+/** The shell's notice says this row (StatusBanner): down only, seen by this phone and the relay's check ("both", or a row
+ *  with no source); market data once a check other than the phone's says so (rule 9a: busy or slow is never said). Home
+ *  reads the same rule so a line under the notice never says the same outage twice (M12-4, 8 Nov). */
+export const noticeShows = (x: Pick<ServiceStatus, "service" | "state" | "seen">): boolean =>
+  x.state === "down" && (x.service === "gecko" ? x.seen !== "device" : x.seen === "both" || !x.seen);
 
 /**
  * Is 1Click down, so a swap shouldn't even be offered? Only on fresh, repeated evidence: the relay's own check (it asks
@@ -189,11 +217,18 @@ export type ServiceHealth = Partial<Record<Service, "up" | Fault>>;
 /** A phone with no connection (§3): this, and nothing else. No service is blamed for the phone's own signal. */
 export const OFFLINE_LINE = "You're offline.";
 
-/** The quiet line on a sheet before the tap (R6): "NEAR Intents' bridge is down. Add waits until it's back.". */
-export function waitsLine(s: Service, fault: Fault, action: string): string {
+/** The quiet line on a sheet whose service is down (R6; audit 11's B4, 8 Nov, rule 8: "NEAR Intents is down. Send waits until
+ *  it's back." said something waits when nothing does, and not where the money is): what failed, where the money is, what
+ *  happens next. "NEAR Intents is down, so this can't go now. Your money stays in your Safe. It checks again by itself."
+ *  Audit 16's G4 (8 Nov): never "Try again when it's back": the sheet itself reads the services again (wallet useHealth,
+ *  every 30 s) and its button comes back on by itself, so nothing is the person's to try. An Add or a Take out starts
+ *  outside the Safe: its money stays where it is; `where` names the wallet a sheet pays from ("in your SOL wallet"). */
+export const CHECKS_AGAIN = "It checks again by itself.";
+export function waitsLine(s: Service, fault: Fault, action: string, where?: string): string {
   const name = SERVICE_NAMES[s];
   const state = fault === "busy" ? "is busy" : fault === "slow" ? "is slow" : "is down";
-  return `${name} ${state}. ${action} waits until it's back.`;
+  const stays = where ?? (/^(Add|Take out)$/.test(action) ? "where it is" : "in your Safe");
+  return `${name} ${state}, so this can't go now. Your money stays ${stays}. ${CHECKS_AGAIN}`;
 }
 
 /**

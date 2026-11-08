@@ -26,12 +26,12 @@ test("a network Send can't reach is one line naming it, and never suggests anoth
   assert.equal(cantSendTo({ kind: "address", chain: "monad", candidates: ["monad"], address: EVM }, name), "ZeroFee can't send to Monad yet.");
 });
 
-test("security review M1: a 0x address could be ETH (RH), BNB Chain, Ethereum or Base: a NEW one starts on none, whatever it is sent from; one paid before starts on the network it was paid on", () => {
+test("security review M1: a 0x address could be Robinhood, BNB Chain, Ethereum or Base: a NEW one starts on none, whatever it is sent from; one paid before starts on the network it was paid on", () => {
   const nets = sendNetworks({ kind: "address", chain: null, candidates: ["eth", "base", "bsc"], address: EVM });
   assert.deepEqual(nets, ["hood", "bsc", "eth", "base", "arb", "op", "pol", "avax", "gnosis", "bera"]);
   const paid: Paid[] = [{ to: EVM.toLowerCase(), chain: "bsc" }, { to: "0x1234567890123456789012345678901234567890" }];
   assert.equal(startNetwork(nets, paidOn(EVM, paid)), "bsc", "paid on BNB Chain before (any case): BNB Chain to start");
-  assert.equal(startNetwork(nets, paidOn("0x7D06e272B5305A4B9d40E872c7950D3437547e38".toLowerCase(), paid)), null, "control: a NEW address starts on none, even from the ETH (RH) wallet");
+  assert.equal(startNetwork(nets, paidOn("0x7D06e272B5305A4B9d40E872c7950D3437547e38".toLowerCase(), paid)), null, "control: a NEW address starts on none, even from the Robinhood wallet");
   assert.equal(startNetwork(nets, paidOn("0x1234567890123456789012345678901234567890", paid)), null, "paid before on a network not kept: still asked");
   assert.equal(EXCHANGE_LINE, "Exchanges often take only one network.");
   assert.deepEqual(sendNetworks({ kind: "address", chain: "sol", candidates: ["sol"], address: SOL }), ["sol"]);
@@ -52,9 +52,9 @@ test("the copy review's re-walk: the network line is the core sheet's \"Public o
   for (const n of ["hood", "sol", "bsc", "near", "eth"] as const) for (const l of routeLines(n)) assert.doesNotMatch(l, /Goes through|NEAR\. Lands|left/, "R3: never the machine's route");
 });
 
-test("D124: no Send or Swap line a person reads says \"on Robinhood Chain\" after ETH (RH) (controls: another coin there, or ETH on Base, keeps its network)", async () => {
+test("D124: no Send or Swap line a person reads says \"on Robinhood Chain\" after Robinhood (controls: another coin there, or ETH on Base, keeps its network)", async () => {
   const { onNetwork } = await import("@zerofee/core/send-words");
-  assert.equal(onNetwork("0.0019 ETH (RH)", "nep141:hood.omft.near"), "", "the core's sheets: ETH (RH) alone");
+  assert.equal(onNetwork("0.0019 Robinhood", "nep141:hood.omft.near"), "", "the core's sheets: Robinhood alone");
   assert.equal(onNetwork("3.1 SOL", "nep141:sol.omft.near"), " on Solana", "control: SOL names Solana");
   assert.equal(onNetwork("0.001 ETH on Base", "nep141:base.omft.near"), "", "control: a network the words already name");
   assert.equal(onNetwork("0.1 ETH", "nep141:eth.omft.near"), " on Ethereum", "control: ETH on Ethereum");

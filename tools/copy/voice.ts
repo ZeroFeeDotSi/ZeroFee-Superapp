@@ -41,6 +41,8 @@ export const BANNED: Banned[] = [
   { re: /\bApp Store\b/, word: "App Store (for Apps)", say: "Apps" },
   // the copy review (7 Nov): the place is "Private", in every step, row, page and receipt ("Leaving Private"), never "private balance"
   { re: /\bprivate balances?\b/i, word: "private balance", say: "Private" },
+  // QA 16's MUST 2 (8 Nov): the wallet is "Robinhood" on every screen ("your Robinhood wallet"); the coin in it is ETH
+  { re: /\bETH \(RH\)/, word: "ETH (RH)", say: "Robinhood (the wallet), or ETH (the coin)" },
   { re: /[A-Za-z)]!(\s|$)/, word: "exclamation mark", say: "a full stop" },
   // B28 R5 (product decision, 2 Nov): blame by name, the money line always. ZeroFee never says "we can't reach" or "we couldn't"
   // (it puts the fault on ZeroFee and names nothing), never "something went wrong", and never "the service that holds
@@ -64,8 +66,8 @@ export const SERVICE_ERROR = new RegExp(`\\b${SERVICES}(?:'s price)? ${FAILED}\\
 const SERVICE_WORDS = new Set(["1Click", "intents"]);
 /** Product decision, 5 Nov (mandatory protocols; zero fee: every money screen says who is paid, directly, the protocol): the protocol
  *  by name as the one doing the work or being paid ("1Click prices it.", "NEAR Intents doesn't swap one of these coins.",
- *  "Paid to NEAR Intents' solver directly."), or the name alone (a label). Never marketing ("Swap with 1Click today."): it lifts only the service-name bans. */
-export const PROTOCOL_ROLE = new RegExp(`\\b${SERVICES}(?:'s? (?:fee|price|solver|bridge))? (?:prices|priced|swaps|doesn't swap|moves|settles|charges|takes|signs|didn't sign|sent a different)\\b|\\b(?:[Pp]aid|[Pp]ays|[Tt]hrough|[Gg]oes) (?:to |straight to |directly to )?${SERVICES}\\b|\\bNEAR Intents and the network keep\\b|^(?:1Click|NEAR Intents)$`);
+ *  "Paid to NEAR Intents' solver directly."; a job's step: "NEAR Intents is swapping it for NEAR.", "NEAR Intents swapped it for NEAR.", builder 15), or the name alone (a label). Never marketing ("Swap with 1Click today."): it lifts only the service-name bans. */
+export const PROTOCOL_ROLE = new RegExp(`\\b${SERVICES}(?:'s? (?:fee|price|solver|bridge))? (?:prices|priced|swaps|swapped|is swapping|doesn't swap|moves|settles|charges|takes|signs|didn't sign|didn't pay|didn't move|sent a different)\\b|\\b(?:[Pp]aid|[Pp]ays|[Tt]hrough|[Gg]oes) (?:to |straight to |directly to )?${SERVICES}\\b|\\bNEAR Intents and the network keep\\b|^(?:1Click|NEAR Intents)$`);
 
 /** Strings that may keep a banned word, each with its reason (The house style, section 5: only where it is defined in plain words
  *  or is a name the person must see). Matched on the file and the text. */

@@ -15,7 +15,7 @@ export type JobStepKey = "safe" | "near" | "intents" | "land" | "checking";
 export interface StepWords { key: JobStepKey; doing: string; done: string; next?: string; chain?: string }
 
 const CHAIN_NAME: Record<string, string> = { sol: "Solana", hood: "Robinhood Chain", bsc: "BNB Chain" };
-const WALLET: Record<string, string> = { sol: "your SOL wallet", hood: "your ETH (RH) wallet", bsc: "your BNB wallet", near: "your NEAR wallet", safe: "your Safe" };
+const WALLET: Record<string, string> = { sol: "your SOL wallet", hood: "your Robinhood wallet", bsc: "your BNB wallet", near: "your NEAR wallet", safe: "your Safe" };
 
 export const JOB_STEP_WORDS = {
   /** The Safe's own signature (Face ID): done once NEAR's final block has its transaction. Until then nothing suggests
@@ -26,6 +26,15 @@ export const JOB_STEP_WORDS = {
   /** A page closed while the Safe signed: the chain and 1Click are asked whether it went. */
   checking: { key: "checking", doing: "Asking NEAR if your Safe sent it", done: "Your Safe signed", next: "Then NEAR confirms your Safe sent it." },
 } as const satisfies Record<string, StepWords>;
+
+/** A Safe Buy or Sell's three steps (rule 11; copy at grade 5), for the coin got (`got`): through NEAR Confidential only.
+ *  One source for the trade's receipt and Jobs row (trade native/swap.ts) and its Activity page (wallet swap-detail.ts,
+ *  builder 22's item 2). */
+export const safeTradeSteps = (got: string) => [
+  { doing: "NEAR Confidential is moving it from your Safe to Private.", done: "NEAR Confidential moved it to Private.", next: "First it goes into Private." },
+  { doing: `${PROTOCOL.intents} is swapping it for ${got}.`, done: `${PROTOCOL.intents} swapped it for ${got}.`, next: `Then ${PROTOCOL.intents} swaps it for ${got}.` },
+  { doing: "It's on its way back to your Safe.", done: "It's in your Safe.", next: "Then it comes back to your Safe." },
+] as const;
 
 /** A chain landing it in its wallet, one line per chain (the copy review's ruling, 5 Nov: never "Each chain"). */
 export const landStep = (c: string, where = WALLET[c] ?? "your wallet"): StepWords => {
@@ -94,7 +103,21 @@ export const MEASURED_SEC = { safeToChain: 210, safeToNear: 30 } as const;
  *  the same NEAR transfer as a fill of AgentZero's wallet; Private out to a chain wallet 23 s to Robinhood (hops 6–7),
  *  Solana not yet measured, so a minute until it is; the Safe on to a chain about 4 min (a UI test, 4 Nov). Every job's time
  *  left counts from these, and past one the row says by how much. */
-export const LEG_SEC = { safeToChain: 240, chainIn: 112, nearToSafe: 10, nearOut: 30, privateOut: 30, privateNear: 10, privateSwap: 60, read: 4, other: 60 } as const;
+export const LEG_SEC = { safeToChain: 240, chainIn: 112, nearToSafe: 10, nearOut: 30, privateOut: 30, privateNear: 10, privateSwap: 60, read: 4, other: 60, safeFill: MEASURED_SEC.safeToNear } as const;
+// safeFill (the audit's S8, 7 Nov: a Move that fills Private said "about 30 s", only its second leg): the Safe's fill into Private
+// before Private pays out, one Safe-signed NEAR move, timed as the measured Safe -> NEAR hop (MEASURED_SEC.safeToNear).
+
+/** A Move leg's time, the one estimator (the audit's S8, 7 Nov; the Move sheet's legTime, its job, and Trade's fee-first Sell all
+ *  count from it): the Safe's side on to a chain wallet is Private's payout (privateOut), plus the Safe's fill into Private
+ *  first when the Move needs one (`fill`); a chain wallet into NEAR or the Safe (chainIn); the NEAR wallet home (nearToSafe);
+ *  the NEAR wallet on to a chain wallet or in from the Safe's side (nearOut). Places: safe, private, near, or a chain's. */
+export function moveLegSec(from: string, to: string, o: { fill?: boolean } = {}): number {
+  const side = (p: string) => p === "safe" || p === "private", chain = (p: string) => !side(p) && p !== "near";
+  if (side(from) && chain(to)) return LEG_SEC.privateOut + (from === "safe" && o.fill ? LEG_SEC.safeFill : 0);
+  if (chain(from) && (to === "near" || side(to))) return LEG_SEC.chainIn;
+  if (from === "near" && side(to)) return LEG_SEC.nearToSafe;
+  return from === "near" || to === "near" ? LEG_SEC.nearOut : LEG_SEC.other;
+}
 // privateOut (QA's Sim re-check, 5 Nov: a Move said "About 1 min" and was done in 18-30 s): Private out to a chain wallet,
 // 23 s to Robinhood on mainnet (hops 6-7) and 18-30 s to Solana on the Sim; the slowest seen, 30 s, until a mainnet
 // Solana lap. privateNear (QA's Sim re-check: a Send to bob.near said "58 s left" and was Done a second later): Private
@@ -149,6 +172,17 @@ export function doneIn(ms: number): string {
 }
 const secs = (ms: number) => Math.max(1, Math.ceil(ms / 1000));
 const inWords = (s: number) => (s < 60 ? `${s} s` : `${Math.ceil(s / 60)} min`);
+/** How long a done job took, on its Jobs row ("5 s", "2 min"): the receipt's own count (doneIn's secs), so the row and the
+ *  receipt never give two answers for one job (QA 16, 8 Nov: "Done in 5 s" beside "Done in 6 seconds."); null under a
+ *  second (the row says "Done"). */
+/** M12-1 (8 Nov): how long a landed job took, on its receipt under "Done.": "Took 11 s." (the Jobs row's own figure,
+ *  rowTook), "Took under a second.", "Took 3 min.". Never "Done in" under a "Done." head (said once). */
+export function tookIn(ms: number): string {
+  return `Took ${rowTook(ms) ?? "under a second"}.`;
+}
+export function rowTook(ms: number): string | null {
+  return Number.isFinite(ms) && ms >= 1000 ? inWords(secs(ms)) : null;
+}
 /** The receipt's own spelling (the copy review's J5, 7 Nov: "About 30 seconds left."): seconds in words, minutes as "min". */
 const receiptWords = (s: number) => (s < 60 ? `${s} second${s === 1 ? "" : "s"}` : `${Math.ceil(s / 60)} min`);
 /** A going job's row: "12 s left", "3 min left"; none, "No time estimate". Past its estimate it never blames the
@@ -168,7 +202,7 @@ export function timeLeft(endsAt: number | undefined, now: number, startMs?: numb
 export function receiptLeft(endsAt: number | undefined, now: number, startMs?: number, landedAt?: number): string {
   const landed = typeof landedAt === "number" && Number.isFinite(landedAt) ? landedAt : undefined;
   const started = typeof startMs === "number" && Number.isFinite(startMs) ? startMs : undefined;
-  if (landed !== undefined && started !== undefined) return doneIn(landed - started);
+  if (landed !== undefined && started !== undefined) return tookIn(landed - started);
   if (!(typeof endsAt === "number" && Number.isFinite(endsAt))) return TIME_WORDS.receiptNone;
   const at = landed ?? now;
   return endsAt > at ? `About ${receiptWords(secs(endsAt - at))} left.` : timeLeft(endsAt, at, startMs);
@@ -189,6 +223,21 @@ export function landedOf(list: readonly { id: string; state: string; startedAt: 
   if (!mine.length || !mine.every((t) => t.state === "done" && typeof t.endedAt === "number")) return undefined;
   return Math.max(...mine.map((t) => t.endedAt!));
 }
+/** One clock for one job (QA 16's MUST, 8 Nov: the going Swap receipt said "About 1 min left." beside its Jobs row's "3 min
+ *  left"): when the job's own rows say it ends, the time the Jobs row counts down to (each row's endsAt, set from the
+ *  Approve for a Safe job, then the core's own row's); the latest of its rows still going. None: undefined (the receipt
+ *  keeps its tap-time estimate). Pure. */
+export function jobEndsAt(list: readonly { id: string; state: string; endsAt?: number }[], own: (id: string) => boolean): number | undefined {
+  const going = list.filter((t) => own(t.id) && t.state === "pending" && typeof t.endsAt === "number" && Number.isFinite(t.endsAt));
+  // the core's rows once they exist (the Jobs list shows them; the tap's starting row "job:" goes at the hand-off)
+  const real = going.filter((t) => !t.id.startsWith("job:"));
+  const ends = (real.length ? real : going).map((t) => t.endsAt!);
+  return ends.length ? Math.max(...ends) : undefined;
+}
+/** One tick for every clock of a job (QA 16, 8 Nov: the receipt said "About 57 seconds left." over its row's "56 s left",
+ *  two 1 s timers out of step): the wait to the next tick, landing just after a wall-clock second, so the receipt and the
+ *  Jobs row count the same end at the same moment and say the same figure. `every`: the clock's own pace (1 s, 15 s). */
+export const onSecond = (every: number, now: number): number => Math.max(5, every - (now % 1000) + 5);
 /** The receipt's job as its rows say (QA's MUST, 7 Nov: never the past tense before a chain read says landed):
  *  a row of it stopped or failed: "stopped" with that row's own words ("unsure" when they say the money may be in either
  *  place, private-route unsureIn); every row ended done: "landed"; else "going". The tap's starting row counts only when

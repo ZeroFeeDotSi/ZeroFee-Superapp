@@ -45,6 +45,6 @@ span.zf-shimmer.ac-img { box-shadow: none; }
 .tr-kept-go { min-height: 44px; }
 .tr-kept-more, .tr-kept-copy { min-height: 44px; min-width: 44px; justify-self: start; }
 .tr-kept-details { display: grid; gap: 4px; }
-.tr-kept-row { display: grid; grid-template-columns: auto 1fr 44px; align-items: center; gap: 8px; min-height: 44px; }
+/* S8: a row is its name and Copy, never the raw id */
+.tr-kept-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; min-height: 44px; }
 .tr-kept-row .l { font: 400 13px/1.3 var(--font); color: var(--mute); }
-.tr-kept-row .v { font: 400 15px/1.3 var(--font); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

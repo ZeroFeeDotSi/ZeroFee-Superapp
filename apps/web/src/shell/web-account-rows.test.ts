@@ -40,7 +40,8 @@ test("the rows: the phone's order and icons (Quantum-safe, Protection, Devices, 
   const icons = [...out.matchAll(/data-ic="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(icons, ["shield-check", "shield", "phone", "words"], "the phone's SecurityRows icons");
   const values = [...out.matchAll(/<div class="vd">([^<]+)<\/div>/g)].map((m) => m[1]);
-  assert.deepEqual(values, [ON_IPHONE, ON_IPHONE, ON_IPHONE, "Backup words"]);
+  // QA 16's S12: Recovery's right side says a state (the words behind the password), never the row's name
+  assert.deepEqual(values, [ON_IPHONE, ON_IPHONE, ON_IPHONE, "Locked"]);
   assert.equal(ON_IPHONE, "On iPhone");
   assert.ok(!values.includes("On"), "never a state claimed for this browser");
   assert.doesNotMatch(out, /<input|role="switch"|type="checkbox"/, "no toggles");

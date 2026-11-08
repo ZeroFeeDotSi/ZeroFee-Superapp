@@ -11,19 +11,21 @@
 .ah--bar .zf-notice { bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 8px); }
 /* a full-screen sheet is open: it says its own line */
 .ah:has(.zf-sheet:not([data-under])) .zf-notice, .ah:has(.ah-problem) .zf-notice { display: none; }
-/* what a page keeps clear at its bottom grows by the notice, so it never hides the end of a list */
-.ah--bar:has(> .zf-notice) .ah-page { --zf-safe-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 62px); }
-.ah:not(.ah--bar):has(> .zf-notice) .ah-page { --zf-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + 62px); }
+/* what a page keeps clear at its bottom grows by the notice, so it never hides the end of a list (QA 16, 8 Nov, after B3: the
+   card now wraps to up to three lines, ~96 px with its gap, so the room is that, not one line's 62 px) */
+.ah--bar:has(> .zf-notice) .ah-page { --zf-safe-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 104px); }
+.ah:not(.ah--bar):has(> .zf-notice) .ah-page { --zf-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + 104px); }
 .zf-notice__row { display: flex; align-items: center; gap: 4px; min-height: 46px; padding-left: 16px; }
 .zf-notice__line {
   flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 44px; display: flex; align-items: center;
+  /* audit 11's B3 (8 Nov): the line wraps, never cut mid-word ("NEAR is down. Payments wait. Your mone"): a flex box gets no
+     ellipsis, so the part that says where the money is never showed */
+  white-space: normal; overflow-wrap: normal; padding: 12px 0; min-height: 44px; display: flex; align-items: center;
 }
 button.zf-notice__line { cursor: pointer; }
 .zf-notice--alert .zf-notice__line::before { content: ""; flex: none; width: 7px; height: 7px; margin-right: 10px; border-radius: 50%; background: var(--alert); }
 .zf-notice__act { flex: none; min-height: 44px; padding: 0 10px; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
 .zf-notice__x { flex: none; width: 44px; height: 44px; border: 0; background: none; color: var(--mute); font: 400 20px/1 var(--font); cursor: pointer; }
-.zf-notice.is-open .zf-notice__line { white-space: normal; }
 .zf-notice__more { display: grid; gap: 6px; padding: 0 16px 12px; color: var(--ink-2); }
 .zf-notice__more p { margin: 0; }
 .zf-notice__links { display: flex; gap: 16px; }

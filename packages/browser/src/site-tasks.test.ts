@@ -1,9 +1,10 @@
 // D144: the Browser's tasks for the Activity centre, as pure mappers: a site wallet's Add and Take out with their real
 // legs, a site's sign-in, AgentZero's browser run. Never an address or a key; dollars only in the title.
+import { CLOSED_LINE } from "./agent/live.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createTaskStore } from "@zerofee/shell-api/tasks.ts";
-import { addLanded, addTask, backSteps, backTask, dollarsIn, runTask, signInTask } from "./site-tasks.ts";
+import { RUN_STALE_MS, addLanded, addTask, backSteps, backTask, doneDetail, dollarsIn, isRunTask, runTask, signInTask } from "./site-tasks.ts";
 
 test("an Add: the money sheet's own dollars in the title, its legs as steps, done when it lands (control: no figure, no dollars)", () => {
   const t = addTask("pump.fun", "$10.00 is on its way to pump.fun.", 1000);
@@ -37,13 +38,14 @@ test("AgentZero's run: one task, its steps as they happen, the person's turn wai
   assert.equal(runTask({ phase: "idle" }, [], 1, null), null);
   const start = runTask({ phase: "starting", host: "shop.example.com" }, [], 1, null)!;
   assert.equal(start.task.title, "AgentZero on shop.example.com");
-  assert.deepEqual(start.task.steps.map((s) => s.state), ["doing"]);
+  // audit 17's H6: the plan from the first frame (open, find, tell), each ticking on the run's events
+  assert.deepEqual(start.task.steps.map((s) => s.state), ["doing", "waiting", "waiting"]);
   const acting = runTask({ phase: "agent", host: "shop.example.com", steps: ["Opening a link", "Scrolling the page"] }, ["Opening a link", "Scrolling the page"], 1, "shop.example.com")!;
-  assert.deepEqual(acting.task.steps.map((s) => [s.label, s.state]), [["Opening shop.example.com", "done"], ["Opening a link", "done"], ["Scrolling the page", "doing"]]);
+  assert.deepEqual(acting.task.steps.map((s) => [s.label, s.state]), [["Open shop.example.com", "done"], ["Find what you asked: Scrolling the page", "doing"], ["Tell you what it found", "waiting"]]);
   const yours = runTask({ phase: "you", host: "shop.example.com", why: "sign-in" }, ["Opening a link"], 1, "shop.example.com")!;
-  assert.deepEqual(yours.task.steps.at(-1), { label: "Your turn: sign in", state: "waiting" });
+  assert.deepEqual(yours.task.steps[1], { label: "Your turn: sign in", state: "waiting" }, "the step it's on is the person's");
   assert.equal(runTask({ phase: "ended", line: "Stopped. Nothing was sent." }, [], 1, "a.example")!.end?.state, "stopped");
-  assert.equal(runTask({ phase: "ended", line: "AgentZero is done on a.example." }, [], 1, "a.example")!.end?.state, "done");
+  assert.equal(runTask({ phase: "ended", line: "AgentZero is done on a.example.", done: true }, [], 1, "a.example")!.end?.state, "done");
   assert.deepEqual(runTask({ phase: "ended", line: "The site didn't answer. Nothing was sent." }, [], 1, "a.example")!.end, { state: "failed", detail: "The site didn't answer. Nothing was sent." });
   // eight at most (the centre keeps twelve)
   const many = Array.from({ length: 20 }, (_, i) => `Step ${i}`);
@@ -69,4 +71,17 @@ test("phone test, 3 Nov: a background warm-up's sign-in never shows as a task; o
   assert.equal(showsSignIn("signing", false, true), false, "but never a new one off screen");
   assert.ok(SIGN_IN_TASK_MS <= 2 * 60_000);
   assert.equal(signInStuck("pump.fun"), "pump.fun didn't finish signing in. Nothing moved. Open pump.fun to try again.");
+});
+
+test("E3 + E5 (audit 14): a run's row counts down to the card's own time, ends by itself when ZeroFee closed, and keeps AgentZero's report", () => {
+  const going = runTask({ phase: "agent", host: "a.example", at: 1_000, endsAt: 61_000 }, [], 1_000, "a.example")!;
+  assert.equal(going.task.endsAt, 61_000, "one clock: the card's endsAt");
+  assert.equal(going.task.staleMs, RUN_STALE_MS);
+  assert.equal(going.task.staleDetail, CLOSED_LINE);
+  assert.equal(runTask({ phase: "you", host: "a.example", why: "sign-in", at: 1_000 }, [], 1_000, "a.example")!.task.endsAt, undefined, "the person's turn has no time left");
+  const done = runTask({ phase: "ended", line: "AgentZero is done on a.example.", done: true, summary: "The top story is about rain in Lisbon." }, [], 1, "a.example")!;
+  assert.deepEqual(done.end, { state: "done", detail: "AgentZero is done on a.example. The top story is about rain in Lisbon." });
+  const long = doneDetail("AgentZero is done on a.example.", "word ".repeat(80).trim());
+  assert.ok(long.length <= 300 && !/\u2026|\.\.\.$/.test(long) && /word$/.test(long), "cut at a word, no dots");
+  assert.ok(isRunTask("az-browser-12") && !isRunTask("signin-x-1"));
 });

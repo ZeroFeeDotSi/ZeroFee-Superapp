@@ -7,13 +7,16 @@ import { isNearName } from "../zero/jobs.ts";
 import { tokensOf } from "../zero/rulebox.ts";
 import { obfuscated, textHides } from "../guard/index.ts";
 import { HOME_LEG_MIN_USD, SAFE_LEG_MIN_USD } from "@zerofee/core/float-floors";
+import { APP_CHAINS, appChain, type AppChain } from "@zerofee/core/app-chains";
 
 /** Home's tab: the Safe or one wallet (shell-api money.ts HomeWallet). */
-export type HomePlace = "safe" | "sol" | "hood" | "near" | "bsc";
+// Audit 18's I8 (builder 22's item 14; product decision, 8 Nov: SOL, NEAR and Robinhood only): the wallets are core app-chains.ts's,
+// no BNB coin, place or chain anywhere AgentZero or Claude reads
+export type HomePlace = "safe" | AppChain;
 /** The coins a sheet is asked in. ETH is ETH (RH). */
-export type HomeCoin = "SOL" | "ETH" | "NEAR" | "USDC" | "BNB";
-export const HOME_COINS: readonly HomeCoin[] = ["SOL", "ETH", "NEAR", "USDC", "BNB"];
-export const HOME_PLACES: readonly HomePlace[] = ["safe", "sol", "hood", "near", "bsc"];
+export type HomeCoin = "SOL" | "ETH" | "NEAR" | "USDC";
+export const HOME_COINS: readonly HomeCoin[] = ["SOL", "ETH", "NEAR", "USDC"];
+export const HOME_PLACES: readonly HomePlace[] = ["safe", ...APP_CHAINS];
 
 /**
  * The ask, in the shape Home's product decision (3 Nov; shell-api money.ts gets these optional fields on home/prefill):
@@ -33,9 +36,19 @@ export type HomeAsk =
   /** Trade's own Buy or Sell page (useShell().openTrade, Trade's channel: shell-api trade-ask.ts), the coin named by its
    *  chain and address only (a symbol could be a copycat), found first with Trade's market search. */
   | { kind: "trade"; side: "buy" | "sell"; chain: TradeChain; address: string; symbol: string; name: string; usd?: number; pct?: number };
-export type TradeChain = "sol" | "hood" | "bsc" | "near";
+export type TradeChain = AppChain;
 /** A coin Trade's market search found (skills.ts FoundCoin). */
 export interface Found { chain: TradeChain; address: string; symbol: string; name: string; liquidityUsd: number; /** Trade's search: a same-ticker coin under a tenth of the real one's market (trade/search CoinRow) */ copycatOf?: { chain: TradeChain; address: string } }
+/** Trade's market search's coins on the app's chains only (core app-chains.ts): a coin elsewhere is never offered, and a
+ *  copy's "real one" elsewhere is not named (audit 18's I8). */
+export function appFound(all: readonly { chain: string; address: string; symbol: string; name: string; liquidityUsd: number; copycatOf?: { chain: string; address: string } }[] | null): Found[] | null {
+  if (!all) return null;
+  return all.flatMap((f) => {
+    if (!appChain(f.chain)) return [];
+    const { copycatOf, ...rest } = f;
+    return [{ ...rest, chain: f.chain, ...(copycatOf && appChain(copycatOf.chain) ? { copycatOf: { chain: copycatOf.chain, address: copycatOf.address } } : {}) }];
+  });
+}
 
 /** What the chat shows: the ask, ZeroFee's own one line (never Claude's), its dollars, and the payee shortened. */
 export interface HomeSheet {
@@ -65,16 +78,15 @@ export function chainOf(to: string): "sol" | "hood" | "near" | null {
  *  characters, a raw id); a NEAR name as it is. */
 export const short = (to: string): string => ((isNearName(to) && !NEAR_IMPLICIT.test(to)) || to.length <= 14 ? to : `${to.slice(0, 4)}…${to.slice(-4)}`);
 const usdText = (n: number): string => `$${n.toFixed(2)}`;
-const COIN_WORD: Record<HomeCoin, string> = { SOL: "SOL", ETH: "ETH (RH)", NEAR: "NEAR", USDC: "USDC", BNB: "BNB" };
-export const PLACE_WORD: Record<HomePlace, string> = { safe: "your Safe", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+const COIN_WORD: Record<HomeCoin, string> = { SOL: "SOL", ETH: "ETH", NEAR: "NEAR", USDC: "USDC" };
+export const PLACE_WORD: Record<HomePlace, string> = { safe: "your Safe", sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet" };
 /** The wallet a coin lives in (Home's tab a sheet opens on). USDC is the Safe's. */
-const COIN_PLACE: Record<HomeCoin, HomePlace> = { SOL: "sol", ETH: "hood", NEAR: "near", USDC: "safe", BNB: "bsc" };
+const COIN_PLACE: Record<HomeCoin, HomePlace> = { SOL: "sol", ETH: "hood", NEAR: "near", USDC: "safe" };
 /** The coins Home's Send pays in on each chain. */
 const SENDS: Record<"sol" | "hood" | "near", readonly HomeCoin[]> = { sol: ["SOL", "USDC"], hood: ["ETH"], near: ["NEAR", "USDC"] };
-const CHAIN_WORD = { sol: "Solana", hood: "ETH (RH)", near: "NEAR" } as const;
+const CHAIN_WORD = { sol: "Solana", hood: "Robinhood", near: "NEAR" } as const;
 
-export const BNB_CLOSED = "BNB isn't open in ZeroFee yet. Nothing moved.";
-export const WHO_ANY = "Who should get it? Paste their address (SOL, ETH (RH) or NEAR) or say their NEAR name (it ends in .near). Nothing moved.";
+export const WHO_ANY = "Who should get it? Paste their address (SOL, Robinhood or NEAR) or say their NEAR name (it ends in .near). Nothing moved.";
 export const HOW_MUCH = "How much, in dollars? Say it like $5. Nothing moved.";
 export const NOT_SAID = "Paste the address again, exactly as it is. AgentZero only uses an address you wrote yourself. Nothing moved.";
 
@@ -161,7 +173,7 @@ export function payee(to: unknown, words0: string): { to: string; chain: "sol" |
   const t = near ? raw.toLowerCase() : raw;
   const chain = chainOf(t);
   if (!chain) {
-    if (/^0x/i.test(raw)) return "That isn't a whole ETH (RH) address: it's 0x and 40 letters and numbers. Paste it again. Nothing moved.";
+    if (/^0x/i.test(raw)) return "That isn't a whole Robinhood address: it's 0x and 40 letters and numbers. Paste it again. Nothing moved.";
     if (raw.includes(".")) return `${raw} isn't a NEAR name. NEAR names end in .near. Nothing moved.`;
     return WHO_ANY;
   }
@@ -177,15 +189,13 @@ export function sendSheet(input: Record<string, unknown>, words: string): HomeSh
   const p = payee(input.to, words);
   if (typeof p === "string") return p;
   let coin = input.coin === undefined ? null : coinOf(input.coin);
-  if (input.coin !== undefined && !coin) return "Which coin? SOL, ETH (RH), NEAR or USDC. Nothing moved.";
-  if (coin === "BNB") return BNB_CLOSED;
+  if (input.coin !== undefined && !coin) return "Which coin? SOL, ETH, NEAR or USDC. Nothing moved.";
   if (coin && !SENDS[p.chain].includes(coin)) return `That's a ${CHAIN_WORD[p.chain]} address, so it can't get ${COIN_WORD[coin]}. Check the address or the coin. Nothing moved.`;
   if (!coin && p.chain !== "near") coin = SENDS[p.chain][0]!;
   const usd = dollars(input.usd, words);
   if (typeof usd === "string") return usd;
   const from = input.from === undefined ? null : placeOf(input.from);
   if (input.from !== undefined && !from) return "Send from which: your Safe or a wallet? Nothing moved.";
-  if (from === "bsc") return BNB_CLOSED;
   const n = note(input.note, words);
   const ask: HomeAsk = { kind: "send", to: p.to, chain: p.chain, usd: usd.toFixed(2), ...(coin ? { coin } : {}), ...(from ? { wallet: from } : {}), ...(n ? { note: n } : {}) };
   return { ask, usd, line: `Send ${usdText(usd)}${coin ? ` in ${COIN_WORD[coin]}` : ""} to ${short(p.to)}${from ? `, from ${PLACE_WORD[from]}` : ""}.` };
@@ -195,7 +205,6 @@ export function swapSheet(input: Record<string, unknown>, words: string): HomeSh
   const from = coinOf(input.from);
   const to = coinOf(input.to);
   if (!from || !to) return "Swap which coins? Like USDC to SOL. Nothing moved.";
-  if (from === "BNB" || to === "BNB") return BNB_CLOSED;
   if (from === to) return "Those are the same coin. Nothing moved.";
   const usd = dollars(input.usd, words);
   if (typeof usd === "string") return usd;
@@ -210,8 +219,7 @@ export const ALL_WORDS = /\b(?:everything|all of it|all my|all the|all|whole|ent
 export function moveSheet(input: Record<string, unknown>, words: string): HomeSheet | string {
   const from = placeOf(input.from);
   const to = placeOf(input.to);
-  if (!from || !to) return "Move from where to where? Your Safe, your SOL wallet, your ETH (RH) wallet or your NEAR wallet. Nothing moved.";
-  if (from === "bsc" || to === "bsc") return BNB_CLOSED;
+  if (!from || !to) return "Move from where to where? Your Safe, your SOL wallet, your Robinhood wallet or your NEAR wallet. Nothing moved.";
   if (from === to) return "That's the same place. Nothing moved.";
   const all = input.all === true || (input.usd === undefined && ALL_WORDS.test(words));
   if (all) {
@@ -228,11 +236,9 @@ export function moveSheet(input: Record<string, unknown>, words: string): HomeSh
 export function addSheet(input: Record<string, unknown>): HomeSheet | string {
   // "Add money to my Safe": the Safe's own Add, no coin to pick (suite, 3 Nov: it asked "which coin?")
   const to = placeOf(input.to);
-  if (to === "bsc") return BNB_CLOSED;
   if (to && input.coin === undefined) return { ask: { kind: "receive", wallet: to }, usd: null, line: `A one-time private address to add money to ${PLACE_WORD[to]}.` };
   const coin = coinOf(input.coin);
-  if (!coin) return "Add which coin? SOL, ETH (RH), NEAR or USDC. Nothing moved.";
-  if (coin === "BNB") return BNB_CLOSED;
+  if (!coin) return "Add which coin? SOL, ETH, NEAR or USDC. Nothing moved.";
   return { ask: { kind: "receive", coin, wallet: COIN_PLACE[coin] }, usd: null, line: `A one-time private address to add ${COIN_WORD[coin]} to ${PLACE_WORD[COIN_PLACE[coin]]}.` };
 }
 
@@ -241,8 +247,7 @@ export function requestSheet(input: Record<string, unknown>, words: string): Hom
   if (typeof usd === "string") return usd;
   if (usd < REQUEST_LEAST_USD) return leastLine("request", REQUEST_LEAST_USD);
   const coin = input.coin === undefined ? null : coinOf(input.coin);
-  if (input.coin !== undefined && !coin) return "Ask in which coin? USDC, SOL, ETH (RH) or NEAR. Nothing moved.";
-  if (coin === "BNB") return BNB_CLOSED;
+  if (input.coin !== undefined && !coin) return "Ask in which coin? USDC, SOL, ETH or NEAR. Nothing moved.";
   // who it's for is only said in the line (a request is a link the person shares); it must be in their words too
   const who = input.from === undefined ? null : payee(input.from, words);
   if (typeof who === "string") return who;
@@ -253,8 +258,8 @@ export function requestSheet(input: Record<string, unknown>, words: string): Hom
 /** What the person asked Trade for, read in our own code: buy (dollars) or sell (a share), and the coin as they named it
  *  (a ticker to look up, or an address they pasted). */
 export type TradeWant = { side: "buy" | "sell"; usd?: number; pct?: number; symbol: string; chain?: TradeChain; address?: string };
-const TRADE_CHAINS: readonly TradeChain[] = ["sol", "hood", "bsc", "near"];
-export const TRADE_CHAIN_WORD: Record<TradeChain, string> = { sol: "Solana", hood: "RH", bsc: "BNB", near: "NEAR" };
+const TRADE_CHAINS: readonly TradeChain[] = APP_CHAINS;
+export const TRADE_CHAIN_WORD: Record<TradeChain, string> = { sol: "Solana", hood: "RH", near: "NEAR" };
 /** Trade's own limit on a filled-in buy (shell-api trade-ask.ts ASK_MAX_USD). */
 export const TRADE_MAX_USD = 10_000;
 export function tradeWant(input: Record<string, unknown>, words: string): TradeWant | string {
@@ -265,7 +270,7 @@ export function tradeWant(input: Record<string, unknown>, words: string): TradeW
   let want: TradeWant;
   if (SOL_ADDRESS.test(coin) || EVM_ADDRESS.test(coin)) {
     if (!tokensOf(words).includes(coin)) return NOT_SAID;
-    const on: TradeChain = EVM_ADDRESS.test(coin) ? (chain === "bsc" ? "bsc" : "hood") : "sol";
+    const on: TradeChain = EVM_ADDRESS.test(coin) ? "hood" : "sol";
     want = { side, symbol: "", chain: on, address: coin };
   } else {
     const sym = coin.toUpperCase();
@@ -274,7 +279,6 @@ export function tradeWant(input: Record<string, unknown>, words: string): TradeW
     if (!tokensOf(words.toUpperCase()).some((t) => t.replace(/^\$/, "") === sym)) return "Which coin? Say its name. Nothing moved.";
     want = { side, symbol: sym, ...(chain ? { chain } : {}) };
   }
-  if (want.chain === "bsc") return BNB_CLOSED;
   if (side === "buy") {
     if (input.pct !== undefined) return "A buy is in dollars. How much? Nothing moved.";
     if (input.usd !== undefined) {
@@ -306,7 +310,7 @@ export function tradeSheet(w: TradeWant, found: readonly Found[] | null): HomeSh
   else {
     if (!found) return `Trade's market couldn't be searched right now. Paste ${w.symbol}'s address instead. Nothing moved.`;
     // Trade's own order (its search ranks the real coin first, trade/search); the chain the person named, if any
-    const all = found.filter((f) => f.chain !== "bsc");
+    const all = found;
     const open = w.chain ? all.filter((f) => f.chain === w.chain) : all;
     if (!open.length) return `Trade's market has no coin called ${w.symbol}${w.chain ? ` on ${TRADE_CHAIN_WORD[w.chain]}` : ""}. Paste its address. Nothing moved.`;
     const a = open[0]!;

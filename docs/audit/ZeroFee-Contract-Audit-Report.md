@@ -962,7 +962,7 @@ Run with `cargo test` in `contracts/account-policy` (add `--features modules` fo
 | reaudit3 | `tests/reaudit3.rs` | Reviewer B's leads | 3 / 3 |
 | audit_a | `tests/audit_a.rs` | Round 4 | 30 / 30 |
 | audit_a2 | `tests/audit_a2.rs` | Round 5 | 13 / 13 |
-| audit_fable | `tests/audit_fable.rs` | Round 6b | 17 / 17, 1 ignored (FB-3, deferred) |
+| audit_contract_review | `tests/audit_contract_review.rs` | Round 6b | 17 / 17, 1 ignored (FB-3, deferred) |
 | upgrade | `tests/upgrade.rs` | Contract authors | 2 / 2 |
 | **Total** | | | **138 passed, 1 ignored** |
 

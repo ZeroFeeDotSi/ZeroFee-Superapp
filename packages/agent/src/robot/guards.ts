@@ -1,6 +1,7 @@
 // What the robot may do, decided by our code (Security's section D), never by the model or the page. The page is a
 // stranger's: its words can say anything, so nothing here takes an instruction from it. The host checks every action
 // again natively; these checks mean a bad step never even reaches it.
+import { redactPage } from "./redact.ts";
 import type { HostAction, PageElement, Recipe, RobotAction, Slot, Snapshot } from "./types.ts";
 
 /** Exactly one of the recipe's hosts (D.A1: no wildcards). */
@@ -61,7 +62,8 @@ export function isDone(page: Snapshot, recipe: Recipe): boolean {
 
 /** IBANs, card-like digit runs and emails, wherever the page shows them: the person's own data, none of it needed by the model. */
 const HIDE = [/\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b/g, /\b(?:\d[ -]?){12,19}\b/g, /[\w.+-]+@[\w-]+(\.[\w-]+)+/g];
-const hidden = (s: string) => HIDE.reduce((t, re) => t.replace(re, "[hidden]"), s);
+/** E6: these as before, then every other kind redactPage knows (wallets, keys, tokens, phones, addresses). */
+const hidden = (s: string) => redactPage(HIDE.reduce((t, re) => t.replace(re, "[hidden]"), s));
 
 /** What the model is shown of a page: short strings, at most 8 KB (D.D2), never a value, and the person's data hidden. */
 export function forModel(page: Snapshot, limit = 8192): Snapshot {

@@ -72,7 +72,7 @@ test("a drag gives clear legs, never a spray of cents: the rebalance's changes u
 });
 
 test("review M1: a leg between two wallets starts at the core's least ($2.65), said under its slider and by the button (control: the Safe to a wallet at $2.64 goes)", () => {
-  assert.equal(moveBlock([{ from: "sol", to: "hood", usd: 2.64 }], 100), "SOL → ETH (RH) needs at least $2.65.");
+  assert.equal(moveBlock([{ from: "sol", to: "hood", usd: 2.64 }], 100), "SOL → Robinhood needs at least $2.65.");
   assert.equal(moveBlock([{ from: "sol", to: "hood", usd: 2.65 }], 100), null);
   assert.equal(moveBlock([{ from: "safe", to: "hood", usd: 2.64 }], 100), null, "control");
   assert.equal(moveBlock([{ from: "sol", to: "near", usd: 2 }], 100), null, "to the NEAR wallet is one leg: $2");
@@ -109,7 +109,7 @@ test("review L8: the NEAR wallet keeps a move out's 3 % fee room, so a leg from 
   assert.notEqual(near.lo, 0, "control");
 });
 
-test("review L9: until the $1 proof, a chain's slider trades only with the Safe and the NEAR wallet, so no leg goes between two chains' wallets (control: the proof build pairs SOL with ETH (RH))", () => {
+test("review L9: until the $1 proof, a chain's slider trades only with the Safe and the NEAR wallet, so no leg goes between two chains' wallets (control: the proof build pairs SOL with Robinhood)", () => {
   const off = drag(NOW, today(NOW), "hood", 300, false);
   const legs = legsOf(NOW, off, false);
   assert.ok(legs.length > 0 && legs.every((l) => l.from === "safe" || l.from === "near"), JSON.stringify(legs));
@@ -160,7 +160,7 @@ test("UI's AgentZero walk (5): Move refuses before the Approve any leg under the
   assert.equal(moveBlock([{ from: "sol", to: "safe", usd: 2.5 }], 100), "SOL → Safe needs at least $2.59.");
   assert.equal(moveBlock([{ from: "sol", to: "safe", usd: 2.59 }], 100), null, "control: at the least");
   assert.equal(moveBlock([{ from: "safe", to: "near", usd: 2 }], 100), null, "the NEAR wallet: $2 is enough, nothing moves on");
-  assert.equal(moveBlock([{ from: "sol", to: "hood", usd: 2.6 }], 100), "SOL → ETH (RH) needs at least $2.65.");
+  assert.equal(moveBlock([{ from: "sol", to: "hood", usd: 2.6 }], 100), "SOL → Robinhood needs at least $2.65.");
   assert.equal(moveBlock([{ from: "near", to: "sol", usd: 1.5 }], 100), "NEAR → SOL needs at least $2.");
   assert.equal(leastWords({ from: "safe", to: "hood", usd: 2 }), "At least $2.09 from your Safe to a wallet.");
 });
@@ -250,12 +250,12 @@ test("phone test (3 Nov): all to SOL from a $11.45 Safe ($9.30 USDC) and a $1.38
   assert.equal(moveBlock(fixed, totalOf(now)), null, "Move works for the Safe's leg");
   assert.equal(MOVE_WORDS.leave("Safe"), "Leave your Safe as it is");
 });
-const PLACE_NAME_OF = (p: string) => ({ safe: "Safe", sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" } as Record<string, string>)[p]!;
+const PLACE_NAME_OF = (p: string) => ({ safe: "Safe", sol: "SOL", hood: "Robinhood", near: "NEAR", bsc: "BNB" } as Record<string, string>)[p]!;
 
 test("REVAMP P0 (product decision, 3 Nov: floating paragraphs): costRows says costLine's figures as grouped rows, the time last; the rounding line as its note (control: no legs, no rows)", () => {
   const legs = [{ from: "sol" as const, to: "safe" as const, usd: 26.1 }];
   const r = costRows(legs)!;
-  assert.deepEqual(r.rows.map((x) => x.label), ["Leaves your SOL wallet", "Arrives in your Safe", "Fees", "Takes"]);
+  assert.deepEqual(r.rows.map((x) => x.label), ["Leaves your SOL wallet", "To your Safe", "Fees", "Takes"]);
   assert.deepEqual(r.rows.slice(0, 3).map((x) => x.value), ["$26.10", "at least $24.10", "at most $2.00"], "the same figures costLine says");
   assert.equal(costLine(legs), "$26.10 leaves your SOL wallet. At least $24.10 reaches your Safe. Fees at most $2.00.");
   assert.equal(r.rows[3]!.value, aboutLegs(legs)!.replace(/^About /, "about ").replace(/\.$/, ""));

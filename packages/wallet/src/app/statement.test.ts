@@ -155,3 +155,14 @@ test("crawl F6: a site wallet's Take out names the site as where it came from, o
   assert.doesNotMatch(describe(out, TOKENS, CHAINS).title, /Put away/);
   assert.equal(describe(plain, TOKENS, CHAINS).title, "Put away $9.60", "control");
 });
+
+test("the audit's Trade S9 (8 Nov): a month older than the first read pages it (four times as many each time) before any note", async () => {
+  const { nextRead, READ_MAX } = await import("./statement.ts");
+  assert.equal(nextRead(true, 1000), 4000);
+  assert.equal(nextRead(true, 4000), 16000);
+  assert.equal(nextRead(true, READ_MAX), null, "at the most: the note says so");
+  assert.equal(nextRead(false, 1000), null, "control: a whole month reads once");
+  const sheet = (await import("node:fs")).readFileSync(new URL("./screens/StatementSheet.tsx", import.meta.url), "utf8");
+  assert.match(sheet, /bridge\.call<Movement\[\]>\("ledger\.activity", \{ limit \}\)/, "the read asks the page's own size");
+  assert.match(sheet, /\{short && nextRead\(short, limit\) === null && <p/, "the note only once the reads are at their most");
+});

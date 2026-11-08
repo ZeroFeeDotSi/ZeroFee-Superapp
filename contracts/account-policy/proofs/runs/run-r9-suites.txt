@@ -1,3 +1,4 @@
+Names and labels rewritten for the public export; the results are unchanged.
 Release 9: the contract's whole suite. cargo test --no-fail-fast, default features (short-waits), the five fuzz_ loops
 included; 1 Nov 2026, 10:34-10:44 by the machine clock, in the worktree, on lib.rs
 e83ec614796ce334b1f8ce6515c9aaf80b8d70531d7a642d651762f2fc8eec5e and tests.rs
@@ -11,7 +12,7 @@ src/lib.rs (unit)  test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 
 tests/audit        test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 103.43s
 tests/audit_a      test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 166.45s
 tests/audit_a2     test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.18s
-tests/audit_fable  test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.70s
+tests/audit_contract_review  test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.70s
 tests/r7_completion test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
 tests/r8           test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
 tests/r8_mutants   test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s

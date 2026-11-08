@@ -495,6 +495,9 @@ export class DevSigner implements Signer {
         const units = (u: string | undefined) => (typeof u === "string" && /^\d{1,40}$/.test(u) ? u : undefined);
         const grp = groups[shown.indexOf(g)]!;
         intents.moveFill = leg ? { privateTokenId: leg.tokenId, ...(units(leg.units) ? { privateUnits: leg.units } : {}), ...(units(leg.payUnits) ? { payUnits: leg.payUnits } : {}), ...(typeof leg.recipient === "string" ? { payee: leg.recipient, payeeOwn: leg.own === true } : {}), ...(typeof leg.toTokenId === "string" ? { payTokenId: leg.toTokenId } : {}), ...(grp.movePlan ? { plan: grp.movePlan } : {}), ...(grp.moveSwap ? { swap: true as const } : {}), ...(Array.isArray(leg.others) && leg.others.length ? { others: leg.others } : {}), ...(Array.isArray(leg.move) && leg.move.length ? { parts: leg.move, sheet: (await import("./move-plan.ts")).moveFillBlock } : {}) } : {};
+        // a Safe Swap (builder 15, 8 Nov: wallet safe-send.ts swapFromSafe): its payment lands back in the Safe itself, the one
+        // own payee the core's wallet list doesn't hold (ownPayee: "their Safe's own account"), so the sheet names it so
+        if (leg && grp.moveSwap && leg.own === true && typeof leg.recipient === "string" && !own.has(leg.recipient)) intents.ownWallets = new Map([...own, [leg.recipient, "your Safe"]]);
         // a Swap's coin out, read as every sheet coin is (ft_metadata at the sheet's block), so its title names it
         if (leg && grp.moveSwap && typeof leg.toTokenId === "string") await (await import("./send-fill.ts")).sendPayoutCoin(intents, { destinationAsset: leg.toTokenId } as SendPayout, this.chain, block);
       }

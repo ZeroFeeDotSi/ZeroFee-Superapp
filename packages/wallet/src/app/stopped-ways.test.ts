@@ -14,9 +14,9 @@ test("a stopped site Add: Try again to that site's own wallet, or Move back to y
   assert.deepEqual(stoppedWays(row(), WALLETS), [{ label: "Try again", kind: "on", network: "sol", usd: 10, wallet: "sw-site-pump-sol" }, HOME]);
 });
 
-test("a Move whose leg to ETH (RH) stopped: Try again that leg from the NEAR wallet, or Move back to your Safe", () => {
+test("a Move whose leg to Robinhood stopped: Try again that leg from the NEAR wallet, or Move back to your Safe", () => {
   const leg: SpendingActivity = { id: "l1", kind: "ready", usd: "2.12", status: "failed", shown: true, atIso: "2026-11-04T13:51:00Z", words: "Moving $2.12 to Robinhood Chain", network: "hood", of: "m1", parkedUsd: 2.12 };
-  const move = row({ site: undefined, usd: "2.20", parkedUsd: 2.12, words: "$2.20 is in your NEAR wallet. It didn't go on to your ETH (RH) wallet", goesTo: ["hood"], legs: [leg] });
+  const move = row({ site: undefined, usd: "2.20", parkedUsd: 2.12, words: "$2.20 is in your NEAR wallet. It didn't go on to your Robinhood wallet", goesTo: ["hood"], legs: [leg] });
   assert.deepEqual(stoppedWays(move, WALLETS), [{ label: "Try again", kind: "on", network: "hood", usd: 2.12 }, HOME]);
 });
 

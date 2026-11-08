@@ -2,7 +2,7 @@
 // ./keypad.ts, so it is a decimal string from first tap to the bridge. Rebrand (DESIGN-REBRAND §2.2): each glyph sits in
 // its own span (it gives under the finger while a soft disc fades in behind it), a key the amount can't take tells the
 // caller (onRefuse: it shakes the figure and buzzes), and holding Delete clears the amount.
-import { useRef } from "react";
+import { useRef, type CSSProperties } from "react";
 import { isRefused, press, type Key } from "./keypad.ts";
 import "./keypad.css";
 
@@ -10,7 +10,9 @@ const KEYS: Key[] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del
 /** How long Delete is held before it clears the whole amount. */
 export const CLEAR_HOLD_MS = 450;
 
-export function Keypad({ value, decimals, onChange, onRefuse }: { value: string; decimals: number; onChange: (v: string) => void; onRefuse?: (() => void) | undefined }) {
+/** `box`: attributes for the keypad's own box, e.g. wallet restsProps (inert and dimmed while its sheet can't go, audit 16's
+ *  G1), where a wrapper would break the sheet's own layout (Swap's `> .zf-keypad` rows). */
+export function Keypad({ value, decimals, onChange, onRefuse, box }: { value: string; decimals: number; onChange: (v: string) => void; onRefuse?: (() => void) | undefined; box?: { inert?: true; "aria-disabled"?: true; "data-rests"?: "1"; style?: CSSProperties } }) {
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; cleared: boolean } | null>(null);
   const endHold = () => { if (hold.current) clearTimeout(hold.current.timer); };
   const tap = (k: Key) => {
@@ -20,7 +22,7 @@ export function Keypad({ value, decimals, onChange, onRefuse }: { value: string;
     onChange(next);
   };
   return (
-    <div className="zf-keypad" role="group" aria-label="Amount">
+    <div className="zf-keypad" role="group" aria-label="Amount" {...box}>
       {KEYS.map((k) => (
         <button
           key={k}

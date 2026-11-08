@@ -8,7 +8,7 @@ const SIGNED = "Another job is using this money, so nothing moved. Try again onc
 
 const TABLE: [readonly string[], string][] = [
   [["row:sol"], HOT("SOL")],
-  [["row:hood"], HOT("ETH (RH)")],
+  [["row:hood"], HOT("Robinhood")],
   [["row:bsc"], HOT("BNB")],
   [["row:near"], HOT("NEAR")],
   [["agent", "row:near"], HOT("NEAR")], // AgentZero's Add money comes out of the NEAR wallet
@@ -40,6 +40,6 @@ test("runJob says the wallet of the money it was asked for, before its call", as
   const end = await runJob({ tasks: undefined, title: "Send", safe: false, money: ["row:hood"], call: async () => { called = true; return { ok: 1 }; }, declined: () => false, made: () => undefined });
   release();
   assert.ok("refused" in end);
-  assert.equal(end.refused.whatHappened, HOT("ETH (RH)"));
+  assert.equal(end.refused.whatHappened, HOT("Robinhood"));
   assert.equal(called, false);
 });

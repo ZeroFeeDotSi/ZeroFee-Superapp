@@ -13,7 +13,7 @@ import { keepCardKey } from "./add-coins.ts";
 const mem = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) }; };
 const SOL_WALLET = "7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV";
 const EVM_WALLET = "0xAb5e688E42cE07Fc83e0AD8ca0486b96a5D53e39";
-const wallets = new Map([[SOL_WALLET.toLowerCase(), "SOL wallet"], [EVM_WALLET.toLowerCase(), "ETH (RH) wallet"]]);
+const wallets = new Map([[SOL_WALLET.toLowerCase(), "SOL wallet"], [EVM_WALLET.toLowerCase(), "Robinhood wallet"]]);
 const bridge = { call: async (m: string, p: { accountId?: string }) => (m === "ledger.recipientInfo" ? { ok: { exists: true, hasLedgerBalance: false, accountId: p.accountId } } : { problem: { code: "x" } }) } as unknown as Bridge;
 
 test("the person's own wallet, Safe, and Add addresses (the Sim's made-up ones too) are said to be theirs", () => {
@@ -25,9 +25,9 @@ test("the person's own wallet, Safe, and Add addresses (the Sim's made-up ones t
   const own = { wallets, addEnds: keptAddEnds(store), self: "zf-0123456789.near" };
   assert.equal(ownLine(safeAdd, own), OWN_ADD("Safe"));
   assert.equal(ownLine(` ${solAdd} `, own), OWN_ADD("SOL wallet"));
-  assert.equal(ownLine(rhAdd, own), OWN_ADD("ETH (RH) wallet"));
+  assert.equal(ownLine(rhAdd, own), OWN_ADD("Robinhood wallet"));
   assert.equal(ownLine(SOL_WALLET, own), OWN_WALLET("SOL wallet"));
-  assert.equal(ownLine(EVM_WALLET.toLowerCase(), own), OWN_WALLET("ETH (RH) wallet"), "an EVM address in any case");
+  assert.equal(ownLine(EVM_WALLET.toLowerCase(), own), OWN_WALLET("Robinhood wallet"), "an EVM address in any case");
   assert.equal(ownLine("ZF-0123456789.NEAR", own), OWN_SAFE);
   assert.equal(OWN_WALLET("SOL wallet"), "That's your own SOL wallet. Use Move.");
   assert.equal(OWN_ADD("Safe"), "That's where you add money to your Safe. Use Move.");

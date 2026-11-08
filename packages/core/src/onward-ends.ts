@@ -12,7 +12,7 @@ import { REST_STAYS_LINE, REST_STAYS_OLD } from "./inflow-grid.ts";
 import { SITE_WALLETS } from "./site-wallets.ts";
 
 /** The person's own chain wallets, as Home names them (D124). */
-export const OWN_ENDS = ["SOL", "ETH (RH)", "BNB"] as const;
+export const OWN_ENDS = ["SOL", "Robinhood", "BNB"] as const;
 const TO_NEAR_WALLET = " to your NEAR wallet";
 export const ROUTE_LINE = "It goes through your NEAR wallet first.";
 /** The listed sites' own wallets (site-wallets.ts), each filled on Solana (finding 45: a $3 pump.fun Add's sheet said
@@ -42,7 +42,7 @@ export function onwardEnds(onward: string | undefined): { ends: string[]; rest: 
  */
 export function swapAsk(onward: string | undefined): { usd: number; pay: string; get: string; rest: number } | null {
   if (typeof onward !== "string") return null;
-  const m = /^(?:[A-Z][a-z]{1,15} says: )?it is a swap of \$(\d{1,6}\.\d{2}) of (USDC|USDT|NEAR) for (SOL|ETH \(RH\)|BNB) in your (SOL|ETH \(RH\)|BNB) wallet\.(?: \$(\d{1,6}\.\d{2}) stays hidden in your NEAR wallet\.)?$/.exec(onward.trim());
+  const m = /^(?:[A-Z][a-z]{1,15} says: )?it is a swap of \$(\d{1,6}\.\d{2}) of (USDC|USDT|NEAR) for (SOL|Robinhood|ETH \(RH\)|BNB) in your (SOL|Robinhood|ETH \(RH\)|BNB) wallet\.(?: \$(\d{1,6}\.\d{2}) stays hidden in your NEAR wallet\.)?$/.exec(onward.trim());
   if (!m || m[3] !== m[4]) return null;
   return { usd: Number(m[1]), pay: m[2]!, get: m[3]!, rest: m[5] ? Number(m[5]) : 0 };
 }

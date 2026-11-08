@@ -233,9 +233,14 @@ test("no \"as of\" line for a copy under 2 minutes old even when its read failed
   const recent = JSON.stringify({ ...fresh, balances: { ...fresh.balances!, at: Date.now() - 30_000 } });
   const shown = await open({ store: { [keep.HOME_CACHE_KEY]: recent }, balancesDown: true });
   assert.match(shown, /\nSafe\n\$5,254\.15\n/);
-  assert.doesNotMatch(shown, /as of/, "under 2 minutes: no as-of line");
+  assert.doesNotMatch(shown, /Your Safe is as of/, "under 2 minutes: no as-of read line");
+  // M12-3 (8 Nov): the figure's time is said once, under the figure ("As of 12:50 AM"), whatever its age; the read line never repeats it
+  assert.match(shown, /\nYour Safe\n\$5,254\.15\nAs of \d{1,2}:\d\d\s?[AP]M\n/);
   const oldCopy = JSON.stringify({ ...fresh, balances: { ...fresh.balances!, at: Date.now() - 10 * 60_000 } });
-  assert.match(await open({ store: { [keep.HOME_CACHE_KEY]: oldCopy }, balancesDown: true }), /NEAR didn't answer\. Your Safe is as of/, "control: ten minutes old says as of");
+  const old = await open({ store: { [keep.HOME_CACHE_KEY]: oldCopy }, balancesDown: true });
+  assert.match(old, /NEAR didn't answer\. Your money is still in your Safe\./, "control: ten minutes old names NEAR");
+  assert.match(old, /\nAs of \d{1,2}:\d\d\s?[AP]M\n/, "and its time, once, under the figure");
+  assert.doesNotMatch(old, /Your Safe is as of/);
 });
 
 // ---- product decision, 3 Nov ----

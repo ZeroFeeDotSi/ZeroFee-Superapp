@@ -150,8 +150,10 @@ test("the copy review's trims: the one-slider sheet's bar reads Check this; the 
   const html = renderToStaticMarkup(createElement(P.MoveAllSheet, { usd: "$20.00", stays: "$13.86", slide: { value: 20, max: 33.86, onChange: () => {} }, onApprove: () => {}, onClose: () => {} }));
   assert.match(html, /<div class="zf-label zf-sheet__title">Check this<\/div>/, "fails before: Move");
   const t0 = 1_000_000;
-  assert.equal(P.madeLine(t0, t0), "Job created. About 10 seconds left. It goes through NEAR Confidential. Watch it in Activity.");
-  assert.equal(P.madeLine(t0, t0 + 4_000), "Job created. About 6 seconds left. It goes through NEAR Confidential. Watch it in Activity.");
+  // the audit's Move S4 (8 Nov): two short lines, never four ideas on one
+  assert.equal(P.madeLine(t0, t0), "Job created. About 10 seconds left.\nIt goes through NEAR Confidential. Watch it in Activity.");
+  assert.equal(P.madeLine(t0, t0 + 4_000), "Job created. About 6 seconds left.\nIt goes through NEAR Confidential. Watch it in Activity.");
+  assert.match(renderToStaticMarkup(createElement(P.HomeRow, { step: "sent", has: false, onOpen: () => {}, line: P.madeLine(t0, t0) })), /Job created\. About 10 seconds left\.<br\/>It goes through NEAR Confidential\./);
   assert.equal(P.PRIVATE_MOVE_WORDS.landed, "Landed in your Safe.");
   assert.equal(P.landedShown(t0, t0), true);
   assert.equal(P.landedShown(t0, t0 + 59_999), true);

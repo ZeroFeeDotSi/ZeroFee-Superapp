@@ -15,6 +15,8 @@ import { usePanel, useLive } from "../runtime.tsx";
 const BUY = ["10", "25", "50", "100"], SELL = ["25", "50", "75", "100"];
 const REFRESH_MS = 8_000;
 
+/** Audit 15 FE4: the coin didn't load, so its name isn't known; never a cut address. */
+export const COIN_LATE = "Solana didn't answer, so this coin didn't load. Your money is in your trading wallet.";
 export function TradeView({ mint, limitUsd, onDone, onProblem }: { mint: string; limitUsd: number; onDone: (r: TradeRecord) => void; onProblem: (p: Problem, retry?: (passcode: string) => void) => void }) {
   const { svc, market, bridge } = usePanel();
   const [side, setSide] = useState<Side>("buy");
@@ -69,7 +71,7 @@ export function TradeView({ mint, limitUsd, onDone, onProblem }: { mint: string;
   const share = Math.min(1, Number(value) / 100);
   const label = side === "buy" ? `Buy $${value} of ${symbol}` : share >= 1 ? `Sell all of my ${symbol}` : share === 0.5 ? `Sell half of my ${symbol}` : `Sell ${value}% of my ${symbol}`;
 
-  if (coin.error && !d) return <div className="tr-inline"><p className="zf-small">Solana didn't answer for {mint.slice(0, 4)}…{mint.slice(-4)}.</p><button className="zf-link" onClick={coin.reload}>Try again</button></div>;
+  if (coin.error && !d) return <div className="tr-inline"><p className="zf-small">{COIN_LATE}</p><button className="zf-link" onClick={coin.reload}>Try again</button></div>;
   if (!d) return <div className="tr-center tr-tall"><Mark size={48} mode="loading" /></div>;
   return (
     <div className="p-trade zf-enter">
@@ -111,7 +113,7 @@ export function TradeView({ mint, limitUsd, onDone, onProblem }: { mint: string;
       {!(side === "sell" && !holds) && !quote.problem && (
         <div className="tr-sheet-floor p-floor">
           <button className="zf-btn" disabled={!q || !quote.checked || busy} onClick={() => quote.p && void tap(quote.p)}>
-            {busy ? "Sending…" : !q || quote.checked ? label : side === "buy" ? "Checking it can be sold back…" : "Checking the sale…"}
+            {busy || !q || quote.checked ? label : side === "buy" ? "Checking it can be sold back" : "Checking the sale"}
           </button>
           <p className="zf-small">One tap up to ${limitUsd} a trade</p>
         </div>

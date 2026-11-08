@@ -127,7 +127,7 @@ test("the audit's SHOULD (8 Nov): a wallet-to-wallet part has no signed quote ye
   const cents = (usd: number) => BigInt(Math.floor(usd * 100 + 1e-6));
   // the walk's Move: $46.00 from the Safe to the SOL wallet (quote $45.53, at least $45.07), $3.64 from the ETH (RH) wallet to
   // it, and $5.00 from the ETH (RH) wallet to the NEAR wallet
-  const s = moveSheet([{ wallet: "your SOL wallet", priv: 0n, pay: 4600n, got: 4553n, least: 4507n }], 5000n, $c, { others: [{ from: "your ETH (RH) wallet", to: "your SOL wallet", v: 364n }, { from: "your ETH (RH) wallet", to: "your NEAR wallet", v: 500n }] });
+  const s = moveSheet([{ wallet: "your SOL wallet", priv: 0n, pay: 4600n, got: 4553n, least: 4507n }], 5000n, $c, { others: [{ from: "your Robinhood wallet", to: "your SOL wallet", v: 364n }, { from: "your Robinhood wallet", to: "your NEAR wallet", v: 500n }] });
   const sol = 4507n + cents(walletLegLeastUsd(3.64, true, true)), near = cents(walletLegLeastUsd(5, true, false));
   assert.deepEqual(s.lines.slice(0, 2), [`Your SOL wallet gets · about $49.17, at least ${$c(sol)}`, `Your NEAR wallet gets · about $5.00, at least ${$c(near)}`]);
   assert.deepEqual([sol, near], [4799n, 432n], "the plan's floors: leastIn(99 %) / 1.03 on to a chain, leastIn(99 %) into the NEAR wallet");

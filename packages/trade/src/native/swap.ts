@@ -3,17 +3,63 @@
 // mt_transfer in the core, Face ID there), its updates on ledger.movementUpdated. Nothing here builds, signs or sizes a
 // transfer beyond the amount the person typed: the core checks the signed quote. Buy pays with the Safe's USDC; Sell
 // returns USDC to it. The job is published at the tap, names the protocol, and carries 1Click's own time, never ours.
+// Through NEAR Confidential only (product decision, 8 Nov; core safe-swap-private.ts): three steps, into
+// Private, NEAR Intents swapping it, back in the Safe; each ticks only on the ledger's read (inPrivateAtIso, then done).
 import type { Bridge } from "@zerofee/core/bridge";
-import type { Tasks } from "@zerofee/shell-api/tasks.ts";
+import type { Tasks, TaskStep } from "@zerofee/shell-api/tasks.ts";
+import { LEG_SEC, safeTradeSteps } from "@zerofee/shell-api/job-steps.ts";
 import { SAFE_CASH } from "./assets.ts";
+import { landedUsd } from "@zerofee/wallet/app/format.ts";
 
 export const PROTOCOL = "NEAR Intents";
 export const QUOTER = "NEAR Intents";
 
 /** ledger.swapQuote's answer (the swap-in-place builder's shape, 5 Nov). Amounts are decimal strings in the coin's units. */
-export interface SafeQuote { id: string; from: string; to: string; amountIn: string; amountOut: string; minOut: string; feeUsd?: number | string; feeNote?: string; etaSeconds?: number; expiresAtIso: string; source: "safe" | "private" }
+export interface SafeQuote { id: string; from: string; to: string; amountIn: string; amountOut: string; minOut: string; feeUsd?: number | string; feeNote?: string; etaSeconds?: number; /** the fill into Private's own time (s), where the quoter knows it (the Sim's pace); else the measured Safe -> NEAR hop */ fillSeconds?: number; expiresAtIso: string; source: "safe" | "private" }
 /** A swap job as ledger.swap and ledger.movementUpdated give it. */
-export interface SwapMove { id: string; kind: "swap"; status: "moving" | "waiting" | "done" | "problem" | "refunded"; from: string; to: string; amount: string; amountOut?: string; startedAtIso?: string; etaSeconds?: number; settledMs?: number; problem?: { whatHappened?: string } }
+export interface SwapMove { id: string; kind: "swap"; status: "moving" | "waiting" | "done" | "problem" | "refunded"; from: string; to: string; amount: string; amountOut?: string; startedAtIso?: string; etaSeconds?: number; settledMs?: number; problem?: { whatHappened?: string }; /** its leg into Private read landed (the ledger's 1Click read) */ inPrivateAtIso?: string }
+
+/** The job's three steps (rule 11: every step shown, each by who does it; copy at grade 5), for the coin got (`got`). */
+export const confidentialSteps = safeTradeSteps;
+/** The legs' own times (s), one per step: the Safe's fill into Private as measured (LEG_SEC.safeFill, the Safe -> NEAR hop
+ *  Move's fill counts), then NEAR Intents' own quoted time for the swap from Private (its timeEstimate), else Private's
+ *  swap leg (LEG_SEC.privateSwap); the landing in the Safe is the same 1Click answer (0). Never a wait of ours. */
+export const confidentialLegs = (etaSec?: number, fillSec?: number): [number, number, number] => [fillSec && fillSec > 0 ? Math.round(fillSec) : LEG_SEC.safeFill, etaSec && etaSec > 0 ? Math.round(etaSec) : LEG_SEC.privateSwap, 0];
+
+// Audit 18's I3 (builder 22, 8 Nov): the clock said "About 32 seconds left." for a 6 s Sim run (the measured mainnet fill,
+// 30 s, plus the quote's 2 s). The measured-legs rule: a Safe trade's clock is this device's own finished Safe trades
+// (the median of the last PACE_KEPT, each leg as read: into Private, then the swap and landing), and the quote's legs
+// only before any. One clock: the sheet's "Takes", the receipt and the Jobs row all read paceLegs.
+const PACE_KEY = "zf.trade.safePace";
+const PACE_KEPT = 5;
+type Pace = { fill: number; rest: number };
+const median = (xs: number[]): number => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2; };
+function paceKept(st: Store | null): Pace[] {
+  try { const v = JSON.parse(st?.getItem(PACE_KEY) ?? "[]"); return Array.isArray(v) ? v.filter((x): x is Pace => !!x && Number.isFinite(x.fill) && Number.isFinite(x.rest) && x.fill >= 0 && x.rest >= 0) : []; } catch { return []; }
+}
+/** A finished Safe trade's legs, as read (ms): kept on this device for the next clock. */
+export function keepPace(fillMs: number, restMs: number, storage?: Store | null): void {
+  const st = storeOf(storage);
+  if (!(fillMs >= 0) || !(restMs >= 0)) return;
+  try { st?.setItem(PACE_KEY, JSON.stringify([...paceKept(st), { fill: fillMs, rest: restMs }].slice(-PACE_KEPT))); } catch { /* the next clock takes the quote's legs */ }
+}
+/** The legs (s) a Safe trade's clock counts: this device's measured pace once one trade finished, else the quote's. */
+export function paceLegs(q?: Pick<SafeQuote, "etaSeconds" | "fillSeconds"> | null, storage?: Store | null): [number, number, number] {
+  const kept = paceKept(storeOf(storage));
+  if (!kept.length) return confidentialLegs(q?.etaSeconds, q?.fillSeconds);
+  return [Math.max(1, Math.round(median(kept.map((x) => x.fill)) / 1000)), Math.max(0, Math.round(median(kept.map((x) => x.rest)) / 1000)), 0];
+}
+/** The steps as the job stands: `inAt`, when its leg into Private read landed; `doneAt`, when it ended done. */
+export function stepsAt(got: string, tapMs: number, inAt?: number, doneAt?: number): TaskStep[] {
+  const w = confidentialSteps(got);
+  if (doneAt !== undefined) return w.map((x, i) => ({ label: x.done, state: "done" as const, at: i === 0 ? inAt ?? doneAt : doneAt }));
+  if (inAt !== undefined) return [{ label: w[0].done, state: "done", at: inAt }, { label: w[1].doing, state: "doing", at: inAt }, { label: w[2].next, state: "waiting" }];
+  return [{ label: w[0].doing, state: "doing", at: tapMs }, { label: w[1].next, state: "waiting" }, { label: w[2].next, state: "waiting" }];
+}
+/** When the job ends, from its legs (the one clock: the receipt and the Jobs row both count down to it). */
+export const endsAtOf = (tapMs: number, legs: readonly number[], inAt?: number): number => (inAt !== undefined ? inAt + (legs[1]! + legs[2]!) * 1000 : tapMs + legs.reduce((n, x) => n + x, 0) * 1000);
+/** The job's whole time, said before the tap: "40 s", or past a minute "2 min" (rounded up). */
+export const legsTime = (legs: readonly number[]): string => { const s = legs.reduce((n, x) => n + x, 0); return s < 60 ? `${s} s` : `${Math.ceil(s / 60)} min`; };
 
 /** The words (copywriter, 5 Nov). */
 export const NATIVE_WORDS = {
@@ -36,6 +82,8 @@ export const SHEET_WORDS = {
 
 export const buyTitle = (usd: string, symbol: string) => `Buy ${usd} of ${symbol}`;
 export const sellTitle = (usd: string, symbol: string) => `Sell ${usd} of ${symbol}`;
+/** Typed dollars as typed, thousands grouped ("1,250.5"): the keypad's echo, never rounded. */
+export const groupTyped = (v: string): string => { const [w = "0", f] = v.split("."); return `${w.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${f !== undefined ? `.${f}` : ""}`; };
 /** 1Click's own time, said as theirs: "1Click says about 12 s". None when it gave none. */
 export const etaLine = (eta?: number): string | undefined => (eta && eta > 0 ? `${QUOTER} says about ${Math.round(eta)} s` : undefined);
 export const tookLine = (ms: number): string => `Took ${(Math.max(0, ms) / 1000).toFixed(1)} s.`;
@@ -44,7 +92,7 @@ const feeOf = (q: SafeQuote): number => { const f = Number(q.feeUsd); return Num
 export function quoteLine(q: SafeQuote): string {
   const fee = feeOf(q) >= 0.01 ? `fees $${feeOf(q).toFixed(2)}` : "fees under $0.01";
   const eta = etaLine(q.etaSeconds);
-  return `${PROTOCOL} swaps it in your Safe. ${QUOTER} prices it, ${fee}.${eta ? ` ${eta}.` : ""}`;
+  return `It goes through NEAR Confidential. ${QUOTER} prices it, ${fee}.${eta ? ` ${eta}.` : ""}`;
 }
 
 // ---- amounts: decimal strings, exact (never through a float where it matters)
@@ -109,7 +157,7 @@ export const CHECKING_AFTER_MS = 10 * 60_000;
 /** The jobs whose swap is still followed, kept on this phone (task id → the ledger's movement id), so a reload ends the
  *  job from the ledger's own record (resumeSwapJobs) and it never stays "on its way" forever (sandbox hunt B3). */
 const KEPT_KEY = "zf.trade.native-jobs";
-type KeptJob = { moveId: string; tapMs: number };
+type KeptJob = { moveId: string; tapMs: number; got?: string; legs?: number[] };
 type Store = Pick<Storage, "getItem" | "setItem">;
 const storeOf = (s?: Store | null): Store | null => { try { return s === undefined ? (globalThis as { localStorage?: Storage }).localStorage ?? null : s; } catch { return null; } };
 function keptJobs(st: Store | null): Record<string, KeptJob> {
@@ -124,21 +172,37 @@ function keepJob(st: Store | null, taskId: string, job: KeptJob | null) {
 type Follow = {
   bridge: Bridge; tasks: Tasks | undefined; taskId: string; tapMs: number; now: () => number; onView?: (v: SwapView) => void;
   timer: (fn: () => void, ms: number) => () => void; store: Store | null;
+  /** the coin got (the steps' words) and the legs' times (the one clock) */
+  got: string; legs: readonly number[]; inAt?: number;
 };
 const failWith = (o: Follow, line: string, sheet?: string): "failed" => {
-  o.tasks?.update(o.taskId, { steps: [{ label: NATIVE_WORDS.doing, state: "failed", at: o.now() }] });
+  const steps = stepsAt(o.got, o.tapMs, o.inAt);
+  const at = steps.findIndex((x) => x.state !== "done");
+  o.tasks?.update(o.taskId, { steps: steps.map((x, i) => (i === at ? { ...x, state: "failed" as const, at: o.now() } : x)) });
   o.tasks?.end(o.taskId, "failed", line);
   o.onView?.({ state: "failed", line: sheet ?? line });
   keepJob(o.store, o.taskId, null);
   return "failed";
 };
+/** Its leg into Private read landed: step 1 ticks, and the clock counts the rest from that read (never before it). */
+function tickIn(o: Follow, m: SwapMove) {
+  if (o.inAt !== undefined || !m.inPrivateAtIso) return;
+  const t = Date.parse(m.inPrivateAtIso);
+  o.inAt = Number.isFinite(t) ? t : o.now();
+  o.tasks?.update(o.taskId, { steps: stepsAt(o.got, o.tapMs, o.inAt), endsAt: endsAtOf(o.tapMs, o.legs, o.inAt) });
+}
 /** A movement that ended, said on the job and the sheet: done with what arrived (the ledger's figure), else refunded. */
 function ended(o: Follow, m: SwapMove): "done" | "failed" {
+  tickIn(o, m);
   if (m.status === "refunded") return failWith(o, NATIVE_WORDS.refunded, SHEET_WORDS.refunded);
   if (m.status !== "done") return failWith(o, m.problem?.whatHappened || NATIVE_WORDS.refunded, m.problem?.whatHappened ? undefined : SHEET_WORDS.refunded);
   const at = o.now();
   const took = typeof m.settledMs === "number" && m.settledMs >= 0 ? m.settledMs : at - o.tapMs;
-  o.tasks?.update(o.taskId, { steps: [{ label: NATIVE_WORDS.done, state: "done", at }], detail: tookLine(took) });
+  // audit 18's I3: this trade's legs as read, the next clock's pace (into Private at its read, the rest to the end)
+  const fillMs = Math.min(took, Math.max(0, (o.inAt ?? o.tapMs + took) - o.tapMs));
+  keepPace(fillMs, took - fillMs, o.store);
+  // audit 17's H4: a Sell's Jobs row ends on what landed, the figure the done screen and Activity say
+  o.tasks?.update(o.taskId, { steps: stepsAt(o.got, o.tapMs, o.inAt, at), detail: tookLine(took), ...(o.got === "USDC" && m.amountOut && Number(m.amountOut) > 0 ? { usd: landedUsd(m.amountOut) } : {}) });
   o.tasks?.end(o.taskId, "done");
   o.onView?.({ state: "done", line: `${NATIVE_WORDS.landed} ${tookLine(took)}`, tookMs: took, ...(m.amountOut ? { got: m.amountOut } : {}) });
   keepJob(o.store, o.taskId, null);
@@ -148,6 +212,7 @@ function ended(o: Follow, m: SwapMove): "done" | "failed" {
 async function followToEnd(o: Follow, first: SwapMove, seen: Map<string, SwapMove>, wakeUp: (w: (() => void) | undefined) => void, startMs: number): Promise<"done" | "failed"> {
   let m = first, said = false;
   while (m.status === "moving" || m.status === "waiting") {
+    tickIn(o, m);
     const next = seen.get(m.id);
     if (next && next !== m) { m = next; continue; }
     if (!said && o.now() - startMs > CHECKING_AFTER_MS) {
@@ -162,19 +227,22 @@ async function followToEnd(o: Follow, first: SwapMove, seen: Map<string, SwapMov
 }
 
 /**
- * The swap behind its job. The task is published FIRST (the tap is the job, with 1Click's own time), then ledger.swap
- * is asked, then its movement followed to its end. `onView` drives the sheet; Home's Activity row says the same. Never throws.
+ * The swap behind its job. The task is published FIRST (the tap is the job, its three steps and its legs' end), then
+ * ledger.swap is asked, then its movement followed to its end. `onView` drives the sheet; Home's Activity row says the
+ * same. `got`: the coin got, for the steps' words. Never throws.
  */
 export async function runSwap(o: {
-  bridge: Bridge; tasks: Tasks | undefined; taskId: string; title: string; usd: string; quote: SafeQuote; tapMs: number; route?: string;
+  bridge: Bridge; tasks: Tasks | undefined; taskId: string; title: string; usd: string; quote: SafeQuote; tapMs: number; route?: string; got?: string;
   now?: () => number; onView?: (v: SwapView) => void; timer?: (fn: () => void, ms: number) => () => void; storage?: Store | null;
 }): Promise<"done" | "failed"> {
+  const legs = paceLegs(o.quote, o.storage);
+  const got = o.got ?? (o.quote.to === SAFE_CASH ? "USDC" : "the coin");
   const f: Follow = {
     bridge: o.bridge, tasks: o.tasks, taskId: o.taskId, tapMs: o.tapMs, now: o.now ?? Date.now, ...(o.onView ? { onView: o.onView } : {}),
-    timer: o.timer ?? ((fn, ms) => { const t = setTimeout(fn, ms); return () => clearTimeout(t); }), store: storeOf(o.storage),
+    timer: o.timer ?? ((fn, ms) => { const t = setTimeout(fn, ms); return () => clearTimeout(t); }), store: storeOf(o.storage), got, legs,
   };
-  const eta = etaLine(o.quote.etaSeconds);
-  o.tasks?.publish({ id: o.taskId, title: o.title, usd: o.usd, where: "In your Safe", steps: [{ label: NATIVE_WORDS.doing, state: "doing", at: o.tapMs }], ...(eta ? { detail: eta } : {}), ...(o.route ? { open: { route: o.route } } : {}) });
+  // where the money is while it goes: passing through Private (the Activity row says the same: format.ts placeOf)
+  o.tasks?.publish({ id: o.taskId, title: o.title, usd: o.usd, where: "Through NEAR Confidential", steps: stepsAt(got, o.tapMs), endsAt: endsAtOf(o.tapMs, legs), ...(o.route ? { open: { route: o.route } } : {}) });
   o.onView?.({ state: "doing" });
   // listen before asking, so an update that comes with the answer is never missed
   const seen = new Map<string, SwapMove>();
@@ -184,12 +252,12 @@ export async function runSwap(o: {
     if (!quoteLive(o.quote, f.now())) return failWith(f, NATIVE_WORDS.expired);
     let m: SwapMove;
     try {
-      const r = await o.bridge.call<SwapMove | { declined: true }>("ledger.swap", { quoteId: o.quote.id });
+      const r = await o.bridge.call<SwapMove | { declined: true }>("ledger.swap", { quoteId: o.quote.id, key: o.taskId.replace(/[^\w-]/g, "-").slice(-64) });
       if ("problem" in r) return failWith(f, r.problem.whatHappened);
       if (!r.ok || "declined" in r.ok) return failWith(f, NATIVE_WORDS.declined);
       m = r.ok;
     } catch { return failWith(f, NATIVE_WORDS.lost, SHEET_WORDS.lost); }
-    keepJob(f.store, o.taskId, { moveId: m.id, tapMs: o.tapMs });
+    keepJob(f.store, o.taskId, { moveId: m.id, tapMs: o.tapMs, got, legs: [...legs] });
     // the core took it: where the Safe's sheet is heard and no yes came first, the job is made now ("Job created.")
     if (m.status === "moving" || m.status === "waiting") o.onView?.({ state: "doing", made: true });
     return await followToEnd(f, m, seen, (w) => { wake = w; }, f.now());
@@ -213,7 +281,7 @@ export async function resumeSwapJobs(o: { bridge: Bridge; tasks: Tasks | undefin
     if (!r || !("ok" in r) || !Array.isArray(r.ok)) return;
     const byId = new Map(r.ok.map((m) => [m.id, m]));
     await Promise.all(jobs.map(async ([taskId, k]) => {
-      const f: Follow = { bridge: o.bridge, tasks: o.tasks, taskId, tapMs: k.tapMs, now: o.now ?? Date.now, timer: o.timer ?? ((fn, ms) => { const t = setTimeout(fn, ms); return () => clearTimeout(t); }), store };
+      const f: Follow = { bridge: o.bridge, tasks: o.tasks, taskId, tapMs: k.tapMs, now: o.now ?? Date.now, timer: o.timer ?? ((fn, ms) => { const t = setTimeout(fn, ms); return () => clearTimeout(t); }), store, got: k.got ?? "the coin", legs: Array.isArray(k.legs) && k.legs.length === 3 ? k.legs : confidentialLegs() };
       const m = byId.get(k.moveId);
       if (!m) return void failWith(f, NATIVE_WORDS.lost);
       let mine: (() => void) | undefined;

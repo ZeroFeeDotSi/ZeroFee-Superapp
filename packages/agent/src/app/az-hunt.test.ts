@@ -103,7 +103,7 @@ test("W9-5b: the funding receipt stops its clock and \"It keeps going\" once the
   const { receiptLeft } = await import("@zerofee/shell-api/job-steps.ts");
   const { JOB_WORDS, watchShown } = await import("@zerofee/shell-api/job-start.ts");
   const t = 1_000_000;
-  assert.equal(receiptLeft(t + 10_000, t, t, t + 400), "Done in under a second.", "53, 7 Nov: never \"Landed early.\"");
+  assert.equal(receiptLeft(t + 10_000, t, t, t + 400), "Took under a second.", "53, 7 Nov: never \"Landed early.\"");
   assert.equal(watchShown(t + 1_000), false);
   assert.equal(receiptLeft(t + 10_000, t), "About 10 seconds left.", "control");
   assert.equal(watchShown(undefined), true, "control");

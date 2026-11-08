@@ -14,7 +14,7 @@ import { FACE_WORDS, jobFace, stepWord, stopLine, type FaceState } from "./job-f
 
 const T0 = 1_700_000_000_000;
 const iso = (ms: number) => new Date(ms).toISOString();
-const row = (o: Partial<SpendingActivity>): SpendingActivity => ({ id: "r1", kind: "top-up", usd: "222", status: "on-its-way", shown: true, atIso: iso(T0), words: "Move $222.00 to your ETH (RH) wallet", ...o });
+const row = (o: Partial<SpendingActivity>): SpendingActivity => ({ id: "r1", kind: "top-up", usd: "222", status: "on-its-way", shown: true, atIso: iso(T0), words: "Move $222.00 to your Robinhood wallet", ...o });
 /** The owner's Move: from the Safe, paid from Private after the Safe's fill, NEAR Confidential's payment done, the landing unread. */
 const OWNER = row({ via: "private", goesTo: ["hood"], fill: "done", paidDone: true, askedUsd: "222" });
 const live = (r: SpendingActivity, now: number, seen: Seen = {}): LiveTrack => slowed(stamp(moveTrack(r, undefined, undefined)!, seen, now), now);
@@ -52,11 +52,11 @@ test("liveNow keeps a slow job on Home past DONE_SHOWN_MS (its place never goes 
 });
 
 test("startingTracks: a Move task an older build ended \"stopped\" with no words reads as still on its way, never \"Move stopped\"", () => {
-  const base: Task = { id: "move:mv-abc", app: "home", title: "Move $222.00 to your ETH (RH) wallet", state: "stopped", startedAt: T0, endedAt: T0 + SLOW_MS, steps: [{ label: "NEAR Confidential moved it to Private.", state: "done" }, { label: "NEAR Confidential paid your ETH (RH) wallet.", state: "done" }, { label: "Robinhood Chain is landing it in your ETH (RH) wallet.", state: "waiting" }] };
+  const base: Task = { id: "move:mv-abc", app: "home", title: "Move $222.00 to your Robinhood wallet", state: "stopped", startedAt: T0, endedAt: T0 + SLOW_MS, steps: [{ label: "NEAR Confidential moved it to Private.", state: "done" }, { label: "NEAR Confidential paid your Robinhood wallet.", state: "done" }, { label: "Robinhood Chain is landing it in your Robinhood wallet.", state: "waiting" }] };
   assert.equal(wordlessStop(base), true);
   const [t] = startingTracks([base], T0 + SLOW_MS + 60_000);
   assert.equal(t?.end?.slow, true);
-  assert.equal(rowTitle(t!), "Move $222.00 to your ETH (RH) wallet");
+  assert.equal(rowTitle(t!), "Move $222.00 to your Robinhood wallet");
   assert.equal(jobFace(t!).bar, "Move");
   // control: a stop that said why stays a stop
   const [s] = startingTracks([{ ...base, detail: "Nothing moved. Your money is still in your Safe." }], T0 + SLOW_MS + 60_000);
@@ -73,22 +73,22 @@ test("publishTracks: an ended task in the store gets the slow job's words, never
   tasks.end(slow.id, "stopped");
   publishTracks(tasks, [slow], new Map());
   const kept = store.list().find((t) => t.id === slow.id)!;
-  assert.match(kept.detail ?? "", /^Slower than usual\. It's on its way to your ETH \(RH\) wallet\./);
+  assert.match(kept.detail ?? "", /^Slower than usual\. It's on its way to your Robinhood wallet\./);
   const stop = live(row({ id: "r3", via: "private", goesTo: ["hood"], status: "failed", note: "NEAR Confidential sent it back" }), T0 + 60_000);
   publishTracks(tasks, [stop], new Map());
-  assert.match(store.list().find((t) => t.id === stop.id)!.detail ?? "", /NEAR Confidential didn't pay your ETH \(RH\) wallet/);
+  assert.match(store.list().find((t) => t.id === stop.id)!.detail ?? "", /NEAR Confidential didn't pay your Robinhood wallet/);
 });
 
 // ---- the owner's page now ----
 
-test("the owner's Move on its page: title once \"Move\", Landing lit, money on its way to the ETH (RH) wallet, who hasn't shown it, Activity and Close", () => {
+test("the owner's Move on its page: title once \"Move\", Landing lit, money on its way to the Robinhood wallet, who hasn't shown it, Activity and Close", () => {
   const f = jobFace(live(UNREAD, T0 + 60_000));
   assert.equal(f.state, "slow");
   assert.equal(f.bar, "Move");
-  assert.equal(f.what, "Move $222.00 to your ETH (RH) wallet");
+  assert.equal(f.what, "Move $222.00 to your Robinhood wallet");
   assert.equal(f.figure, "$222.00");
   assert.deepEqual([f.at, f.bad], [2, false]);
-  assert.deepEqual(f.money, { lead: "Your money is on its way to ", place: "your ETH (RH) wallet" });
+  assert.deepEqual(f.money, { lead: "Your money is on its way to ", place: "your Robinhood wallet" });
   // waiting (the copy review's ruling, 6 Nov): "<who> is taking longer than usual. ZeroFee keeps checking."
   assert.equal(f.reason, "Robinhood Chain is taking longer than usual. ZeroFee keeps checking.");
   assert.deepEqual(f.choices, []);
@@ -181,7 +181,7 @@ test("every face: its state; the title once; a money line with a Home name; 0 to
     assert.notEqual(f.what, f.bar, `${want}: the title is said once (the bar), the line under the figure is what it is`);
     // the copy review (7 Nov): the unsure line is its own sentence, "Either in <place> or still with NEAR Intents."
     assert.ok(f.money!.lead.startsWith("Your money is") || f.money!.lead === "Either in ", want);
-    assert.match(f.money!.place, /^(Private|your Safe|your (SOL|ETH \(RH\)|NEAR|BNB) wallet|on its way|either in Private or still with NEAR Intents)$/, want);
+    assert.match(f.money!.place, /^(Private|your Safe|your (SOL|Robinhood|NEAR|BNB) wallet|on its way|either in Private or still with NEAR Intents)$/, want);
     assert.ok(f.choices.length <= 2, want);
     assert.equal(f.out, "x", `${want}: never a dead end (the bar's X)`);
     assert.ok(!f.choices.some((n) => n.go.kind === "close" || n.go.kind === "activity"), `${want}: no Close or Activity button in the floor (copy review)`);
@@ -209,7 +209,7 @@ test("choices by face: back = Resume + Send it back to the Safe; nothing for fun
 // ---- the copy review's rulings on the page (6 Nov): the words, the steps' one word, the floor ----
 
 /** A place a line says the money is in ("It's in Private.", "NEAR Intents says it's in your Safe."), if it says one. */
-const saysIn = (w: string) => /(?:it's|It's|is) (?:back )?in (Private|your Safe|your SOL wallet|your ETH \(RH\) wallet|your NEAR wallet|your BNB wallet)/.exec(w)?.[1];
+const saysIn = (w: string) => /(?:it's|It's|is) (?:back )?in (Private|your Safe|your SOL wallet|your Robinhood wallet|your NEAR wallet|your BNB wallet)/.exec(w)?.[1];
 
 test("money truth: on every face the money line and the reason line never disagree (a place said is the money line's, here)", () => {
   for (const [want, t] of FACES) {
@@ -280,7 +280,7 @@ test("steps: each once with one word (Done, Stopped here, Not yet); the step goi
 });
 
 test("a wordless stop past the keep (PRIVATE_KEEP_MS from its tap) with no core row is the unknown face, not going; within it, on its way; a core row wins", () => {
-  const base: Task = { id: "move:mv-old", app: "home", title: "Move $222.00 to your ETH (RH) wallet", state: "stopped", startedAt: T0, endedAt: T0 + SLOW_MS, steps: [{ label: "NEAR Confidential moved it to Private.", state: "done" }, { label: "Robinhood Chain is landing it.", state: "waiting" }] };
+  const base: Task = { id: "move:mv-old", app: "home", title: "Move $222.00 to your Robinhood wallet", state: "stopped", startedAt: T0, endedAt: T0 + SLOW_MS, steps: [{ label: "NEAR Confidential moved it to Private.", state: "done" }, { label: "Robinhood Chain is landing it.", state: "waiting" }] };
   const table: [number, "going" | "unknown"][] = [[T0 + 60 * 60_000, "going"], [T0 + PRIVATE_KEEP_MS - 1, "going"], [T0 + PRIVATE_KEEP_MS, "unknown"], [T0 + PRIVATE_KEEP_MS + 30 * 60_000, "unknown"]];
   for (const [now, want] of table) {
     assert.equal(oldStop(base, now), want, String(now - T0));
@@ -309,7 +309,7 @@ test("a wordless stop past the keep (PRIVATE_KEEP_MS from its tap) with no core 
 // ---- the copy review's MUST 2 (Activity train, 6 Nov): one $161 Move showed two going rows on Now ----
 
 test("foldInto: two rows saved under one job are one track and one task (the Safe's top-up and the wallet's leg share no `of`)", () => {
-  const safe = row({ id: "top1", kind: "top-up", usd: "150", words: "Move $161.00 to your ETH (RH) wallet", atIso: iso(T0) });
+  const safe = row({ id: "top1", kind: "top-up", usd: "150", words: "Move $161.00 to your Robinhood wallet", atIso: iso(T0) });
   const leg = row({ id: "leg1", kind: "move", network: "sol", to: "hood", usd: "11", words: "Move $11.00", atIso: iso(T0 + 2_000) });
   const other = row({ id: "x9", kind: "top-up", usd: "5", words: "Move $5.00 to your SOL wallet", atIso: iso(T0 + 1_000) });
   const jobs: Record<string, string> = { top1: "job:A", leg1: "job:A", x9: "job:B" };

@@ -106,7 +106,7 @@ export function SettingsPanel({ onClose, onBack: backTo, onStartOver, logins = l
           <p className="zf-small" style={{ marginTop: 10 }}>Your money stays in your Safe. Your 24 words bring it back.</p>
           {reset === "not-done" && <p className="zf-small" style={{ marginTop: 10 }}>Nothing was reset.</p>}
           <div className="set__sheet-floor">
-            <button className="zf-btn" disabled={reset === "busy"} onClick={() => void go()}>{reset === "busy" ? "Resetting…" : "Reset this iPhone"}</button>
+            <button className="zf-btn" disabled={reset === "busy"} onClick={() => void go()}>{reset === "busy" ? "Resetting this iPhone" : "Reset this iPhone"}</button>
             <button className="zf-link" onClick={() => setReset(null)}>Not now</button>
           </div>
         </aside>

@@ -20,19 +20,19 @@ const SAFE = "Face ID approves the Safe's part. ", NONE = "No Face ID. ";
 test("(a) the copy review's quiet line, every case: by the sources, the wallets by the rows' names in the plan's order; the Safe the only source: none", () => {
   assert.equal(typeof P.hotLine, "function", "move-plan.ts exports hotLine");
   const rows: [string, string[], boolean, boolean, string | null][] = [
-    ["Safe, a wallet and Private", ["your ETH (RH) wallet"], true, true, `${SAFE}Your ETH (RH) wallet and Private send on their own.`],
+    ["Safe, a wallet and Private", ["your Robinhood wallet"], true, true, `${SAFE}Your Robinhood wallet and Private send on their own.`],
     ["Safe and Private", [], true, true, `${SAFE}Private sends on its own.`],
-    ["Safe and a wallet", ["your ETH (RH) wallet"], false, true, `${SAFE}Your ETH (RH) wallet sends on its own.`],
+    ["Safe and a wallet", ["your Robinhood wallet"], false, true, `${SAFE}Your Robinhood wallet sends on its own.`],
     ["the Safe alone", [], false, true, null],
-    ["two wallets", ["your ETH (RH) wallet", "your SOL wallet"], false, true, `${SAFE}Your SOL and ETH (RH) wallets send on their own.`],
-    ["two wallets and Private", ["your SOL wallet", "your ETH (RH) wallet"], true, true, `${SAFE}Your SOL and ETH (RH) wallets and Private send on their own.`],
-    ["three wallets", ["your NEAR wallet", "your SOL wallet", "your ETH (RH) wallet"], false, true, `${SAFE}Your wallets send on their own.`],
+    ["two wallets", ["your Robinhood wallet", "your SOL wallet"], false, true, `${SAFE}Your SOL and Robinhood wallets send on their own.`],
+    ["two wallets and Private", ["your SOL wallet", "your Robinhood wallet"], true, true, `${SAFE}Your SOL and Robinhood wallets and Private send on their own.`],
+    ["three wallets", ["your NEAR wallet", "your SOL wallet", "your Robinhood wallet"], false, true, `${SAFE}Your wallets send on their own.`],
     ["three wallets and Private", ["your NEAR wallet", "your SOL wallet", "your BNB wallet"], true, true, `${SAFE}Your wallets and Private send on their own.`],
-    ["no Safe: a wallet and Private", ["your ETH (RH) wallet"], true, false, `${NONE}Your ETH (RH) wallet and Private send on their own.`],
+    ["no Safe: a wallet and Private", ["your Robinhood wallet"], true, false, `${NONE}Your Robinhood wallet and Private send on their own.`],
     ["no Safe: Private", [], true, false, `${NONE}Private sends on its own.`],
     ["no Safe: a wallet", ["your SOL wallet"], false, false, `${NONE}Your SOL wallet sends on its own.`],
     ["no Safe: two wallets", ["your SOL wallet", "your NEAR wallet"], false, false, `${NONE}Your SOL and NEAR wallets send on their own.`],
-    ["no Safe: three wallets and Private", ["your SOL wallet", "your NEAR wallet", "your ETH (RH) wallet"], true, false, `${NONE}Your wallets and Private send on their own.`],
+    ["no Safe: three wallets and Private", ["your SOL wallet", "your NEAR wallet", "your Robinhood wallet"], true, false, `${NONE}Your wallets and Private send on their own.`],
   ];
   for (const [name, wallets, priv, safe, want] of rows) assert.equal(P.hotLine(wallets, priv, safe), want, name);
 });
@@ -40,9 +40,9 @@ test("(a) the copy review's quiet line, every case: by the sources, the wallets 
 test("(a) on the sheet: the row stays plain, the line is the last under the rows (the caller adds \"Anyone can see the Safe's part.\" after it); the Safe alone, no line", () => {
   const c = (n: number) => BigInt(Math.round(n * 100));
   const say = (v: bigint) => `$${(Number(v) / 100).toFixed(2)}`;
-  const s = plan.moveSheet([{ wallet: "your SOL wallet", priv: c(8.39), pay: 0n }, { wallet: "your NEAR wallet", priv: 0n, pay: c(101.48) }], c(150), say, { others: [{ from: "your ETH (RH) wallet", to: "your SOL wallet", v: c(3.94) }, { from: "your ETH (RH) wallet", to: "your NEAR wallet", v: c(5.52) }] });
-  assert.ok(s.lines.includes("From your ETH (RH) wallet · about $9.46"), s.lines.join(" | "));
-  assert.equal(s.lines.at(-1), `${SAFE}Your ETH (RH) wallet and Private send on their own.`, s.lines.join(" | "));
+  const s = plan.moveSheet([{ wallet: "your SOL wallet", priv: c(8.39), pay: 0n }, { wallet: "your NEAR wallet", priv: 0n, pay: c(101.48) }], c(150), say, { others: [{ from: "your Robinhood wallet", to: "your SOL wallet", v: c(3.94) }, { from: "your Robinhood wallet", to: "your NEAR wallet", v: c(5.52) }] });
+  assert.ok(s.lines.includes("From Robinhood wallet · about $9.46"), s.lines.join(" | "));
+  assert.equal(s.lines.at(-1), `${SAFE}Your Robinhood wallet and Private send on their own.`, s.lines.join(" | "));
   const alone = plan.moveSheet([{ wallet: "your NEAR wallet", priv: 0n, pay: c(150) }], c(150), say);
   assert.ok(!alone.lines.some((l) => /Face ID|on its own|on their own/.test(l)), alone.lines.join(" | "));
 });

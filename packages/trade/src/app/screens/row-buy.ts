@@ -24,6 +24,8 @@ export interface RowBuy {
   why?: string;
 }
 
+/** A trap coin's refused row (B9): who and the money, its name kept. */
+export const TRAP_ROW_LINE = "ZeroFee won't buy it · Nothing was spent";
 /** The row's one line under the name, for each phase. `notForSale`: the row says "Not for sale" where Buy was (a trap coin's
  *  refusal, not-for-sale.ts), so its line is "Didn't buy" alone; the refusal's sentence is the coin's own (the copy review's walk). */
 export function rowBuyLine(b: RowBuy, symbol: string, notForSale = false): string {
@@ -31,7 +33,9 @@ export function rowBuyLine(b: RowBuy, symbol: string, notForSale = false): strin
   if (b.phase === "landed") return `Bought · ${b.got ? `${b.about ? "about " : ""}${b.got}` : symbol}`;
   // the copy review's row word (7 Nov) for a trade no read can place yet
   if (b.phase === "checking") return "Not confirmed yet";
-  if (notForSale) return "Didn't buy";
+  // audit 11's B9 (8 Nov, rule 8): who said no and where the money is, beside the coin's name ("Didn't buy" alone, in red,
+  // said neither)
+  if (notForSale) return TRAP_ROW_LINE;
   return `Didn't buy · ${b.why ?? "Nothing left your wallet."}`;
 }
 

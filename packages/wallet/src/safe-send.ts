@@ -196,7 +196,7 @@ export function createSafeSend(x: SafeSendDeps) {
     const why = named ?? `Send ${max ? fromUnits(pocketPart + rest, coin.decimals) : amount} ${symbol} to ${x.payeeText(to)}`;
     const out: Movement[] = [];
     // M9 (the audit's audit): Private pays the whole Send (no Safe part follows): its signature is the last, so it carries the Send's key
-    if (pocketPart > 0n) out.push(await payFromPocket(pocket, pocketCoin, pocketPart, coin, to, toTokenId, why, named, caller, route.ownWallet === true, undefined, !plan && route.ownWallet !== true ? jobKey : undefined));
+    if (pocketPart > 0n) out.push(await payFromPocket(pocket, pocketCoin, pocketPart, coin, to, toTokenId, why, named, caller, route.ownWallet === true, undefined, !plan && route.ownWallet !== true ? jobKey : undefined, jobKey));
     if (plan) {
       // the Move's fill (QA, 5 Nov): its one Safe sheet says Private's leg and the Safe's to this wallet, and
       // their sum, from the core's own figures (the bytes; its record of the pocket's share above): a marker, no figures
@@ -228,11 +228,11 @@ export function createSafeSend(x: SafeSendDeps) {
   }
 
   /** The pocket's own share, straight out: EXACT_INPUT of exactly that, the core's Send sheet (no pot cap), submitted. */
-  async function payFromPocket(pocket: { id: string; address: string }, pocketCoin: string, units: bigint, coin: Coin, to: Payee, toTokenId: string, why: string, named: string | undefined, caller: Caller, ownWallet = false, moveJob?: string, sendJob?: string): Promise<Movement> {
+  async function payFromPocket(pocket: { id: string; address: string }, pocketCoin: string, units: bigint, coin: Coin, to: Payee, toTokenId: string, why: string, named: string | undefined, caller: Caller, ownWallet = false, moveJob?: string, sendJob?: string, stamp?: string): Promise<Movement> {
     const req = x.privatePayRequest({ fromTokenId: pocketCoin, toTokenId, to, inUnits: units, pocket: pocket.address, dry: false });
     const real = await x.askPrivate(req);
     const depositAddress = real.quote.depositAddress;
-    if (!depositAddress || BigInt(real.quote.amountIn) !== units || !(BigInt(real.quote.amountOut || "0") > 0n)) throw new ProblemError(walletProblems.quoteExpired());
+    if (!depositAddress || BigInt(real.quote.amountIn) !== units || !(BigInt(real.quote.amountOut || "0") > 0n)) throw new ProblemError(walletProblems.quoteMismatch("private"));
     // QA's (a): the same coin in and out (USDC to USDC) pays exactly what was typed, by 1Click's own figure;
     // (c) NEAR (wrapped) as before
     if (!ownWallet && pocketCoin === toTokenId && toTokenId !== LANDS_AS.near.tokenId && BigInt(real.quote.amountOut) !== units) throw new ProblemError(walletProblems.sameCoinShort(coin.symbol));
@@ -243,6 +243,8 @@ export function createSafeSend(x: SafeSendDeps) {
     const movement: Movement = {
       id: `pocket-send:${depositAddress.slice(0, 24)}`, kind: "pay", status: "moving", from: pocketCoin, to: x.payeeText(to), toChain: to.kind === "chain" ? to.chain : "near", amount: fromUnits(units, coin.decimals),
       startedAtIso: at, updatedAtIso: at, explorerUrls: [], ...(named ? { label: named } : {}), caller, private: true, ...leastOf(real.quote),
+      // K2 (audit 13, 8 Nov): the page's key for its job (Send's, a Move's or a Swap's), so a reload before the answer finds it
+      ...(stamp ? { jobKey: stamp } : {}),
     };
     // H1: kept (movement and job) before it is handed over; a submit that errors is "may have gone", followed by 1Click's
     // own status of this payment, never a Try again that could pay twice
@@ -264,13 +266,15 @@ export function createSafeSend(x: SafeSendDeps) {
   };
 
   /** The Safe's part (E4): leg 2 signed first, joined to leg 1; then leg 1 on the Safe's own sheet; then the saved job. */
-  async function fromSafe(plan: Plan, tokenId: string, amount: string, asked: bigint, symbol: string, pocket: { id: string; address: string }, to: Payee, toTokenId: string, why: string, named: string | undefined, caller: Caller, mark: FillMark = false, since?: number, jobKey?: string): Promise<Movement> {
+  /** `swap` (swapFromSafe): the movement is the Swap's own (kind "swap", its `to` the coin got), leg 2 is refused when it
+   *  promises less than `least` (the figure shown before the tap), and its end carries what arrived (outDecimals). */
+  async function fromSafe(plan: Plan, tokenId: string, amount: string, asked: bigint, symbol: string, pocket: { id: string; address: string }, to: Payee, toTokenId: string, why: string, named: string | undefined, caller: Caller, mark: FillMark = false, since?: number, jobKey?: string, swap?: { least: bigint; outDecimals: number }): Promise<Movement> {
     const fromId = x.originAsset(tokenId);
     // leg 1: the core's own quote (through: the money passes through), exactly plan.units in
     // the Safe's NEAR Intents balance pays it inside intents.near (Move's fill: one mt_transfer, one bridge leg in all)
     const leg1 = await x.core<PrivateInQuote>("subwallet.private.quoteIn", { tokenId: fromId, amount: plan.units.toString(), through: true, ...(plan.route === "intents" ? { intents: true } : {}) });
     const fair = /^[0-9a-f]{64}$/.test(String(leg1.depositAddress)) && /^\d{1,30}$/.test(String(leg1.amountIn)) && /^\d{1,30}$/.test(String(leg1.minAmountOut)) && BigInt(leg1.amountIn) === plan.units && BigInt(leg1.minAmountOut) > 0n;
-    if (!fair) throw new ProblemError(walletProblems.quoteExpired());
+    if (!fair) throw new ProblemError(walletProblems.quoteMismatch());
     // leg 2: exactly the asked share of what leg 1 promises to bring (its signed minimum, no trim: D137; all of it off
     // the grid), from the pocket, to the payee as their chain's own coin; the rest stays in the private balance (H1).
     // Its quote lives through leg 1's own time.
@@ -278,7 +282,9 @@ export function createSafeSend(x: SafeSendDeps) {
     const req = x.privatePayRequest({ fromTokenId: fromId, toTokenId, to, inUnits: pays, pocket: pocket.address, dry: false, deadlineMs: SEND_QUOTE_MS });
     const real = await x.askPrivate(req);
     const outDeposit = real.quote.depositAddress;
-    if (!outDeposit || BigInt(real.quote.amountIn) !== pays || !(BigInt(real.quote.amountOut || "0") > 0n)) throw new ProblemError(walletProblems.quoteExpired());
+    if (!outDeposit || BigInt(real.quote.amountIn) !== pays || !(BigInt(real.quote.amountOut || "0") > 0n)) throw new ProblemError(walletProblems.quoteMismatch());
+    // a Safe Swap: never less than the least shown before the tap (its signed minimum), else nothing is signed
+    if (swap && BigInt(/^\d{1,40}$/.test(real.quote.minAmountOut ?? "") ? real.quote.minAmountOut! : real.quote.amountOut) < swap.least) throw new ProblemError(walletProblems.quoteMismatch());
     const intent = await generate(pocket.address, outDeposit);
     // the pocket's payment, joined to leg 1 (the core checks the join from 1Click's signed quotes) and HELD by the core for
     // the Safe's one sheet (the audit's c1, 6 Nov): signed only once the chip's signature of leg 1 checks, then kept in the core's
@@ -288,11 +294,15 @@ export function createSafeSend(x: SafeSendDeps) {
     if (two.declined || (!two.signedData && !two.pair)) throw new ProblemError(walletProblems.declined());
     const at = iso();
     const noted: Movement = {
-      id: `safe-send:${outDeposit.slice(0, 24)}`, kind: "pay", status: "moving", from: tokenId, to: x.payeeText(to), toChain: to.kind === "chain" ? to.chain : "near", amount,
+      id: `safe-send:${outDeposit.slice(0, 24)}`, kind: swap ? "swap" : "pay", status: "moving", from: tokenId, to: swap ? toTokenId : x.payeeText(to), toChain: to.kind === "chain" ? to.chain : "near", amount,
       ...(plan.units > asked ? { kept: fromUnits(plan.units - asked, plan.coin.decimals) } : {}),
       startedAtIso: at, updatedAtIso: at, explorerUrls: [], ...(named ? { label: named } : {}), caller, private: true, ...leastOf(real.quote),
+      // builder 15: a Safe swap's movement says it came from the Safe (its Buy / Sell through NEAR Confidential)
+      ...(swap ? { source: "safe" as const } : {}),
+      // K2 (audit 13): the page's key for its job on the movement (Movement.jobKey), a Send's and a Swap's alike
+      ...(jobKey ? { jobKey } : {}),
     };
-    const job: SendJob = { id: noted.id, ...(mark === "send" ? { filled: true as const } : {}), inDeposit: leg1.depositAddress, ...(leg1.statusTag ? { inTag: leg1.statusTag } : {}), outDeposit, ...(real.zerofeeStatusTag ? { outTag: real.zerofeeStatusTag } : {}), ...(two.pair ? { signedData: null, sealed: true as const } : { signedData: two.signedData }), leg2In: String(real.quote.amountIn), coin: symbol, coinId: fromId, startedAtIso: at, ...deadlineOf(intent.payload) };
+    const job: SendJob = { id: noted.id, ...(mark === "send" ? { filled: true as const } : {}), ...(swap ? { outDecimals: swap.outDecimals } : {}), inDeposit: leg1.depositAddress, ...(leg1.statusTag ? { inTag: leg1.statusTag } : {}), outDeposit, ...(real.zerofeeStatusTag ? { outTag: real.zerofeeStatusTag } : {}), ...(two.pair ? { signedData: null, sealed: true as const } : { signedData: two.signedData }), leg2In: String(real.quote.amountIn), coin: symbol, coinId: fromId, startedAtIso: at, ...deadlineOf(intent.payload) };
     // security review L2: the movement and the job are on the device BEFORE leg 1's sheet, so a crash after it leaves
     // both (a restart follows leg 1's own status). A No sends nothing, a sheet that errored hands nothing over: both
     // taken back, and leg 2's signature with them.
@@ -313,6 +323,31 @@ export function createSafeSend(x: SafeSendDeps) {
     return movement;
   }
 
+
+  /**
+   * A Safe Swap (product decision, 8 Nov; a Safe Buy or Sell is one too): the Send's own two legs, never a
+   * second path. Leg 1: exactly `units` of the Safe's coin into Private, paid from the Safe's NEAR Intents balance by one
+   * mt_transfer (the fill's intents route). Leg 2: Private pays NEAR Intents, which swaps it and delivers the coin got
+   * into the Safe's own NEAR Intents balance (INTENTS to this account: core paysWhomPicked, "this account itself"). Leg 2
+   * is signed first and held by the core for the Safe's ONE sheet (a Swap: moveSwap), handed over only once leg 1 reads
+   * SUCCESS. `least`: the least shown before the tap (units of the coin got). One movement, kind "swap".
+   */
+  async function swapFromSafe(o: { from: string; to: string; units: bigint; least: bigint; key?: string }, caller: Caller): Promise<Movement> {
+    const since = x.now();
+    await x.notForChild();
+    const cat = await x.catalogue();
+    const coin = cat.coin(x.originAsset(o.from)), got = cat.coin(o.to);
+    if (!coin || !got) throw new ProblemError(walletProblems.quoteUnavailable("That coin isn't listed."));
+    if (o.units <= 0n) throw new ProblemError(walletProblems.amountInvalid());
+    const pocket = await ensurePocket();
+    const amount = fromUnits(o.units, coin.decimals);
+    const plan = await x.privatePlan(o.from, amount, true, true, true);
+    if (plan.pocket !== pocket.address) throw new ProblemError(walletProblems.privateUnavailable());
+    // only the Safe's NEAR Intents balance pays a Swap (one mt_transfer), never its NEAR account
+    if (plan.route !== "intents") throw new ProblemError(walletProblems.balanceLow(amount, coin.symbol));
+    const why = `Swap ${amount} ${coin.symbol} for ${got.symbol}`;
+    return fromSafe(plan, o.from, amount, o.units, coin.symbol, pocket, { kind: "ledger", accountId: plan.accountId }, o.to, why, undefined, caller, { swap: true }, since, o.key, { least: o.least, outDecimals: got.decimals });
+  }
 
   /** The Safe's route for a Move's one fill (`units`, as the core's plan sized it), read before anything is paid, so a
    *  Safe that can't cover the fill's step says so while the plan can still be sized down (ledger.balance.low). */
@@ -366,7 +401,7 @@ export function createSafeSend(x: SafeSendDeps) {
     // leg 1: the core's own quote of exactly the plan's one fill (the core refuses any other amount for this Move)
     const leg1 = await x.core<PrivateInQuote>("subwallet.private.quoteIn", { tokenId: fromId, amount: route.units.toString(), through: true, ...(route.route === "intents" ? { intents: true } : {}), job: o.job });
     const fair = /^[0-9a-f]{64}$/.test(String(leg1.depositAddress)) && /^\d{1,30}$/.test(String(leg1.amountIn)) && /^\d{1,30}$/.test(String(leg1.minAmountOut)) && BigInt(leg1.amountIn) === route.units && BigInt(leg1.minAmountOut) > 0n;
-    if (!fair) throw new ProblemError(walletProblems.quoteExpired());
+    if (!fair) throw new ProblemError(walletProblems.quoteMismatch());
     // each leg 2: its share of what leg 1 promises (its signed minimum), so their sum never passes it
     const pays = o.legs.map((l) => askedShare(BigInt(leg1.minAmountOut), l.units, route.units));
     const jobs = await x.jobs();
@@ -379,7 +414,7 @@ export function createSafeSend(x: SafeSendDeps) {
         const req = x.privatePayRequest({ fromTokenId: fromId, toTokenId, to, inUnits: pays[i]!, pocket: pocket.address, dry: false, deadlineMs: SEND_QUOTE_MS });
         const real = await x.askPrivate(req);
         const outDeposit = real.quote.depositAddress;
-        if (!outDeposit || BigInt(real.quote.amountIn) !== pays[i]! || !(BigInt(real.quote.amountOut || "0") > 0n)) throw new ProblemError(walletProblems.quoteExpired());
+        if (!outDeposit || BigInt(real.quote.amountIn) !== pays[i]! || !(BigInt(real.quote.amountOut || "0") > 0n)) throw new ProblemError(walletProblems.quoteMismatch());
         const intent = await generate(pocket.address, outDeposit);
         const two = await x.core<{ signedData?: unknown; declined?: true; pair?: { hash: string } }>("subwallet.privatePay", { id: pocket.id, depositAddress: outDeposit, intent: { payload: intent.payload }, why, ...(real.zerofeeStatusTag ? { statusTag: real.zerofeeStatusTag } : {}), inDeposit: leg1.depositAddress, payee: payeeAsk(req), pair: true, job: o.job });
         if (two.declined || (!two.signedData && !two.pair)) throw new ProblemError(walletProblems.declined());
@@ -413,5 +448,5 @@ export function createSafeSend(x: SafeSendDeps) {
     return out;
   }
 
-  return { sendFromSafe, pocketShare, fillRoute, payOwn, fillMove };
+  return { sendFromSafe, pocketShare, fillRoute, payOwn, fillMove, swapFromSafe };
 }

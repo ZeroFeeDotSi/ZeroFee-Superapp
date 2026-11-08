@@ -103,7 +103,7 @@ export async function clearThisBrowser(device: UnlockDevice = browserDevice()): 
 /** `laptopWords`: the laptop page (LaptopGate.tsx, product decision, 5 Nov): its own Touch ID / Windows Hello passkey (passkey.ts reads
  *  the page's mode) and these words in place of the iPhone's. `laptopStart`: its first screen's heading (what the page
  *  is) and next step (LAPTOP_START), passed in so they load with the laptop page only. */
-export function UnlockGate({ children, device = browserDevice(), intro, unfinished, iphoneOnly = MAINNET, web = false, laptopWords, laptopStart }: { children: ReactNode; device?: UnlockDevice; intro?: (done: (lockNow?: boolean) => void) => ReactNode; unfinished?: () => boolean; iphoneOnly?: boolean; web?: boolean; laptopWords?: typeof LaptopLock; laptopStart?: { heading: string; next: string } }) {
+export function UnlockGate({ children, device = browserDevice(), intro, unfinished, iphoneOnly = MAINNET, web = false, laptopWords, laptopStart }: { children: ReactNode; device?: UnlockDevice; intro?: (done: (lockNow?: boolean) => void) => ReactNode; unfinished?: () => boolean; iphoneOnly?: boolean; web?: boolean; laptopWords?: typeof LaptopLock; laptopStart?: { heading: string; next: string; soon?: string } }) {
   const [step, setStep] = useState<Step>({ k: "checking" });
   const [introDone, setIntroDone] = useState(false);
   const [say, setSay] = useState<{ text: string; bad?: boolean } | null>(null);
@@ -227,7 +227,7 @@ export function UnlockGate({ children, device = browserDevice(), intro, unfinish
   // browser's storage is read; Use this laptop turns on once it is (a stuck read still ends on "stuck" at OPEN_DEADLINE_MS).
   if (step.k === "checking" && laptop) {
     return (
-      <Screen title={laptopStart?.heading ?? laptop.setupTitle} body={laptop.setupBody} {...(laptopStart ? { more: laptopStart.next } : {})} say={null}>
+      <Screen title={laptopStart?.heading ?? laptop.setupTitle} body={laptopStart ? laptop.setupHow : laptop.setupBody} {...(laptopStart ? { more: laptopStart.next } : {})} {...(laptopStart?.soon ? { soon: laptopStart.soon } : {})} say={null}>
         <button className="zf-btn" disabled>{laptop.use}</button>
       </Screen>
     );
@@ -259,8 +259,9 @@ export function UnlockGate({ children, device = browserDevice(), intro, unfinish
     return (
       <Screen
         title={laptop ? (!step.legacy && laptopStart ? laptopStart.heading : laptop.setupTitle) : step.legacy ? "Lock your account" : "Lock ZeroFee on this device"}
-        body={laptop ? (step.legacy ? laptop.setupBodyLegacy : laptop.setupBody) : step.legacy ? `Your account is here. ${IPHONE_UNLOCKS}` : IPHONE_KEY}
+        body={laptop ? (step.legacy ? laptop.setupBodyLegacy : laptopStart ? laptop.setupHow : laptop.setupBody) : step.legacy ? `Your account is here. ${IPHONE_UNLOCKS}` : IPHONE_KEY}
         {...(laptop && !step.legacy && laptopStart ? { more: laptopStart.next } : {})}
+        {...(laptop && laptopStart?.soon ? { soon: laptopStart.soon } : {})}
         say={say}
       >
         <button className="zf-btn" onClick={() => void usePasskey(step.legacy)}>{laptop ? laptop.use : `Use ${name}`}</button>
@@ -374,7 +375,7 @@ function Plain({ title }: { title: string }) {
   );
 }
 
-function Screen({ title, body, more, say, children }: { title: string; body: string; more?: string; say: { text: string; bad?: boolean } | null; children: ReactNode }) {
+function Screen({ title, body, more, soon, say, children }: { title: string; body: string; more?: string; soon?: string; say: { text: string; bad?: boolean } | null; children: ReactNode }) {
   return (
     <div className="zf-screen zf-pad">
       <div className="zf-fill" />
@@ -383,6 +384,7 @@ function Screen({ title, body, more, say, children }: { title: string; body: str
         <h1 className="zf-title" style={{ marginTop: 32 }}>{title}</h1>
         <p className="zf-body" style={{ marginTop: 12 }}>{body}</p>
         {more && <p className="zf-small" style={{ marginTop: 10 }}>{more}</p>}
+        {soon && <p className="zf-small" data-testid="laptop-soon" style={{ marginTop: 10 }}>{soon}</p>}
       </div>
       <div className="zf-fill" />
       <div className="zf-floor zf-enter-2">

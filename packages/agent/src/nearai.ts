@@ -133,10 +133,13 @@ interface Att {
 }
 
 /** Fetch the attestation for `model` with a fresh nonce, and check it. Needs no key. */
+/** How long NEAR AI Cloud's proof may take (attest's deadline; AgentZero's screen counts it down, read-left.ts). */
+export const ATTEST_MS = 30_000;
+
 export async function attest(model = MODEL, fetchFn: Fetch = fetch as unknown as Fetch, nonce = freshNonce()): Promise<Proof> {
   let r;
   try {
-    r = await fetchFn(`${NEAR_AI}/attestation/report?model=${encodeURIComponent(model)}&signing_algo=ecdsa&nonce=${nonce}`, { signal: AbortSignal.timeout(30_000) });
+    r = await fetchFn(`${NEAR_AI}/attestation/report?model=${encodeURIComponent(model)}&signing_algo=ecdsa&nonce=${nonce}`, { signal: AbortSignal.timeout(ATTEST_MS) });
   } catch {
     throw new NearAiError("NEAR AI Cloud didn't send its proof.");
   }

@@ -65,14 +65,14 @@ const block = (w: PlainWords) => [w.title, ...w.lines.slice(0, w.lines.indexOf("
 
 test("the phone: the page's parts cross to the core in whole cents under the Move's key, and the core's own sheet says the whole Move (control: honest parts)", async () => {
   const s = await phone(4);
-  assert.ok(s.hoodUsd >= 4, `the Sim's ETH (RH) wallet holds ${s.hoodUsd}`);
+  assert.ok(s.hoodUsd >= 4, `the Sim's Robinhood wallet holds ${s.hoodUsd}`);
   const A = "phone-move-a-0123456789";
   const r = await top(s, A, [{ from: "hood", to: "sol", usd: 2.5 }, { from: "hood", to: "near", usd: 1.25 }]);
   assert.ok("ok" in r, JSON.stringify(r));
   assert.deepEqual(s.crossed.at(-1), { job: A, others: [{ from: "hood", to: "sol", cents: "250" }, { from: "hood", to: "near", cents: "125" }] });
   const a = block(s.sheets.at(-1)!);
   assert.equal(a[0], "Move $33.75 to your SOL and NEAR wallets", a.join(" | "));
-  assert.ok(a.includes("From your ETH (RH) wallet · about $3.75"), a.join(" | "));
+  assert.ok(a.includes("From Robinhood wallet · about $3.75"), a.join(" | "));
 });
 
 test("the phone: a part the page's engine would allow but over the core's own read is not said (the Safe's side only); a malformed part never crosses", async () => {
@@ -82,14 +82,14 @@ test("the phone: a part the page's engine would allow but over the core's own re
   assert.equal(PAGE.has("phone-move-b-0123456789"), true, "the page's own keep took it (its engine reads more)");
   const b = block(s.sheets.at(-1)!);
   assert.equal(b[0], "Move $30.00 to your SOL and NEAR wallets", b.join(" | "));
-  assert.ok(!b.some((l) => /ETH \(RH\)/.test(l)), b.join(" | "));
+  assert.ok(!b.some((l) => /Robinhood wallet|ETH \(RH\)/.test(l)), b.join(" | "));
   // malformed: crosses as none, the Safe's side only
   assert.ok("ok" in (await top(s, "phone-move-c-0123456789", [{ from: "hood", to: "sol", usd: "all" }])));
   assert.deepEqual(s.crossed.at(-1), { job: "phone-move-c-0123456789", others: null });
   assert.equal(block(s.sheets.at(-1)!)[0], "Move $30.00 to your SOL and NEAR wallets");
   // control: under the core's read, on the same phone, said
   assert.ok("ok" in (await top(s, "phone-move-d-0123456789", [{ from: "hood", to: "sol", usd: 1.5 }])));
-  assert.ok(block(s.sheets.at(-1)!).includes("From your ETH (RH) wallet · about $1.50"), block(s.sheets.at(-1)!).join(" | "));
+  assert.ok(block(s.sheets.at(-1)!).includes("From Robinhood wallet · about $1.50"), block(s.sheets.at(-1)!).join(" | "));
 });
 
 test("the phone: Not now ends the parts in the core too (a leg there with the key is refused); no parts, nothing crosses", async () => {
@@ -120,8 +120,8 @@ test("(c) only Home's own Move says wallet parts: from AgentZero, Browser, a sit
     assert.ok("ok" in r || r.problem.code === "security.request.not-allowed", `${caller}: ${JSON.stringify(r)}`);
     assert.equal(s.crossed.length, n, `${caller}: nothing crosses`);
     assert.equal(PAGE.has(key), false, `${caller}: nothing kept in the page`);
-    if ("ok" in r) assert.ok(!block(s.sheets.at(-1)!).some((l) => /ETH \(RH\)/.test(l)), `${caller}: ${block(s.sheets.at(-1)!).join(" | ")}`);
+    if ("ok" in r) assert.ok(!block(s.sheets.at(-1)!).some((l) => /Robinhood wallet|ETH \(RH\)/.test(l)), `${caller}: ${block(s.sheets.at(-1)!).join(" | ")}`);
   }
   assert.ok("ok" in (await top(s, "phone-gate-home-0123456789", parts)));
-  assert.ok(block(s.sheets.at(-1)!).includes("From your ETH (RH) wallet · about $2.50"), "control: Home's own Move");
+  assert.ok(block(s.sheets.at(-1)!).includes("From Robinhood wallet · about $2.50"), "control: Home's own Move");
 });

@@ -51,7 +51,7 @@ test("D128: both copies of the prompt and the tools use the new words (control: 
     assert.equal(/\bhidden\b|\brows?\b/i.test(text), false, `${name}: no hidden place, no rows`);
     assert.match(text, /SOL wallet/);
     assert.match(text, /NEAR wallet/);
-    assert.match(text, /ETH \(RH\) wallet/);
+    assert.match(text, /Robinhood wallet/);
     const act = tools.find((t) => t.name === "propose_act")!.input_schema as { properties: { from: { enum: string[] } } };
     assert.ok(!act.properties.from.enum.includes("hidden"), `${name}: no Hidden choice`);
   }

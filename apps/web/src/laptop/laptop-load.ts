@@ -4,6 +4,7 @@
 // test can hold it without a browser.
 import type { BridgeResult } from "@zerofee/core/bridge";
 import type { Problem } from "@zerofee/core/problem";
+import { shortTime } from "@zerofee/core/clock";
 import { LAPTOP_START } from "../unlock/laptop-lock-words.ts";
 
 /** How long the laptop's key and its accounts may take to load before the page says so. */
@@ -17,3 +18,16 @@ export function withinDeadline<T>(call: () => Promise<BridgeResult<T>>, ms = LOA
   let late: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([call(), new Promise<BridgeResult<T>>((r) => (late = setTimeout(() => r({ problem: LOAD_LATE }), ms)))]).finally(() => clearTimeout(late));
 }
+
+/**
+ * Audit 15 FL3 (rule 9a, keep the last state with its time): what a poll's answer does to the page. The first load's
+ * failure is the page's Problem (there is nothing to keep); once the page has shown its state, a NEAR blip keeps the
+ * Guarding list, the waiting requests and an open approval sheet, and says one line with the last read's time.
+ */
+export function pollOutcome<T>(res: BridgeResult<T>, shown: boolean): { ok: T } | { problem: Problem } | { late: true } {
+  if (!("problem" in res)) return { ok: res.ok };
+  return shown ? { late: true } : { problem: res.problem };
+}
+
+/** The kept page's line while NEAR doesn't answer: what is down, that it checks by itself, and when it last read. */
+export const keptLines = (lastReadMs: number, locale?: string): [string, string] => [LAPTOP_START.stale, `As of ${shortTime(lastReadMs, locale)}`];

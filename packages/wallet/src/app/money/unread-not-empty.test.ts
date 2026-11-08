@@ -14,7 +14,7 @@ test("Move: an unread Safe, an unloaded or unread Spending, or a wallet Spending
   assert.equal(moveUnread(null, { loaded: true, networks: both }), true, "the Safe not read yet");
   assert.equal(moveUnread("46.00", { loaded: false, networks: both }), true, "Spending not loaded");
   assert.equal(moveUnread("46.00", { loaded: true, unread: true, networks: both }), true, "Spending unread");
-  assert.equal(moveUnread("0", { loaded: true, networks: [{ network: "sol" }] }), true, "ETH (RH) not read");
+  assert.equal(moveUnread("0", { loaded: true, networks: [{ network: "sol" }] }), true, "Robinhood not read");
   assert.equal(moveUnread("0", { loaded: true, networks: both }), false, "control: everything answered, truly empty");
 });
 

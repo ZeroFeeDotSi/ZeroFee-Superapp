@@ -38,7 +38,7 @@ export interface KeptFacts { id: string; wallet: string; hash: string; token: st
 const CHAIN: Record<string, string> = { sol: "Solana", hood: "Robinhood Chain", bsc: "BNB Chain", near: "NEAR" };
 const wallet = (c?: string): string => (c && c in WALLET_NAME ? WALLET_NAME[c as keyof typeof WALLET_NAME] : "its wallet");
 /** The status a row says while it isn't done; a done one says none. */
-const STATUS: Record<Badge, string | undefined> = { Done: undefined, Running: "Sending…", Waiting: "Waiting", "Didn't go": "Didn't go through", Check: "Check" };
+const STATUS: Record<Badge, string | undefined> = { Done: undefined, Running: "Sending", Waiting: "Waiting", "Didn't go": "Didn't go through", Check: "Check" };
 /** the audit's MUST (ii), 7 Nov: done on one node's word, its final amount never confirmed (trade.trade.final-unchecked). */
 export const unchecked = (r: Pick<TradeRecord, "problem">): boolean => r.problem?.code === "trade.trade.final-unchecked" || keptCard(r);
 /** the audit's MUST (7 Nov): Ref kept the trade's coin out on its side, never proven where (trade.near.rhea-kept). */
@@ -54,14 +54,15 @@ export interface KeptView { head: string; body?: string; claim?: { label: string
  * Never a bare end.
  */
 export function keptWay(k: KeptFacts, held: string | null | undefined): KeptView {
-  if (held === undefined) return { head: "Checking with Rhea…" };
+  if (held === undefined) return { head: "Checking with Rhea" };
   // the audit's T9: the trade moved (its NEAR left; Ref kept the coin), so never "Nothing moved."
   if (held === null) return { head: "Rhea's servers didn't answer.", body: `${k.left ? `Your ${k.left} left. ` : ""}Ref kept the ${k.symbol}. Open this again to check.` };
   // the audit's T8: a claim went out and the lost and found reads empty: it most likely came back; never Rhea's team
   if (k.sent && BigInt(held) === 0n) return { head: `Your ${k.symbol} claim was sent.`, body: "Rhea sent it back or still holds it. Check your NEAR wallet." };
   if (BigInt(held) > 0n) return { head: `Your ${k.symbol} is still with Rhea.`, body: `About ${amount(held, k.decimals)} ${k.symbol}. Nothing is lost.`, claim: { label: "Get it back", running: "Getting it back…" } };
   return {
-    head: `Your ${k.symbol} didn't reach your NEAR wallet.`, body: "It's most likely with Rhea's team. Ask them to send it back.",
+    // QA 16's S8 (8 Nov): no hedge ("It's most likely"): where it sits is an inference, so the card says only what to do
+    head: `Your ${k.symbol} didn't reach your NEAR wallet.`, body: "Ask Rhea's team to send it back. Show them the details below.",
     details: { open: "Show details", head: "Give them these:", rows: [{ label: "Your wallet", value: k.wallet }, { label: "The trade", value: k.hash }, { label: "The coin", value: k.token }] },
   };
 }
@@ -184,7 +185,7 @@ export function moveCard(m: MoveRow, chainName?: string): Card {
   const now = steps.find((s) => s.state === "now");
   if (now && m.etaSec !== undefined) now.etaSec = m.etaSec;           // on its way: until it lands; waiting: until it goes
   const badge: Badge = m.status === "done" ? "Done" : m.status === "failed" || m.status === "refunded" ? "Didn't go" : m.status === "waiting" ? "Waiting" : "Running";
-  const status = m.status === "waiting" ? "Waiting" : m.status === "moving" ? "Moving…" : STATUS[badge];
+  const status = m.status === "waiting" ? "Waiting" : m.status === "moving" ? "Moving" : STATUS[badge];
   return { id: m.id, title: moveWords(m), result: where, badge, at: m.at, steps, usd: m.usd, moveIcon: m.chain ?? "near", ...(status ? { status } : {}), ...(m.held ? { held: m.held } : {}) };
 }
 

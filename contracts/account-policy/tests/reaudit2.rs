@@ -70,7 +70,7 @@ fn account() -> AccountPolicy {
 
 // ══ N1 (Critical) — rule 2 made the phone the master: a stolen phone replaced the words in 24 h and took everything ══
 
-/// FIXED (N1 (a), the owner's choice: the words beat the phone). New backup words asked by the phone wait the floor (8
+/// FIXED (N1 (a), the product's choice: the words beat the phone). New backup words asked by the phone wait the floor (8
 /// days), not the band's day, and the owner's start drops them; the old words stay, and spending stays frozen while the
 /// owner's recovery waits. A stolen phone can't replace the words.
 #[test]
@@ -152,7 +152,7 @@ fn n1d_new_words_during_a_recovery_are_refused_so_a_late_stop_leaves_the_owner_a
     assert!(p.waiting_requests().is_empty());
 }
 
-/// The cost of N1 (a), accepted by the owner (re-audit R2 reopened): leaked words and no second device. The owner's new
+/// The cost of N1 (a), accepted by the product (re-audit R2 reopened): leaked words and no second device. The owner's new
 /// words are dropped by each start the leaked words make, so the owner stops recovery after recovery and spending stays
 /// frozen, but the leaked words take nothing: no payment runs at Face ID, and the phone stops each move. (The app asks
 /// for a second device before the vault holds more than $5,000.)

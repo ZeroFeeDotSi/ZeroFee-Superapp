@@ -73,6 +73,7 @@ export function ActivityDetail({ title, line, usd, atIso, page, onClose, onBack,
         )}
         {payee && <div className="wl-rows"><button className="wl-row wl-row-2 wl-pick" onClick={() => copy(payee)}><div><div className="t">Paid to</div><div className="d">{copied === payee ? `${W.copied} ${payee}` : payee}</div></div></button></div>}
         <div className="wl-rows" data-testid="proof-ends">
+          {page.noLink && !page.started && <div className="wl-row wl-row-2" data-testid="proof-no-link"><div><div className="d">{W.noLink}</div></div></div>}
           {end(W.started, page.started, "s")}
           {page.finished ? (headFinished(page) ? end(W.finished, page.finished, "f") : null) : page.ended === null ? null : <div className="wl-row wl-row-2"><div><div className="t">{page.ended?.label ?? W.finished}</div><div className="d">{page.ended?.line ?? (page.done ? W.doneNoLink : W.notYet)}</div>{page.ended?.check && <div className="d" data-testid="detail-check">{page.ended.check}</div>}</div></div>}
         </div>

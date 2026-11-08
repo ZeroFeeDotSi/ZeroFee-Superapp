@@ -145,7 +145,7 @@ test("O-2c: NEAR waiting for the words: the checklist, the thread and the apps s
   assert.match(openingWords(at(NEAR_COIN, { haveYocto: 100n }), "Wallet").title, /Opening/);
 });
 
-test("D125: set-up's swap route (SOL, ETH (RH)) is on only in the test build; off, NEAR alone and one line, never the old public route (control: on, every coin)", () => {
+test("D125: set-up's swap route (SOL, Robinhood) is on only in the test build; off, NEAR alone and one line, never the old public route (control: on, every coin)", () => {
   const coins = [{ id: "near" }, { id: "sol" }, { id: "hood-eth" }];
   assert.deepEqual(fundCoinsShown(coins, false).map((c) => c.id), ["near"], "off: NEAR only (it needs no swap)");
   assert.deepEqual(fundCoinsShown(coins, true).map((c) => c.id), ["near", "sol", "hood-eth"], "control: the test build");

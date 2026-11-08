@@ -12,7 +12,8 @@ const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
 test("item 9: each wallet chip is its name over its figure (\"SOL wallet\" / \"$169.37\"), spoken \"SOL wallet · $169.37\"", () => {
   const cases: [Parameters<typeof walletChip>, ReturnType<typeof walletChip>][] = [
     [["sol", 169.37], { name: "SOL wallet", figure: "$169.37", label: "SOL wallet · $169.37" }],
-    [["hood", 28.17], { name: "ETH (RH) wallet", figure: "$28.17", label: "ETH (RH) wallet · $28.17" }],
+    // QA 16 (8 Nov): by its name, "Robinhood" alone so the tab fits (was "ETH (RH) wallet")
+    [["hood", 28.17], { name: "Robinhood", figure: "$28.17", label: "Robinhood · $28.17" }],
     [["near", 0], { name: "NEAR wallet", figure: "$0.00", label: "NEAR wallet · $0.00" }],
     [["sol", undefined], { name: "SOL wallet", figure: null, label: "SOL wallet" }],          // not read yet: a shimmer, never $0.00
     [["bsc", Number.NaN], { name: "BNB wallet", figure: null, label: "BNB wallet" }],
@@ -142,4 +143,10 @@ test("item 10: first paint has no cursor and reads \"Now\"; a live feed says Liv
   assert.match(c, /vertLine: \{ visible: false, color:/, "the line is hidden until armed");
   assert.match(c, /if \(!arm\.armed \|\| !e\.time \|\| !e\.point\) \{ say\(null\); return; \}/, "an unarmed crosshair says nothing");
   assert.match(p, /\{word === "Now" && <span className="zf-live-word cp-live cp-now">Now<\/span>\}/);
+});
+
+test("QA 16 (8 Nov): the strip's tab says \"Robinhood\" alone, clear of the fade at 390 pt (10 pt gaps, 8 pt before Move)", () => {
+  assert.equal(walletChip("hood", 1).name, "Robinhood");
+  const css = readFileSync(new URL("./discover.css", import.meta.url), "utf8");
+  assert.match(css, /\.dc-tabs \{ gap: 14px; \}\n[^]*?\.dc-tabs \{ gap: 10px; margin-right: 8px; \}/);
 });

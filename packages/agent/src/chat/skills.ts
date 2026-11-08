@@ -26,6 +26,7 @@ import { createEvmRpc } from "@zerofee/trade/evm/rpc.ts";
 import type { Candle, CoinRow, Market, Range } from "@zerofee/trade/market/types.ts";
 import type { ChainId } from "@zerofee/trade/types.ts";
 import { SWAP_PLACES, coinName, getsFor } from "@zerofee/wallet/app/money/swap-corridor.ts";
+import { appChain } from "@zerofee/core/app-chains";
 
 export type PriceAsk = { coins: string[]; range?: "7d" | "30d" };
 export type QuoteAsk = { usd: number; pay: string; get: string };
@@ -39,7 +40,7 @@ export interface SkillHands {
   /** What each place holds now, in dollars, for AgentZero's own checks (plan.ts fit): the Safe, and each wallet's cash
    *  (its own coin; the NEAR wallet's USDC). A place that couldn't be read is null, never 0. */
   balances?(): Promise<Balances>;
-  /** One coin's live dollar price (SOL, NEAR, ETH, USDC, BNB, BTC), for a coin amount the person said ("0.02 SOL"):
+  /** One coin's live dollar price (SOL, NEAR, ETH, USDC, BTC), for a coin amount the person said ("0.02 SOL"):
    *  ZeroFee turns it into dollars, never Claude. null when it can't be read. */
   price?(symbol: string): Promise<number | null>;
   /** 1Click (the swap service) answering, by the core's own service read (ledger.status, what service_status reads):
@@ -75,12 +76,11 @@ export interface SkillDeps {
   web?: boolean;
 }
 
-/** The six named coins: CoinGecko's ids. Any other symbol is looked up in Trade's market (GeckoTerminal). */
-export const CG_IDS: Record<string, string> = { SOL: "solana", NEAR: "near", ETH: "ethereum", BNB: "binancecoin", BTC: "bitcoin", USDC: "usd-coin" };
+/** The five named coins: CoinGecko's ids. Any other symbol is looked up in Trade's market (GeckoTerminal). */
+export const CG_IDS: Record<string, string> = { SOL: "solana", NEAR: "near", ETH: "ethereum", BTC: "bitcoin", USDC: "usd-coin" };
 /** The named coins a 7- or 30-day summary is read for, by the chain's own wrapped coin (Trade's candles). */
 const RANGE_COIN: Record<string, { chain: ChainId; address: string }> = {
   SOL: { chain: "sol", address: "So11111111111111111111111111111111111111112" },
-  BNB: { chain: "bsc", address: "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c" },
   NEAR: { chain: "near", address: "wrap.near" },
 };
 /** The coins a dry quote prices against USDC (1Click's ids on NEAR Intents, and their decimals). */
@@ -204,12 +204,14 @@ export function skillHands(d: SkillDeps): SkillHands {
   /** Another coin, by its ticker in Trade's market search: the most-traded pool whose symbol is exactly it. */
   async function searched(sym: string): Promise<CoinRow | null> {
     const rows = await within((await market()).search(sym), FETCH_MS);
-    const same = rows.filter((r) => r.symbol.toUpperCase() === sym && typeof r.priceUsd === "number" && r.priceUsd > 0);
+    // the app's chains only (core app-chains.ts, audit 18's I8): a same ticker elsewhere is never the price said
+    const same = rows.filter((r) => appChain(r.chain) && r.symbol.toUpperCase() === sym && typeof r.priceUsd === "number" && r.priceUsd > 0);
     same.sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0));
     return same[0] ?? null;
   }
 
-  const CHAIN_WORD: Record<ChainId, string> = { sol: "Solana", bsc: "BNB Chain", hood: "Robinhood Chain", near: "NEAR" };
+  // audit 18's I8: the app's chains only (core app-chains.ts); a coin on another chain is never offered (appFound)
+  const CHAIN_WORD: Partial<Record<ChainId, string>> = { sol: "Solana", hood: "Robinhood Chain", near: "NEAR" };
 
   return {
     async find(symbol, chain) {
@@ -263,7 +265,7 @@ export function skillHands(d: SkillDeps): SkillHands {
           lines.push(`${s}: no coin with that ticker was found.`);
           continue;
         }
-        let line = `${s} (on ${CHAIN_WORD[row.chain]}): ${usdText(row.priceUsd!)}${row.change24hPct !== undefined ? `, ${pctText(row.change24hPct)} in 24 hours` : ""} (GeckoTerminal, data from ${clock(now())})`;
+        let line = `${s} (on ${CHAIN_WORD[row.chain]!}): ${usdText(row.priceUsd!)}${row.change24hPct !== undefined ? `, ${pctText(row.change24hPct)} in 24 hours` : ""} (GeckoTerminal, data from ${clock(now())})`;
         if (q.range) {
           const sm = await summary(row.chain, row.address, q.range).catch(() => null);
           line += sm ? `; ${sm}` : `; no ${q.range === "7d" ? "7-day" : "30-day"} figure here`;
@@ -279,13 +281,13 @@ export function skillHands(d: SkillDeps): SkillHands {
       try {
         rows = await within((await market()).trending(id), FETCH_MS);
       } catch {
-        return `Couldn't get what's trending on ${CHAIN_WORD[id]} right now.`;
+        return `Couldn't get what's trending on ${CHAIN_WORD[id]!} right now.`;
       }
       const named = rows.filter((r) => tickerOf(r.symbol) && typeof r.priceUsd === "number").slice(0, MAX_TRENDING);
-      if (!named.length) return `No trending coins on ${CHAIN_WORD[id]} right now.`;
+      if (!named.length) return `No trending coins on ${CHAIN_WORD[id]!} right now.`;
       const when = rows.asOf ? `an older list, from ${clock(rows.asOf)} (GeckoTerminal couldn't be asked just now)` : `data from ${clock(now())}`;
       return [
-        `Trending on ${CHAIN_WORD[id]} (GeckoTerminal, ${when}):`,
+        `Trending on ${CHAIN_WORD[id]!} (GeckoTerminal, ${when}):`,
         ...named.map((r, i) => `${i + 1}. ${tickerOf(r.symbol)}: ${usdText(r.priceUsd!)}${r.change24hPct !== undefined ? `, ${pctText(r.change24hPct)} in 24 hours` : ""}${r.volume24hUsd !== undefined ? `, ${bigUsd(r.volume24hUsd)} traded in 24 hours` : ""}`),
       ].join("\n");
     },
@@ -333,17 +335,16 @@ export function skillHands(d: SkillDeps): SkillHands {
       };
       const heldUsd = (c: string) => held(c).reduce((s, p) => s + (Number(p.usd) || 0), 0);
       if (!st || !st.loaded || st.unread) {
-        lines.push("Your SOL wallet, your ETH (RH) wallet and your NEAR wallet: couldn't be read right now.");
+        lines.push("Your SOL wallet, your Robinhood wallet and your NEAR wallet: couldn't be read right now.");
       } else {
-        const wallets: [string, string, string][] = [["sol", "Your SOL wallet", "SOL"], ["hood", "Your ETH (RH) wallet", "ETH"], ["bsc", "Your BNB wallet", "BNB"]];
+        const wallets: [string, string, string][] = [["sol", "Your SOL wallet", "SOL"], ["hood", "Your Robinhood wallet", "ETH"]];
         for (const [c, name, coin] of wallets) {
           const n = st.networks.find((x) => x.network === c);
           if (!n) {
-            if (c !== "bsc") lines.push(`${name}: couldn't be read right now.`);
+            lines.push(`${name}: couldn't be read right now.`);
             continue;
           }
           const usd = (Number(n.cashUsd) || 0) + (Array.isArray(pos) ? heldUsd(c) : Number(n.coinsUsd) || 0);
-          if (c === "bsc" && !(usd >= 0.01)) continue;
           lines.push(`${name}: ${usdText(usd)}${n.nativeAmount !== undefined ? ` (${amountText(Number(n.nativeAmount))} ${coin})` : ""}.${heldText(c)}`);
         }
         const cash = Number(st.reserveUsd ?? 0) || 0;
@@ -354,7 +355,7 @@ export function skillHands(d: SkillDeps): SkillHands {
       const ws = ok(wsR);
       if (Array.isArray(ws)) {
         // never AgentZero's own (its wallet is its own figure) nor an older wallet (replaced words)
-        // one line per wallet name: a site with a wallet per network (GMGN: Solana and BNB, ST13) is one wallet to the
+        // one line per wallet name: a site with a wallet per network (GMGN, ST13) is one wallet to the
         // person, its networks' dollars added (QA walk: "Your GMGN wallet" said twice)
         const by = new Map<string, { unread: boolean; priced: boolean; usd: number; holds?: string }>();
         for (const w of ws.filter((x) => x.role === "site" && x.site !== "agentzero" && x.current !== false)) {
@@ -489,19 +490,18 @@ export function skillHands(d: SkillDeps): SkillHands {
         d.web ? { problem: null } : d.bridge.call<{ name?: unknown }[]>("ledger.chains").catch(() => ({ problem: null })),
       ]);
       const st = ok(stR);
-      const bscOpen = !!st?.networks?.some((n) => n.network === "bsc" && !n.closed);
       // W7, the web wallet: no Safe, so its three wallets only; send and trade are its money tools, each on the password
-      if (d.web) return WEB_COINS(bscOpen).join("\n");
-      const open = (c: "bsc" | "pair") => (c === "pair" ? HOME_PROOF : bscOpen);
+      if (d.web) return WEB_COINS().join("\n");
+      // a chain the app doesn't show is never open (core app-chains.ts)
+      const open = (c: string) => c === "pair" && HOME_PROOF;
       const agentPairs: string[] = [];
       const homePairs: string[] = [];
       for (const pay of SWAP_PLACES) for (const g of getsFor(pay, open)) (pay.startsWith("safe") ? homePairs : agentPairs).push(`${coinName(pay)} → ${coinName(g)}`);
       const chains = ok(chainsR);
-      const names = Array.isArray(chains) ? [...new Set(chains.map((c) => (typeof c.name === "string" ? c.name.replace(/[^\p{L}\p{N} ()-]/gu, "").trim().replace(/^Robinhood Chain$/, "ETH (RH)") : "")).filter(Boolean))].slice(0, 20) : [];
+      const names = Array.isArray(chains) ? [...new Set(chains.map((c) => (typeof c.name === "string" ? c.name.replace(/[^\p{L}\p{N} ()-]/gu, "").trim().replace(/^Robinhood Chain$/, "Robinhood") : "")).filter(Boolean))].slice(0, 20) : [];
       return [
         "Send, swap, move, add and request: AgentZero opens Home's own sheet filled in, from your Safe or any wallet; you approve each with Face ID.",
-        "Wallets and their coins: your SOL wallet holds SOL; your ETH (RH) wallet holds ETH (RH); your NEAR wallet holds USDC cash and NEAR coins; your Safe holds USDC, NEAR and coins added from other chains.",
-        `BNB: ${bscOpen ? "open" : "not open yet"}.`,
+        "Wallets and their coins: your SOL wallet holds SOL; your Robinhood wallet holds ETH; your NEAR wallet holds USDC cash and NEAR coins; your Safe holds USDC, NEAR and coins added from other chains.",
         `Swaps AgentZero can propose: ${agentPairs.join("; ") || "none right now"}.`,
         `From your Safe (AgentZero opens Home's own Swap filled in; you approve it): ${homePairs.join("; ") || "none"}.`,
         names.length ? `Money can be added to your Safe from: ${names.join(", ")}.` : "The chains money can be added from couldn't be read right now.",
@@ -511,10 +511,9 @@ export function skillHands(d: SkillDeps): SkillHands {
 }
 
 /** W7: covered_coins on the web wallet (no Safe, no Face ID): what its wallets hold and how money moves there. */
-export const WEB_COINS = (bscOpen: boolean): string[] => [
+export const WEB_COINS = (): string[] => [
   "Send and trade: AgentZero fills in Home's Send or a coin's page. You approve each one with your password.",
   "Each wallet holds its own chain's coins.",
-  `BNB: ${bscOpen ? "open" : "not open yet"}.`,
   "Money comes in to each wallet at its own address, on Home's Add.",
 ];
 

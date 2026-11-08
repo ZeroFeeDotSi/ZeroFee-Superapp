@@ -1,6 +1,7 @@
 # AgentZero problems (the Sign-up Robot's planner)
 
-Every Problem `src/agent-problems.ts` can produce (robot/think.ts, Pay's `agent.robot.next`). A test checks that every code
+Every Problem `src/agent-problems.ts` can produce (robot/think.ts, Pay's `agent.robot.next`; robot/relay-think.ts, AgentZero's
+browser on ZeroFee's server). A test checks that every code
 there is listed here and nothing else is. Money: every one leaves the money in the person's Safe. The old Agent app's rows
 (its rules, setup and the contract's refusals) went with its screens (D110).
 
@@ -14,4 +15,7 @@ there is listed here and nothing else is. Money: every one leaves the money in t
 | `agent.model.unavailable` | Claude didn't answer properly, so AgentZero made no plan. | In your Safe | Try again |
 | `agent.model.refused` | Claude declined to plan this, so nothing changed. | In your Safe | Ask in other words |
 | `agent.plan.unreadable` | AgentZero's plan didn't make sense, so it was dropped. | In your Safe | Ask in other words |
+| `agent.browse.off` | AgentZero's browser is off in this version. | In your Safe | OK |
+| `agent.browse.unfunded` | AgentZero needs more money to think. Add money to its wallet. | In AgentZero's wallet | OK |
+| `agent.browse.no-payer` | AgentZero pays for each step from its wallet, and its chat is closed. Open AgentZero to go on. | In AgentZero's wallet | OK |
 | `agent.robot.not-allowed` | Only Pay's sign-ups can use the Sign-up Robot, so nothing ran. | In your Safe | Go back |

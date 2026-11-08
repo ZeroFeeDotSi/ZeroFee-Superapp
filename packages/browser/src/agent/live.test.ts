@@ -38,7 +38,10 @@ test("the flag is off: nothing of AgentZero's browser shows until the operator's
   // both read the same build switch (VITE_AGENT_BROWSER=1), off when unset (node: no import.meta.env)
   const expr = '(import.meta.env?.VITE_AGENT_BROWSER === "1")';
   assert.ok(app.includes(`const AGENT_BROWSER = ${expr} as boolean;`), "BrowserApp reads the same switch");
-  assert.ok(readFileSync(new URL("./flag.ts", import.meta.url), "utf8").includes(`export const AGENT_BROWSER: boolean = ${expr};`), "flag.ts reads the same switch");
+  // E2 (audit 14): the one flag lives in shell-api, read by the chat (its "browse" tool) and re-exported here
+  assert.ok(readFileSync(new URL("../../../shell-api/src/agent-browser.ts", import.meta.url), "utf8").includes(`export const AGENT_BROWSER: boolean = import.meta.env?.VITE_AGENT_BROWSER === "1";`), "shell-api's one flag reads the same switch");
+  assert.match(readFileSync(new URL("./flag.ts", import.meta.url), "utf8"), /export \{ AGENT_BROWSER \} from "@zerofee\/shell-api\/agent-browser\.ts";/, "flag.ts is that flag");
+  assert.match(readFileSync(new URL("../../../agent/src/chat/use-chat-turn.ts", import.meta.url), "utf8"), /import \{ AGENT_BROWSER \} from "@zerofee\/shell-api\/agent-browser\.ts";/, "the chat reads that flag");
   // the live view is a lazy import, and the only way in is guarded by the flag
   assert.match(app, /AGENT_BROWSER && \(/);
   assert.match(app, /lazy\(\(\) => import\("\.\/LiveView\.tsx"\)\)/);
@@ -60,7 +63,7 @@ test("BR1, the task: a site's https address with its host shown plainly; http, j
 test("BR2/BR3, the live view: AgentZero acts read-only; Take over gives the person the wheel and AgentZero waits (its events wait too); Hand back returns it", () => {
   let s: Live = { phase: "idle" };
   s = liveStep(s, { type: "start", host: "axiom.trade" });
-  assert.equal(liveLine(s), "AgentZero is opening axiom.trade…");
+  assert.equal(liveLine(s), "AgentZero is opening axiom.trade.");
   s = liveStep(s, { type: "event", e: { kind: "at", host: "axiom.trade" } });
   assert.equal(liveLine(s), "AgentZero is on axiom.trade.");
   assert.equal(touchable(s), false, "read-only while AgentZero acts");
@@ -81,9 +84,11 @@ test("BR3, the hand-over lines: each need names the site and the one thing to do
   assert.equal(you("code"), "axiom.trade sent a code. Type it.");
   assert.equal(you("terms"), "axiom.trade wants you to agree to its rules. Read, then tap Agree.");
   assert.equal(you("create-account"), "Make an account on axiom.trade? Tap Create. AgentZero waits.");
-  assert.equal(you("money"), "axiom.trade asks for money. AgentZero never pays here.");
+  // audit 17's H9: what to tap next (no figure on the page: "there")
+  assert.equal(you("money"), "axiom.trade asks for money. AgentZero never pays. Tap Watch to pay there yourself, or Stop.");
   assert.equal(liveLine(liveStep({ phase: "agent", host: "axiom.trade" }, { type: "event", e: { kind: "done", host: "axiom.trade" } })), "AgentZero is done on axiom.trade.");
-  assert.equal(liveLine(liveStep({ phase: "agent", host: "axiom.trade" }, { type: "stop" })), "Stopped. Nothing was sent.");
+  // audit 17's H7: a Stop says what was and wasn't done
+  assert.equal(liveLine(liveStep({ phase: "agent", host: "axiom.trade" }, { type: "stop" })), "Stopped. AgentZero read the page. It did nothing else.");
   assert.equal(liveLine(liveStep({ phase: "starting", host: null }, { type: "event", e: { kind: "failed", host: null } })), "The page didn't open. Nothing was sent.");
 });
 
@@ -100,7 +105,7 @@ test("a session over the cloud browser: touchable exactly on the person's turn; 
   assert.equal(liveLine(s.state()), "You have the wheel. AgentZero waits.", "its events wait on the person's turn");
   s.handBack();
   s.stop();
-  assert.equal(liveLine(s.state()), "Stopped. Nothing was sent.");
+  assert.equal(liveLine(s.state()), "Stopped. AgentZero read the page. It did nothing else.");
   assert.deepEqual(f.calls, ["start Sign in to axiom.trade https://axiom.trade/", "interactive s1 true", "interactive s1 false", "unsubscribed", "stop s1"]);
   assert.ok(!states.some((x) => JSON.stringify(x).includes("secret-token")), "the live URL is never in a state");
   // the browser didn't start: said by name, nothing else

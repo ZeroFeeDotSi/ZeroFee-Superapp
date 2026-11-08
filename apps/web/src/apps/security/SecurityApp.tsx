@@ -534,6 +534,9 @@ function PendingCount({ pending, device }: { pending: NonNullable<NonNullable<Ac
   return <>{c.before}<b>{text}</b>{c.after}</>;
 }
 
+/** The Account tab while NEAR's history is read: who does it, no ellipsis (builder 20, item 8). */
+export const ACCOUNT_READING = "NEAR is sending what your account did.";
+
 /** What the account did may have changed: a move or a payment signed, ended or came back. */
 export const ACCOUNT_CHANGED = ["spending.changed", "ledger.balancesChanged"] as const;
 
@@ -574,7 +577,7 @@ function ActivityTab({ bridge, bare = false }: { bridge: Bridge; bare?: boolean 
   if (!rows) return (
     <div className="zf-enter" aria-busy="true">
       {head}
-      <p className="zf-small" role="status" style={{ marginBottom: 6 }}>Reading your account's history…</p>
+      <p className="zf-small" role="status" style={{ marginBottom: 6 }}>{ACCOUNT_READING}</p>
       {[0, 1, 2, 3].map((i) => <div key={i} className="sec-act-row sec-act-skel" aria-hidden="true"><div className="t" /><div className="d" /></div>)}
     </div>
   );
@@ -799,7 +802,7 @@ export function LaptopFlow({ actions, onDone, onHeld, kind = "laptop", start }: 
           {kind === "laptop" && !sample && LAPTOP.address && <CopyAddress address={LAPTOP.address} />}
           <div className="zf-fill" />
           {/* A browser has no scanner here (Permissions-Policy camera=()): Paste only, no frame that looks like one. */}
-          <div className="zf-floor">{kind === "laptop" && LAPTOP.later && !sample ? <button className="zf-btn" onClick={onDone}>Done</button> : sample ? <button className="zf-btn" onClick={() => setStep("laptop")}>Open ZeroFee on my laptop</button> : phone ? <><button className="zf-btn" onClick={() => setStep("scan")}>{t.scanButton}</button><button className="zf-link" onClick={() => void pasteCode()}>Paste the code</button></> : <button className="zf-btn" disabled={asking} onClick={() => void pasteCode()}>{asking ? "Asking your account…" : PAIR_STEP_TWO.web.button}</button>}</div>
+          <div className="zf-floor">{kind === "laptop" && LAPTOP.later && !sample ? <button className="zf-btn" onClick={onDone}>Done</button> : sample ? <button className="zf-btn" onClick={() => setStep("laptop")}>Open ZeroFee on my laptop</button> : phone ? <><button className="zf-btn" onClick={() => setStep("scan")}>{t.scanButton}</button><button className="zf-link" onClick={() => void pasteCode()}>Paste the code</button></> : <button className="zf-btn" disabled={asking} onClick={() => void pasteCode()}>{asking ? "Asking your account" : PAIR_STEP_TWO.web.button}</button>}</div>
         </>
       )}
       {step === "laptop" && sample && (
@@ -836,7 +839,7 @@ export function LaptopFlow({ actions, onDone, onHeld, kind = "laptop", start }: 
             <p className="zf-small" style={{ marginTop: 10 }}>{sample && code.trim() === sample.code ? `Your laptop shows the letters ${sample.letters}. They match.` : t.match}</p>
           </div>
           <div className="zf-fill" />
-          <div className="zf-floor"><button className="zf-btn" disabled={!code.trim() || asking} onClick={() => void pair()}>{asking ? "Asking your account…" : t.add}</button><p className="zf-small">You'll approve adding it on the next screen.</p></div>
+          <div className="zf-floor"><button className="zf-btn" disabled={!code.trim() || asking} onClick={() => void pair()}>{asking ? "Asking your account" : t.add}</button><p className="zf-small">You'll approve adding it on the next screen.</p></div>
         </>
       )}
       {step === "amount" && (
@@ -853,7 +856,7 @@ export function LaptopFlow({ actions, onDone, onHeld, kind = "laptop", start }: 
           </div>
           <p className="zf-small" style={{ textAlign: "center", marginTop: 16 }}>Payments under this stay one tap.</p>
           <div className="zf-fill" />
-          <div className="zf-floor"><button className="zf-btn" disabled={asking} onClick={() => void finish()}>{asking ? "Asking your account…" : `Turn on ${kind === "laptop" ? "your laptop's" : kind === "phone" ? "your other phone's" : "your guardian's"} yes`}</button><p className="zf-small">You'll approve it on the next screen.</p></div>
+          <div className="zf-floor"><button className="zf-btn" disabled={asking} onClick={() => void finish()}>{asking ? "Asking your account" : `Turn on ${kind === "laptop" ? "your laptop's" : kind === "phone" ? "your other phone's" : "your guardian's"} yes`}</button><p className="zf-small">You'll approve it on the next screen.</p></div>
         </>
       )}
     </div>

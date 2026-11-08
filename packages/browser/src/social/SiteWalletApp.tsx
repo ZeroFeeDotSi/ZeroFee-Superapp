@@ -23,8 +23,10 @@ import { usd } from "@zerofee/trade/app/format.ts";
 import { PRESET_LOGO } from "../app/chains.tsx";
 import { SIGN_IN_TASK_MS, addLanded, addNotSeen, showsSignIn, signInStuck, signInTask, type SignInState } from "../site-tasks.ts";
 import { LISTED } from "./catalog.ts";
-import { CHAIN_NAME, SITE_CHAINS, addEnded, addTaskAt, hubRows, landedLine, landing, pickable, readHub, readLanding, saveHub, saveLanding, solOf, walletTitle, type HubRow, type Landing } from "./hub-state.ts";
-import { madeFor, groupAddress, proofUrl, readAddTasks, saveAddTasks, shortAddress, walletView, type SiteBack, type SiteCoin } from "./site-wallet.ts";
+import { CHAIN_NAME, SITE_CHAINS, addEnded, addTaskAt, hubRows, keptHub, landedLine, landing, pickable, readHub, readLanding, saveHub, saveLanding, solOf, walletTitle, type HubRow, type Landing } from "./hub-state.ts";
+import { READING, madeFor, groupAddress, proofUrl, readAddTasks, readingWho, saveAddTasks, shortAddress, solanaDownOf, walletView, type SiteBack, type SiteCoin } from "./site-wallet.ts";
+import { shortTime } from "@zerofee/core/clock";
+import type { ServiceStatus } from "@zerofee/core/services";
 import { every } from "@zerofee/shell-api/rest.ts";
 import { taskStore } from "@zerofee/shell-api/tasks.ts";
 import { SiteApp } from "./SiteApp.tsx";
@@ -62,6 +64,15 @@ export function SiteWalletApp({ site, browser, page, onBack }: { site: string; b
   const [coinsIn, setCoinsIn] = useState(false);
   useEffect(() => { if (!active) return; const t = setTimeout(() => setCoinsIn(true), 4000); return () => clearTimeout(t); }, [active]); // never held longer than 4 s
   const [read, setRead] = useState<"first" | "ok" | "failed">("first");
+  // audit 15 FB1: the last figure read on this device (before this page's own read saves over it) and Solana's state
+  const [kept, setKept] = useState(() => keptHub()[site]);
+  const [solanaDown, setSolanaDown] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    const look = () => void bridge.call<ServiceStatus[]>("ledger.status").then((r) => setSolanaDown("ok" in r && Array.isArray(r.ok) && solanaDownOf(r.ok)), () => undefined);
+    look();
+    return every(30_000, look, page ?? `site:${site}`);
+  }, [active, bridge, site]);
   const [adds, setAdds] = useState<SpendingActivity[]>([]);
   const [backs, setBacks] = useState<SiteBack[]>([]);
   const was = useRef<Landing | undefined>(readLanding()[site]);
@@ -101,6 +112,7 @@ export function SiteWalletApp({ site, browser, page, onBack }: { site: string; b
       if (rows && mine) {
         setRow(mine);
         saveHub(rows);
+        setKept(keptHub()[site]);
         setRead("ok");
       } else setRead("failed");
       if (act && "ok" in act && Array.isArray(act.ok)) setAdds(act.ok);
@@ -251,14 +263,16 @@ export function SiteWalletApp({ site, browser, page, onBack }: { site: string; b
   }} />;
 
   const settling = !coinsIn && (row?.usd ?? 0) >= 0.01;
-  const v0 = walletView({ site, name, ...(row ? { row } : {}), read, ...(moving ? { moving } : {}), adds, backs, line, now: Date.now(), coins, jobs });
-  const v = settling ? { ...v0, dollars: "…", coins: [], canAdd: false, canTakeOut: false, totalNote: undefined } : v0;
+  const v0 = walletView({ site, name, ...(row ? { row } : {}), read, ...(moving ? { moving } : {}), adds, backs, line, now: Date.now(), coins, jobs, ...(kept ? { kept } : {}), solanaDown });
+  // builder 25 (item 2): while its coins are read, the kept figure with its time, else "Reading" and who reads it; never "…"
+  const v = settling ? { ...v0, ...(kept ? { dollars: usd(kept.usd), asOf: `As of ${shortTime(kept.at)}` } : { dollars: READING, asOf: readingWho(name) }), coins: [], canAdd: false, canTakeOut: false, totalNote: undefined } : v0;
   return (
     <Frame name={name} onBack={onBack}>
       <div className="sw-page" data-testid={`site-wallet-${site}`}>
         <section className="sw-top">
           <img className="st-app-logo sw-logo" src={PRESET_LOGO[site]} alt="" width={56} height={56} />
           <p className="sw-big" data-testid="sw-usd">{v.dollars}</p>
+          {v.asOf && <p className="zf-small sw-total-note" data-testid="sw-as-of">{v.asOf}</p>}
           {v.totalNote && <p className="zf-small sw-total-note">{v.totalNote}</p>}
           <p className="zf-small sw-sub">{walletTitle(name)}</p>
           <p className="zf-small sw-sub" data-testid="sw-made-for">{madeFor(name)}</p>
@@ -278,7 +292,7 @@ export function SiteWalletApp({ site, browser, page, onBack }: { site: string; b
             <div><div className="t">{c.name}</div><div className="d">{c.symbol}</div></div>
             <div className="v">{c.dollars}</div>
           </div>
-        )) : <p className="zf-small sw-empty">{v.dollars === "…" ? "Looking…" : "No coins yet."}</p>}
+        )) : settling || v.dollars === READING ? null : <p className="zf-small sw-empty">No coins yet.</p>}
 
         {v.address && <>
           <h2 className="sw-h">Address</h2>

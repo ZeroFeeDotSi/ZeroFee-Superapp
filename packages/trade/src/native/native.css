@@ -48,3 +48,11 @@
 /* a row with no chip (a coin the Safe can't buy yet) gives the chip's room back to its name */
 /* "Send this coin ›" (the copy review's ruling, 5 Nov): a quiet row under the figures, the key-value row's own look, as a button */
 .nc-send { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; font-size: 14.5px; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* builder 15 (8 Nov): a Safe Buy or Sell's three steps on its receipt (into Private, the swap, back): one line each, a tick
+   once its read says done, the steps not begun quieter. No numbers: the order is the lines' own. */
+.nc-steps { list-style: none; margin: 8px 0 0; padding: 0; }
+.nc-steps li { margin: 0; }
+.nc-steps li[data-state="done"]::before { content: "\2713\00a0"; color: var(--up, currentColor); }
+.nc-steps li[data-state="waiting"] { opacity: 0.6; }
+.nc-steps li[data-state="failed"] { color: var(--down, currentColor); }

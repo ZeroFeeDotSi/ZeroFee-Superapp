@@ -13,16 +13,16 @@ back, the network) are Trade's own, listed in `packages/trade/errors.md`, and th
 | `extension.wallet.locked` | Your trading wallet is locked. (It locks after an hour without a trade, and when Chrome closes.) | safe: in your trading wallet | Unlock (open → unlock) |
 | `extension.trade.over-limit` | This trade is over your one-tap limit of $50. | safe: in your trading wallet | Type your passcode to go ahead (open → confirm) |
 | `extension.touch.gone` | Touch ID can't open this wallet any more. (More: nothing is lost; the passcode opens it; turn Touch ID on again in Settings.) | safe: in your trading wallet | Use your passcode (open → unlock) |
-| `extension.touch.unavailable` | Touch ID can't lock this wallet in this browser. (More: the passcode keeps working.) | safe: in your trading wallet | OK |
+| `extension.touch.unavailable` | Touch ID can't lock this wallet in this browser. (More: the passcode keeps working.) | safe: in your trading wallet | Close |
 | `extension.trade.no-quote` | This coin can't be bought here right now. (More: no pool gave a price for it just now; nothing was sent.) | safe: in your trading wallet | Try again (retry) |
-| `extension.sign.refused` | We stopped this before signing it. (More: what it asked for that a trade never needs.) | safe: in your trading wallet | Go back (nothing) |
-| `extension.sign.stale` | This trade waited too long, so we didn't sign it. (Its blockhash was no longer recent.) | safe: in your trading wallet | Get a new price (retry) |
-| `extension.sign.unchecked` | We couldn't check this trade with the Solana network, so we didn't sign it. | safe: in your trading wallet | Try again (retry) |
+| `extension.sign.refused` | ZeroFee stopped this trade before signing it. (More: one plain line for what it asked for: money to someone else, a program ZeroFee doesn't know, moving your coins out, a fee over the limit, or more than a trade needs. Never an id.) | safe: in your trading wallet | Go back (nothing) |
+| `extension.sign.stale` | This trade waited too long, so ZeroFee didn't sign it. (Its blockhash was no longer recent.) | safe: in your trading wallet | Get a new price (retry) |
+| `extension.sign.unchecked` | Solana didn't answer the check of this trade, so it wasn't signed. | safe: in your trading wallet | Try again (retry) |
 | `extension.wallet.empty` | Your trading wallet is empty. (More: send SOL to it from any Solana wallet.) | not involved | Add money (open → fund) |
-| `extension.site.unreadable` | We can't tell which coin this page shows. (More: open the coin's own page on the site.) | safe: in your trading wallet | OK (nothing) |
-| `extension.site.chain` | This coin is on BNB Chain. The panel trades Solana coins. (More: open a Solana coin's page.) | safe: in your trading wallet | OK (nothing) |
+| `extension.site.unreadable` | This page doesn't say which coin it shows. (More: open the coin's own page on the site.) | safe: in your trading wallet | Close (nothing) |
+| `extension.site.chain` | This coin is on BNB Chain. The panel trades Solana coins. (More: open a Solana coin's page.) | safe: in your trading wallet | Close (nothing) |
 | `extension.link.code` | That doesn't look like the code on your phone. (More: it has 10 letters and numbers.) | not involved | Type it again (fix-input → code) |
-| `extension.app.only` | That isn't something the panel does. (Funding and bringing money back belong to the ZeroFee app.) | safe: in your trading wallet | OK (nothing) |
+| `extension.app.only` | That isn't something the panel does. (Funding and bringing money back belong to the ZeroFee app.) | safe: in your trading wallet | Close (nothing) |
 | `extension.worker.stopped` | The extension stopped partway, so nothing was signed. | safe: in your trading wallet | Try again (retry) |
 | `extension.panel.tab` | This panel works beside a trading site, like pump.fun or GMGN. (More: Open one of those and it appears there. Nothing moved.) | not involved | Close this tab (nothing) |
 | `extension.storage.failed` | This browser didn't save the trading wallet. (Nothing was made, so no money is in it yet.) | not involved | Try again (retry) |

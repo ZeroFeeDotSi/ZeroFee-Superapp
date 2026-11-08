@@ -326,3 +326,16 @@ test("finding 18: a Top up still moving when its page went is followed again by 
   await ok<Movement[]>(again, "ledger.activity");
   assert.equal(fetch.calls.filter((c) => c.url.startsWith(`${SERVER}/status`)).length >= 1, true);
 });
+
+// K2 (audit 13, 8 Nov): the Add's key (a Move's or a Swap's `job`, float-core) is stamped on its movement (Movement.jobKey)
+// and so on its ledger.activity row: a page reloaded before the answer finds the job by it. Fails on main: no key.
+test("K2: ledger.toTrading keeps the page's key for its job on the movement and its activity row; none given, none kept", async () => {
+  const KEY = "home-swap-0123456789abcdef01234567";
+  const { ledger } = setup();
+  const m = await ok<Movement>(ledger, "ledger.toTrading", { amount: "10", job: KEY });
+  assert.equal(m.jobKey, KEY);
+  const rows = await ok<Movement[]>(ledger, "ledger.activity", { limit: 50 });
+  assert.equal(rows.find((r) => r.id === m.id)?.jobKey, KEY);
+  const bare = await ok<Movement>(setup().ledger, "ledger.toTrading", { amount: "10" });
+  assert.equal(bare.jobKey, undefined, "control: no key");
+});

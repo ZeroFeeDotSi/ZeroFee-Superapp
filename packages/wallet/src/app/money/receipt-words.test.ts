@@ -33,10 +33,10 @@ test("item 1: each receipt's line is the job's own words: Send's payee, Swap's p
   assert.match(send, /setSentSaid\(sendWords\(toWho\)\); setFlying\(shown\);/, "Send: whom, as its job says it (the figure is the hero's alone, the audit's M8)");
   assert.match(send, /title: `Send \$\{said\}`/, "control: the same figures as the job's title");
   assert.match(send, /<JobReceipt amount=\{flying\} icon=\{<ActSend \/>\} testid="send-sent" etaSec=\{etaSec\} said=\{sentSaid\?\.going\} landedSaid=\{sentSaid\?\.landed\} job=\{flyingJob\} onDone=\{madeDone\} \/>/);
-  assert.match(src("./SwapSheet.tsx"), /setMadeSaid\(\{ going: swappingLine\(SWAP_COIN\[pay\.place\]\.label, SWAP_COIN\[get\]\.label\), landed: swappedLine\(lands, SWAP_COIN\[get\]\.where\) \}\)/, "Swap: going, then the figure the sheet priced and where it lands");
-  assert.match(src("../screens/MoveSheet.tsx"), /\{movingLine\(madeTo\(legs\.map\(\(l\) => l\.to\)\), job\.state === "landed"\)\}/, "Move: J5's line");
+  assert.match(src("./SwapSheet.tsx"), /setMadeSaid\(\{ going: swappingLine\(SWAP_COIN\[pay\.place\]\.label, SWAP_COIN\[get\]\.label\), landed: swappedLine\(undefined, SWAP_COIN\[get\]\.where\) \}\)/, "Swap: going, then where it lands (M12-1: the figure only once read off its record, never the tap's estimate under Done.)");
+  assert.match(src("../screens/MoveSheet.tsx"), /title: movingLine\(o\.where, landed\)/.test(src("./receipt-said.ts")) ? /data-testid="move-made-title">\{said\.title\}/ : /never/, "Move: J5's line (audit 13's D1: through moveReceiptWords)");
   assert.match(src("./SiteMoney.tsx"), /<SaidLine testid="site-add-said" \{\.\.\.addWords\(made, name, network\)\} job=\{madeJob\} \/>/);
-  assert.match(src("./JobMade.tsx"), /<p className="zf-receipt__head">\{JOB_WORDS\.created\}<\/p>/);
+  assert.match(src("./JobMade.tsx"), /<p className="zf-receipt__head" data-testid=\{`\$\{testid\}-head`\}>\{landed \? JOB_WORDS\.landed : JOB_WORDS\.created\}<\/p>/);
 });
 
 test("item 3: a landed job says how long it took, early or late; never \"Landed early.\" (controls: still going, the time left; no start known, the old past-estimate words)", () => {
@@ -48,8 +48,8 @@ test("item 3: a landed job says how long it took, early or late; never \"Landed 
   assert.equal(TIME_WORDS.underSecond, "Done in under a second.");
   assert.ok(!Object.values(TIME_WORDS).includes("Landed early." as never), "the word is gone");
   const endsAt = T + 240_000;
-  assert.equal(receiptLeft(endsAt, T + 600_000, T, T + 430), "Done in under a second.", "landed early");
-  assert.equal(receiptLeft(endsAt, T + 600_000, T, T + 270_000), "Done in 5 min.", "landed late: how long, never a frozen \"Almost there.\"");
+  assert.equal(receiptLeft(endsAt, T + 600_000, T, T + 430), "Took under a second.", "landed early (M12-1: under the head \"Done.\", how long it took)");
+  assert.equal(receiptLeft(endsAt, T + 600_000, T, T + 270_000), "Took 5 min.", "landed late: how long, never a frozen \"Almost there.\"");
   assert.equal(receiptLeft(endsAt, T + 60_000, T, undefined), "About 3 min left.", "control: still going");
   assert.equal(receiptLeft(T + 30_000, T), "About 30 seconds left.", "the copy review's J5: seconds in words");
   assert.equal(receiptLeft(T + 1_000, T), "About 1 second left.");
@@ -94,13 +94,13 @@ test("item 5: the funding page: the amounts first, three plain lines, the rest o
 
 test("the copy review's J5: Swap says it is swapping while it goes, swapped once landed; Move names where it goes (controls: one place, the Safe, Private)", () => {
   assert.equal(swappingLine("USDC", "SOL"), "Swapping USDC for SOL.");
-  assert.equal(movingLine(moveWhere(["SOL", "ETH (RH)"]), false), "Moving it to your SOL and ETH (RH) wallets.");
-  assert.equal(movingLine(moveWhere(["SOL", "ETH (RH)", "NEAR"]), false), "Moving it to your SOL, ETH (RH) and NEAR wallets.");
+  assert.equal(movingLine(moveWhere(["SOL", "Robinhood"]), false), "Moving it to your SOL and Robinhood wallets.");
+  assert.equal(movingLine(moveWhere(["SOL", "Robinhood", "NEAR"]), false), "Moving it to your SOL, Robinhood and NEAR wallets.");
   assert.equal(moveWhere(["SOL", "SOL"]), "your SOL wallet", "control: one wallet");
   assert.equal(moveWhere(["Safe"]), "your Safe", "control: the Safe");
   assert.equal(moveWhere(["Private"]), "Private", "control: never \"your Private wallet\"");
   assert.equal(moveWhere([]), "your wallets", "control: none known");
-  assert.equal(movingLine("your Safe", true), "Moved to your Safe.");
+  assert.equal(movingLine("your Safe", true), "It's now in your Safe.");
 });
 
 test("the copy review (7 Nov): where the Safe pays, the details say so, never \"never spends from your Safe\" (control: a real account's NEAR wallet fill keeps the wallet's own rule)", () => {
@@ -136,9 +136,9 @@ test("QA's MUST: the line's tense follows the job's chain read: going, the prese
   const table: [typeof send, Parameters<typeof receiptSaid>[1], string][] = [
     [send, { state: "going" }, "Sending it to bob.near."],
     [send, { state: "landed" }, "Sent to bob.near."],
-    [send, { state: "stopped", words: "NEAR said no. Your money is in your Safe." }, "Sending it to bob.near. NEAR said no. Your money is in your Safe."],
+    [send, { state: "stopped", words: "NEAR said no. Your money is in your Safe." }, "Not sent to bob.near. NEAR said no. Your money is in your Safe."], // the audit's Send S2: the stop first,
     [send, { state: "unsure", words: "Your money is either in Private or still with NEAR Intents." }, "Sending it to bob.near. Your money is either in Private or still with NEAR Intents."],
-    [send, { state: "stopped" }, "Sending it to bob.near."],
+    [send, { state: "stopped" }, "Not sent to bob.near."],
     [add, { state: "going" }, "Adding $10.00 to your pump.fun wallet."],
     [add, { state: "landed" }, "Added $10.00 to your pump.fun wallet."],
     [add, { state: "stopped", words: "Solana said no." }, "Adding $10.00 to your pump.fun wallet. Solana said no."],

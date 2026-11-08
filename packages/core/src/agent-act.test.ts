@@ -130,7 +130,7 @@ test("each kind inside the scope reaches its one existing core path once; what h
   assert.equal(r.calls.length, 5, "a trade calls no wallet here: the trading day signs it");
   await assert.rejects(act({ kind: "trade", from: "hood", usd: 1, key: key() }, r.h), refused(/AgentZero trades on Solana for now/));
   for (const kind of ["send", "pay"]) await assert.rejects(act({ kind, from: "sol", to: "kim.near", usd: 1, key: key() }, r.h), refused(new RegExp(`can't ${kind} from your SOL wallet yet`)));
-  await assert.rejects(act({ kind: "move", from: "sol", to: "hood", usd: 1, key: key() }, r.h), refused(/can't move from your SOL wallet to your ETH \(RH\) wallet yet/));
+  await assert.rejects(act({ kind: "move", from: "sol", to: "hood", usd: 1, key: key() }, r.h), refused(/can't move from your SOL wallet to your Robinhood wallet yet/));
   await assert.rejects(act({ kind: "move", from: "spending", to: "bsc", usd: 1, key: key() }, r.h), refused(/can't move money on your BNB wallet yet/));
   assert.equal(r.calls.length, 5);
 });
@@ -139,7 +139,7 @@ test("a place the job doesn't name is refused by name; junk is refused before th
   const r = rig();
   await actScope({ set: { ...ALL, places: ["spending", "sol"] } }, r.h);
   await assert.rejects(act({ kind: "move", from: "hidden", to: "safe", usd: 1, key: key() }, r.h), refused(/doesn't let AgentZero use your NEAR wallet/));
-  await assert.rejects(act({ kind: "move", from: "spending", to: "hood", usd: 1, key: key() }, r.h), refused(/doesn't let AgentZero use your ETH \(RH\) wallet/));
+  await assert.rejects(act({ kind: "move", from: "spending", to: "hood", usd: 1, key: key() }, r.h), refused(/doesn't let AgentZero use your Robinhood wallet/));
   for (const bad of [{ kind: "steal" }, { kind: "move", from: "moon" }, { kind: "move", from: "spending", to: "sol", usd: Number.NaN }, { kind: "move", from: "spending", to: "sol", usd: 1, key: "x" }]) {
     await assert.rejects(act({ key: key(), usd: 1, ...bad }, r.h), (e: any) => e.problem.code === "security.request.invalid", JSON.stringify(bad));
   }

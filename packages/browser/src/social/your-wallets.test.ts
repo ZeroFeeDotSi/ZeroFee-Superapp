@@ -12,9 +12,11 @@ const coin = (symbol: string, amount: string, decimals: number, usd: number | nu
 const LIST = [
   w({ id: "pump-sol", site: "pump", cashUsd: "8.20" }),
   w({ id: "gmgn-sol", site: "gmgn", cashUsd: "0.00" }),
+  // builder 25 (J8): a wallet on a chain V1 doesn't show (core app-chains.ts) stays where it is, never listed
   w({ id: "gmgn-bsc", site: "gmgn", network: "bsc", cashUsd: "3.00" }),
+  w({ id: "foo-eth", site: "host:foo.xyz", network: "eth", cashUsd: "5.00" }),
   w({ id: "ex-sol", site: "host:app.example.com", cashUsd: "0.00" }),
-  w({ id: "foo-eth", site: "host:foo.xyz", network: "eth", holds: "0.0012 ETH" }),
+  w({ id: "foo-hood", site: "host:foo.xyz", network: "hood", holds: "0.0012 ETH" }),
   w({ id: "jup-sol", site: "jupiter", unread: true }),
   // never listed: AgentZero's pocket, a chain wallet, an older site wallet, a site wallet with no site
   w({ id: "pocket", site: "agentzero", cashUsd: "40.00" }),
@@ -25,34 +27,33 @@ const LIST = [
 const COINS = { "pump-sol": [sol("41000000", 8.2), coin("BONK", "123456700000", 5, 2.47)], "ex-sol": [sol("0", 0)] };
 
 test("every site wallet, by site: listed sites and per-host ones; never AgentZero's pocket, a chain wallet or an older one", () => {
-  assert.deepEqual(siteWalletsOf(LIST).map((x) => x.id), ["pump-sol", "gmgn-sol", "gmgn-bsc", "ex-sol", "foo-eth", "jup-sol"]);
+  assert.deepEqual(siteWalletsOf(LIST).map((x) => x.id), ["pump-sol", "gmgn-sol", "ex-sol", "foo-hood", "jup-sol"]);
   const v = yourWallets({ list: LIST, coins: COINS, read: "ok" });
   // with money, largest first; a wallet that can't be read goes last but is never taken for an empty one
   assert.deepEqual(v.money.map((c) => [c.site, c.name, c.dollars]), [
     ["pump", "pump.fun", "$10.67"],
-    ["gmgn", "GMGN", "$3.00"],
     ["host:foo.xyz", "foo.xyz", "0.0012 ETH"],
-    ["jupiter", "Jupiter", "Looking…"],
+    ["jupiter", "Jupiter", "Reading"],
   ]);
-  assert.deepEqual(v.empty.map((c) => [c.site, c.name, c.dollars]), [["host:app.example.com", "app.example.com", "$0.00"]]);
+  assert.deepEqual(v.empty.map((c) => [c.site, c.name, c.dollars]), [["gmgn", "GMGN", "$0.00"], ["host:app.example.com", "app.example.com", "$0.00"]], "GMGN's BNB $3.00 isn't shown in V1");
   // a per-host wallet is named and lettered by its host
-  assert.equal(v.empty[0]!.host, "app.example.com");
-  assert.equal(v.empty[0]!.letter, "E");
+  assert.equal(v.empty[1]!.host, "app.example.com");
+  assert.equal(v.empty[1]!.letter, "E");
   assert.equal(nameOfSite("host:pump.fun.example"), "pump.fun.example");
   assert.equal(letterOf("www.zebra.io"), "Z");
   // control: the same list read again with the pump.fun wallet emptied moves it to the empty group
   const after = yourWallets({ list: LIST.map((x) => (x.id === "pump-sol" ? { ...x, cashUsd: "0.00" } : x)), coins: { ...COINS, "pump-sol": [sol("0", 0)] }, read: "ok" });
-  assert.deepEqual(after.empty.map((c) => c.site), ["pump", "host:app.example.com"]);
+  assert.deepEqual(after.empty.map((c) => c.site), ["gmgn", "pump", "host:app.example.com"]);
 });
 
-test("the total: every priced coin; a wallet that can't be read says so; only an empty first read is '…'", () => {
+test("the total: every priced coin; a wallet that can't be read says so; only an empty first read is 'Reading'", () => {
   const v = yourWallets({ list: LIST, coins: COINS, read: "ok" });
-  assert.equal(v.total, "$13.67");
+  assert.equal(v.total, "$10.67", "never GMGN's BNB or foo.xyz's Ethereum in it (V1's chains only)");
   assert.equal(v.totalNote, words.someUnseen);
   const seen = yourWallets({ list: LIST.filter((x) => x.id !== "jup-sol"), coins: COINS, read: "ok" });
-  assert.equal(seen.total, "$13.67");
+  assert.equal(seen.total, "$10.67");
   assert.equal(seen.totalNote, words.noPrice, "foo.xyz's ETH has no price: said, never added as $0");
-  assert.equal(yourWallets({ list: [], read: "first" }).total, "…");
+  assert.equal(yourWallets({ list: [], read: "first" }).total, "Reading");
   assert.equal(yourWallets({ list: [], read: "ok" }).total, "$0.00");
 });
 
@@ -76,15 +77,15 @@ test("Move back to Safe: a carried network's own coin at $2 or more; the site's 
   const v = yourWallets({ list: LIST, coins: COINS, read: "ok" });
   const by = Object.fromEntries([...v.money, ...v.empty].map((c) => [c.site, c]));
   assert.deepEqual(by.pump!.back, { wallet: "pump-sol", name: "pump.fun", also: [], usd: 8.2 });
-  // GMGN's Solana is empty: its BNB wallet leads
-  assert.deepEqual(by.gmgn!.back, { wallet: "gmgn-bsc", name: "GMGN", also: [], usd: 3 });
-  assert.equal(by["host:foo.xyz"]!.back, undefined, "Ethereum isn't carried back");
-  assert.deepEqual(by["host:foo.xyz"]!.notes, [words.staysOn("Ethereum")]);
+  // GMGN's Solana is empty, and its BNB wallet isn't shown in V1 (builder 25, J8): nothing to take out
+  assert.equal(by.gmgn!.back, undefined);
+  assert.equal(by["host:foo.xyz"]!.back, undefined, "Robinhood isn't carried back from a site wallet");
+  assert.deepEqual(by["host:foo.xyz"]!.notes, [words.staysOn("Robinhood")]);
   assert.equal(by.jupiter!.back, undefined, "an unread wallet has nothing to move");
   assert.equal(by["host:app.example.com"]!.back, undefined, "an empty one has nothing to move");
-  // both networks with money: one sheet, Solana first, BNB swept with it
+  // both networks with money: one sheet for the Solana one; BNB isn't shown in V1, so it isn't swept (builder 25, J8)
   const two = yourWallets({ list: [w({ id: "g-bsc", site: "gmgn", network: "bsc", cashUsd: "2.00" }), w({ id: "g-sol", site: "gmgn", cashUsd: "9.00" })], read: "ok" });
-  assert.deepEqual({ ...two.money[0]!.back!, usd: 0 }, { wallet: "g-sol", name: "GMGN", also: ["g-bsc"], usd: 0 });
+  assert.deepEqual(two.money[0]!.back, { wallet: "g-sol", name: "GMGN", also: [], usd: 9 });
   // the $2 floor, both sides of it
   const at = (cash: string) => yourWallets({ list: [w({ id: "p", site: "pump", cashUsd: cash })], read: "ok" }).money[0]!;
   assert.equal(BACK_MIN_USD, 2);
@@ -123,7 +124,7 @@ test("a wallet the chain can't read keeps its last view; a fresh read replaces i
 
 test("Move everything back: every wallet that can move, largest first; nothing that can't", () => {
   const v = yourWallets({ list: [...LIST, w({ id: "orca-sol", site: "orca", cashUsd: "25.00" }), w({ id: "tiny", site: "kamino", cashUsd: "1.00" })], coins: COINS, read: "ok" });
-  assert.deepEqual(v.sweep.map((b) => b.wallet), ["orca-sol", "pump-sol", "gmgn-bsc"]);
+  assert.deepEqual(v.sweep.map((b) => b.wallet), ["orca-sol", "pump-sol"]);
   // control: nothing with money, nothing to sweep
   assert.deepEqual(yourWallets({ list: [w({ id: "e", site: "pump", cashUsd: "0.00" })], read: "ok" }).sweep, []);
 });

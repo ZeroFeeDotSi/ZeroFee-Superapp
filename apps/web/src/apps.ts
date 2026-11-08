@@ -31,8 +31,11 @@ const AZ_CHAT = import.meta.env?.VITE_ZEROFEE_PUBLIC === "1" || import.meta.env?
 export function readyLazy<P extends object>(load: () => Promise<ComponentType<P>>): { Root: ComponentType<P>; preload: () => Promise<unknown> } {
   let loading: Promise<ComponentType<P>> | null = null;
   let here: ComponentType<P> | null = null;
-  const loaded = () => (loading ??= load().then((c) => (here = c), (e: unknown) => { loading = null; reloadForChunk(e); throw e; }));
-  const Later = lazy(() => loaded().then((c) => ({ default: c })));
+  // React keeps a failed lazy as failed: a load that failed (offline, audit 12 C1) gets a fresh one, so the boundary's
+  // remount asks for the code again
+  const fresh = () => lazy(() => loaded().then((c) => ({ default: c })));
+  const loaded = () => (loading ??= load().then((c) => (here = c), (e: unknown) => { loading = null; Later = fresh(); reloadForChunk(e); throw e; }));
+  let Later = fresh();
   const Root = (p: P) => {
     const [now] = useState(() => here);
     return jsx((now ?? Later) as ComponentType<P>, p);

@@ -5,3 +5,6 @@ export const simSitesOn = (_env?: { sim?: boolean; demo?: boolean; phone?: boole
 export const simSiteKind = (_site: string | undefined): SimSiteKind => "web";
 export const simHistory = (_now?: number): { host: string; url: string; atIso: string }[] => [];
 export const SIM_PRIVACY = { kind: "phone", private: true, normalSites: [] as string[], built: true, blockTrackers: true } as const;
+/** b18: AgentZero's Sim browser is never in the extension. */
+export const simAgent = async (_env?: { sim?: boolean; demo?: boolean; phone?: boolean }): Promise<null> => null;
+export const SIM_AGENT_SITES: readonly string[] = [];

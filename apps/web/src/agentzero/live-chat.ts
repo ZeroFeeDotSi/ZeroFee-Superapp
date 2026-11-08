@@ -19,6 +19,7 @@ import { LIMITS, withinOr } from "@zerofee/agent/chat/wait";
 import { mayAsk, useAgentWallet, type WalletSource } from "./use-agent-wallet.ts";
 import { streamMicros } from "./meter.ts";
 import { webWallet } from "@zerofee/shell-api/release.ts";
+import { setBrowsePay } from "@zerofee/agent/robot/relay-think";
 
 /** Funded wallet only (product decision, 3 Nov; D152; D37 prepaid): no free try, no credit. A message goes only when
  *  AgentZero's own money covers it (mayAsk); each reply is paid right after it, exactly, from AgentZero's own wallet. */
@@ -55,6 +56,8 @@ export function useLiveChat(bridge: Bridge): ChatSource {
   } : undefined), [!!wallet]); // eslint-disable-line react-hooks/exhaustive-deps
   // product decision, 4 Nov ("$0.000 used" after a reply): a paid reply's own cost when its closing line had no batch figure
   const onCost = useMemo(() => (wallet ? (micros: number) => walletRef.current?.cost(micros) : undefined), [!!wallet]); // eslint-disable-line react-hooks/exhaustive-deps
+  // audit 14 E1: AgentZero's browser thinks on the same paid path: each step is paid from this wallet like a reply
+  useEffect(() => (wallet ? setBrowsePay({ account: () => walletRef.current?.account ?? null, bindFor: (t) => walletRef.current?.bindFor(t) ?? Promise.resolve(null), settle: () => walletRef.current?.settle() ?? Promise.resolve(false), owe: (o) => walletRef.current?.owe(o), cost: (m) => walletRef.current?.cost(m) }) : undefined), [!!wallet]); // eslint-disable-line react-hooks/exhaustive-deps
   const chat = useChatTurn(bridge, { activity: reader.activity, ...(beforeCall ? { beforeCall } : {}), ...(onOwed ? { onOwed } : {}), ...(onCost ? { onCost } : {}), ...(account ? { account } : {}), ...(bindFor ? { bindFor } : {}), ...(thinking ? { thinking } : {}), ...(webWallet() ? { web: true } : {}) });
   /** Stopped by the person: Send is free again at once, whatever the request still does. */
   const [stopped, setStopped] = useState(false);

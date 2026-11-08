@@ -6,12 +6,14 @@ import type { ChainId } from "../types.ts";
 import { pct, rowUsd, usd } from "./format.ts";
 
 /** Home's words for each chain (D124): the coin, and ETH (RH) for Robinhood Chain. */
-export const CHAIN_SHORT: Record<ChainId, string> = { sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+export const CHAIN_SHORT: Record<ChainId, string> = { sol: "SOL", hood: "Robinhood", near: "NEAR", bsc: "BNB" };
 
 /** A wallet chip on Trade's top row (copy review, item 9): the wallet's name over its figure, "SOL wallet" / "$169.37"; spoken
  *  "SOL wallet · $169.37". `figure` is null while the wallet is read (a shimmer, never "$0.00"). */
 export function walletChip(chain: ChainId, usdValue: number | undefined): { name: string; figure: string | null; label: string } {
-  const name = `${CHAIN_SHORT[chain]} wallet`;
+  // QA 16 on the Sim shot (8 Nov): Robinhood by its name, never the bracketed "ETH (RH)"; "Robinhood" alone, so the
+  // strip's tab is whole and clear of its fade (Status keeps "Robinhood Chain")
+  const name = chain === "hood" ? "Robinhood" : `${CHAIN_SHORT[chain]} wallet`;
   const figure = usdValue === undefined || !Number.isFinite(usdValue) ? null : usd(usdValue);
   return { name, figure, label: figure === null ? name : `${name} · ${figure}` };
 }

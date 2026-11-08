@@ -219,7 +219,7 @@ to 128 24-hour rows): 6.278 Tgas with a live quote, 5.046 without (the app's EXE
 | `release/previous/account_policy-10-before-r2.wasm` (round 1) | `5fb691b1eb9d44e3c37ffafe8d602e7c35ce9c8c97b1fc115423fcd38bbc98aa` | `7SdCPVynVHqeqo9AnLxqZ8Wfu4SYi63e4cJ7kkgGihYD` | 339,534 |
 | `release/previous/account_policy-10-before-r2-short-waits.wasm` | `9a73101b0422930ad9b14a28a59399667043d27ab1580442891b693f804c3f52` | `BPuYmPa8nQDT2sNMuYmCGBHDiBSdLfvNe2seCctDofkm` | 339,532 |
 
-After the merge with main (fix/contract-b4-main): the wasm reproduces to the same `44e44024…c289d0b244`. `contracts/` tree differs from 07e780329's `2d952747b554…` only in main's path redaction of the four `proofs/runs/run-r8-sandbox-rehearsal*.txt` logs (not build inputs; the audit's ruling, 5 Nov); every source, Cargo and test file is identical. New `contracts/` tree: `e962f5f6e968c4f2d04d4adce80d62d019e3e4a6`.
+After the merge with main (fix/contract-b4-main): the wasm reproduces to the same `44e44024…c289d0b244`. `contracts/` tree differs from 07e780329's `2d952747b554…` only in main's path redaction of the four `proofs/runs/run-r8-sandbox-rehearsal*.txt` logs (not build inputs; the audit's ruling, 5 Nov); every source, Cargo and test file is identical (in this public export, comments and proof-log labels under `contracts/` are also rewritten: no code changes, and the wasm reproduces the same hash). New `contracts/` tree: `e962f5f6e968c4f2d04d4adce80d62d019e3e4a6`.
 
 Round 2's evidence (5 Nov, on the source as committed):
 

@@ -64,7 +64,7 @@ export function PasswordsScreen({ client, onClose }: { client: LoginsClient; onC
         <div className="pw__body">
           <h2 className="pw__title">Your logins</h2>
           <p className="zf-small pw__sub">Kept in this phone's secure chip. Never in iCloud. Face ID to see or copy one.</p>
-          {view.k === "loading" && <p className="zf-small pw__empty">Reading…</p>}
+          {view.k === "loading" && <p className="zf-small pw__empty">Reading your passwords on this device.</p>}
           {view.k === "list" && view.logins.length === 0 && <p className="zf-small pw__empty">No logins yet. The Sign-up Robot saves the ones it makes here.</p>}
           {view.k === "list" && (
             <ul className="pw__list">

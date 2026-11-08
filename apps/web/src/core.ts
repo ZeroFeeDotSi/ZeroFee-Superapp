@@ -232,14 +232,15 @@ const guardian = createGuardian(() => secondDeviceIn("guardian", () => laterBrid
 /** The Sign-up Robot's host methods (partner.*): Swift's robot mode on the phone (PartnerRobot.swift), none in a browser. */
 const partner = partnerService(host);
 /**
- * Agent's `agent.robot.next` (D29/D22): Agent's own Claude key, read as Agent; Pay's run asks it through its bridge
- * (it answers only a caller stamped "pay"). Made on first use, since it reads through the shell bridge it is part of.
+ * Agent's `agent.robot.next` (D29/D22): AgentZero's browser (caller "browser") thinks on the chat's own paid relay path
+ * (robot/service.ts, audit 14 E1: the chat's sign-up token and AgentZero's wallet, no key); Pay's run (caller "pay") on
+ * Agent's own Claude key. Made on first use, since it reads through the shell bridge it is part of.
  */
 // Its code (and the Anthropic SDK's) loads on that first use, never in the app's first load (speed, 2 Nov).
 let agentRobot: Promise<Bridge> | null = null;
 const agent: Bridge = {
   call: <T>(method: string, params?: Record<string, unknown>): Promise<BridgeResult<T>> =>
-    (agentRobot ??= import("@zerofee/agent/robot/think").then((m) => m.agentRobotService(forApps(shellBridge, "agent"))))
+    (agentRobot ??= import("@zerofee/agent/robot/service").then((m) => m.agentRobotService(forApps(shellBridge, "agent"), { relayBase: RELAY ?? null })))
       .then((robot) => robot.call<T>(method, params))
       .catch(() => {
         agentRobot = null;
@@ -271,7 +272,12 @@ const ownStore = {
     if (!("ok" in r)) throw new Error("not kept");
   },
 };
-const status = laterBridge(() => Promise.all([import("@zerofee/core/status-probe"), import("@zerofee/trade/near/switched.ts"), import("@zerofee/core/hood-proxy"), host ? import("./own-reach.ts") : null]).then(([m, s, h, r]) => m.statusService({ relay: FORK ? null : RELAY ?? null, nearSwitched: s.isSwitched, store: ownStore, apply: (c) => { if (c === "hood") h.setOwnHood(); }, ...(r ? { reach: r.phoneReaches } : {}) })));
+// On the phone the core runs apart from this page (Swift's own context), so each own server is handed to it too
+// (core own-core.ts, ZeroFee's own screens only): its Solana checks and Robinhood Chain reads use it as Trade's doors do.
+const ownIntoCore = (chain: string, address: string | null) => core.call("subwallet.own.set", { chain, address });
+// …and the core says which it couldn't reach, so Status never says "Using your server" while the core is on ZeroFee's
+const coreMissed = () => core.call<{ missed: ("near" | "solana" | "hood")[] }>("subwallet.own.state").then((r) => ("ok" in r && Array.isArray(r.ok?.missed) ? r.ok.missed : []));
+const status = laterBridge(() => Promise.all([import("@zerofee/core/status-probe"), import("@zerofee/trade/near/switched.ts"), import("@zerofee/core/hood-proxy"), host ? import("./own-reach.ts") : null]).then(([m, s, h, r]) => m.statusService({ relay: FORK ? null : RELAY ?? null, nearSwitched: s.isSwitched, store: ownStore, apply: (c) => { if (c === "hood") h.setOwnHood(); }, ...(r ? { reach: r.phoneReaches } : {}), ...(coreIsIsolated(host) ? { core: ownIntoCore, coreMissed } : {}) })));
 // Every read a screen waits on answers within 10 s, else "the network is slow" with Try again (grade 1 Nov b, N2): no
 // screen waits for ever. Sends, signatures and anything that waits for the person have no deadline.
 const routed: Bridge = withReadDeadline(guardian.withApprovals(routeBridge(core, { device, ledger, earn, trade, spending, guardian: guardian.service, partner, agent, status })));

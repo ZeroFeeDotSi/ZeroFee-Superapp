@@ -5,17 +5,17 @@ import assert from "node:assert/strict";
 import { moveSheet, walletsWords } from "./move-plan.ts";
 
 const say = (c: bigint) => `$${(c / 100n).toLocaleString("en-US")}.${String(c % 100n).padStart(2, "0")}`;
-const SOL = "your SOL wallet", RH = "your ETH (RH) wallet", NEAR = "your NEAR wallet";
+const SOL = "your SOL wallet", RH = "your Robinhood wallet", NEAR = "your NEAR wallet";
 
 // fix/move-row-truth (QA's rule and the copy review's words, 7 Nov, 04b graded C): no sources sentence (a second Safe figure), no why
 // sentence (the Stays row says it); the wallets in the plan's order; "Anyone can see the Safe's part." on every Move fill (the audit's MUST,
 // 7 Nov: the caller adds it, whatever stays; move-sheet-seen.test.ts)
 test("the copy review's layout: the person's action, then destinations first (the plan's order), the Safe, Private, what stays, the fee, in that order; no sources line, no why", () => {
   const s = moveSheet([{ wallet: SOL, priv: 0n, pay: 8962n }, { wallet: RH, priv: 8500n, pay: 0n }], 10000n, say, { brought: 9975n });
-  assert.equal(s.title, "Move $174.62 to your SOL and ETH (RH) wallets");
+  assert.equal(s.title, "Move $174.62 to your SOL and Robinhood wallets");
   assert.deepEqual(s.lines, [
     "Your SOL wallet gets · $89.62",
-    "Your ETH (RH) wallet gets · $85.00",
+    "Your Robinhood wallet gets · $85.00",
     "From your Safe · $100.00",
     // J2-1 (8 Nov): Private's row is its NET change: it pays $85.00 and gets $99.75 less $89.62 back, so $74.87 out on
     // net, a quote's figure (about); the sum closes on sight: $100.00 + $74.87 = $89.62 + $85.00 + $0.25
@@ -66,8 +66,8 @@ test("the audit's SHOULD 4: the rows add up, a table: From your Safe + From Priv
 
 test("walletsWords: one, two, three wallets", () => {
   assert.equal(walletsWords([SOL]), "your SOL wallet");
-  assert.equal(walletsWords([SOL, RH]), "your SOL and ETH (RH) wallets");
-  assert.equal(walletsWords([SOL, RH, NEAR]), "your SOL, ETH (RH) and NEAR wallets");
+  assert.equal(walletsWords([SOL, RH]), "your SOL and Robinhood wallets");
+  assert.equal(walletsWords([SOL, RH, NEAR]), "your SOL, Robinhood and NEAR wallets");
 });
 
 test("the copy review's ruling (7 Nov): the title by count, a comma list with \"and\" before the last and \"wallets\" once; one leg the same layout, its destination first", () => {
@@ -75,7 +75,7 @@ test("the copy review's ruling (7 Nov): the title by count, a comma list with \"
     [[SOL], "Move $34.40 to your SOL wallet"],
     [[SOL, NEAR], "Move $34.40 to your SOL and NEAR wallets"],
     // the plan's order (fix/move-row-truth): SOL, ETH (RH), NEAR, whatever order the parts came in
-    [[SOL, NEAR, RH], "Move $34.40 to your SOL, ETH (RH) and NEAR wallets"],
+    [[SOL, NEAR, RH], "Move $34.40 to your SOL, Robinhood and NEAR wallets"],
   ];
   for (const [names, title] of rows) {
     const pay = 3440n / BigInt(names.length), parts = names.map((wallet, i) => ({ wallet, priv: 0n, pay: i === 0 ? 3440n - pay * BigInt(names.length - 1) : pay }));

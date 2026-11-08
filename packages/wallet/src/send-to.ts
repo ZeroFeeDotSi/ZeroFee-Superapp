@@ -11,7 +11,7 @@ export type SendToChain = "sol" | "hood" | "eth" | "base" | "bsc" | "near" | "ar
  *  never "on Robinhood Chain"), and NEAR as it arrives (never "wNEAR on NEAR"). */
 export const LANDS_AS: Record<SendToChain, { tokenId: string; coin: string; network: string; named?: string }> = {
   sol: { tokenId: "nep141:sol.omft.near", coin: "SOL", network: "Solana" },
-  hood: { tokenId: "nep141:hood.omft.near", coin: "ETH", network: "Robinhood Chain", named: "ETH (RH)" },
+  hood: { tokenId: "nep141:hood.omft.near", coin: "ETH", network: "Robinhood Chain", named: "Robinhood" },
   eth: { tokenId: "nep141:eth.omft.near", coin: "ETH", network: "Ethereum" },
   base: { tokenId: "nep141:base.omft.near", coin: "ETH", network: "Base" },
   bsc: { tokenId: "nep245:v2_1.omni.hot.tg:56_11111111111111111111", coin: "BNB", network: "BNB Chain" },

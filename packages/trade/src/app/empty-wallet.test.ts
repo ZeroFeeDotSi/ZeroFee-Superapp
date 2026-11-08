@@ -11,7 +11,7 @@ const at = (nativeUsd: number, coinsUsd = 0, inFlight?: { usd: number; etaSec: n
 
 test("a $0 wallet's buy: head names the wallet, body the money fact, one button; each chain by its own label", () => {
   assert.deepEqual(emptyWallet({ side: "buy", loaded: true, chain: at(0), landing: false, walletName: WALLET_NAME.hood }),
-    { head: "Your ETH (RH) wallet has nothing in it.", body: "Nothing moved. Your money is where it was.", add: "Add money to it" });
+    { head: "Your Robinhood wallet has nothing in it.", body: "Nothing moved. Your money is where it was.", add: "Add money to it" });
   assert.equal(emptyWallet({ side: "buy", loaded: true, chain: at(0.004), landing: false, walletName: WALLET_NAME.sol })?.head, "Your SOL wallet has nothing in it.");
   assert.equal(emptyWallet({ side: "buy", loaded: true, chain: at(0), landing: false, walletName: WALLET_NAME.bsc })?.head, "Your BNB wallet has nothing in it.");
 });

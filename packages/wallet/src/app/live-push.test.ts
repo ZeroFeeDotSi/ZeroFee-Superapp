@@ -127,7 +127,7 @@ test("SOL: a lamports change tells the page once; the same lamports again tells 
   h.stop();
 });
 
-test("ETH (RH): at most one balance ask a second, never two waiting; a different balance tells; control: the same balance doesn't", () => {
+test("Robinhood: at most one balance ask a second, never two waiting; a different balance tells; control: the same balance doesn't", () => {
   const h = harness({ hood: HOOD });
   const s = h.last(PUSH_HOSTS.hood);
   s.open();
@@ -152,7 +152,7 @@ test("ETH (RH): at most one balance ask a second, never two waiting; a different
   h.stop();
 });
 
-test("ETH (RH), HEAT-2026-11-03: once a second while lively, every 5 s once quiet a minute; a change or quicken() is once a second again", () => {
+test("Robinhood, HEAT-2026-11-03: once a second while lively, every 5 s once quiet a minute; a change or quicken() is once a second again", () => {
   const h = harness({ hood: HOOD });
   const s = h.last(PUSH_HOSTS.hood);
   s.open();
@@ -187,7 +187,7 @@ test("ETH (RH), HEAT-2026-11-03: once a second while lively, every 5 s once quie
   h.stop();
 });
 
-test("ETH (RH): an ask unanswered for ANSWER_MS replaces the socket; control: answered asks keep the one socket", () => {
+test("Robinhood: an ask unanswered for ANSWER_MS replaces the socket; control: answered asks keep the one socket", () => {
   const h = harness({ hood: HOOD });
   const s = h.last(PUSH_HOSTS.hood);
   s.open();
@@ -330,7 +330,7 @@ test("one socket per address, and no message carries two of the person's address
     }
   }
   assert.ok(sol.sent.some((m) => JSON.stringify(m).includes(SOL)) && !sol.sent.some((m) => JSON.stringify(m).toLowerCase().includes(HOOD.toLowerCase())), "control: SOL's socket names only SOL");
-  assert.ok(hood.sent.some((m) => JSON.stringify(m).includes(HOOD)) && !hood.sent.some((m) => JSON.stringify(m).includes(SOL)), "control: ETH (RH)'s names only its own");
+  assert.ok(hood.sent.some((m) => JSON.stringify(m).includes(HOOD)) && !hood.sent.some((m) => JSON.stringify(m).includes(SOL)), "control: Robinhood's names only its own");
   h.stop();
 });
 
@@ -417,7 +417,7 @@ test("a socket maker that throws (a CSP that refuses it) never throws into the p
   stop();
 });
 
-test("review L6: the SOL and ETH (RH) lines go to two operators and never open together (control: one wallet's line opens at once)", () => {
+test("review L6: the SOL and Robinhood lines go to two operators and never open together (control: one wallet's line opens at once)", () => {
   assert.notEqual(new URL(PUSH_HOSTS.sol).host.split(".").slice(-2).join("."), new URL(PUSH_HOSTS.hood).host.split(".").slice(-2).join("."));
   const h = harness({ sol: SOL, hood: HOOD });
   assert.deepEqual(h.sockets.map((s) => s.url), [PUSH_HOSTS.sol], "the second waits");

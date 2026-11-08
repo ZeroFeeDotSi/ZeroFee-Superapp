@@ -5,6 +5,8 @@
 // replaces them. A Spending wallet's key exports from one card after the list ("Show this wallet's key", then which wallet; 5 Nov,
 // it was "Export key" on every card) behind a plain warning, a typed phrase (audit K-5), the core's own sheet and Face ID; on the phone it shows only on ZeroFee's own screen, which hides from screenshots (SecretSheet.swift). D56:
 // after an export ZeroFee keeps using the wallet. "Behind the scenes" lists the quiet moves (refills, gas, older wallets).
+import { siteWalletsShown } from "./safe-hot.ts";
+import { appChain } from "@zerofee/core/app-chains";
 import { useEffect, useState } from "react";
 import type { Problem } from "@zerofee/core/problem";
 import type { SpendingActivity, SpendingWallet } from "@zerofee/core/spending";
@@ -98,7 +100,9 @@ export function Details({ onNewWords, onProblem }: { onNewWords: () => void; onP
   const safe = balances ? safeLines(balances, pocket, chains, earning) : null;
   // Spending lists an older wallet only while it holds anything (D55); every other one always
   // Spending's own cash first, then one wallet per network (D55); an older one only while it holds anything
-  const shown = [...(Array.isArray(wallets) ? wallets : [])].sort((a, b) => Number(b.role === "hub") - Number(a.role === "hub"));
+  // a site's empty extra wallet as Hot leaves it out (audit 12 C7: Hot "GMGN · 1 wallet", Details two)
+  // D13 (product decision, 8 Nov): a chain's own wallet only on the app's chains (core app-chains.ts): no BNB wallet in V1
+  const shown = siteWalletsShown([...(Array.isArray(wallets) ? wallets : [])].filter((w) => w.role !== "chain" || appChain(String(w.network)))).sort((a, b) => Number(b.role === "hub") - Number(a.role === "hub"));
   return (
     <div className="wl wl-dt zf-enter">
       <div className="zf-label wl-dt-head">Safe</div>
@@ -168,7 +172,7 @@ const nameOf = (w: SpendingWallet) => (w.role === "hub" ? "Your NEAR wallet's ca
 const shortAddress = (a: string) => (/^[0-9a-zA-Z]{25,}$/.test(a) ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
 
 /** The Details words for a wallet's key (the Copywriter, 5 Nov). */
-export const KEY_WORDS = { head: "A wallet's key", note: "Use it to open a wallet in another app.", show: "Show this wallet's key", pick: "Which wallet?", hub: "Its key stays in ZeroFee." } as const;
+export const KEY_WORDS = { head: "A wallet's key", note: "Use it to open a wallet in another app.", show: "Show this wallet's key", pick: "Which wallet?", hub: "Its key stays on this phone." } as const;
 
 function WalletCard({ w }: { w: SpendingWallet }) {
   const name = nameOf(w);
@@ -179,7 +183,7 @@ function WalletCard({ w }: { w: SpendingWallet }) {
       {marks.length > 0 && <div className="wl-dt-marks">{marks.map((m) => <span key={m} className={`wl-tag${m === "Key exported" ? " wl-tag-alert" : ""}`}>{m}</span>)}</div>}
       <Address text={w.address} label={name} />
       <div className="wl-kv"><span>Holds</span><span>{w.unread ? "Can't see it right now" : w.holds ? w.holds : Number(w.coinsUsd) > 0 ? `${dollars(w.cashUsd ?? "0")} cash · ${dollars(w.coinsUsd ?? "0")} in coins` : dollars(w.cashUsd ?? "0")}</span></div>
-      {w.role === "older" && <p className="zf-small wl-dt-note">An older wallet. Its cash moves to your {networkOf(w)} wallet; coins stay until sold.</p>}
+      {w.role === "older" && <p className="zf-small wl-dt-note">An older wallet. Its cash moves to your {w.label.replace(/^Older /, "")}; coins stay until sold.</p>}
       {w.role === "chain" && !w.inCap && <p className="zf-small wl-dt-note">Used by your apps on {networkOf(w)}. Outside your Trade limit.</p>}
       {w.role === "hub" && <p className="zf-small wl-dt-note">{KEY_WORDS.hub}</p>}
     </div>
@@ -187,7 +191,7 @@ function WalletCard({ w }: { w: SpendingWallet }) {
 }
 
 /** Every wallet's key in one place: "Show this wallet's key", which wallet, then the same warning, typed phrase and export as before
- *  (audit K-5; the core's own sheet and Face ID). The NEAR wallet's cash has no key to show (it stays in ZeroFee). */
+ *  (audit K-5; the core's own sheet and Face ID). The NEAR wallet's cash has no key to show (its key stays on this phone, audit 13's D12: never "in ZeroFee", D37). */
 function KeysCard({ wallets, onProblem, onExported }: { wallets: SpendingWallet[]; onProblem: (p: Problem) => void; onExported: () => void }) {
   const [picking, setPicking] = useState(false);
   const [id, setId] = useState<string | null>(null);

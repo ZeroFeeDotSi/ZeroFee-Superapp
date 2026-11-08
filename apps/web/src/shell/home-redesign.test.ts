@@ -17,6 +17,9 @@ import type { Bridge } from "@zerofee/core/bridge";
 import type { SpendingStatus } from "@zerofee/core/spending";
 import { grade, onePot } from "../../../../tools/copy/voice.ts";
 import { foldedInto } from "../shown-apps.ts";
+import { SERVICE_EFFECTS } from "@zerofee/core/services";
+import { offlineWords } from "@zerofee/shell-api/chunk-reload.ts";
+import { closedLine } from "@zerofee/wallet/app/screens/closed-rows.ts";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 const read = (p: string) => readFileSync(ROOT + p, "utf8");
@@ -129,7 +132,7 @@ test("Home (product decision, 5 Nov): two tabs, Safe first: the number is the Sa
   assert.match(hot, /Trade wallets\n(\S\n)*SOL wallet\n1\.42 SOL\n\$144\.37\n\+\n(\S\n)*BONK\n125,050 BONK\n\$3\.46\n/, "SOL: one row, its own coin in units and dollars, its Add (a quiet + disc, named Add SOL), then the coin bought in it");
   assert.doesNotMatch(hot, /1\.42 SOL\n\$147\.83/, "control: the whole wallet's dollars never sit beside SOL's units");
   assert.doesNotMatch(hot, /No Face ID per trade/, "the Trade card's Face ID note is gone: the tab line says what Hot is");
-  assert.match(hot, /ETH \(RH\) wallet\n0\.012 ETH\n\$28\.17/);
+  assert.match(hot, /Robinhood wallet\n0\.012 ETH\n\$28\.17/);
   assert.match(hot, /NEAR wallet\nCash\n\$40\.00/, "the NEAR wallet's cash");
   assert.match(hot, /pump\.fun\n1 wallet · \$10\.00\n\$10\.00\n›/, "the site is one row in Hot, its figure the sum of its wallets (S14)");
   assert.doesNotMatch(hot, /SOL wallet\n\$10\.00/, "closed: its wallets are not drawn yet");
@@ -239,7 +242,7 @@ test("a Trade wallet's row opens its market; a coin bought in it opens its page;
 test("an empty Trade wallet is one quiet row, Empty, with its Add (control: one with money has no Empty)", async () => {
   const empty = { ...SPENDING, reserveUsd: "0.00", networks: [...SPENDING.networks.slice(0, 1), { network: "hood", name: "Robinhood Chain", cashUsd: "0.00", coinsUsd: "0.00", readyUsd: "0", nativeAmount: "0" }, SPENDING.networks[2]] };
   const hot = (await homeShown({ status: empty, tap: /^Hot/ })).shown;
-  assert.match(hot, /ETH \(RH\) wallet\nEmpty\n\$0\.00\n\+\n/);
+  assert.match(hot, /Robinhood wallet\nEmpty\n\$0\.00\n\+\n/);
   assert.match(read("packages/wallet/src/app/screens/Home.tsx"), /className="wl-hw-add" data-testid=\{`add-\$\{c\}`\} aria-label=\{`Add \$\{NATIVE\[c\]\}`\}/, "its Add is named Add ETH (a + disc, no words)");
   assert.doesNotMatch((await homeShown({ tap: /^Hot/ })).shown, /^Empty$/m, "control: wallets with money");
 });
@@ -324,7 +327,7 @@ test("bug hunt, 4 Nov item 1: a coin bought in place is a row of the NEAR wallet
   assert.deepEqual([before.usd, before.coins, before.uncounted], ["40.00", [], undefined]);
 });
 
-test("the rows: SOL, ETH (RH) and NEAR always ($0.00 too); BNB only open and funded; a row is its native coin, a held coin its own sub-row (never counted twice); NEAR in dollars with what it holds under it, never a NEAR amount made from USDC", () => {
+test("the rows: SOL, Robinhood and NEAR always ($0.00 too); BNB only open and funded; a row is its native coin, a held coin its own sub-row (never counted twice); NEAR in dollars with what it holds under it, never a NEAR amount made from USDC", () => {
   const s = { ...SPENDING, reserveUsd: "37.90", networks: [
     { network: "sol", name: "Solana", cashUsd: "0.00", coinsUsd: "0.00", readyUsd: "0", nativeAmount: "0" },
     { network: "hood", name: "Robinhood Chain", cashUsd: "2.10", coinsUsd: "0.00", readyUsd: "1.80", nativeAmount: "0.0007" },
@@ -332,7 +335,7 @@ test("the rows: SOL, ETH (RH) and NEAR always ($0.00 too); BNB only open and fun
   ] } as unknown as SpendingStatus;
   const held = [{ chain: "near", address: "token.v2.ref-finance.near", symbol: "REF", amount: "10", usd: "2.10" }, { chain: "near", address: "noprice.near", symbol: "NOPE", amount: "5" }];
   const rows = home.homeRows(s, held);
-  assert.deepEqual(rows.map((r) => [r.name, r.amount, r.usd]), [["SOL", "0 SOL", "0.00"], ["ETH (RH)", "0.0007 ETH", "2.10"], ["NEAR", null, "40.00"]]);
+  assert.deepEqual(rows.map((r) => [r.name, r.amount, r.usd]), [["SOL", "0 SOL", "0.00"], ["Robinhood", "0.0007 ETH", "2.10"], ["NEAR", null, "40.00"]]);
   assert.deepEqual(rows[2]!.coins.map((c) => [c.symbol, c.usd]), [["Cash", "37.90"], ["REF", "2.10"], ["NOPE", null]], "its cash (review L7: not \"USDC\"), then the NEAR coins; an unpriced coin has no dollars, never $0");
   // e2e walk 3 Nov ("Cash $0.11" under NEAR $0.11 during a move): with no NEAR coin, the row's own dollars are the cash
   // and no sub-row says them twice (control above: with coins, Cash is the first sub-row)
@@ -344,7 +347,7 @@ test("the rows: SOL, ETH (RH) and NEAR always ($0.00 too); BNB only open and fun
   assert.deepEqual([sol.amount, sol.usd, sol.coins.map((c) => [c.symbol, c.usd])], ["1.174 SOL", "119.37", [["BIRB", "24.92"]]]);
   assert.equal(home.walletUsd(sol), "144.29", "the wallet's figure: its own coin and the coin in it");
   const open = { ...s, networks: [...s.networks.slice(0, 2), { network: "bsc", name: "BNB Chain", cashUsd: "3.00", coinsUsd: "0.00", readyUsd: "2.7", nativeAmount: "0.005" }] } as unknown as SpendingStatus;
-  assert.deepEqual(home.homeRows(open).map((r) => r.name), ["SOL", "ETH (RH)", "NEAR", "BNB"], "BNB open and funded: a row");
+  assert.deepEqual(home.homeRows(open).map((r) => r.name), ["SOL", "Robinhood", "NEAR", "BNB"], "BNB open and funded: a row");
   const empty = { ...open, networks: [...s.networks.slice(0, 2), { network: "bsc", name: "BNB Chain", cashUsd: "0.00", coinsUsd: "0.00", readyUsd: "0" }] } as unknown as SpendingStatus;
   assert.ok(!home.homeRows(empty).some((r) => r.name === "BNB"), "BNB open but empty: no row");
   const closedFunded = { ...open, networks: [...s.networks.slice(0, 2), { network: "bsc", name: "BNB Chain", cashUsd: "3.00", coinsUsd: "0.00", readyUsd: "0", closed: true }] } as unknown as SpendingStatus;
@@ -412,8 +415,9 @@ test("QA (4 Nov): 0.04 SOL read while the price read 429s is \"0.04 SOL\" throug
   const row = home.homeRows(bare).find((r) => r.chain === "sol")!;
   assert.deepEqual([row.amount, home.walletUsd(row), (row as { unpriced?: true }).unpriced], ["0.04 SOL", null, true]);
   const shown = (await homeShown({ status: bare, tap: /^Hot/ })).shown;
-  const sol = shown.slice(shown.indexOf("Trade wallets"), shown.indexOf("ETH (RH) wallet"));
-  assert.match(sol, /SOL wallet\n0\.04 SOL\n0\.04 SOL\n/, "its row says the amount where the dollars go");
+  const sol = shown.slice(shown.indexOf("Trade wallets"), shown.indexOf("Robinhood wallet"));
+  assert.match(sol, /SOL wallet\n\n?0\.04 SOL\n/, "its row says the amount where the dollars go");
+  assert.equal(sol.split("0.04 SOL").length - 1, 1, "once (audit 12 C7: the amount was said twice on its row)");
   assert.doesNotMatch(sol, /Empty|\$0\.00|is empty/, "never Empty, never $0.00");
   const priced = await statusWhen(true);
   assert.equal(priced.unpriced, undefined, "control: priced, nothing unpriced");
@@ -421,7 +425,7 @@ test("QA (4 Nov): 0.04 SOL read while the price read 429s is \"0.04 SOL\" throug
   assert.deepEqual([p.amount, home.walletUsd(p)], ["0.04 SOL", "6.00"], "control: its dollars");
 });
 
-test("§0 proof row (D111): each row reads its own chain; an answer with NEAR alone is never a whole Home: SOL and ETH (RH) say updating…, and the line names Solana and Robinhood Chain, never NEAR", async () => {
+test("§0 proof row (D111): each row reads its own chain; an answer with NEAR alone is never a whole Home: SOL and Robinhood say updating…, and the line names Solana and Robinhood Chain, never NEAR", async () => {
   const s = { ...SPENDING, reserveUsd: "7.00", networks: [
     { network: "sol", name: "Solana", cashUsd: "1.00", coinsUsd: "0.00", readyUsd: "0", nativeAmount: "0.0067" },
     { network: "hood", name: "Robinhood Chain", cashUsd: "2.00", coinsUsd: "0.00", readyUsd: "0", nativeAmount: "0.0008" },
@@ -433,16 +437,19 @@ test("§0 proof row (D111): each row reads its own chain; an answer with NEAR al
   assert.equal(trading.tradingUsd(nearOnly, [], []).partial, true, "a NEAR-only answer is never a final figure");
   assert.equal(trading.tradingUsd(s, [], []).partial, false, "control: every chain answered");
   const shown = (await homeShown({ nearOnly: true, tap: /^Hot/ })).shown;
-  assert.match(shown, /SOL wallet\n\n?updating…[\s\S]*ETH \(RH\) wallet\n\n?updating…/);
-  assert.match(shown, /Solana and Robinhood Chain didn't answer\. SOL and ETH \(RH\) show when they do\./);
+  assert.match(shown, /SOL wallet\n\n?Updating[\s\S]*Robinhood wallet\n\n?Updating/);
+  assert.match(shown, /Solana and Robinhood Chain didn't answer\. Both wallets show when they do\./);
   assert.doesNotMatch(shown, /Solana and NEAR/, "never the old line, whatever failed");
 });
 
 test("a failed Safe read keeps its last figure \"as of 10:52\" and names NEAR, with Retry; never $0", async () => {
   const shown = (await homeShown({ safeDown: true })).shown;
   const at = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(KEPT_AT);
-  assert.ok(shown.includes(`NEAR didn't answer. Your Safe is as of ${at}. Your money is still in it.\nRetry`), shown);
+  // M12-3 (8 Nov): the time once, under the figure; the read line names NEAR and where the money is
+  assert.ok(shown.includes(`NEAR didn't answer. Your money is still in your Safe.\nRetry`), shown);
   assert.match(shown, /\nSafe\n\$5,254\.15\n/, "the Safe's figure as last read");
+  assert.ok(shown.includes(`As of ${at}`), "its time under it");
+  assert.equal(shown.split(at).length - 1, 1, "the time said once");
   assert.doesNotMatch(shown, /\$0\.00/);
   assert.doesNotMatch((await homeShown()).shown, /didn't answer/, "control: every read answered, no line");
 });
@@ -543,7 +550,7 @@ test("every word Home and Swap put on screen reads at grade 5 or under and grade
   const words = [
     ...Object.values(home.HOME_WORDS), ...Object.values(home.ROW_NAME), home.walletCount(1), home.walletCount(2), "Safe", "All", "Add", "Send", "Swap", "Move", "Your account",
     // Home's wallet bar, its empty wallet and its honest reads (home-view.ts)
-    home.emptyLine("ETH (RH)"), "Add SOL", ...view.readLines({ offline: false, safe: { by: "NEAR Intents' bridge", at: 1 }, oneClick: { at: 1 }, chains: { ids: ["sol", "hood"], at: 1 }, trade: true }),
+    home.emptyLine("Robinhood"), "Add SOL", home.notCountedLine(["pump.fun", "GMGN"]), home.notCountedLine(["pump.fun"]), home.safeAsOf(Date.UTC(2026, 10, 8, 0, 40)), ...view.readLines({ offline: false, safe: { by: "NEAR", at: 1, timed: true } }), ...view.readLines({ offline: false, safe: { by: "NEAR", at: 1, timed: true, told: true } }), ...view.readLines({ offline: false, safe: { by: "NEAR", at: null, shown: false, told: true } }), ...view.readLines({ offline: false, safe: { by: "NEAR", at: 1, told: true } }), ...view.readLines({ offline: false, safe: { by: "NEAR Intents' bridge", at: 1 }, oneClick: { at: 1 }, chains: { ids: ["sol", "hood"], at: 1 }, trade: true }),
     ...view.readLines({ offline: false, oneClick: { at: null }, chains: { ids: ["hood"], at: null } }), ...view.readLines({ offline: true, safe: { by: "NEAR", at: 1 } }),
     "What you did", "Your address on each network", "Colors, passwords, Face ID, lock", "Colors, backup words, lock", "Colors, start over", "Colors, lock", "Move to Spending", "Move to your Safe", "Move it all", "Move some",
     "Swap NEAR for USDC", "From your Safe. The USDC lands in Spending.", "About 73.92 NEAR", "Swap $8.22 of NEAR for USDC", "Swapped $8.22 of NEAR for USDC",
@@ -552,8 +559,23 @@ test("every word Home and Swap put on screen reads at grade 5 or under and grade
     "Your rules on NEAR are an older kind, so this would wait. Save them once and it goes with Face ID.",
     "Your new rules are saved on NEAR. Finish them, then this moves with Face ID.", "Your new rules on NEAR start in a moment. Then this moves with Face ID.",
     "Your rules make this wait, and the swap service's price lasts only minutes. We stopped.", "Save my rules",
+    // audit 12 C6: the down banner's lines, and C1: a screen whose code didn't arrive offline
+    ...Object.values(SERVICE_EFFECTS).flatMap((e) => [e.blocks, e.works]), offlineWords("Send"), offlineWords("Trade"), offlineWords(),
+    // audit 12 C7: what Hot's total leaves out, by name
+    closedLine(["BNB wallet"]),
+    // QA 16 on the C1 shot: offline Send's one line
+    "You're offline. Your money is safe. Send works again when you're back. It checks again by itself.",
+    // audit 13 (builder 14): Move's landed receipt (D1)
+    "It's now in your SOL wallet.", "It's now in your Robinhood wallet.", "It went there through NEAR Confidential.",
+    // D11 Add to Private names the protocol
+    "It goes in through NEAR Confidential.",
+    // D8 Move offline
+    "You're offline. Your money is safe. Move works again when you're back. It checks again by itself.",
+    // D3 the chip's label; D5 Add while a service it needs is down
+    "Solana is down. Trades on it can't go now.", "NEAR Intents is down, so Add can't go now.", "NEAR Confidential is down, so Add can't go now.", "Money you sent before goes to NEAR Intents' bridge and waits there.", "Send money when it's back. The addresses come back then.",
   ];
-  const EXCEPT = new Set<string>();
+  // QA 16's MUST 2 (8 Nov): the wallet's name is "Robinhood" (a name: the grade counts it as three syllables); the one line that is only the name
+  const EXCEPT = new Set<string>(["Your Robinhood wallet is empty."]);
   const hard = words.filter((s) => s.split(/\s+/).length > 3 && !EXCEPT.has(s)).map((s) => ({ s, fk: fkGrade(s) })).filter((x) => x.fk > 5);
   assert.deepEqual(hard.map((x) => `${x.s} (grade ${x.fk.toFixed(1)})`), []);
   const graded = words.map((s) => ({ s, g: grade("spine", s) })).filter((x) => x.g.grade !== "A" && x.g.grade !== "B");

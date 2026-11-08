@@ -26,7 +26,7 @@ test("every coin held is listed: a pinned token goes as itself (all of it); any 
   const t = tokenSources(held);
   assert.deepEqual(t.map((s) => [s.symbol, s.place, s.coin ?? null, s.max, s.cant ?? null, s.swap ?? null]), [
     ["USDC", "your SOL wallet", USDC_SOL, "12.5", null, null],
-    ["USDG", "your ETH (RH) wallet", "nep141:hood-0x5fc5360d0400a0fd4f2af552add042d716f1d168.omft.near", "3", null, null],
+    ["USDG", "your Robinhood wallet", "nep141:hood-0x5fc5360d0400a0fd4f2af552add042d716f1d168.omft.near", "3", null, null],
     ["BONK", "your SOL wallet", null, "0", SEND_CANT.swapFirst("BONK"), "sol"],
     ["USDT", "your BNB wallet", null, "0", SEND_CANT.bnb, null],
     ["RHEA", "your NEAR wallet", null, "0", SEND_CANT.nearWallet, null],

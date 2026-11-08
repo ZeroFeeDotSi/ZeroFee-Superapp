@@ -63,10 +63,11 @@ test("Settings lists each site's wallet (never AgentZero's pocket or an older on
   ] as SpendingWallet[];
   assert.deepEqual(siteWalletLines(list), [{ id: "p", title: "pump.fun $4.00", line: "Solana" }, { id: "g", title: "GMGN · Can't see it now", line: "Solana" }], "the copy review's S3: a dollar figure follows the name; a word keeps its dot");
   assert.deepEqual(siteWalletLines(list.filter((w) => w.role !== "site")), [], "control: no site wallet, nothing listed");
-  // the proof (5 Nov): an empty Base wallet said "GMGN · 0 ETH"; it is "$0.00" (control: one holding some says its amount)
-  const base0 = { ...base, id: "b", role: "site", site: "gmgn", network: "base", label: "GMGN wallet", holds: "0 ETH" } as SpendingWallet;
-  assert.equal(siteWalletLines([base0])[0]!.title, "GMGN $0.00");
-  assert.equal(siteWalletLines([{ ...base0, holds: "0.002 ETH" }])[0]!.title, "GMGN · 0.002 ETH", "control: an amount still says it");
+  // the proof (5 Nov): an empty wallet with no price said "GMGN · 0 ETH"; it is "$0.00" (control: one holding some says its
+  // amount). Audit 16's G9: a Base wallet is not listed at all in V1 (core app-chains.ts), so the rule is read on Solana's
+  const sol0 = { ...base, id: "b", role: "site", site: "gmgn", network: "sol", label: "GMGN wallet", holds: "0 SOL" } as SpendingWallet;
+  assert.equal(siteWalletLines([sol0])[0]!.title, "GMGN $0.00");
+  assert.equal(siteWalletLines([{ ...sol0, holds: "0.002 SOL" }])[0]!.title, "GMGN · 0.002 SOL", "control: an amount still says it");
 });
 
 test("a Sim walk (5 Nov): Settings > Sites over the Sim's funded pump.fun wallet lists it, never the empty line (control: the empty line only when there is no site wallet and no site)", () => {

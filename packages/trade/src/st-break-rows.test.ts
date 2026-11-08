@@ -217,7 +217,7 @@ test("finding 61: a site's Add under $2.09 is refused before any sheet (its last
   assert.ok(!("problem" in plain) || plain.problem.code !== "spending.move.too-small", JSON.stringify(plain));
 });
 
-test("k-trade re-test (4 Nov): a Move's leg to ETH (RH) 1Click took, then failed: the Move's row says where the money is, never \"Moved … On its way\" over a leg that didn't go through", async () => {
+test("k-trade re-test (4 Nov): a Move's leg to Robinhood 1Click took, then failed: the Move's row says where the money is, never \"Moved … On its way\" over a leg that didn't go through", async () => {
   const s = await setup({ failLater: true });
   const r = await s.svc.call<SpendingActivity>("spending.topUp", { usd: 10, legs: [{ network: "hood", usd: 10 }] });
   assert.ok("ok" in r, JSON.stringify(r));
@@ -230,7 +230,7 @@ test("k-trade re-test (4 Nov): a Move's leg to ETH (RH) 1Click took, then failed
   const rows = await s.svc.call<SpendingActivity[]>("spending.activity", {});
   assert.ok("ok" in rows);
   const move = rows.ok.find((a) => a.id === r.ok.id)!;
-  assert.equal(move.words, "$10.00 is in your NEAR wallet. It didn't go on to your ETH (RH) wallet", JSON.stringify(rows.ok));
+  assert.equal(move.words, "$10.00 is in your NEAR wallet. It didn't go on to your Robinhood wallet", JSON.stringify(rows.ok));
   assert.equal(move.stoppedShort, true);
   assert.equal(move.parkedUsd, 10, "what is parked, as a number");
   assert.equal(s.asked.filter((a) => a.method === "subwallet.float.out").length, 1, "not sent again by itself");

@@ -131,7 +131,7 @@ const prefixed = (v: Vault): Vault => {
 
 /** The fill's sheet (Face ID on the phone). */
 export function fillWords(usd: number, from: FillSource, feesUsd = 0): PlainWords {
-  const name = { near: "your NEAR wallet", safe: "your Safe", sol: "your SOL wallet", hood: "your ETH (RH) wallet", bsc: "your BNB wallet" }[from];
+  const name = { near: "your NEAR wallet", safe: "your Safe", sol: "your SOL wallet", hood: "your Robinhood wallet", bsc: "your BNB wallet" }[from];
   return { title: "Fund AgentZero's wallet", lines: [`$${usd.toFixed(2)} moves from ${name} to AgentZero.`, ...(feesUsd > 0 ? [`$${feesUsd.toFixed(2)} of it is NEAR, for AgentZero's sending fees.`] : []), "AgentZero spends only what you put here, one reply at a time. Your Safe and wallets stay yours."], warnings: [], effect: [] };
 }
 

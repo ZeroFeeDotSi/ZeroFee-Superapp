@@ -384,14 +384,14 @@ test("Home's Move (integration walk, 3 Nov): the Add's sheet keeps its own title
   assert.equal((await sheet()).hint, undefined, "control: no onward words, no line");
 });
 
-test("the independent grade (3 Nov, w-m04d): a Move from the Safe on to the SOL and ETH (RH) wallets names where it ends, the route a quiet line, no app's line (controls: another form of words, a name that isn't the person's own wallet, or a move that isn't into the NEAR wallet keep the core's title)", async () => {
+test("the independent grade (3 Nov, w-m04d): a Move from the Safe on to the SOL and Robinhood wallets names where it ends, the route a quiet line, no app's line (controls: another form of words, a name that isn't the person's own wallet, or a move that isn't into the NEAR wallet keep the core's title)", async () => {
   const FLOAT = "f3".repeat(32);
   const own = new Map([[FLOAT, TRADING_BALANCE]]);
   const into = { originAsset: `nep141:${USDC}`, destinationAsset: `nep141:${USDC}`, recipient: FLOAT, recipientType: "CONFIDENTIAL_INTENTS", refundTo: FLOAT, refundType: "CONFIDENTIAL_INTENTS" };
-  const add = { ...intentsCall("ft_withdraw", { token: USDC, receiver_id: DEPOSIT, amount: "10000000" }), why: "Move $10.00 from your Safe · SOL $5.00 · ETH (RH) $4.50", from: "trade" as const };
+  const add = { ...intentsCall("ft_withdraw", { token: USDC, receiver_id: DEPOSIT, amount: "10000000" }), why: "Move $10.00 from your Safe · SOL $5.00 · Robinhood $4.50", from: "trade" as const };
   const sheet = (onward?: string) => setup({ quote: quote(into, { amountIn: "10000000", minAmountOut: "10000000" }), ownWallets: own }).signer.describe({ ...add, ...(onward !== undefined ? { onward } : {}) });
-  const two = await sheet("it goes on to your SOL and ETH (RH) wallets. The rest stays in Private.");
-  assert.equal(two.title, "Move 10 USDC to your SOL and ETH (RH) wallets", "the final wallets; the amount the bytes say");
+  const two = await sheet("it goes on to your SOL and Robinhood wallets. The rest stays in Private.");
+  assert.equal(two.title, "Move 10 USDC to your SOL and Robinhood wallets", "the final wallets; the amount the bytes say");
   assert.deepEqual(two.lines, ["From your Safe.", "It goes through your NEAR wallet first.", "The rest stays in Private.", "Fee: at most 0.007 NEAR."]);
   assert.equal(two.hint, undefined, "no \"Trade says:\" line");
   const one = await sheet("it goes on to your SOL wallet.");
@@ -419,7 +419,7 @@ test("Home's Swap to a chain wallet: the sheet says Swap and the person's own am
   const s = endsTitle("Move $26.00 (26.00 USDC) to your NEAR wallet", on)!;
   assert.equal(s.title, "Swap $25.00 of USDC for SOL");
   assert.deepEqual(s.lines, ["It goes through your NEAR wallet first.", "$1.00 more leaves your Safe, rounded up for privacy. It stays in your NEAR wallet. It's not a fee."]);
-  assert.equal(endsTitle("Move $25.00 (25.00 USDC) to your NEAR wallet", "it is a swap of $25.00 of USDC for ETH (RH) in your ETH (RH) wallet.")!.title, "Swap $25.00 of USDC for ETH (RH)", "no extra: no line");
+  assert.equal(endsTitle("Move $25.00 (25.00 USDC) to your NEAR wallet", "it is a swap of $25.00 of USDC for Robinhood in your Robinhood wallet.")!.title, "Swap $25.00 of USDC for Robinhood", "no extra: no line");
   assert.equal(endsTitle("Move $40.00 (40.00 USDC) to your NEAR wallet", on), null, "control: $25 + $1 isn't the $40 that leaves: the core's own title stands");
   assert.equal(endsTitle("Move $26.00 (26.00 USDC) to your NEAR wallet", "it is a swap of $25.00 of USDC for SOL in your BNB wallet. $1.00 stays hidden in your NEAR wallet."), null, "control: not the engine's form");
   assert.equal(swapEnds("Swap $2.20 (0.5486 NEAR) for USDC", "it is a swap of $2.20 of NEAR for SOL in your SOL wallet.")!.title, "Swap $2.20 (0.5486 NEAR) for SOL", "paid in NEAR: the core's own figure, for the coin asked");

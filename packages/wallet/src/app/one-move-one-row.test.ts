@@ -115,7 +115,7 @@ test("rule 11 (the prover, 5 Nov): a $5.20 Move to SOL paid from Private reads \
   assert.deepEqual([landed!.status, landed!.words, legsLine(landed!)], ["done", "Moved $5.20 to your SOL wallet", "Done"]);
   // two wallets: one read is not both
   const [half] = activityRows([], [{ ...paid, goesTo: ["sol", "hood"], status: "done", words: "Moved $5.20 to your wallets", landed: ["sol"] }]).spending;
-  assert.equal(half!.status, "on-its-way", "the ETH (RH) wallet not read yet");
+  assert.equal(half!.status, "on-its-way", "the Robinhood wallet not read yet");
   // control: a part that came back to Private is over (its note says so): `landed` names it, the row ends
   const [back] = activityRows([], [{ ...paid, status: "done", words: "Moved $5.20 to your SOL wallet", note: "Solana: back in Private", landed: ["sol"] }]).spending;
   assert.equal(back!.status, "done");

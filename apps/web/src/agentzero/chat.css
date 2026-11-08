@@ -142,7 +142,9 @@
 
 /* the menu top left (product decision, 3 Nov): New chat, Jobs and limits, the saved chats, as the app's rows */
 .azc-app { position: relative; height: 100%; }
-.azc-pushed { position: absolute; inset: 0; z-index: 30; background: var(--bg); }
+/* The pushed page covers the tab bar, so its scroll keeps only the phone's own bottom inset (audit 14 E9: the bar's room
+   was kept, and the sticky Fund button sat mid-page over the Wallet row with rows showing under it). */
+.azc-pushed { position: absolute; inset: 0; z-index: 30; background: var(--bg); --zf-safe-bottom: env(safe-area-inset-bottom, 0px); }
 .azc-menu { display: flex; flex-direction: column; }
 .azc-menu-row { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; width: 100%; min-height: 56px; border-bottom: 1px solid var(--line); color: var(--ink); font: var(--t-body); letter-spacing: -.01em; }
 .azc-menu-head { margin: 22px 0 4px; font: var(--t-label); letter-spacing: .18em; text-transform: uppercase; color: var(--mute); }
@@ -218,3 +220,10 @@
 /* first run: the screen's lit action (Save the key, Start) is the floor command, 56 pt */
 .azc-keyacts .zf-btn { height: 56px; border-radius: var(--r-cmd); }
 .azc-btn-quiet { background: var(--fill); box-shadow: none; }
+/* audit 17's H6: a browse run's plan, each step by its state; H8: a run that didn't finish in the problem colour */
+.azc-plan { list-style: none; margin: 6px 0 0; padding: 0; }
+.azc-plan li { margin: 2px 0 0; color: var(--mute); }
+.azc-plan li[data-state="doing"], .azc-plan li[data-state="you"] { color: var(--ink); font-weight: 600; }
+.azc-plan li[data-state="done"]::before { content: "\2713\00a0"; color: var(--up, currentColor); }
+.azc-plan li[data-state="failed"] { color: var(--down, currentColor); }
+.azc-step-state[data-tone="problem"] { color: var(--down, currentColor); }

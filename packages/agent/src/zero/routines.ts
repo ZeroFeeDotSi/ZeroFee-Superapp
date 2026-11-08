@@ -17,7 +17,7 @@ import { isNearName } from "./jobs.ts";
 export type RoutineWhen = { every: "week"; day: number } | { every: "month"; day: number } | { price: PriceCoin; dropPct: number }
   /** once, when the swap service answers again ("tell me when 1Click is back"): tells, then turns itself off */
   | { back: "oneclick" };
-export type PriceCoin = "SOL" | "NEAR" | "ETH" | "BNB";
+export type PriceCoin = "SOL" | "NEAR" | "ETH";
 export type RoutineDo =
   | { act: "tell" }
   /** Move Spending's money to the Safe: all above `aboveUsd`, or exactly `usd`; at most `limitUsd` each time. */
@@ -51,7 +51,7 @@ export const RUNS_WHEN_OPEN = "Runs when ZeroFee is open.";
 export const ASK_EACH_DAY = "After today, AgentZero asks you to approve it again on the day.";
 
 const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-const COINS: Record<string, PriceCoin> = { sol: "SOL", solana: "SOL", near: "NEAR", eth: "ETH", ether: "ETH", ethereum: "ETH", bnb: "BNB" };
+const COINS: Record<string, PriceCoin> = { sol: "SOL", solana: "SOL", near: "NEAR", eth: "ETH", ether: "ETH", ethereum: "ETH" };
 const money = (s: string) => {
   const m = /\$\s*(\d+(?:\.\d{1,2})?)/.exec(s);
   return m ? Number(m[1]) : null;
@@ -226,5 +226,4 @@ export const PRICE_ASSET: Record<PriceCoin, string> = {
   SOL: "nep141:sol.omft.near",
   NEAR: "nep141:wrap.near",
   ETH: "nep141:eth.omft.near",
-  BNB: "nep245:v2_1.omni.hot.tg:56_11111111111111111111",
 };

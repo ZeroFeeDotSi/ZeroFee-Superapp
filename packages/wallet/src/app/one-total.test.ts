@@ -37,7 +37,7 @@ test("A2-3: set-up, Home and the Move sheet show ONE total from the same reads: 
   const hot = tradingUsd(SPENDING as never, [], WALLETS as never, []);
   const safePill = balanceTotal(SAFE, [], [], POCKET);
   assert.equal(safePill, "5288.01", "Home's Safe pill");
-  assert.equal(hot.usd, "227.48", "Home's Hot pill: SOL $144.37 + ETH (RH) $28.17 + pump.fun $27.47 + GMGN $27.47");
+  assert.equal(hot.usd, "227.48", "Home's Hot pill: SOL $144.37 + Robinhood $28.17 + pump.fun $27.47 + GMGN $27.47");
   const home = (Number(safePill) + Number(hot.usd)).toFixed(2);
   // set-up (DemoMoneyIn: useBalanceParts → balance-parts.ts)
   const setup = await readBalanceParts(bridge());
@@ -75,11 +75,11 @@ test("A2-3: the Move sheet's headline is drawn from moveHead(oneTotal(…)), nev
   assert.match(src, /const block = allStill && total >= 2 \? MOVE_WORDS\.still : moveBlock\(legs, total, HOME_PROOF, now\);/, "control: what can move is still the places' own sum");
 });
 
-test("A2-3: set-up waits while Spending hasn't named the SOL and ETH (RH) wallets (it said $5,342.95, Home said Updating…); controls: named, whole; a site's unread wallet, whole", async () => {
+test("A2-3: set-up waits while Spending hasn't named the SOL and Robinhood wallets (it said $5,342.95, Home said Updating…); controls: named, whole; a site's unread wallet, whole", async () => {
   // the Sim's first answer after set-up's engine start (read in a debug walk of 0518e6948): loaded, no wallet named yet
   const early = { ...SPENDING, totalUsd: "0.00", cashUsd: "0.00", networks: [] };
   const r = await readBalanceParts(bridge(early));
-  assert.equal(r!.partial, true, "no SOL or ETH (RH) row yet: partial");
+  assert.equal(r!.partial, true, "no SOL or Robinhood row yet: partial");
   assert.equal(r!.usd, "5342.95", "the figure set-up showed in a run on 0518e6948 (the Safe and the sites, no trade wallets)");
   assert.equal((await readBalanceParts(bridge()))!.partial, false, "control: both named, whole");
   const unreadSite = WALLETS.map((w) => (w.role === "site" ? { ...w, unread: true } : w));

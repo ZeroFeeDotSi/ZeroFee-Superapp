@@ -15,16 +15,17 @@
 // (`ownMissed`). The status service keeps the address through device.store only (sealed / Keychain), shows its host
 // only, and its Test runs this same check against a typed address (checkOwn).
 import { relayBase } from "./relay.ts";
-import { OWN_STORE_APP, isOwnChain, ownAddressOf, ownHostOf, ownOriginOf, ownServer, ownStoreKey, setOwnServer, OWN_CHAINS, type OwnChain } from "./own-servers.ts";
+import { OWN_BAD, OWN_STORE_APP, isOwnChain, ownAddressOf, ownHostOf, ownOriginOf, ownServer, ownStoreKey, setOwnServer, OWN_CHAINS, type OwnChain } from "./own-servers.ts";
 
-export const STATUS_IDS = ["relay", "near", "solana", "hood", "price", "oneclick", "jupiter", "agentzero"] as const;
+// audit 13's D6: NEAR Confidential, which every money move goes through (status-summary.ts withConfidential)
+export const STATUS_IDS = ["relay", "near", "solana", "hood", "price", "oneclick", "confidential", "jupiter", "agentzero"] as const;
 export type StatusId = (typeof STATUS_IDS)[number];
 export type StatusState = "working" | "slow" | "down";
 /** Where the answer came from: the relay's paid door, the service's public servers, or the service itself (no door). */
 export type Via = "relay" | "public" | "direct" | "own";
 
 /** Each service's speed bar (rule 3; the relay's 500 ms, the spec's line 3). Slow is an answer over twice this. */
-export const SPEED_BAR_MS: Record<StatusId, number> = { relay: 500, near: 2_000, solana: 200, hood: 2_000, price: 500, oneclick: 2_000, jupiter: 1_000, agentzero: 2_000 };
+export const SPEED_BAR_MS: Record<StatusId, number> = { relay: 500, near: 2_000, solana: 200, hood: 2_000, price: 500, oneclick: 2_000, confidential: 2_000, jupiter: 1_000, agentzero: 2_000 };
 /** No answer in this long is Down (spec line 3); the Settings row says "Checking…" at most this long (QA's hold). */
 export const PROBE_MS = 5_000;
 /** A chain's paid door gets this long before its public servers are asked, so both fit in PROBE_MS. */
@@ -230,7 +231,7 @@ export type OwnHosts = Record<OwnChain, string | null>;
 
 type StatusProblem = { problem: { code: string; whatHappened: string; money: { state: "not-involved" }; next: { kind: "nothing"; label: string } } };
 const problem = (code: string, whatHappened: string): StatusProblem => ({ problem: { code, whatHappened, money: { state: "not-involved" }, next: { kind: "nothing", label: "Close" } } });
-export const OWN_BAD = "That isn't a server address. It starts with https://";
+export { OWN_BAD };
 export const OWN_NOT_KEPT = "This device didn't keep it. Try again.";
 
 /** Each chain's own server from the store into the doors (own-servers.ts), once after the unlock; the hosts it set. */
@@ -246,19 +247,39 @@ export async function loadOwnServers(store: OwnStore, apply: (c: OwnChain) => vo
   return out;
 }
 
+/** The page's look with the core's word on top (QA 16's MUST on builder 7's item 3): a chain whose own server the core
+ *  couldn't reach (refused or no answer) never says "Using your server": ZeroFee's server (or the public ones) took over. */
+export function coreMissedIn(report: StatusReport, missed: readonly OwnChain[], relay: boolean): StatusReport {
+  if (!missed.length) return report;
+  return { ...report, rows: report.rows.map((r) => (r.via === "own" && (missed as readonly string[]).includes(r.id) ? { ...r, via: relay ? "relay" : "public", ownMissed: true } : r)) };
+}
+
 /**
  * The bridge's answerer for the Status sheet and the Settings row (apps/web core.ts). `status.probe`: the read-only look.
  * `status.own.get`: each chain's own server's host. `status.own.test` {chain, address}: the Test (checkOwn), nothing kept.
  * `status.own.set` {chain, address | null}: kept through `store` and put in the doors (`apply`: the page's hooks, as
  * hood-proxy.ts setOwnHood), or cleared (null: back to ZeroFee's server). The address itself is never answered back.
  */
-export function statusService(deps: ProbeDeps & { store?: OwnStore; reach?: (origin: string) => boolean; apply?: (c: OwnChain) => void } = {}) {
+export function statusService(deps: ProbeDeps & { store?: OwnStore; reach?: (origin: string) => boolean; apply?: (c: OwnChain) => void; core?: (c: OwnChain, address: string | null) => Promise<unknown>; coreMissed?: () => Promise<readonly OwnChain[]> } = {}) {
   const p = createStatusProbe({ ...deps, own: deps.own ?? ownServer });
   let loaded: Promise<OwnHosts> | null = null;
-  const load = () => (loaded ??= deps.store ? loadOwnServers(deps.store, deps.apply).catch(() => (loaded = null, { near: null, solana: null, hood: null })) : Promise.resolve({ near: null, solana: null, hood: null }));
+  // `core`: a core apart from this page (the phone's, in Swift's own context) gets each own server too, so its own
+  // checks and reads use it as the page's doors do (own-core.ts). A core that didn't take it is asked again next load.
+  const intoCore = async (cs: readonly OwnChain[]): Promise<void> => {
+    if (!deps.core) return;
+    const said = await Promise.all(cs.map((c) => deps.core!(c, ownServer(c)).then((r) => !(r && typeof r === "object" && "problem" in r), () => false)));
+    if (said.includes(false)) loaded = null;
+  };
+  const load = () => (loaded ??= deps.store ? loadOwnServers(deps.store, deps.apply).then(async (h) => { await intoCore(OWN_CHAINS.filter((c) => ownServer(c))); return h; }).catch(() => (loaded = null, { near: null, solana: null, hood: null })) : Promise.resolve({ near: null, solana: null, hood: null }));
   return {
     async call<T>(method: string, params: Record<string, unknown> = {}): Promise<{ ok: T } | StatusProblem> {
-      if (method === "status.probe") { await load(); return { ok: (await p.probe()) as T }; }
+      if (method === "status.probe") {
+        await load();
+        const report = await p.probe();
+        // a core apart from this page (the phone's) that couldn't reach the own server: its row says who took over
+        const missed = deps.coreMissed ? await deps.coreMissed().catch(() => [] as readonly OwnChain[]) : [];
+        return { ok: coreMissedIn(report, missed, !!deps.relay) as T };
+      }
       if (method === "status.own.get") {
         await load();
         return { ok: Object.fromEntries(OWN_CHAINS.map((c) => [c, ownServer(c) ? ownHostOf(ownServer(c)) : null])) as T };
@@ -273,6 +294,7 @@ export function statusService(deps: ProbeDeps & { store?: OwnStore; reach?: (ori
         try { await deps.store.set(ownStoreKey(chain), url); } catch { return problem("status.own.unkept", OWN_NOT_KEPT); }
         setOwnServer(chain, url);
         deps.apply?.(chain);
+        await intoCore([chain]);
         p.forget();
         return { ok: { host: url ? ownHostOf(url) : null } as T };
       }

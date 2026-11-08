@@ -27,12 +27,14 @@ import { taskStore } from "@zerofee/shell-api/tasks.ts";
 import { sealJobs } from "@zerofee/shell-api/job-start.ts";
 import { ShellContext } from "@zerofee/shell-api/shell-context.ts";
 import { later } from "./later.tsx";
+import { DidntOpen } from "./didnt-open.tsx";
+import { WAIT_WORDS } from "./wait-words.ts";
 import { FRESH, loadSetup, nextStep, saveSetup, type SetupState } from "./setup.ts";
 /** A coin's own page: its code loads with Home (after the first paint) or its first tap, drawn the moment it is here. */
 const Coin = later<Parameters<typeof import("./screens/Coin.tsx").Coin>[0]>(
   () => import("./screens/Coin.tsx").then((m) => m.Coin),
-  () => <p className="zf-small" role="status">Opening…</p>,
-  () => <p className="zf-small" role="status">This didn't open. <button className="zf-link" onClick={() => location.reload()}>Try again</button></p>,
+  () => <p className="zf-small" role="status">{WAIT_WORDS.opening}</p>,
+  () => <DidntOpen />,
 );
 import { Home } from "./screens/Home.tsx";
 import { privateDoor, safeCoinRoute } from "./screens/safe-hot.ts";
@@ -60,18 +62,18 @@ const Setup = lazy(() => import("./screens/Setup.tsx").then((m) => ({ default: m
 // drawn the moment its code is here (later.tsx: never Suspense's 300 ms hold on a chunk that took tens of ms)
 const Activity = later<Parameters<typeof import("./screens/Activity.tsx").Activity>[0]>(
   () => import("./screens/Activity.tsx").then((m) => m.Activity),
-  () => <p className="zf-small" role="status">Reading your activity…</p>,
-  () => <p className="zf-small" role="status">Activity didn't open. <button className="zf-link" onClick={() => location.reload()}>Try again</button></p>,
+  () => <p className="zf-small" role="status">{WAIT_WORDS.opening}</p>,
+  () => <DidntOpen name="Activity" />,
 );
 /** Home's address card at a wallet tab's top (D127): its one-time address, loaded with the tab, never in Home's first
  *  load; a chunk that didn't load draws nothing (never the wallet's public address). */
 const AddressCard = lazy(() => import("./money/AddressCard.tsx").then((m) => ({ default: m.AddressCard }), () => ({ default: () => null })));
 /** Convert (its own tab, shown only once CONVERT_OPEN) loads when opened, never in Home's first load (Home shell 2, 3 Nov:
  *  main grew past the budget under it). A chunk that didn't load says so. */
-const Convert = lazy(() => import("./screens/Convert.tsx").then((m) => ({ default: m.Convert }), () => ({ default: () => <p className="zf-small" role="status">Convert didn't open. <button className="zf-link" onClick={() => location.reload()}>Try again</button></p> })));
+const Convert = lazy(() => import("./screens/Convert.tsx").then((m) => ({ default: m.Convert }), () => ({ default: () => <DidntOpen name="Convert" /> })));
 /** The private pocket's own screens (no place on Home since D128, reached from Details) load when opened, never in Home's
  *  first load (home/words, 3 Nov: D132's server-limit line needed the room). A chunk that didn't load says so. */
-const privateDidntLoad = () => ({ default: () => <p className="zf-small" role="status">This didn't open. <button className="zf-link" onClick={() => location.reload()}>Try again</button></p> });
+const privateDidntLoad = () => ({ default: () => <DidntOpen name="Private" /> });
 const PrivateScreen = lazy(() => import("./screens/Private.tsx").then((m) => ({ default: m.PrivateScreen }), privateDidntLoad));
 const AddToPrivate = lazy(() => import("./screens/Private.tsx").then((m) => ({ default: m.AddToPrivate }), privateDidntLoad));
 /** A coin that can move into the pocket: listed, NEAR's own, not already there (Private.tsx's rule, kept here so the
@@ -82,8 +84,8 @@ const canGoPrivate = (b: Balance) => b.listed !== false && b.held !== "private" 
 // Receive (the networks list behind Add's "another network") loads when opened: Home's first load stays in its budget.
 const Receive = lazy(() => import("./screens/Receive.tsx").then((m) => ({ default: m.Receive }), () => ({ default: () => <p className="zf-small" role="status">Receive didn't load. Close it and open it again.</p> })));
 /** The web wallet's Details (its wallets' addresses, no Safe, no key export): loaded when opened, on the web only. */
-const WebDetailsPage = lazy(() => import("./screens/WebDetails.tsx").then((m) => ({ default: m.WebDetailsPage }), () => ({ default: () => <p className="zf-small" role="status">Details didn't open. <button className="zf-link" onClick={() => location.reload()}>Try again</button></p> })));
-const Details = lazy(() => import("./screens/Details.tsx").then((m) => ({ default: m.Details }), () => ({ default: () => <p className="zf-small" role="status">Details didn't open. <button className="zf-link" onClick={() => location.reload()}>Try again</button></p> })));
+const WebDetailsPage = lazy(() => import("./screens/WebDetails.tsx").then((m) => ({ default: m.WebDetailsPage }), () => ({ default: () => <DidntOpen name="Details" /> })));
+const Details = lazy(() => import("./screens/Details.tsx").then((m) => ({ default: m.Details }), () => ({ default: () => <DidntOpen name="Details" /> })));
 import "./wallet.css";
 
 type Tab = "balance" | "convert";
@@ -438,7 +440,7 @@ function WalletScreens() {
     // opened by another app (Trade's Your wallets, k-trade test, 4 Nov S3): Back goes back to that app's page, not Home;
     // opened from Your account (k-security test, 4 Nov S3): Back goes back to Your account
     const back = view.back;
-    body = <PushedFrame name="Details" onBack={back ? () => { tabs(); shell.openApp(back.app, back.tab); } : backFrom(view)}><Suspense fallback={<p className="zf-small" role="status">Reading your wallets…</p>}><Details onNewWords={() => openPlace("recovery", "new-words")} onProblem={(p) => void problem(p)} /></Suspense></PushedFrame>;
+    body = <PushedFrame name="Details" onBack={back ? () => { tabs(); shell.openApp(back.app, back.tab); } : backFrom(view)}><Suspense fallback={<p className="zf-small" role="status">{WAIT_WORDS.wallets}</p>}><Details onNewWords={() => openPlace("recovery", "new-words")} onProblem={(p) => void problem(p)} /></Suspense></PushedFrame>;
   } else if (view.kind === "details") {
     // the web wallet's own (bug report, 5 Nov late): each network's wallet address with Copy, nothing about a Safe, no key
     // export (Settings has it, behind the password)
@@ -488,7 +490,7 @@ function WalletScreens() {
     const back = view.fromSetup;
     body = (
       <PushedFrame name="Add money" onBack={back ? () => setView({ kind: "setup", state: back }) : tabs}>
-        {chain ? <Suspense fallback={<Waiting size={44} text="Opening…" />}><Receive bridge={bridge} tokens={tokens} chain={chain} chains={chains} onChange={() => setSheet("chains")} onProblem={addFailed} /></Suspense> : <Waiting size={44} text="Reading the networks…" />}
+        {chain ? <Suspense fallback={<Waiting size={44} text={WAIT_WORDS.opening} />}><Receive bridge={bridge} tokens={tokens} chain={chain} chains={chains} onChange={() => setSheet("chains")} onProblem={addFailed} /></Suspense> : <Waiting size={44} text={WAIT_WORDS.networks} />}
       </PushedFrame>
     );
   } else {

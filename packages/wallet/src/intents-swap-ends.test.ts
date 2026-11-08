@@ -56,51 +56,9 @@ function rig(o: { privateStatus?: () => string; moveAnswer?: () => unknown } = {
   return { s, bal, jobs, followed, said, slept, moveReads, sleepers, tick, now: () => t, advance: (ms: number) => (t += ms) };
 }
 
-test("1. a Safe swap is NOT done because some other wNEAR reached the Safe (1Click hasn't swapped)", async () => {
-  const r = rig();
-  const q = await r.s.swapQuote({ from: SWAP_USDC, to: WNEAR, amountIn: "5", source: "safe" }, "wallet");
-  const job = await r.s.swap({ quoteId: q.id }, "wallet");
-  r.bal.set(SWAP_USDC, r.bal.get(SWAP_USDC)! - 5_000_000n); // the mt_transfer left
-  await r.tick(2);
-  r.bal.set(WNEAR, 10n ** 22n); // anyone's 0.01 wNEAR deposit for the Safe (ft_transfer_call msg=<Safe>), not the swap
-  await r.tick(2);
-  const end = r.jobs.get(job.id);
-  assert.notEqual(end.status, "done", `job says done with amountOut ${end.amountOut} off an unrelated deposit`);
-  // control: 1Click's own SUCCESS for this deposit ends it, with 1Click's figure, never the stranger's 0.01
-  r.said.set(job.depositAddress!, { status: "SUCCESS", amountOut: "2000000000000000000000000" });
-  await r.tick(2);
-  assert.equal(r.jobs.get(job.id).status, "done");
-  assert.equal(r.jobs.get(job.id).amountOut, "2");
-});
-
-test("2. two Safe swaps to the same coin: the first one's coins don't end the second", async () => {
-  const r = rig();
-  const q1 = await r.s.swapQuote({ from: SWAP_USDC, to: WNEAR, amountIn: "5", source: "safe" }, "wallet");
-  const j1 = await r.s.swap({ quoteId: q1.id }, "wallet");
-  const q2 = await r.s.swapQuote({ from: SWAP_USDC, to: WNEAR, amountIn: "7", source: "safe" }, "wallet");
-  const j2 = await r.s.swap({ quoteId: q2.id }, "wallet");
-  r.bal.set(WNEAR, 2n * 10n ** 24n); // swap 1's 2 wNEAR lands; swap 2 is still with 1Click (or gets refunded later)
-  r.said.set(r.jobs.get(j1.id).depositAddress, { status: "SUCCESS", amountOut: "2000000000000000000000000" }); // 1Click: swap 1 done
-  await r.tick(2);
-  assert.equal(r.jobs.get(j1.id).status, "done");
-  assert.notEqual(r.jobs.get(j2.id).status, "done", `swap 2 says done with amountOut ${r.jobs.get(j2.id).amountOut}: swap 1's coins`);
-});
-
-test("3. a Safe swap 1Click refunds reads refunded inside a minute, not after 10 minutes of 'moving' (control: still with 1Click, it stays moving)", async () => {
-  const r = rig();
-  const q = await r.s.swapQuote({ from: SWAP_USDC, to: WNEAR, amountIn: "5", source: "safe" }, "wallet");
-  const job = await r.s.swap({ quoteId: q.id }, "wallet");
-  await r.tick(Math.ceil(60_000 / 400)); // control: a minute of 1Click saying nothing has ended
-  assert.equal(r.jobs.get(job.id).status, "moving", "no end until 1Click says one");
-  // 1Click refunds: the USDC is back in the Safe; wNEAR never rises
-  r.said.set(job.depositAddress!, { status: "REFUNDED" });
-  const at = r.now();
-  await r.tick(Math.ceil(60_000 / 400)); // one minute of reads
-  assert.equal(r.jobs.get(job.id).status, "refunded", "a minute after the refund it reads refunded");
-  assert.ok(Date.parse(r.jobs.get(job.id).updatedAtIso) - at < 60_000);
-  assert.deepEqual(r.followed, [], "its own read said so; nothing waited for the ledger's slow follow");
-});
-
+// 1-3 (the Safe's own 1Click watch) are gone with the public Safe swap (product decision, 8 Nov): a Safe swap is the Send's two legs
+// through NEAR Confidential (safe-send.ts swapFromSafe), followed by its Send job (send-job.ts), which ends only on
+// 1Click's own status of each leg's deposit address (safe-swap-private.test.ts).
 test("4. a NEAR-wallet (private) swap that ends after 10 minutes still ends", async () => {
   let status = "pending";
   const r = rig({ privateStatus: () => status });
@@ -240,13 +198,13 @@ test("control: the follow alone ends a Safe swap on 1Click's word only, after a 
 // ---- what the person sees (source reads, as the other Home and Native screen tests do)
 const source = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
-test("M1: the Safe swap's privacy line is on its quote screen, Buy and Sell, before the button (control: not on the receipt; only Native's sheet asks for a Safe swap)", () => {
+test("M1: the Safe swap's line is on its quote screen, Buy and Sell, before the button: it goes through NEAR Confidential, never \"Anyone can see\" (control: only Native's sheet asks for a Safe swap)", () => {
   const page = source("../../trade/src/native/NativeScreens.tsx");
   const receipt = page.indexOf('data-testid="native-receipt"'), who = page.indexOf('data-testid="native-who"'), about = page.indexOf('data-testid="native-about"'), go = page.indexOf("tp-go");
   assert.ok(receipt > 0 && who > 0, "both on the page");
   assert.ok(about > receipt && who > about && go > who, "after the receipt's branch, in the quote form, above the button");
-  assert.match(page.slice(who - 60, who + 40), /<p className="zf-small nc-who" data-testid="native-who">\{W\.who\}<\/p>/, "shown as it is, under no condition of its own");
-  assert.match(source("../../trade/src/native/words.ts"), /who: "Anyone can see your Safe's coins change on NEAR\./);
+  assert.match(page.slice(who - 60, who + 70), /<p className="zf-small nc-who" data-testid="native-who">\{THROUGH_CONFIDENTIAL\}<\/p>/, "shown as it is, under no condition of its own");
+  assert.doesNotMatch(source("../../trade/src/native/words.ts") + page, /Anyone can see/, "the public line is gone");
   assert.match(source("../../trade/src/native/swap.ts"), /"ledger\.swapQuote", \{ \.\.\.pairOf\(side, assetId\), amountIn: amount, source: "safe"/);
 });
 

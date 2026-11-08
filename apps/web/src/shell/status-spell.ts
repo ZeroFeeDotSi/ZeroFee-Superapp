@@ -6,7 +6,7 @@ import type { Fault, Service, ServiceStatus } from "@zerofee/core/services";
 /** The services in the order a notice names them when more than one fails (the one that blocks the most first). Never
  *  NEAR AI Cloud (restore crawl, 4 Nov: "NEAR AI Cloud is slow" sat over Home's rows): it holds up AgentZero's chat alone,
  *  and that chat says so itself; the shell's notice is for what money waits on. */
-export const FIRST: Service[] = ["near", "bridge", "oneclick", "relay", "solana", "hood", "bsc", "helius", "gecko"];
+export const FIRST: Service[] = ["near", "confidential", "bridge", "oneclick", "relay", "solana", "hood", "bsc", "helius", "gecko"];
 
 /** How long every service must have been fine before the notice says "back" and its clock ends (QA, 5 Nov:
  *  the "since" time jumped six times in 10 min as reads flipped between busy, slow and fine). */

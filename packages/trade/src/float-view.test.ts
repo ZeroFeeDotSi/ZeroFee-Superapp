@@ -15,8 +15,8 @@ test("moves in words", () => {
   const m = { id: "1", usd: 40, at: 0, where: "chain" as const };
   assert.equal(moveWords({ ...m, kind: "out", chain: "sol", status: "done" }), "Moved $40.00 to your SOL wallet");
   assert.equal(moveWords({ ...m, kind: "out", chain: "bsc", status: "refunded" }), "$40.00 for your BNB wallet came back to your NEAR wallet");
-  assert.equal(moveWords({ ...m, kind: "in", chain: "hood", status: "moving" }), "Bringing $40.00 back from your ETH (RH) wallet");
-  assert.equal(moveWords({ ...m, kind: "out", chain: "hood", status: "waiting" }), "$40.00 to your ETH (RH) wallet, waiting its turn", "waiting is never \"Moving\"");
+  assert.equal(moveWords({ ...m, kind: "in", chain: "hood", status: "moving" }), "Bringing $40.00 back from your Robinhood wallet");
+  assert.equal(moveWords({ ...m, kind: "out", chain: "hood", status: "waiting" }), "$40.00 to your Robinhood wallet, waiting its turn", "waiting is never \"Moving\"");
   assert.equal(moveWords({ ...m, kind: "in", chain: "sol", status: "waiting" }), "$40.00 back from your SOL wallet, waiting its turn");
   assert.equal(moveWords({ ...m, kind: "add", status: "moving" }), "Moving $40.00 to your NEAR wallet");
 });

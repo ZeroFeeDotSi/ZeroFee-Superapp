@@ -18,8 +18,9 @@ export interface AccountRowWords { quantum: string; protection: string; recovery
 export const ACCOUNT_ROW_WORDS = {
   /** the copy review's S3: Protection's right side on the web (the Safe's rules, which this browser only shows) */
   yourRules: "Your rules",
-  /** the copy review's S3 and #7: Recovery's right side, on the phone and the web (the wait lives on Recovery itself) */
-  backupWords: "Backup words",
+  /** QA 16's S12 (8 Nov): Recovery's right side says a state, never the row's name ("Backup words"): the words checked
+   *  ("Written down", only on the core's answer), due ("Check"), a move waiting ("Stop it"); not said yet: nothing */
+  wordsDown: QUANTUM_WORDS.wordsDown,
 } as const;
 
 /** the audit's Trade audit T14 (8 Nov): Recovery's "Backup words · Written down" was ticked from the first frame, before the
@@ -37,6 +38,6 @@ export const wordsCheckedOf = (hasWordsKey: boolean, checkDue: boolean | null): 
 export function accountRowWords(f: AccountRowFacts): AccountRowWords {
   const quantum = f.quantumOn === null ? "" : f.quantumOn ? (f.web ? QUANTUM_WORDS.onIphone : QUANTUM_WORDS.on) : QUANTUM_WORDS.fix;
   const protection = f.protection === null ? "" : f.protection ? (f.web ? ACCOUNT_ROW_WORDS.yourRules : "On") : "Add";
-  const recovery = f.pending ? { line: "A new device is waiting", value: "Stop it" } : f.checkDue === true ? { line: "Check your backup words", value: "Check" } : { value: ACCOUNT_ROW_WORDS.backupWords };
+  const recovery = f.pending ? { line: "A new device is waiting", value: "Stop it" } : f.checkDue === true ? { line: "Check your backup words", value: "Check" } : { value: f.checkDue === false ? ACCOUNT_ROW_WORDS.wordsDown : "" };
   return { quantum, protection, recovery };
 }

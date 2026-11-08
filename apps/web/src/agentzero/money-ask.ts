@@ -16,9 +16,9 @@ import type { SpendingActivity } from "@zerofee/core/spending";
 export const HOME_PREFILL = true;
 
 /** A coin as Swap names it, by where it sits (shell-api SwapCoin): USDC and NEAR are the Safe's, SOL and ETH (RH) the wallets'. */
-export const SWAP_COIN_OF: Readonly<Record<HomeCoin, SwapCoin>> = { SOL: "sol", ETH: "hood", USDC: "safe-usdc", NEAR: "safe-near", BNB: "bsc" };
+export const SWAP_COIN_OF: Readonly<Record<HomeCoin, SwapCoin>> = { SOL: "sol", ETH: "hood", USDC: "safe-usdc", NEAR: "safe-near" };
 /** A coin as Add and Request name it, by its chain (shell-api AddCoin); USDC has none of its own: Add opens on the Safe. */
-export const ADD_COIN_OF: Readonly<Record<HomeCoin, AddCoin | undefined>> = { SOL: "sol", ETH: "hood", NEAR: "near", BNB: "bsc", USDC: undefined };
+export const ADD_COIN_OF: Readonly<Record<HomeCoin, AddCoin | undefined>> = { SOL: "sol", ETH: "hood", NEAR: "near", USDC: undefined };
 
 /** The ask Home's sheet is opened with: today's fields, and the prefill fields (`prefill` off: today's only). */
 export function moneyAsk(a: Exclude<HomeAsk, { kind: "trade" }>, prefill = HOME_PREFILL): MoneyAsk {
@@ -37,14 +37,17 @@ export function moneyAsk(a: Exclude<HomeAsk, { kind: "trade" }>, prefill = HOME_
   }
 }
 
+/** A move AgentZero opened, on its way (item 6): its clock is its job's, so the line points there, never a bare busy word. */
+export const FOLLOW_LINE = "On its way. Jobs shows the time left.";
+
 /** A move's words as it goes, from Activity's own status (never a tick before it landed). */
 export function followLine(m: Pick<Movement, "status" | "problem" | "held"> | null, waitedMs: number): { text: string; end: boolean } {
-  if (!m) return waitedMs > 90_000 ? { text: "It went. Activity shows it when it lands.", end: true } : { text: "On its way. AgentZero is following it…", end: false };
+  if (!m) return waitedMs > 90_000 ? { text: "It went. Activity shows it when it lands.", end: true } : { text: FOLLOW_LINE, end: false };
   if (m.status === "done") return { text: "Landed. It's in your Activity.", end: true };
   if (m.status === "refunded") return { text: "It came back to you, so nothing was lost.", end: true };
   if (m.status === "problem") return { text: `It stopped. ${m.problem?.whatHappened ?? "The move didn't go through."}`, end: true };
   if (m.status === "waiting" && m.held) return { text: "On hold for your safety. Nothing has moved yet.", end: true };
-  return { text: "On its way. AgentZero is following it…", end: false };
+  return { text: FOLLOW_LINE, end: false };
 }
 
 /**
@@ -100,7 +103,7 @@ export function endOf(m: Pick<Movement, "status" | "problem" | "held"> | null, w
 }
 
 /** Trade's channel (shell-api trade-ask.ts, Trade's build, branch trade/ask): a narrow local copy until it is on main. */
-export type TradeAsk = { side: "buy" | "sell"; chain: "sol" | "hood" | "bsc" | "near"; address: string; usd?: number; pct?: number; from: "agentzero" };
+export type TradeAsk = { side: "buy" | "sell"; chain: "sol" | "hood" | "near"; address: string; usd?: number; pct?: number; from: "agentzero" };
 export type TradeEnd = { went: boolean; tradeId?: string; landedMs?: number; refused?: string };
 export type OpenTrade = (ask: TradeAsk, onEnd: (end: TradeEnd) => void) => void;
 
@@ -140,4 +143,4 @@ export function hopOf(a: HomeAsk): "sol" | "hood" | null {
   return null;
 }
 /** Said when step one landed and the step on to the wallet can't be read here: never "Landed" for the whole move. */
-export const hopLine = (to: "sol" | "hood"): string => `Step one landed, in your NEAR wallet. The step on to your ${to === "sol" ? "SOL" : "ETH (RH)"} wallet shows in Home's Move.`;
+export const hopLine = (to: "sol" | "hood"): string => `Step one landed, in your NEAR wallet. The step on to your ${to === "sol" ? "SOL" : "Robinhood"} wallet shows in Home's Move.`;

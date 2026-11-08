@@ -369,7 +369,7 @@ test("a phone ask (3 Nov): \"move $10 over to eth on rh\" with $14.50 in the Saf
   const s = out.find((e) => e.kind === "needs-you") as { sheet: { kind: string; ask: unknown; line: string } };
   assert.equal(s.sheet.kind, "home", "Home's own sheet, never an act sheet (no account update)");
   assert.deepEqual(s.sheet.ask, { kind: "move", from: "safe", to: "hood", usd: "10.00" });
-  assert.equal(s.sheet.line, "Move $10.00 from your Safe to your ETH (RH) wallet.");
+  assert.equal(s.sheet.line, "Move $10.00 from your Safe to your Robinhood wallet.");
   // Claude picked the move tool but guessed the NEAR wallet: the same, from the Safe
   const b = anthropic([toolsSse(["t1", "move", { from: "near", to: "hood", usd: 10 }])]);
   const out2 = await run("move $10 over to eth on rh", { ownKey: OWN, anthropicFetch: b.f, hands: hands(PHONE) });
@@ -448,7 +448,7 @@ test("\"Add money to my Safe\": the Safe's own Add, no coin to pick (control: no
   assert.ok(typeof s !== "string");
   assert.deepEqual(s.ask, { kind: "receive", wallet: "safe" });
   assert.equal(s.line, "A one-time private address to add money to your Safe.");
-  assert.equal(addSheet({}), "Add which coin? SOL, ETH (RH), NEAR or USDC. Nothing moved.");
+  assert.equal(addSheet({}), "Add which coin? SOL, ETH, NEAR or USDC. Nothing moved.");
   assert.deepEqual((addSheet({ coin: "SOL" }) as HomeSheet).ask, { kind: "receive", coin: "SOL", wallet: "sol" });
 });
 

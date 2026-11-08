@@ -123,8 +123,10 @@ test("all of the SOL wallet's $5.01 back to the Safe (Move's take-out): the core
     seen.add(r.usd);
     const at = named(r);
     assert.deepEqual([at.live, at.card], ["Move $5.01 to your Safe", "Move $5.01 to your Safe"], `round ${i}: ${r.status}`);
-    assert.deepEqual(at.activity, ["Move $5.01 to your Safe", "$5.01"], `round ${i}: Activity`);
-    if (r.usd !== "5.01") assert.deepEqual([at.bareTrack, ...at.bareActivity], ["Move $5.01 to your Safe", "Move $5.01 to your Safe", "$5.01"], `round ${i}: with no carry`);
+    // audit 13's D2: landed, Activity's figure is what came in (the row's own), the title keeps the asked
+    const shown = r.status === "done" ? `$${r.usd}` : "$5.01";
+    assert.deepEqual(at.activity, ["Move $5.01 to your Safe", shown], `round ${i}: Activity`);
+    if (r.usd !== "5.01") assert.deepEqual([at.bareTrack, ...at.bareActivity], ["Move $5.01 to your Safe", "Move $5.01 to your Safe", shown], `round ${i}: with no carry`);
   }
   assert.equal(r!.status, "done");
   assert.equal(tasks.list().find((x) => x.id.startsWith("job:"))?.title, "Move $5.01 to your Safe", "the tap's Jobs row");

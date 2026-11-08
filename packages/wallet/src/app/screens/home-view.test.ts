@@ -15,9 +15,9 @@ const AT = new Date(2026, 10, 3, 10, 52).getTime();
 const T = shortTime(AT);
 
 test("a failed read names who failed, never \"Solana and NEAR\" whatever failed (Home.tsx:68, :218 on main)", () => {
-  assert.deepEqual(readLines({ offline: false, chains: { ids: ["hood"], at: null } }), ["Robinhood Chain didn't answer. ETH (RH) shows when it does."]);
+  assert.deepEqual(readLines({ offline: false, chains: { ids: ["hood"], at: null } }), ["Robinhood Chain didn't answer. Robinhood shows when it does."]);
   assert.deepEqual(readLines({ offline: false, chains: { ids: ["sol"], at: AT } }), [`Solana didn't answer. SOL is as of ${T}.`]);
-  assert.deepEqual(readLines({ offline: false, chains: { ids: ["sol", "hood"], at: AT } }), [`Solana and Robinhood Chain didn't answer. SOL and ETH (RH) are as of ${T}.`]);
+  assert.deepEqual(readLines({ offline: false, chains: { ids: ["sol", "hood"], at: AT } }), [`Solana and Robinhood Chain didn't answer. Both wallets are as of ${T}.`]);
   // Trading's balance is 1Click's confidential count (subwallets.ts heldBy): 1Click, never NEAR
   assert.deepEqual(readLines({ offline: false, oneClick: { at: AT } }), [`NEAR Intents didn't answer. Your wallets are as of ${T}.`]);
   assert.deepEqual(readLines({ offline: false, oneClick: { at: null } }), ["NEAR Intents didn't answer, so your wallets show when it does."]);

@@ -34,6 +34,8 @@ const WalletLine = lazy(() => import("./AgentWallet.tsx").then((m) => ({ default
 import type { WalletSource } from "./use-agent-wallet.ts";
 import { ChatsMenu, type ChatsSource } from "./ChatsMenu.tsx";
 import { keyGate } from "./key-gate.ts";
+// audit 15 FM1 (end to end or hidden): AgentZero's email row and sheet show only once its Inbox gets mail
+import { MAIL_RECEIVE_LIVE } from "./inbox-gate.ts";
 import { localKeep, moneyTask, OWN_SHEETS, sheetAsk, sheetTitle, SHEET_OPEN, tasksOf, type MoneySheet } from "./az-tasks.ts";
 // Jobs (product decision, 3 Nov): the top bar's Now, the Jobs sheet, the live card after a money sheet, AgentZero's email;
 // one chunk, loaded with the chat's first paint (the Now count reads the core's moves), never in Home's first load
@@ -259,13 +261,13 @@ export function AgentZeroChat({ chat, menu = false, onMenu, onJobs, onMood }: { 
         <SheetOpen.Provider value={onSheet}><JobsOpen.Provider value={openJobs}><PlanOpen.Provider value={planCtl}><RetryOpen.Provider value={!running && chat.retry ? chat.retry : null}>
           {thread.map((m, i) => (m.role === "user" ? <UserMessage key={m.id} m={m} /> : <AgentMessage key={m.id} m={m} activityNote={i === firstRead ? chat.activityNote : undefined} asked={askedMoney(thread[i - 1])} said={saidBefore(thread, i)} />))}
         </RetryOpen.Provider></PlanOpen.Provider></JobsOpen.Provider></SheetOpen.Provider>
-        {card && <Suspense fallback={<p className="zf-small azc-thinking">Opening…</p>}><KeyCard keys={keys!} /></Suspense>}
+        {card && <Suspense fallback={null}><KeyCard keys={keys!} /></Suspense>}
       </div>
       {/* the first run's fund card is the one way in: no second "Add money" line under it (one call to action) */}
       {wallet ? !fundFirst && <Suspense fallback={null}><WalletLine w={wallet} busy={running} onSheet={(start) => setWalletSheet({ start })} {...(broke ? { state: "refused" as const } : {})} model={chosen} {...(chat.resume ? { onContinue: chat.resume } : {})} /></Suspense> : chat.note && <p className="zf-small azc-note">{chat.note}</p>}
-      {menu && <ChatsMenu chats={chat.chats} onNew={() => { stick.current = true; setWords(""); chat.newChat?.(); }} onJobs={() => onJobs?.()} nowCount={<Suspense fallback={null}><NowCount bridge={bridge} /></Suspense>} onMail={() => setMail(true)} mail={<Suspense fallback={null}><MailHint bridge={bridge} /></Suspense>} onClose={() => onMenu?.(false)} />}
+      {menu && <ChatsMenu chats={chat.chats} onNew={() => { stick.current = true; setWords(""); chat.newChat?.(); }} onJobs={() => onJobs?.()} nowCount={<Suspense fallback={null}><NowCount bridge={bridge} /></Suspense>} {...(MAIL_RECEIVE_LIVE ? { onMail: () => setMail(true), mail: <Suspense fallback={null}><MailHint bridge={bridge} /></Suspense> } : {})} onClose={() => onMenu?.(false)} />}
       {jobsAt && <Suspense fallback={null}><JobsSheet bridge={bridge} open={jobsAt.open} onAsk={(w) => start(w)} onClose={() => setJobsAt(null)} /></Suspense>}
-      {mail && <Suspense fallback={null}><MailSheet bridge={bridge} onClose={() => setMail(false)} /></Suspense>}
+      {MAIL_RECEIVE_LIVE && mail && <Suspense fallback={null}><MailSheet bridge={bridge} onClose={() => setMail(false)} /></Suspense>}
       {/* first run, funded wallet only (no free try): "Fund AgentZero to start" and nothing else, so no box yet */}
       {!card && !(fundFirst && !keys?.own) && <form className="azc-composer" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <textarea ref={box} className="azc-input" rows={1} value={words} onChange={(e) => setWords(e.target.value)} onKeyDown={onKey} placeholder="Ask AgentZero" aria-label="Ask AgentZero" />
@@ -308,7 +310,7 @@ function AgentMessage({ m, activityNote, asked, said = "" }: { m: AzMessage; act
   const working = !m.done && last?.type === "step" && last.state === "running";
   return (
     <div className="azc-msg azc-assistant" aria-busy={!m.done}>
-      {m.parts.map((p, i) => (p.type === "text" && (strict || proposes || pending) ? <FactWords key={i} text={p.text} facts={p.facts ?? m.facts ?? {}} strict={strict || (proposes && !sheet)} sheet={pending ? "…" : sheet} streaming={!m.done && i === m.parts.length - 1} onOpen={setOpen} said={said} /> : <Part key={p.type === "step" ? `s:${p.id}` : i} p={p} streaming={!m.done && i === m.parts.length - 1} />))}
+      {m.parts.map((p, i) => (p.type === "text" && (strict || proposes || pending) ? <FactWords key={i} text={p.text} facts={p.facts ?? m.facts ?? {}} strict={strict || (proposes && !sheet)} sheet={pending ? "…" : sheet} streaming={!m.done && i === m.parts.length - 1} onOpen={setOpen} said={said} /> : <Part key={p.type === "step" ? `s:${p.id}` : i} p={p} at={`${m.id}:${i}`} streaming={!m.done && i === m.parts.length - 1} />))}
       {read && m.done && activityNote && <ActivityNote note={activityNote} />}
       {open && <Suspense fallback={null}><FactRows fact={open} onClose={() => setOpen(null)} /></Suspense>}
       {/* no "Thinking…" on screen: the mark at the top turns; the words stay for screen readers */}
@@ -346,11 +348,11 @@ function FactWords({ text, facts, strict, sheet, streaming, onOpen, said }: { te
   return <MdText text={body} streaming={streaming} leaf={leaf} />;
 }
 
-function Part({ p, streaming }: { p: AzPart; streaming: boolean }) {
+function Part({ p, streaming, at = "" }: { p: AzPart; streaming: boolean; /** b18: the part's place (message id and index), a browse card's own key */ at?: string }) {
   if (p.type === "text") return <MdText text={p.text} streaming={streaming} {...(streaming ? { leaf: wordLeaf } : {})} />;
   if (p.type === "step") return <StepCard p={p} />;
   // a browse sheet: the live card (the person's tap starts it; never a full screen)
-  if (p.type === "needs" && isBrowse(p.sheet)) return <Suspense fallback={<p className="zf-small azc-thinking">Opening…</p>}><LiveCard task={p.sheet.task} url={p.sheet.url} /></Suspense>;
+  if (p.type === "needs" && isBrowse(p.sheet)) return <Suspense fallback={null}><LiveCard task={p.sheet.task} url={p.sheet.url} at={at} /></Suspense>;
   // send, swap, move, add, request, trade: Home's own sheet, filled in, on the person's tap; followed to the end
   if (p.type === "needs" && isHome(p.sheet)) return <HomeCard ask={p.sheet.ask} line={p.sheet.line} tag={p.sheet.plan} stale={!!p.stale} card={p.card} />;
   // a money card from before a reload: what it saw, then what Activity says became of it
@@ -384,7 +386,7 @@ function HomeCard({ ask, line, tag, stale, card }: { ask: import("@zerofee/agent
   const { stepEnded, cardSaw } = useContext(PlanOpen);
   const onEnd = useMemo(() => (tag && stepEnded ? (e: StepEnd) => stepEnded(tag, e) : undefined), [tag?.id, tag?.step, stepEnded]); // eslint-disable-line react-hooks/exhaustive-deps
   const onCard = useMemo(() => (card && cardSaw ? (e: CardNews) => cardSaw(card, e) : undefined), [card, cardSaw]);
-  return <Suspense fallback={<p className="zf-small azc-thinking">Opening…</p>}><MoneyCard ask={ask} line={line} onOpen={onSheet} stale={stale} {...(onEnd ? { onEnd } : {})} {...(onCard ? { onCard } : {})} /></Suspense>;
+  return <Suspense fallback={null}><MoneyCard ask={ask} line={line} onOpen={onSheet} stale={stale} {...(onEnd ? { onEnd } : {})} {...(onCard ? { onCard } : {})} /></Suspense>;
 }
 
 const isPlan = (x: unknown): x is { kind: "plan"; plan: Plan } => !!x && typeof x === "object" && (x as { kind?: unknown }).kind === "plan" && Array.isArray((x as { plan?: { steps?: unknown } }).plan?.steps);
@@ -440,7 +442,7 @@ function SheetCard({ sheet, line }: { sheet: unknown; line: string }) {
     setState("open");
   };
   if (state === "ask") return <div className="azc-card"><p className="azc-card-line">{line}</p><div className="azc-acts"><button type="button" className="azc-act" onClick={review}>Review</button></div></div>;
-  return <div className="azc-sheet"><Suspense fallback={<p className="zf-small azc-thinking">Opening…</p>}><ChatSheetCard bridge={bridge} sheet={sheet as ChatSheet} onDone={() => setState("done")} /></Suspense></div>;
+  return <div className="azc-sheet"><Suspense fallback={null}><ChatSheetCard bridge={bridge} sheet={sheet as ChatSheet} onDone={() => setState("done")} /></Suspense></div>;
 }
 
 /** One tool step: its line and state, and why (a refusal), in a card that opens for the detail and closes again. */

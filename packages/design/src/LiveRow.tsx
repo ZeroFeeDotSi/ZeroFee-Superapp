@@ -16,6 +16,7 @@ const Badge = ({ state }: { state: LiveRowState }) => (
   <span className="zf-lrow__badge">
     {state === "done" && <svg viewBox="0 0 10 10"><path d="M2 5.2l2 2L8 3" /></svg>}
     {state === "stopped" && <svg viewBox="0 0 10 10"><path d="M5 2.2v3.4M5 7.6v.2" /></svg>}
+    {state === "ended" && <svg viewBox="0 0 10 10"><path d="M3.2 3.2h3.6v3.6H3.2z" /></svg>}
     {state === "back" && <svg viewBox="0 0 10 10"><path d="M4 2.5L2 4.5l2 2M2.2 4.5H6a2 2 0 010 4H5" /></svg>}
   </span>
 );

@@ -59,7 +59,7 @@ test("reads: at once, then every 20 s while nothing moves; every 2 s while money
   }
 });
 
-test("push: the core's open SOL addresses are watched, one line each; money seen tells the core and reads at once, then fast (control: the ETH (RH) entry isn't watched; a dropped one is closed)", async () => {
+test("push: the core's open SOL addresses are watched, one line each; money seen tells the core and reads at once, then fast (control: the Robinhood entry isn't watched; a dropped one is closed)", async () => {
   mock.timers.enable({ apis: ["setTimeout", "Date"], now: 2_000_000 });
   try {
     let watch: unknown[] = [{ chain: "sol", address: ADDR }, { chain: "hood", address: "0x1111111111111111111111111111111111111111" }];

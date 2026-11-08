@@ -255,7 +255,7 @@ Impact: no money moves; it needs the phone AND a second device of age to co-sign
 and then a recovery to exactly that key, so in practice it is self-inflicted or needs two of three (which already control
 the account); the new phone can cancel the waiting removal (it is listed in waiting_requests), and the words recover the
 account again (start_recovery to a new key works: the list is empty but sealed). Suggested fix (contract change, the
-owner's call): in the RemoveKey finish, also refuse a key that is now a device key of the sealed list (as for the backup
+the product's call): in the RemoveKey finish, also refuse a key that is now a device key of the sealed list (as for the backup
 key), or have start_recovery / finish_recovery drop waiting removals of the recovery's new key. Reported to the lead at
 21:08; the lead fixed it in lib e951e00a (finish_recovery drops any waiting RemoveKey of the new key; the RemoveKey
 finish also refuses the waiting recovery's new key and the last key on the device list). This round never edited src.

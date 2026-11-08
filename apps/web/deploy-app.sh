@@ -75,7 +75,7 @@ for gone in "PublicKeyCredential" "navigator.credentials"; do
 done
 # Release rule 4, H13: the laptop page (a real key that approves real money) isn't in this build (LAPTOP_SITE_LIVE is
 # off), and neither is the developers' gallery. Each marker must still be in the source, or the check can't fire.
-for gone in "Or copy the code and paste it on your main device" "Coin logos (bundled, else a monogram)"; do
+for gone in "Or copy the code to paste on your phone" "Coin logos (bundled, else a monogram)"; do
   grep -rqF --include='*.ts' --include='*.tsx' --exclude='*.test.ts' -- "$gone" "$work/src/apps/web/src" || { echo "STOP: the marker \"$gone\" is gone from the source, so its check can't fire: update this script" >&2; exit 1; }
   ! grep -rqF -- "$gone" "$dist/assets" || { echo "STOP: the laptop page or the gallery (\"$gone\") is in the public build" >&2; exit 1; }
 done

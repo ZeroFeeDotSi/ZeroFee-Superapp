@@ -1,4 +1,5 @@
-// The Problems AgentZero's Sign-up Robot planner (robot/think.ts, Pay's agent.robot.next) can produce, in one place.
+// The Problems AgentZero's Sign-up Robot planner (robot/think.ts, Pay's agent.robot.next) and its browser's thinker
+// (robot/relay-think.ts) can produce, in one place.
 // Each code is listed in packages/agent/errors.md, and a test checks. The old Agent app's table (its rules, setup and the
 // contract's refusals) went with its screens (D110): AgentZero's own lines live with its engine and the core.
 //
@@ -6,6 +7,7 @@
 import type { MoneyState, Problem } from "@zerofee/core/problem";
 
 const inYourBalance: MoneyState = { state: "safe", where: "in your Safe" };
+const inAgentWallet: MoneyState = { state: "safe", where: "in AgentZero's wallet" };
 
 export const agentProblems = {
   keyMissing: (): Problem => ({
@@ -56,6 +58,27 @@ export const agentProblems = {
     whatHappened: "AgentZero's plan didn't make sense, so it was dropped.",
     money: inYourBalance,
     next: { kind: "open", label: "Ask in other words", screen: "ask" },
+  }),
+  /** Audit 14 E1: the browser thinks on ZeroFee's server, and this build has none. */
+  browseOff: (): Problem => ({
+    code: "agent.browse.off",
+    whatHappened: "AgentZero's browser is off in this version.",
+    money: inYourBalance,
+    next: { kind: "nothing", label: "OK" },
+  }),
+  /** Audit 14 E1: AgentZero's wallet can't pay for its next step. */
+  browseUnfunded: (): Problem => ({
+    code: "agent.browse.unfunded",
+    whatHappened: "AgentZero needs more money to think. Add money to its wallet.",
+    money: inAgentWallet,
+    next: { kind: "nothing", label: "OK" },
+  }),
+  /** b18 (4b): a step with no wallet to pay it: AgentZero's chat, which holds its wallet, is closed. */
+  browseNoPayer: (): Problem => ({
+    code: "agent.browse.no-payer",
+    whatHappened: "AgentZero pays for each step from its wallet, and its chat is closed. Open AgentZero to go on.",
+    money: inAgentWallet,
+    next: { kind: "nothing", label: "OK" },
   }),
   robotNotAllowed: (): Problem => ({
     code: "agent.robot.not-allowed",

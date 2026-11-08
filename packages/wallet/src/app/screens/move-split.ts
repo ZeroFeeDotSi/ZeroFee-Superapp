@@ -12,10 +12,11 @@
 //   (spending.move, E5).
 
 export type Place = "safe" | "private" | "sol" | "hood" | "near" | "bsc";
-export const PLACES: readonly Place[] = ["safe", "private", "sol", "hood", "near", "bsc"];
+// D13 (product decision, 8 Nov): a chain's place only on the app's chains (core app-chains.ts): no BNB in V1
+export const PLACES: readonly Place[] = (["safe", "private", "sol", "hood", "near", "bsc"] as const).filter((p) => p === "safe" || p === "private" || appChain(p));
 /** Home's words (D124: "ETH (RH)", never "ETH on Robinhood"). Private: its own row (the pair-private walk, 5 Nov), the
  *  money a Move pays from first (NEAR Confidential); it only gives, to the wallets, never takes. */
-export const PLACE_NAME: Record<Place, string> = { safe: "Safe", private: "Private", sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+export const PLACE_NAME: Record<Place, string> = { safe: "Safe", private: "Private", sol: "SOL", hood: "Robinhood", near: "NEAR", bsc: "BNB" };
 /** The Safe's side: the Safe's own coins and Private. Their legs to a wallet are one Approve (spending.topUp's legs),
  *  paid from Private first. */
 export const safeSide = (p: Place): boolean => p === "safe" || p === "private";
@@ -25,9 +26,10 @@ const chainPlace = (p: Place): boolean => p === "sol" || p === "hood" || p === "
 export const LEG_MIN_USD = 2;
 /** Between two chains' wallets (E5, review M1): the least that still arrives, by the core's own floors. */
 export { PAIR_MIN_USD } from "@zerofee/core/float-floors";
+import { appChain } from "@zerofee/core/app-chains";
 import { pickSafeCoin, withPrivate, type SpendingActivity } from "@zerofee/core/spending";
 import { intentsKept } from "@zerofee/core/zero-fee";
-import { LEG_SEC } from "@zerofee/shell-api/job-steps.ts";
+import { LEG_SEC, moveLegSec } from "@zerofee/shell-api/job-steps.ts";
 import { moveSplitUsd } from "@zerofee/core/move-plan";
 import { HOME_LEG_MIN_USD, PAIR_MIN_USD, SAFE_LEG_MIN_USD, leastHome, leastIn, planLeastUsd, walletLegLeastUsd } from "@zerofee/core/float-floors";
 /** A leg between two chains' wallets: a move in to the NEAR wallet, then a move out (E5). */
@@ -354,6 +356,9 @@ export function typedUsd(text: string): number | null {
 /** Finding 66 (tester, 4 Nov: "abc" on NEAR's row became $250): a keystroke on a row's figure is taken only when the
  *  field still reads as dollars (digits, one point, two cents; a pasted "$1,200" loses its marks); anything else is
  *  ignored, never read. */
+/** A row's figure while it is typed: with its unit, as every other row ("$223.76", never "223.76"; audit 16 re-grade). The
+ *  typed text keeps digits only (nextTyped strips the "$"). */
+export const typingShown = (text: string): string => `$${text}`;
 export function nextTyped(prev: string, raw: string): string {
   if (!/^[\d.,$\s]*$/.test(raw)) return prev;
   const t = raw.replace(/[$,\s]/g, "");
@@ -443,7 +448,10 @@ export const MOVE_WORDS = {
   // the Copywriter's labels (COPY-MOVE-SUMMARY-2026-11-03): "at least", "at most" and "about" sit in the values
   leavesFrom: (where: string) => `Leaves ${where}`,
   leaves: "Leaves in total",
-  arrivesIn: (where: string) => `Arrives in ${where}`,
+  /** the Check sheet's own source rows (A7): "From your Safe", "From Robinhood wallet", "From Private" */
+  from: (where: string) => `From ${where}`,
+  // builder 10's SHOULD (8 Nov): "Arrives in your SOL wallet" wrapped to three lines on the floor; the label is where it goes
+  arrivesIn: (where: string) => `To ${where}`,
   arrives: "Arrives in total",
   atLeast: (x: string) => `at least ${x}`,
   fees: "Fees",
@@ -484,6 +492,12 @@ export const MOVE_WORDS = {
   moves: (to: string) => `Moves it to ${to}.`,
   // a source the plan moved by itself (row 8 b): said once, with the plan's own figure
   also: (parts: string) => `Also moves ${parts}.`,
+  // QA 16's MUST 1 on b8's (8 Nov): "Also moves $4.36 from your ETH (RH) wallet and $9.36 to Private." read as money
+  // going the wrong way with no reason: Private's part first, with its why, then what else gives, in that order
+  // audit 10's A6 (8 Nov): it said the fill's extra "pays the Move"; it pays nothing, Private keeps it (Check says "Private
+  // keeps the rest"), so the line says that, once
+  intoPrivate: (usd: string) => `${usd} also goes into Private and stays there.`,
+  thenAlso: (parts: string) => `${parts}.`,
   done: "Done",
 } as const;
 
@@ -507,7 +521,7 @@ export function leastOf(l: Leg): number {
   if (safeSide(l.from)) return planLeastUsd(l.usd, l.to === "private" ? "near" : l.to);
   return walletLegLeastUsd(l.usd, chainFrom, chainTo);
 }
-export const WHERE: Record<Place, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+export const WHERE: Record<Place, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 /** "$26.10 leaves your SOL wallet. At least $24.01 reaches your Safe. Fees at most $2.09." (several places: "leaves" and
  *  "arrives" alone). Rounded so the least is never more than the floors give, the fees never less. */
 /** The figures costLine says, once (one source for the sentence and for the sheet's grouped rows). */
@@ -594,8 +608,13 @@ export function alsoMoved(ops: readonly SetOp[], pays: { legs: readonly Leg[]; e
   // Private only ever gives: a figure set on it is a source set, whichever way its row ends
   const auto = gives.some(([p]) => set.has(p)) || set.has("private") ? gives.filter(([p]) => !set.has(p)) : gives.slice(1);
   const parts = auto.map(([p, usd]) => `${money2(usd)} from ${WHERE[p]}`);
-  if (pays.privateUsd >= 0.005 && !set.has("private")) parts.push(`${money2(pays.privateUsd)} to ${WHERE.private}`);
-  return parts.length ? MOVE_WORDS.also(parts.join(" and ")) : null;
+  const into = pays.privateUsd >= 0.005 && !set.has("private") ? money2(pays.privateUsd) : null;
+  if (!into) return parts.length ? MOVE_WORDS.also(parts.join(" and ")) : null;
+  if (!parts.length) return MOVE_WORDS.intoPrivate(into);
+  // "$9.36 also goes into Private and stays there. $4.36 also comes from your Robinhood wallet and $3.00 from your NEAR wallet."
+  const [first, ...rest] = parts;
+  const then = [first!.replace(/ from /, " also comes from "), ...rest].join(" and ");
+  return `${MOVE_WORDS.intoPrivate(into)} ${MOVE_WORDS.thenAlso(then)}`;
 }
 
 /** What the Move sheet shows (rule 2, the UI reviewer's walk: "Moving…" sat 620 ms before Check this): the receipt once the
@@ -607,10 +626,10 @@ export function moveFace(o: { made: boolean; busy: boolean; running: boolean }):
 
 /** The same figures as costLine, as the sheet's grouped rows (label left, figure right), the time last; `note` is the
  *  rounding line once; none now (a Move pays from Private: the Safe's top-up is fillLine's own step). */
-export function costRows(legs: readonly Leg[]): { rows: { label: string; value: string }[]; note: string | null } | null {
+export function costRows(legs: readonly Leg[], fill = false): { rows: { label: string; value: string }[]; note: string | null } | null {
   if (!legs.length) return null;
   const { leaves, least, fees, from, to } = costFacts(legs);
-  const time = aboutLegs(legs);
+  const time = aboutLegs(legs, fill);
   return {
     rows: [
       { label: from.length === 1 ? MOVE_WORDS.leavesFrom(WHERE[from[0]!]) : MOVE_WORDS.leaves, value: money2(leaves) },
@@ -620,6 +639,34 @@ export function costRows(legs: readonly Leg[]): { rows: { label: string; value: 
     ],
     note: null,
   };
+}
+
+/** Audit 10's A7 (8 Nov): the floor's first row said "Leaves in total $55.00" while its Check sheet said "From your Safe ·
+ *  $60.00" and "From your Robinhood wallet · about $4.36": two figures for what leaves. Now the floor says the Check's own
+ *  sources from the same fill (fillLegs: the Safe's whole fill step, each wallet, Private on a net payout), so what Check
+ *  confirms is what the sheet said. Once the costs are read the whole floor is Check's own (move-check-floor.ts); until
+ *  then the plan's bounds (D137), which Check's figures meet. Private's kept rest: the also line. */
+export function withSources(rows: readonly { label: string; value: string }[], legs: readonly Leg[], pays: { legs: readonly Leg[]; extra: number; privateUsd: number }): { label: string; value: string }[] {
+  if (!rows.length || !legs.length) return [...rows];
+  const safe = cents(sum(pays.legs.filter((l) => l.from === "safe" && !safeSide(l.to)).map((l) => l.usd)) + pays.extra);
+  const from: { label: string; value: string }[] = [];
+  if (safe >= 0.005) from.push({ label: MOVE_WORDS.from(WHERE.safe), value: money2(safe) });
+  for (const p of PLACES) {
+    if (safeSide(p)) continue;
+    const v = cents(sum(legs.filter((l) => l.from === p).map((l) => l.usd)));
+    // three words a row ("From Robinhood wallet"): the grade-5 rule ("From your Robinhood wallet" grades 6.6)
+    if (v >= 0.005) from.push({ label: MOVE_WORDS.from(`${PLACE_NAME[p]} wallet`), value: money2(v) });
+  }
+  if (pays.privateUsd <= -0.005) from.push({ label: MOVE_WORDS.from(WHERE.private), value: money2(-pays.privateUsd) });
+  // the plan's Arrives and Fees rows stay (D137) until the Check's own figures are read (move-check-floor.ts)
+  return from.length ? [...from, ...rows.slice(1)] : [...rows];
+}
+
+/** A7's other half: with the floor's From rows on screen, the also line keeps only what they don't say (Private's kept
+ *  rest); "$4.36 also comes from your Robinhood wallet" is the floor's "From Robinhood wallet · $4.36", said once. */
+export function saidOnce(also: string | null, floor: boolean): string | null {
+  if (!also || !floor) return also;
+  return /^\$[\d,.]+ also goes into Private and stays there\./.exec(also)?.[0] ?? null;
 }
 
 /* One figure per Move (QA's MUST, Sim test: a typed $30 said "$31 leaves", its first Jobs frame $2.11 for a
@@ -686,16 +733,12 @@ export function footNote(o: { back: readonly string[]; fill: string | null; rest
 // 79–112 s (the deposit on Solana, then NEAR Intents crediting it); NEAR wallet → Safe "Done in 10 s". Each route's time
 // is what was measured on mainnet, the slowest seen, never a hope.
 export { LEG_SEC };
-const CHAINS = new Set(["sol", "hood", "bsc"]);
 // the Safe's side on to a chain's wallet: Private pays it by NEAR Confidential (the Safe fills Private first when it is
 // short), the route the job's row counts down (live-steps privateMove: LEG_SEC.privateOut; Sim re-check, 5 Nov)
-export const legTime = (l: Leg): number =>
-  safeSide(l.from) && chainPlace(l.to) ? LEG_SEC.privateOut
-    : CHAINS.has(l.from) && (l.to === "near" || safeSide(l.to)) ? LEG_SEC.chainIn
-      : l.from === "near" && safeSide(l.to) ? LEG_SEC.nearToSafe
-        : l.from === "near" || l.to === "near" ? LEG_SEC.nearOut : LEG_SEC.other;
-export const aboutLegs = (legs: readonly Leg[]): string | null => {
-  const s = Math.max(0, ...legs.map(legTime));
+// `fill` (the audit's S8, 7 Nov): the Move fills Private from the Safe first (safeSigns), so a Safe leg counts both its legs
+export const legTime = (l: Leg, fill = false): number => moveLegSec(l.from, l.to, { fill });
+export const aboutLegs = (legs: readonly Leg[], fill = false): string | null => {
+  const s = Math.max(0, ...legs.map((l) => legTime(l, fill)));
   return !legs.length ? null : s >= 60 ? `About ${Math.round(s / 60)} min.` : `About ${s} s.`;
 };
 
@@ -738,6 +781,9 @@ export function safeKeeps(now: readonly PlaceNow[], o: { coinUsd: number; roomUs
 
 /** Private's rise on this Move (QA 16, 7 Nov: $33.86 → $46.40, unsaid), in one line under its row; null when it doesn't
  *  rise by a cent. `was`: Private today; `after`: what the ledger leaves it (the row's figure). */
+/** A6 (audit 10): whether the also line already says Private's part (alsoMoved's intoPrivate): then Private's row says no
+ *  second line with the same figure. */
+export const alsoSaysPrivate = (also: string | null): boolean => !!also && /also goes into Private and stays there\./.test(also);
 export function privateGetsLine(was: number, after: number): string | null {
   const up = Math.round((after - was) * 100);
   return up >= 1 ? MOVE_WORDS.privateGets(usdShort(up / 100)) : null;
@@ -829,10 +875,10 @@ export const everyLanded = (runs: readonly Run[], legs: number): boolean => legs
  * Legs still on their way: the time the slowest of THEM takes (a landed leg's time is gone). Before the legs' ids are
  * back (`followed` 0): the plan's legs. None moving and not all landed (one stopped): no time line.
  */
-export function madeState(runs: readonly Run[], legs: readonly Leg[], followed: number): { state: "away" | "landed"; etaSec: number | null } {
+export function madeState(runs: readonly Run[], legs: readonly Leg[], followed: number, fill = false): { state: "away" | "landed"; etaSec: number | null } {
   if (everyLanded(runs, followed)) return { state: "landed", etaSec: null };
   const moving = followed > 0 ? runs.filter((r) => r.state === "moving").map((r) => r.leg) : legs;
-  return { state: "away", etaSec: moving.length ? Math.max(0, ...moving.map(legTime)) : null };
+  return { state: "away", etaSec: moving.length ? Math.max(0, ...moving.map((l) => legTime(l, fill))) : null };
 }
 
 /** A refusal's next step on the floor's one button (move-run.ts refusedStep): `less` sets the source to what it can move,

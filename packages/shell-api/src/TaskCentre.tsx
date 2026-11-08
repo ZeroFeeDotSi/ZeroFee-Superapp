@@ -4,12 +4,13 @@
 // one tap away, in the app. Loaded on the bell's first tap (TaskBell.tsx).
 import { useEffect, useState, type ReactNode } from "react";
 import { Sheet } from "@zerofee/design/Sheet.tsx";
-import { LiveRow, progressOf, timeSlot, type LiveRowState } from "@zerofee/design/LiveRow.tsx";
+import { LiveRow, progressOf, timeSlot } from "@zerofee/design/LiveRow.tsx";
+import { ROW_STATE } from "./task-row-state.ts";
 import { checkpointAt, checkpointKind } from "@zerofee/design/checkpoints.ts";
 import { ago, tickEvery } from "@zerofee/design/time.ts";
 import { ActSwap, AppAgent, AppBrowser, AppChat, AppHome, AppTrade } from "@zerofee/design/icons.tsx";
 import { useShell } from "./AppFrame.tsx";
-import { cardStep, timeLeft } from "./job-steps.ts";
+import { cardStep, onSecond, timeLeft } from "./job-steps.ts";
 import { TASK_APP_HOME, taskStore, type Task, type TaskApp } from "./tasks.ts";
 import { appRecorded, useAppHistories, useHistory } from "./history-slot.ts";
 import { earlierOf } from "./task-earlier.ts";
@@ -30,7 +31,7 @@ export const RECEIPT_WORDS = { amount: "Amount", where: "Where", when: "When", p
 /** A finished task with a public transaction is a receipt: a tap opens it (QA 4 Nov: a receipt row opened nothing). */
 export const hasReceipt = (t: Pick<Task, "state" | "proof">): boolean => t.state !== "pending" && !!t.proof?.length;
 const ENDED_WORDS: Record<Exclude<Task["state"], "pending">, string> = { done: "Done", failed: "Didn't finish", stopped: "Stopped" };
-const ROW_STATE: Record<Task["state"], LiveRowState> = { pending: "going", done: "done", failed: "stopped", stopped: "stopped" };
+
 
 /** A going task's one line: the step under way (or next) and the time LEFT from the protocol's own estimate (its endsAt;
  *  product decision, 5 Nov), or that there is none: never the time spent. */
@@ -75,7 +76,8 @@ export function TaskCentre({ onClose, onBack, only, onAll }: { onClose: () => vo
   const youngest = now.length ? Math.min(...now.map((t) => at - t.startedAt)) : Infinity;
   useEffect(() => {
     if (!now.length) return;
-    const t = setTimeout(() => setAt(Date.now()), tickEvery(youngest));
+    // on the second, as each receipt's TimeLeft is (job-steps onSecond): one figure on both
+    const t = setTimeout(() => setAt(Date.now()), onSecond(tickEvery(youngest), Date.now()));
     (t as unknown as { unref?: () => void }).unref?.();
     return () => clearTimeout(t);
   }, [now.length > 0, at]);

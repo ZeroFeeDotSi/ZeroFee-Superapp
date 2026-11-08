@@ -59,7 +59,10 @@ export function createToPrivate(x: ToPrivateDeps) {
     const [cat, block] = await Promise.all([catalogue({ live: true }), chain.commonBlock()]);
     const native = tokenId === NATIVE_NEAR;
     const coin = native ? cat.coin(WRAPPED_NEAR) : cat.coin(tokenId);
-    if (!coin || (!native && coin.route !== "near")) throw new ProblemError(walletProblems.privateCoin(coin?.symbol ?? "This coin"));
+    // a coin bridged into NEAR Intents (BTC, ETH, SOL there) can't be paid in from the NEAR account (route B: a coin native
+    // to NEAR), but the Safe's own NEAR Intents balance pays any intents coin in by one mt_transfer (`through` and `open`,
+    // the fill's intents route: a Move's fill, a Safe Swap's leg into Private, builder 15); refused below when it isn't there
+    if (!coin || (!native && coin.route !== "near" && !(through && open))) throw new ProblemError(walletProblems.privateCoin(coin?.symbol ?? "This coin"));
     const amountUnits = toUnits(amount, coin.decimals);
     if (amountUnits === null || amountUnits <= 0n) throw new ProblemError(walletProblems.amountInvalid());
     const usd = Number(usdOf(amount, coin.priceUsd) ?? NaN);
@@ -138,6 +141,9 @@ export function createToPrivate(x: ToPrivateDeps) {
     return x.signAll(x.approvals(steps, plan.canChain, caller), caller, since);
   }
 
+  /** M12-5 (8 Nov): the page's own key for its job, kept only in its own shape (letters, digits, "-", "_"; 8 to 64). */
+  const jobKeyOf = (k: unknown): string | undefined => (typeof k === "string" && /^[\w-]{8,64}$/.test(k) ? k : undefined);
+
   /** Move into Private: a real quote now (refused if it promises less than shown), paid on NEAR like Convert's route B. */
   async function toPrivate(p: Record<string, unknown>, caller: Caller): Promise<Movement> {
     await x.notForChild();
@@ -155,6 +161,8 @@ export function createToPrivate(x: ToPrivateDeps) {
     const fair = typeof depositAddress === "string" && /^[0-9a-f]{64}$/.test(depositAddress) && /^\d+$/.test(String(r.ok.minAmountOut)) && /^\d+$/.test(String(r.ok.amountIn));
     if (!fair || BigInt(r.ok.minAmountOut) < held.minOutUnits || BigInt(r.ok.amountIn) !== plan.units) throw new ProblemError(walletProblems.quoteExpired());
     privateQuotes.delete(quote.id);
+    // M12-5: the page's key for its job, on the movement (and so on every ledger.activity row of it)
+    const jobKey = jobKeyOf(p.key);
     const why = `Move ${quote.amountIn} ${quote.from === NATIVE_NEAR ? "NEAR" : plan.coin.symbol} to Private`;
     const signed = await payIntoPocket(plan, quote.from, depositAddress, why, caller);
     const at = iso();
@@ -170,6 +178,7 @@ export function createToPrivate(x: ToPrivateDeps) {
       explorerUrls: signed.explorerUrls,
       ...(signed.hold ? { held: signed.hold } : {}),
       caller,
+      ...(jobKey ? { jobKey } : {}),
     };
     return x.finish(movement, signed, { signer: plan.accountId, depositAddress, sender: plan.route === "near-ledger" ? INTENTS.account : plan.accountId });
   }

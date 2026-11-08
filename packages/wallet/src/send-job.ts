@@ -19,6 +19,7 @@ import { moveProof } from "@zerofee/core/tx-proof";
 import { PRIVATE_KEEP_MS, privateBack } from "@zerofee/core/private-route";
 import { partsThatFit } from "@zerofee/core/move-plan";
 import { failedProblem } from "./wallet-problems.ts";
+import { fromUnits as unitsText } from "./amount.ts";
 
 export interface SendJob {
   /** The movement's id. */
@@ -50,6 +51,9 @@ export interface SendJob {
   leg2In: string;
   coin: string;
   startedAtIso: string;
+  /** A Safe Swap through NEAR Confidential (safe-send.ts swapFromSafe): the coin got's decimals, so its end carries what
+   *  1Click settled into the Safe (amountOut, never the quote), and leg 1's read stamps inPrivateAtIso. */
+  outDecimals?: number;
   /** Written before the first submit: from then on the payment's outcome is 1Click's to say. */
   handed?: true;
   lastSubmit?: number;
@@ -314,8 +318,11 @@ export function createSendJobs(x: SendJobDeps) {
           return;
         }
         if (!fits(job, BigInt(landed))) return end(m, { status: "problem", problem: said(sendWords.short(job.coin), m) });
-        // D137: landed with enough, so the payment goes now, in this same step (no wait of ours)
-        job = await hand(job, m);
+        // D137: landed with enough, so the payment goes now, in this same step (no wait of ours). A Safe Swap's first step
+        // ("into Private") ticks on this read (builder 15): the movement says when, and keeps saying it
+        const inPrivate = job.outDecimals !== undefined && !m.inPrivateAtIso ? { ...m, inPrivateAtIso: iso(), updatedAtIso: iso() } : m;
+        if (inPrivate !== m) await remember(inPrivate);
+        job = await hand(job, inPrivate);
         return;
       }
       // handed over: only 1Click's own status of the payment says how it ended
@@ -325,7 +332,10 @@ export function createSendJobs(x: SendJobDeps) {
       // balance, which has no public transaction); its link joins the movement's explorer links
       if (status === "SUCCESS") {
         const proof = moveProof(s, { from: "private", to: m.toChain ?? "near", deposit: job.outDeposit, ...(m.proof ? { was: m.proof } : {}) });
-        return end(m, { status: "done", problem: undefined, proof, ...(proof.end?.url && !m.explorerUrls.includes(proof.end.url) ? { explorerUrls: [...m.explorerUrls, proof.end.url] } : {}) });
+        // a Safe Swap: what 1Click settled into the Safe, in the coin got (its record, never the quote), and its time from the tap
+        const raw = (s as { swapDetails?: { amountOut?: unknown } } | null)?.swapDetails?.amountOut;
+        const got = job.outDecimals !== undefined && typeof raw === "string" && /^\d{1,40}$/.test(raw) ? { amountOut: unitsText(raw, job.outDecimals), settledMs: Math.max(0, now() - Date.parse(m.startedAtIso)) } : {};
+        return end(m, { status: "done", problem: undefined, proof, ...got, ...(proof.end?.url && !m.explorerUrls.includes(proof.end.url) ? { explorerUrls: [...m.explorerUrls, proof.end.url] } : {}) });
       }
       if (status === "REFUNDED" || status === "FAILED") return end(m, { status: "problem", problem: said(sendWords.notPaid(), m) });
       if (status === "PENDING_DEPOSIT") {

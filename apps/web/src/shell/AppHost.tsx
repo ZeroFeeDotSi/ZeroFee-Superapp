@@ -46,7 +46,7 @@ import { SOCIAL_TRADING as WORDS } from "@zerofee/browser/social/social-trading.
 import { LOCKED_IDS, SOCIAL_TRADING, arrangeNote, barSlot, markSlot, markTraySeen, moveItem, orderFor, pageOrder, rowOf, saveOrder, savedOrder, trayBeckons } from "./tray.ts";
 import { LOCKED_APPS } from "./locked-tiles.tsx";
 import { ProblemView } from "./ProblemView.tsx";
-import { AppBoundary } from "./AppBoundary.tsx";
+import { AppBoundary, AppWaiting } from "./AppBoundary.tsx";
 import { later } from "../later.tsx";
 /** The Waiting screen (a request the account holds): its code loads with the neighbours, after the first paint, never in
  *  Home's first load (the speed budget: room for the compositor's flights). */
@@ -920,7 +920,7 @@ const AppPage = memo(function AppPage({ app, i, count, here, active, shown, requ
   }, [i]);
   return (
     <section ref={ref} className="ah-page" aria-hidden={!here} inert={!here}>
-      {shown && <ShellContext.Provider value={ctx}><AppBoundary name={app.name}><Suspense fallback={null}><div className="ah-app">{app.render()}</div></Suspense></AppBoundary></ShellContext.Provider>}
+      {shown && <ShellContext.Provider value={ctx}><AppBoundary name={app.name}><Suspense fallback={<AppWaiting name={app.name} />}><div className="ah-app">{app.render()}</div></Suspense></AppBoundary></ShellContext.Provider>}
     </section>
   );
 });

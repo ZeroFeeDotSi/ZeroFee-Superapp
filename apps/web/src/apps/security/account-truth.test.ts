@@ -55,10 +55,10 @@ test("the sheet draws only quantumRowsShown's words, and On folds the headline i
 test("Your account's right sides: never \"On\" on the web (the copy review's S3, #7); the phone keeps its On", () => {
   const base = { quantumOn: true, protection: true, pending: false, checkDue: false };
   const web = accountRowWords({ ...base, web: true });
-  assert.deepEqual([web.quantum, web.protection, web.recovery.value, web.recovery.line], ["On iPhone", "Your rules", "Backup words", undefined]);
+  assert.deepEqual([web.quantum, web.protection, web.recovery.value, web.recovery.line], ["On iPhone", "Your rules", "Written down", undefined]);
   for (const v of [web.quantum, web.protection, web.recovery.value]) assert.notEqual(v, "On");
   const phone = accountRowWords({ ...base, web: false });
-  assert.deepEqual([phone.quantum, phone.protection, phone.recovery.value, phone.recovery.line], ["On", "On", "Backup words", undefined], "control: the phone's On is true there");
+  assert.deepEqual([phone.quantum, phone.protection, phone.recovery.value, phone.recovery.line], ["On", "On", "Written down", undefined], "control: the phone's On is true there");
   // the states that ask for something say so on both
   for (const w of [true, false]) {
     const ask = accountRowWords({ web: w, quantumOn: false, protection: false, pending: false, checkDue: true });

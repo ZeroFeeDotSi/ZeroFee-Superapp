@@ -227,3 +227,16 @@ test("the audit's check (8 Nov): upTo with no decimals reader reads decimals 0, 
   await fromPrivate({ upTo: { [USDC]: "33" } }, "wallet", x);
   assert.deepEqual(homes, ["33"]);
 });
+
+test("M12-5: the move in keeps the page's key for its job on the movement and on its ledger.activity row; a key of another shape is left off", async () => {
+  const { ledger } = setup();
+  const key = "jk-0123456789abcdef";
+  const q = await ok<Quote>(ledger, "ledger.quoteToPrivate", { tokenId: USDC, amount: "50" });
+  const m = await ok<Movement>(ledger, "ledger.toPrivate", { quoteId: q.id, key });
+  assert.equal(m.jobKey, key);
+  const rows = await ok<Movement[]>(ledger, "ledger.activity", { limit: 50 });
+  assert.equal(rows.find((r) => r.id === m.id)?.jobKey, key, "a page reloaded before the answer finds it by its key");
+  const q2 = await ok<Quote>(ledger, "ledger.quoteToPrivate", { tokenId: USDC, amount: "5" });
+  const bare = await ok<Movement>(ledger, "ledger.toPrivate", { quoteId: q2.id, key: "<script>" });
+  assert.equal(bare.jobKey, undefined, "control: not a key's shape");
+});

@@ -130,7 +130,7 @@ test("W4 web Send entry, SOL: the sheet's one call -> the real web core's own co
   } finally { e.restore(); }
 });
 
-test("W4 web Send entry, ETH (RH): the same path from the ETH (RH) wallet; Robinhood Chain pays 1Click's signed address", async () => {
+test("W4 web Send entry, Robinhood: the same path from the Robinhood wallet; Robinhood Chain pays 1Click's signed address", async () => {
   const e = await webEntry();
   try {
     const r = await sheetGo(e, "hood", TO_EVM, "0.003");
@@ -231,11 +231,11 @@ test("W4 web Send entry, an SPL token (USDC on Solana): its chip -> the real web
   } finally { e.restore(); }
 });
 
-test("W4 web Send entry, an ERC-20 on ETH (RH) (USDG): its chip -> the confidential quote for USDG -> the password sheet -> USDG's transfer(1Click's signed address, amount) to its own contract, no ETH value", async () => {
+test("W4 web Send entry, an ERC-20 on Robinhood (USDG): its chip -> the confidential quote for USDG -> the password sheet -> USDG's transfer(1Click's signed address, amount) to its own contract, no ETH value", async () => {
   const e = await webEntry();
   try {
     const from = chip(USDG_ID);
-    assert.deepEqual([from.chain, from.symbol, from.decimals, from.row], ["hood", "USDG", 6, "ETH (RH) wallet"]);
+    assert.deepEqual([from.chain, from.symbol, from.decimals, from.row], ["hood", "USDG", 6, "Robinhood wallet"]);
     const r = await sheetGo(e, "hood", TO_EVM, "3", from);
     assert.ok("sent" in r, JSON.stringify(r));
     assert.equal(r.sent.line, WEB_SEND_WORDS.sent("3", "USDG"));
@@ -265,7 +265,7 @@ test("W4 token controls: a quote paying someone else, another amount, another co
     try {
       const r = await sheetGo(e, chain, to, chain === "sol" ? "2.5" : "3", chip(id));
       assert.ok("line" in r, `${why}: ${JSON.stringify(r)}`);
-      assert.match(r.line!, new RegExp(`^NEAR Intents .*Nothing moved\\. Your money is in your ${chain === "sol" ? "SOL" : "ETH \\(RH\\)"} wallet\\.$`), why);
+      assert.match(r.line!, new RegExp(`^NEAR Intents .*Nothing moved\\. Your money is in your ${chain === "sol" ? "SOL" : "Robinhood"} wallet\\.$`), why);
       assert.deepEqual([e.sheets.length, e.solSent.length, e.evmSent.length, e.handed.length], [0, 0, 0, 0], `${why}: no sheet, nothing signed or sent`);
     } finally { e.restore(); }
   }

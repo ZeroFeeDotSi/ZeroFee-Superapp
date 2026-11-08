@@ -32,6 +32,7 @@ let mockBridge: () => Bridge;
 let forApps: (b: Bridge, app: string) => Bridge;
 let faultedBridge: (b: Bridge, f: { service: Service; failure: Failure }) => Bridge;
 let SHEET_NEEDS: Record<string, readonly Service[]>;
+let needsWith: (base: readonly Service[], places: readonly string[]) => readonly Service[];
 let sheetsLoaded: () => Promise<unknown>;
 let LoadingSheet: FunctionComponent<Record<string, unknown>>;
 let sendLink: (l: { to: string; chain: string; amount?: string; back?: string }) => string;
@@ -76,7 +77,7 @@ before(async () => {
   ({ AppHost } = await server.ssrLoadModule("./shell/AppHost.tsx"));
   ({ useShell } = await server.ssrLoadModule("@zerofee/shell-api/AppFrame.tsx"));
   ({ SiteAddSheet, SiteBackSheet } = await server.ssrLoadModule("@zerofee/wallet/app/money/SiteMoney.tsx"));
-  ({ SHEET_NEEDS } = await server.ssrLoadModule("@zerofee/wallet/app/services.ts"));
+  ({ SHEET_NEEDS, needsWith } = await server.ssrLoadModule("@zerofee/wallet/app/services.ts"));
   ({ sheetsLoaded, LoadingSheet } = await server.ssrLoadModule("@zerofee/wallet/app/money/MoneyHost.tsx"));
   ({ faultedBridge } = await server.ssrLoadModule("@zerofee/shell-api/faults.ts"));
   ({ sendLink } = await server.ssrLoadModule("@zerofee/pay/app/links.ts"));
@@ -110,7 +111,8 @@ function withSpending(inner: Bridge): Bridge {
 
 interface Sheet { name: string; kind: string; title: RegExp; go?: RegExp; open: (shell: { openMoney: (a: unknown) => void }) => void; direct?: () => unknown }
 const SHEETS = (): Sheet[] => [
-  { name: "Add", kind: "add", title: /Add money/, open: (s) => s.openMoney({ kind: "receive" }) },
+  // audit 13's D5: Home's Add list needs NEAR Intents, its bridge and NEAR Confidential (wallet services.ts addAddress)
+  { name: "Add", kind: "addAddress", title: /Add money/, open: (s) => s.openMoney({ kind: "receive" }) },
   { name: "Send", kind: "send", title: /^Send$/m, open: (s) => s.openMoney({ kind: "send" }) },
   { name: "Swap", kind: "swap", title: /Swap (NEAR|USDT) for USDC|^Swap$/m, go: /^Swap \$/, open: (s) => s.openMoney({ kind: "swap" }) },
   { name: "Move", kind: "move", title: /Move to your NEAR wallet/, go: /^Move \$/, open: (s) => s.openMoney({ kind: "topup" }) },
@@ -151,7 +153,8 @@ for (const service of SERVICES) {
         const bridge = faultedBridge(withSpending(mockBridge()), { service, failure });
         try {
         const shown = await open(sheet, bridge);
-        const needs = SHEET_NEEDS[sheet.kind]!.includes(service);
+        // audit 16's G3: Swap opens on the Safe's USDC into the SOL wallet, so it needs Solana too (wallet needsWith)
+        const needs = (sheet.kind === "swap" ? needsWith(SHEET_NEEDS.swap!, ["safe-usdc", "sol"]) : SHEET_NEEDS[sheet.kind]!).includes(service);
         const label = `${SERVICE_NAMES[service]} ${failure}, ${sheet.name}`;
         assert.match(shown, sheet.title, `${label}: the sheet paints its title`);
         assert.doesNotMatch(shown, PROBLEM_PAGE, `${label}: never the shell's Problem screen`);
@@ -237,8 +240,8 @@ test("B30: with a service dead the banner names it, since when, what waits and w
       runtime.press(new RegExp(`^${head.replace(/[.'()]/g, ".")}`));
       await runtime.settle();
       const shown = runtime.text();
-      assert.match(shown, /waits?\.|may be old\.|may wait\./, `${service}: what it holds up`);
-      assert.match(shown, /works?\.|stays in your Safe\./, `${service}: what still works`);
+      assert.match(shown, /can't go now\.|can't answer\.|are not fresh\.|are slow now\./, `${service}: what it holds up`);
+      assert.match(shown, /works?\.|stays in your Safe\.|stays where it is\./, `${service}: what still works`);
       // never NEAR's (bug 8): status.near.org measures something else than the nodes this phone reads
       const linked = ["oneclick", "bridge", "solana", "helius"].includes(service);
       assert.equal(/See their status/.test(shown), linked, `${service}: its own status page, only where one is allow-listed`);
@@ -367,7 +370,7 @@ test("bug 8: the banner says a service is down only when this phone and the rela
   };
   assert.equal(await say("device"), "", "one failed read on this phone (the 10:13 'NEAR is down') is no banner");
   assert.equal(await say("relay"), "", "the relay's check alone is no banner");
-  assert.match(await say("both"), /^NEAR is down\. Payments wait\. Your money stays in your Safe\./, "control: both sources, it is down: what is down and whether money moves (rule 9a)");
+  assert.match(await say("both"), /^NEAR is down\. Payments can't go now\. Your money stays in your Safe\./, "control: both sources, it is down: what is down and whether money moves (rule 9a)");
   assert.doesNotMatch(await say("both"), /See their status/, "and never status.near.org, which measures something else");
 });
 
@@ -391,7 +394,7 @@ test("product decision, 4 Nov or 'Solana is slow' seen by this phone alone (a fr
   assert.equal(await say("near", "busy", "relay"), "", "the relay's paid door busy: no 'NEAR is busy since'");
   assert.equal(await say("near", "slow", "both"), "", "both saw NEAR slow: no 'NEAR is slow since'");
   assert.equal(await say("solana", "slow", "both"), "", "both saw it slow: still nothing");
-  assert.match(await say("solana", "down", "both"), /^Solana is down\. pump\.fun and Solana trades wait\. /, "control: really down (every door), said plainly");
+  assert.match(await say("solana", "down", "both"), /^Solana is down\. pump\.fun and Solana trades can't go now\. /, "control: really down (every door), said plainly");
 });
 
 test("phone test, 5 Nov never shows; market data is said only when every door is down, as one calm line (controls: NEAR busy still says so; gecko down says the line)", async () => {

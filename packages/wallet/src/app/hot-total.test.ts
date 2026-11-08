@@ -22,7 +22,7 @@ const rowsShown = (s: SpendingStatus, h: HeldCoin[]) => sumUsd([
   ...movingRows(s).map((m) => m.usd), "27.47",
 ]);
 
-test("Hot's total is the sum of its rows: coins held on SOL and ETH (RH) counted once (control: the old engine-only figure was short by them)", () => {
+test("Hot's total is the sum of its rows: coins held on SOL and Robinhood counted once (control: the old engine-only figure was short by them)", () => {
   // the engine counts no coins (float-core coinsUsd 0): its total is the NEAR wallet and the chains' own coin
   const s = S({ totalUsd: "239.12", reserveUsd: "35.00", networks: [net("sol", "175.14"), net("hood", "28.98")] as never });
   const t = tradingUsd(s, held, [site as never]);

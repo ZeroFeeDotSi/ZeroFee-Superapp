@@ -53,12 +53,12 @@ async function landed(mock: ReturnType<typeof createMockBridge>): Promise<void> 
   }
 }
 
-test("E5: SOL → ETH (RH) is one job: a move in from Solana's wallet, nothing out until it landed AND its private gap passed, then one move out to Robinhood's wallet sized from what arrived; one Activity row says the whole move", async () => {
+test("E5: SOL → Robinhood is one job: a move in from Solana's wallet, nothing out until it landed AND its private gap passed, then one move out to Robinhood's wallet sized from what arrived; one Activity row says the whole move", async () => {
   const s = await setup();
   const r = await s.svc.call<SpendingActivity>("spending.move", { from: "sol", to: "hood", usd: 30, key: KEY });
   assert.ok("ok" in r, JSON.stringify(r));
   assert.equal(r.ok.id, KEY);
-  assert.match(r.ok.words, /^Moving \$30\.00 from your SOL wallet to your ETH \(RH\) wallet$/);
+  assert.match(r.ok.words, /^Moving \$30\.00 from your SOL wallet to your Robinhood wallet$/);
   assert.deepEqual(s.asked.filter((a) => a.method === "subwallet.float.in").map((a) => [a.params.from, a.params.key]), [["sw-trade-sol", KEY]]);
   assert.equal(s.asked.filter((a) => a.method === "ledger.toTrading").length, 0, "no Safe sheet: money only moves between your own wallets");
   // Home's "On its way" (walk, 3 Nov: "Moving $0.00 to Robinhood Chain"): the move once, by its own words, never its
@@ -90,7 +90,7 @@ test("E5: SOL → ETH (RH) is one job: a move in from Solana's wallet, nothing o
   rows = await s.svc.call<SpendingActivity[]>("spending.activity", {});
   assert.ok("ok" in rows);
   assert.equal(rows.ok.find((a) => a.id === KEY)!.status, "done");
-  assert.match(rows.ok.find((a) => a.id === KEY)!.words, /^Moved \$30\.00 from your SOL wallet to your ETH \(RH\) wallet$/);
+  assert.match(rows.ok.find((a) => a.id === KEY)!.words, /^Moved \$30\.00 from your SOL wallet to your Robinhood wallet$/);
   const { foldLegs } = await import("@zerofee/core/spending-fold");
   const one = foldLegs(rows.ok.filter((a) => a.shown));
   assert.equal(one.filter((a) => a.id === `${KEY}-2`).length, 0, "the second leg folds under the move's own row");
@@ -137,7 +137,7 @@ test("E5 refund: the first leg comes back to Trading's own balance (its refund a
   assert.deepEqual(mine.map((a) => a.status), ["refunded"], "one row, the move's own");
   // review L5: it says it didn't move, as a move of its own kind (control: a landed move says "Moved", the first test)
   assert.equal(mine[0]!.kind, "move");
-  assert.match(mine[0]!.words, /^Didn't move \$30\.00 from your SOL wallet to your ETH \(RH\) wallet$/);
+  assert.match(mine[0]!.words, /^Didn't move \$30\.00 from your SOL wallet to your Robinhood wallet$/);
   assert.match(mine[0]!.note ?? "", /your NEAR wallet/);
   assert.doesNotMatch(mine[0]!.note ?? "", /Trading|Hidden|\brow\b|ETH on Robinhood/, "the Agent app's words");
   // the runner's own words for the leg that never started

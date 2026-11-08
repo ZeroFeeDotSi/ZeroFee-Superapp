@@ -165,7 +165,7 @@ test("SOL wallet's token: refused before anything is signed when the token, the 
   for (const x of [short, otherMint, thin, solPrice, usdcPrice, unpinned]) assert.equal(x.sent.length, 0, "nothing sent");
 });
 
-test("ETH (RH) wallet's USDG: leg 1 is the ERC-20's transfer(1Click's address, units), no ETH value (control: ETH itself)", async () => {
+test("Robinhood wallet's USDG: leg 1 is the ERC-20's transfer(1Click's address, units), no ETH value (control: ETH itself)", async () => {
   const t = await setup({ chain: "hood", coin: USDG_HOOD });
   const r = await t.go();
   assert.equal(r.leg1.status, "done");

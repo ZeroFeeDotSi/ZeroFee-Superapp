@@ -71,7 +71,7 @@ type OutsideCoin = { tokenId: string; decimals: number; symbol: string; address:
 /** An order's coin: Home's Add chains (OUTSIDE_COIN), or a chain set-up alone takes (D155, setup-coins.ts). */
 const coinOf = (chain: string): OutsideCoin => OUTSIDE_COIN[chain as AddChain] ?? setupCoin(chain)!;
 /** Each chain's wallet as Home names it (D124): "your ETH (RH) wallet", never "ETH on Robinhood". */
-const WALLET_WORDS: Record<TradeChain, string> = { sol: "SOL", hood: "ETH (RH)", bsc: "BNB" };
+const WALLET_WORDS: Record<TradeChain, string> = { sol: "SOL", hood: "Robinhood", bsc: "BNB" };
 /** An Add's forward that can't go, for good: the money stays in the float, said in these words. */
 class Stays extends Error {}
 /** The longest our own ask for an Add's address runs: 1Click signs 3 days past it (FLEX_INPUT, recorded 2 Nov), and a

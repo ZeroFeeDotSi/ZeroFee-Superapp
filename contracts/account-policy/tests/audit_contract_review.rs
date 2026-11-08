@@ -1,4 +1,4 @@
-//! Independent audit, reviewer Fable (28 Oct), of the release build of the account contract at 9fb4fe7 (release 6, no
+//! Independent audit, the contract review (28 Oct), of the release build of the account contract at 9fb4fe7 (release 6, no
 //! `modules`; pinned wasm sha256 289753a9…2127). Report: an internal review.
 //!
 //! Convention (METHOD.md 5): every `fb*_` test is a finding's proof of concept: it asserts the guarantee, so it FAILS at

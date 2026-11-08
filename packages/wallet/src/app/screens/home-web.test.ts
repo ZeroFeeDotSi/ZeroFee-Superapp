@@ -50,8 +50,8 @@ test("web Home draws no Safe: its All tab is the on-the-way line and the wallets
   assert.ok(home.includes("name?: string }) {\n  const web = a.web ?? webWallet();"), "Actions reads the same flag as Home");
   // two short lines (webd-money2 crawl: six lines pushed the rows under the app bar; the Copywriter's words)
   const head = "Web version: no Safe. It's in the phone app. ";
-  assert.equal(webLine(true), `${head}Add and trade. Send from SOL and ETH (RH).`);
-  assert.equal(webLine(false), `${head}Add money. Send from SOL and ETH (RH).`, "Trade off: the line doesn't promise it");
+  assert.equal(webLine(true), `${head}Add and trade. Send from SOL and Robinhood.`);
+  assert.equal(webLine(false), `${head}Add money. Send from SOL and Robinhood.`, "Trade off: the line doesn't promise it");
   assert.ok(webLine(true).length <= 90, "two lines at most at 390 px");
   assert.doesNotMatch(webLine(true), /sites/, "sites are the phone app's");
   assert.equal(WEB_LINE, webLine(WEB_TRADE), "the line follows WEB_TRADE");

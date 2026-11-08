@@ -16,11 +16,12 @@
 .tp-amt-n { font: 500 var(--fs, 84px)/1 var(--font-money, var(--font)); font-feature-settings: "tnum" 1; letter-spacing: -.045em; font-variant-numeric: tabular-nums; text-shadow: 0 0 44px rgba(var(--glow-rgb), .14); } /* v2: no font-size transition (it laid out every frame as you typed) */
 .tp-amt-n.zero { color: var(--mute); text-shadow: none; }
 .tp-amt-sk { display: block; width: 46%; height: 64px; border-radius: 16px; }
+/* a sale's worth before its quote, from the holding (QA 16, 8 Nov): "About" small and mute before the figure */
+.tp-amt-about { font-size: .34em; letter-spacing: 0; color: var(--mute); margin-right: .2em; vertical-align: .55em; }
 /* one line: what you get and the fee; a tap opens Details (review 15) */
 .tp-get { appearance: none; border: 0; background: none; display: inline-flex; align-items: center; justify-content: center; gap: 0; min-height: 30px; margin: 2px auto 0; padding: 4px 8px;
   font: 400 14.5px/1.4 var(--font); color: var(--ink-2); font-variant-numeric: tabular-nums; cursor: pointer; }
 .tp-get:disabled { cursor: default; }
-.tp-fee { color: var(--mute); white-space: pre; }
 .tp-chev { width: 6px; height: 6px; margin-left: 9px; border-right: 1.3px solid var(--mute); border-bottom: 1.3px solid var(--mute); transform: rotate(-45deg); }
 .tp-get-sk { display: inline-block; width: 15ch; height: 1em; vertical-align: -2px; }
 /* AgentZero's line: its orb and six words, no box (review 16) */

@@ -6,6 +6,9 @@ import type { Bridge, BridgeResult } from "@zerofee/core/bridge";
 import { HIDES_ITS_WORDS } from "@zerofee/agent/guard/index";
 import { LIMIT_LINE, OPEN_ON_IPHONE, STUCK_LINE, wantsOwnMail, forgetSite, phoneBrowser, pictureAllowed, pricesIn, secretBox, stepWords } from "./phone.ts";
 import { liveStep, type CloudEvent } from "./live.ts";
+import { setBrowsePayReady } from "@zerofee/shell-api/agent-browser.ts";
+// b18 (4b): AgentZero's chat is open, so its wallet pays each step
+setBrowsePayReady(true);
 
 const RICH = "Welcome to the shop. ".repeat(30);
 const PIC = "A".repeat(400);
@@ -316,4 +319,54 @@ test("mail isn't live (M14): a task that needs AgentZero's own email stops befor
   const h = host({ shots: [{ host: "shop.example.com", text: RICH, elements: [code] }], steps: [{ kind: "fill", id: "c1", value: "123456" }], turns: ["stop"] });
   await run(h);
   assert.equal(h.calls.find((c) => c.method === "partner.yourTurn")?.params.why, "AgentZero's email isn't on yet, so it can't get the code. It's yours.");
+});
+
+test("E7: \"Continue\" on a checkout page is the person's: never acted; the same button on an article acts", async () => {
+  const checkout = host({
+    shots: [{ host: "shop.example.com", elements: [{ id: "h1", kind: "heading", text: "Order summary" }, { id: "b1", kind: "button", text: "Continue" }], text: "Order summary. Total $49.00" }],
+    steps: [{ kind: "click", id: "b1" }],
+  });
+  await run(checkout, "Find the delivery date on shop.example.com");
+  assert.equal(checkout.calls.filter((c) => c.method === "partner.act").length, 0, "the click never reached the page");
+  const turn = checkout.calls.find((c) => c.method === "partner.yourTurn");
+  assert.equal(turn?.params.why, "This page takes payment. AgentZero leaves this step to you.");
+
+  const pick = host({
+    shots: [{ host: "shop.example.com", elements: [{ id: "s1", kind: "field", tag: "select", label: "Plan", options: ["Free", "Pro, $20 a month"] }], text: RICH }],
+    steps: [{ kind: "select", id: "s1", option: "Pro, $20 a month" }],
+  });
+  await run(pick, "Find the plans on shop.example.com");
+  assert.equal(pick.calls.filter((c) => c.method === "partner.act").length, 0, "a priced option is the person's pick");
+
+  const article = host({
+    shots: [{ host: "shop.example.com", elements: [{ id: "b1", kind: "button", text: "Continue" }], text: RICH }],
+    steps: [{ kind: "click", id: "b1" }, { kind: "done", summary: "read it" }],
+  });
+  await run(article, "Read the shop's story on shop.example.com");
+  assert.equal(article.calls.filter((c) => c.method === "partner.act").length, 1, "an article's Continue acts (control)");
+});
+
+test("b18: a caller that subscribes after start's await still hears the run's start (the card leaves 'opening')", async () => {
+  const { liveSession } = await import("./live.ts");
+  const { simCloud } = await import("../sim/agent-sim.ts");
+  const phases: string[] = [];
+  const s = liveSession(simCloud({ thinkMs: 1, actMs: 1 }), (st) => phases.push(st.phase), () => {});
+  await s.start("Find the price of the Blue mug on mugs.example.com", "https://mugs.example.com/", "mugs.example.com");
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.deepEqual([phases[0], phases[1], phases.at(-1)], ["starting", "agent", "ended"]);
+});
+
+test("b18 (4b): from the Browser tab with AgentZero's chat closed, a run stops before it opens anything, and says why", async () => {
+  const { NO_PAYER_LINE, thinkFailedLine } = await import("./phone.ts");
+  const called: string[] = [];
+  const bridge = { call: async (m: string) => (called.push(m), { ok: { host: "news.example.com" } }), on: () => () => {} } as unknown as Bridge;
+  setBrowsePayReady(false);
+  try {
+    await assert.rejects(phoneBrowser(bridge).start("Read the top story on news.example.com", "https://news.example.com/"), (e: Error) => e.message === NO_PAYER_LINE("news.example.com"));
+    assert.deepEqual(called, [], "no site opened, no step thought");
+  } finally {
+    setBrowsePayReady(true);
+  }
+  assert.equal(NO_PAYER_LINE("news.example.com"), "AgentZero pays for each step from its wallet. Start this from AgentZero's chat. Nothing was done on news.example.com.");
+  assert.equal(thinkFailedLine({ code: "agent.browse.no-payer", whatHappened: "AgentZero pays for each step from its wallet, and its chat is closed. Open AgentZero to go on." }, "x.com"), "AgentZero pays for each step from its wallet, and its chat is closed. Open AgentZero to go on. Nothing more was done on x.com.");
 });

@@ -6,7 +6,7 @@ const css = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 
 test("a job receipt's Done never touches its last line, and a receipt with no protocol line leaves no gap (control: the through line is only drawn when given)", () => {
   assert.match(css("../../../../design/src/receipt.css"), /\.zf-receipt--job \+ \.zf-btn \{ margin-top: 32px; \}/);
-  assert.match(css("./JobMade.tsx"), /\{through && <p className="zf-receipt__line" data-testid=\{`\$\{testid\}-through`\}>\{through\}<\/p>\}/);
+  assert.match(css("./JobMade.tsx"), /\{through && <p className="zf-receipt__line" data-testid=\{`\$\{testid\}-through`\}>\{landed && through === THROUGH_CONFIDENTIAL \? WENT_CONFIDENTIAL : through\}<\/p>\}/);
 });
 
 test("ShortChain's job lines are the row's small lines: one size, never a bigger time than the headline", () => {

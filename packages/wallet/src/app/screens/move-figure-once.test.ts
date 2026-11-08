@@ -14,23 +14,24 @@ const figure = /\$\d/;
 
 test("M6: the receipt's line says where, going and landed, never the hero's figure again", () => {
   for (const landed of [false, true]) {
-    for (const where of [moveWhere(["SOL"]), moveWhere(["SOL", "ETH (RH)"]), moveWhere(["Safe"]), moveWhere(["Private"])]) {
+    for (const where of [moveWhere(["SOL"]), moveWhere(["SOL", "Robinhood"]), moveWhere(["Safe"]), moveWhere(["Private"])]) {
       const line = movingLine(where, landed);
       assert.doesNotMatch(line, figure, line);
       assert.ok(line.includes(where), line);
     }
   }
   assert.equal(movingLine("your SOL wallet", false), "Moving it to your SOL wallet.");
-  assert.equal(movingLine("your SOL wallet", true), "Moved to your SOL wallet.");
+  assert.equal(movingLine("your SOL wallet", true), "It's now in your SOL wallet.");
   // the sheet: the hero says the figure, the line under it the place
   assert.match(sheet, /<p className="zf-receipt__amount">\{dollars\(made\.toFixed\(2\)\)\}<\/p>/);
-  assert.match(sheet, /data-testid="move-made-title">\{movingLine\(madeTo\(legs\.map\(\(l\) => l\.to\)\), job\.state === "landed"\)\}<\/p>/);
+  assert.match(sheet, /data-testid="move-made-title">\{said\.title\}<\/p>/);
+  assert.match(sheet, /moveReceiptWords\(\{ legs: job\.state === "landed", rows: rowsState\.state === "landed", where: madeTo\(legs\.map\(\(l\) => l\.to\)\)/);
 });
 
 test("M6: the start face and the floor's summary say where it goes; the figure is the hero's and the Leaves row's alone", () => {
   const one = [L("safe", "sol", 20)], two = [L("safe", "sol", 112.96), L("private", "hood", 22.04)];
   assert.equal(moveSummary(one, false), "Moves it to your SOL wallet.");
-  assert.equal(moveSummary(two, false), "Moves it to your SOL and ETH (RH) wallets.");
+  assert.equal(moveSummary(two, false), "Moves it to your SOL and Robinhood wallets.");
   for (const plan of [one, two]) {
     assert.doesNotMatch(moveSummary(plan, false)!, figure);
     assert.match(costRows(plan)!.rows[0]!.value, figure, "control: the Leaves row still says the figure");

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-/// contracts/account-policy/src/lib.rs of release 9 (frozen at tag r9-frozen-3, after re-freeze 2: the red team's RT3); release 8 was lib e951e00a…b23a (wasm 1f7d6334…f863); release 7 was lib c3bdaee8…b75a (wasm 013ee2b5…b978), release 6 Hackathon 35e84f4 (lib c68ec080…2bad).
+/// contracts/account-policy/src/lib.rs of release 9 (frozen at tag r9-frozen-3, after re-freeze 2: the red team's RT3); release 8 was lib e951e00a…b23a (wasm 1f7d6334…f863); release 7 was lib c3bdaee8…b75a (wasm 013ee2b5…b978), release 6, the repo at 35e84f4 (lib c68ec080…2bad).
 const PINNED_LIB_SHA256: &str = "e83ec614796ce334b1f8ce6515c9aaf80b8d70531d7a642d651762f2fc8eec5e";
 const PINNED_TESTS_SHA256: &str = "fffb90b4924ee673873618d5c1631d4feb2c4fafa9d4bc5880c4c24ecb5a7956";
 

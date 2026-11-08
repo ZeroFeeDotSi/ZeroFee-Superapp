@@ -23,6 +23,7 @@
 // answer or couldn't be read), 400 agentzero.key.refused (a request that carried a Claude key: never forwarded).
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
+import { browseRoute } from "./agentzero-browse.mjs";
 import { chatRoute, chatTools } from "./agentzero-chat.mjs";
 import { bindProofOk, owedBody, usdcBalance } from "./agentzero-pay.mjs";
 import { addressBucket, networkBucket } from "./guards.mjs";
@@ -474,5 +475,8 @@ export function createAgentZero({ anthropicKey, tokenSecret, allowanceUsd, daily
   /** POST /v0/agentzero/chat (agentzero-chat.mjs): `helpers.stream(body)` → the event-stream Response with the relay's headers. */
   const chat = chatRoute({ begin, client, model: CHAT_DEFAULT.model, effort: CHAT_DEFAULT.effort, tools: chatTools(JOB_SCHEMA), prices: PRICES, now, ...(chatDeadlineMs ? { deadlineMs: chatDeadlineMs } : {}) });
 
-  return { signup, job, chat };
+  /** POST /v0/agentzero/browse (agentzero-browse.mjs, audit 14 E1): the browser's next step, on the chat's paid path. */
+  const browse = browseRoute({ begin, client, prices: PRICES });
+
+  return { signup, job, chat, browse };
 }

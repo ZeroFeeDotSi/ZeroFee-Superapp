@@ -88,7 +88,13 @@ body { font: var(--t-body); -webkit-font-smoothing: antialiased; }
 
 /* The laptop page (/?laptop) is a laptop page: it fills the window instead of sitting in the phone frame. */
 html[data-mode="laptop"], html[data-mode="laptop"] body { background: var(--bg); display: block; overflow: auto; }
+/* audit 15 FL1: the wide screen's `place-items: center` (above) stays on the laptop's block body, and Chrome aligns block
+   children by it (justify-items), so #root shrank to its words' width: a 48 px column at 1280 and at 756. Normal here. */
+html[data-mode="laptop"] body { place-items: normal; }
 html[data-mode="laptop"] #root { width: auto; height: auto; max-width: none; min-height: 100dvh; margin: 0; border-radius: 0; box-shadow: none; transform: none; overflow: visible; }
+/* builder 20 (audit 16's S16-3, 17's edge): on a wide window the lock screen's words and its Use this laptop button sat as
+   wide as the window; they keep a reading width, centred */
+html[data-mode="laptop"] .zf-screen > .ul-center, html[data-mode="laptop"] .zf-screen > .zf-floor { width: 100%; max-width: 480px; margin-inline: auto; box-sizing: border-box; }
 
 /* The page rests (shell-api rest.ts: hidden, or covered by a site's window on the iPhone): every endless animation waits.
    Nobody can see it, and each one costs a style pass a frame (HEAT-2026-11-03: 60 a second on every tab). */

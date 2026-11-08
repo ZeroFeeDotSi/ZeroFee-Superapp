@@ -117,7 +117,7 @@ for (const [name, to] of [["a 0x address", EVM_PAYEE], ["a Solana address", SOL_
   });
 }
 
-test("filled in with its network (chain: hood): ETH (RH) is picked and shown, no \"Pick the network first.\" (control: without one, a new 0x address asks)", async () => {
+test("filled in with its network (chain: hood): Robinhood is picked and shown, no \"Pick the network first.\" (control: without one, a new 0x address asks)", async () => {
   try {
     await openFilled({ to: EVM_PAYEE, usd: "0.50", wallet: "sol", chain: "hood" });
     await until(() => /Public on Robinhood Chain\./.test(runtime.text()), "the network picked");

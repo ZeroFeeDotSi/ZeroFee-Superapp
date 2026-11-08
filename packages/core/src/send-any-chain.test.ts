@@ -83,7 +83,7 @@ async function setup(o: { leg1Usd?: string; refuse?: string; said?: string; appr
   return { w, shown, sent, pay, pocket: p, seen, said };
 }
 
-test("E3: one wallet sends to any chain 1Click pays: SOL wallet → BNB Chain, SOL wallet → a NEAR account, ETH (RH) wallet → Solana, → Base; each to an outside payee asks Face ID once (QA, 5 Nov)", async () => {
+test("E3: one wallet sends to any chain 1Click pays: SOL wallet → BNB Chain, SOL wallet → a NEAR account, Robinhood wallet → Solana, → Base; each to an outside payee asks Face ID once (QA, 5 Nov)", async () => {
   const cases = [
     { from: "sol", coin: SOL_IN, l: { dest: BNB, recipient: EVM_PAYEE, minOut: "8000000000000000" } },
     { from: "sol", coin: SOL_IN, l: { dest: "nep141:wrap.near", recipient: "alice.near", minOut: "1200000000000000000000000" } },
@@ -219,10 +219,10 @@ test("the pocket's own share of a Send (`send`): over the pocket's $10,000 goes;
   const ask = s.pay({ coin: USDC, dest: "nep141:eth.omft.near", recipient: EVM_PAYEE, amountIn: "180000000", usd: "12000.00", minOut: "60000000000000000" }, { minAmountOut: "180000000" });
   const r = (await s.w.privatePay(s.pocket.id, OUT, ask, "Send", "tag-for-this-quote-0001", undefined, true)) as any;
   assert.ok(r.signedData?.signature);
-  assert.deepEqual(s.shown.map((x) => [x.title, x.lines[0], x.tap, x.asker]), [["Send from your private balance", `To ${EVM_PAYEE}`, undefined, "wallet"]], "asked once, Face ID: the payee isn't one of the person's wallets (QA, 5 Nov: at any amount)");
+  assert.deepEqual(s.shown.map((x) => [x.title, x.lines[0], x.tap, x.asker]), [["Send from Private", `To ${EVM_PAYEE}`, undefined, "wallet"]], "asked once, Face ID: the payee isn't one of the person's wallets (QA, 5 Nov: at any amount)");
   const no = await setup({ approve: false });
   const noAsk = no.pay({ coin: USDC, dest: "nep141:eth.omft.near", recipient: EVM_PAYEE, amountIn: "180000000", usd: "12000.00", minOut: "60000000000000000" }, { minAmountOut: "180000000" });
-  await assert.rejects(no.w.privatePay(no.pocket.id, OUT, noAsk, "Send", "tag-for-this-quote-0001", undefined, true), (e: any) => e.problem.code === "security.send.declined" && e.problem.money.where === "in your private balance", "a no signs nothing, and is the person's no (QA's lap: never \"ZeroFee said no\")");
+  await assert.rejects(no.w.privatePay(no.pocket.id, OUT, noAsk, "Send", "tag-for-this-quote-0001", undefined, true), (e: any) => e.problem.code === "security.send.declined" && e.problem.money.where === "in Private", "a no signs nothing, and is the person's no (QA's lap: never \"ZeroFee said no\")");
   // D128: no cap on a Send, but a price is still a must
   for (const usd of ["", "1e5"]) {
     const n = await setup();

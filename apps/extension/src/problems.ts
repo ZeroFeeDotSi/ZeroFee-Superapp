@@ -5,6 +5,15 @@ import type { MoneyState, Problem } from "@zerofee/core/problem";
 
 const inWallet: MoneyState = { state: "safe", where: "in your trading wallet" };
 
+/** The one plain line for a refusal's kind (vault/policy.ts `why`, which is code only): never an id or an instruction's name. */
+export function refusedLine(why: string): string {
+  if (/someone else/.test(why)) return "It would send money from this wallet to someone else.";
+  if (/program/.test(why)) return "It asked to use a program ZeroFee doesn't know.";
+  if (/token instruction/.test(why)) return "It could move your coins out of this wallet.";
+  if (/priority fee/.test(why)) return "Its fee was over this wallet's limit.";
+  return "It asked for more than a trade needs.";
+}
+
 export const extProblems = {
   passcodeShort: (min: number): Problem => ({
     code: "extension.passcode.short",
@@ -57,7 +66,7 @@ export const extProblems = {
     code: "extension.touch.unavailable",
     whatHappened: "Touch ID can't lock this wallet in this browser.",
     money: inWallet,
-    next: { kind: "nothing", label: "OK" },
+    next: { kind: "nothing", label: "Close" },
     more: "Your passcode keeps working as before.",
   }),
   noQuote: (): Problem => ({
@@ -67,16 +76,18 @@ export const extProblems = {
     next: { kind: "retry", label: "Try again" },
     more: "No pool gave a price for it just now. Nothing was sent.",
   }),
+  // audit 15 FE2: "they" by name, never "we"; the policy's own reason (vault/policy.ts, a program's id among them) stays in
+  // the code, and the person reads one plain line for its kind
   refused: (why: string): Problem => ({
     code: "extension.sign.refused",
-    whatHappened: "We stopped this before signing it.",
+    whatHappened: "ZeroFee stopped this trade before signing it.",
     money: inWallet,
     next: { kind: "nothing", label: "Go back" },
-    more: `It asked for something a trade never needs: ${why}.`,
+    more: refusedLine(why),
   }),
   stale: (): Problem => ({
     code: "extension.sign.stale",
-    whatHappened: "This trade waited too long, so we didn't sign it.",
+    whatHappened: "This trade waited too long, so ZeroFee didn't sign it.",
     money: inWallet,
     next: { kind: "retry", label: "Get a new price" },
   }),
@@ -97,14 +108,14 @@ export const extProblems = {
     code: "extension.site.unreadable",
     whatHappened: "This page doesn't say which coin it shows.",
     money: inWallet,
-    next: { kind: "nothing", label: "OK" },
+    next: { kind: "nothing", label: "Close" },
     more: "This page's address doesn't name a coin. Open the coin's own page on the site, and it appears here.",
   }),
   pageChain: (chain: string): Problem => ({
     code: "extension.site.chain",
     whatHappened: `This coin is on ${chain}. The panel trades Solana coins.`,
     money: inWallet,
-    next: { kind: "nothing", label: "OK" },
+    next: { kind: "nothing", label: "Close" },
     more: "Open a Solana coin's page, and it appears here.",
   }),
   linkCodeTyped: (): Problem => ({
@@ -118,7 +129,7 @@ export const extProblems = {
     code: "extension.app.only",
     whatHappened: "That isn't something the panel does.",
     money: inWallet,
-    next: { kind: "nothing", label: "OK" },
+    next: { kind: "nothing", label: "Close" },
   }),
   stopped: (): Problem => ({
     code: "extension.worker.stopped",

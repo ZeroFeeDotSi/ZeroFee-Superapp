@@ -22,7 +22,7 @@ const NOTHING_MOVES: ReadonlySet<string> = new Set([
   // Settings → Status's read-only checks (status-probe.ts): no key, no account, no money
   "status.probe",
   // its own servers (phase 2): the hosts, a Test against a typed address, keeping or clearing one; no money
-  "status.own.get", "status.own.test", "status.own.set",
+  "status.own.get", "status.own.test", "status.own.set", "subwallet.own.set", "subwallet.own.state",
   // Spending's other calls that touch no money
   "spending.setCap", "spending.exportKey", "spending.swap.find", "spending.swap.held", "spending.swap.quote",
 ]);

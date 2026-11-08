@@ -170,7 +170,7 @@ test("read_holdings on the web: the web's own wallets from Home's read, never \"
   const { sent } = await turn("what do I have?", await webHands(agent), [toolSse("h1", "read_holdings", {}), textSse("ok")]);
   const res = toolResult(sent[1]);
   assert.doesNotMatch(res, /Your Safe/, "no Safe on the web");
-  for (const w of ["Your SOL wallet", "Your ETH \\(RH\\) wallet", "Your NEAR wallet"]) assert.match(res, new RegExp(w));
+  for (const w of ["Your SOL wallet", "Your Robinhood wallet", "Your NEAR wallet"]) assert.match(res, new RegExp(w));
   const phone = await skillHands({ bridge: agent, relay: null, now: () => FIXED, clock: () => "12:00 PM" }).holdings();
   assert.match(phone, /^Your Safe/, "control: the phone's answer starts with the Safe");
 });

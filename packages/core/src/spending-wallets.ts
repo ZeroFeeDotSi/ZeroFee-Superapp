@@ -23,7 +23,7 @@ function coinText(raw: bigint, decimals: number): string {
 }
 
 export async function wallets(d: Deps, lib: SpendingLib): Promise<SpendingWallet[]> {
-  const { APPS_NETWORK_NAME, NETWORK_NAME, SPENDING_NETWORKS, usdText } = lib;
+  const { APPS_NETWORK_NAME, WALLET_LABEL, SPENDING_NETWORKS, usdText } = lib;
   const e = d.engine();
   // The list is read first, as spending.status reads it (2 Nov rehearsal: the engine's last snapshot, taken before a
   // wallet was made or read, listed that Solana wallet "unread", so export found none; Wallet's Details, which asks once
@@ -45,7 +45,7 @@ export async function wallets(d: Deps, lib: SpendingLib): Promise<SpendingWallet
     if (w.kind !== "trade" && w.kind !== "browser") return null;
     const current = w.current === true;
     if ((SPENDING_NETWORKS as readonly string[]).includes(w.chain)) {
-      const name = NETWORK_NAME[w.chain as SpendingNetwork];
+      const name = WALLET_LABEL[w.chain as SpendingNetwork];
       const chain = s.chains.find((x) => x.chain === w.chain);
       const v = chain?.wallets.find((x) => x.id === w.id);
       // A network Spending doesn't move money on yet (closed: BNB Chain until its own test) has no figure from the
@@ -56,14 +56,14 @@ export async function wallets(d: Deps, lib: SpendingLib): Promise<SpendingWallet
         const n = rows?.find((r) => r.token === "native");
         if (!current && n && BigInt(n.amount) === 0n) return null;
         return {
-          id: w.id, role: current ? "chain" : "older", network: w.chain as SpendingNetwork, address: w.address, label: current ? `${name} wallet` : `Older ${name} wallet`, current, inCap: false,
+          id: w.id, role: current ? "chain" : "older", network: w.chain as SpendingNetwork, address: w.address, label: current ? name : `Older ${name}`, current, inCap: false,
           ...(n ? { holds: `${coinText(BigInt(n.amount), n.decimals)} ${n.symbol}` } : { unread: true as const }), ...marks,
         };
       }
       // an older wallet only while it holds anything (or can't be read: never hidden as if empty)
       if (!current && v && v.nativeUsd < 0.01 && v.coinsUsd < 0.01) return null;
       return {
-        id: w.id, role: current ? "chain" : "older", network: w.chain as SpendingNetwork, address: w.address, label: current ? `${name} wallet` : `Older ${name} wallet`, current, inCap: true,
+        id: w.id, role: current ? "chain" : "older", network: w.chain as SpendingNetwork, address: w.address, label: current ? name : `Older ${name}`, current, inCap: true,
         cashUsd: usdText(v?.nativeUsd ?? 0), coinsUsd: usdText(v?.coinsUsd ?? 0), ...marks, ...(!v ? { unread: true as const } : {}),
       };
     }

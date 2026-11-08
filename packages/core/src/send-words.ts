@@ -16,15 +16,18 @@ export function landsOn(assetId: string, recipientType?: string): string | null 
   if (m) return CHAIN_WORDS[m[1]!] ?? null;
   return /^nep141:[a-z0-9_.-]+$/.test(assetId) ? "NEAR" : null;
 }
+/** A sheet's place: Private by its own name, any other wallet as "your ...". */
+const placeOf = (from: string): string => (from === "Private" ? "Private" : `your ${from}`);
 /** The outside-send sheet's words (QA's ruling, 5 Nov; the Copywriter's). */
 export const OUTSIDE_WORDS = {
-  title: (from: string) => `Send from your ${from}`,
+  // the audit's S4 (7 Nov): Private is its own name, never "your private balance" (the app's word for the place)
+  title: (from: string) => `Send from ${placeOf(from)}`,
   to: (address: string) => `To ${address}`,
   get: (usd: string) => `They get about $${usd}`,
   fees: (usd: string) => `Fees · about $${usd}`,
   kept: FEES_KEPT,
   high: (pct: string) => `${pct}% goes to fees. On a bigger send, fees are a smaller part.`,
-  declined: (from: string) => `You said no. Nothing left your ${from}.`,
+  declined: (from: string) => `You said no. Nothing left ${placeOf(from)}.`,
   /** What a send out doesn't hide (privacy audit, 4 Nov; QA's filing, 5 Nov): the payee's side is public, said
    *  by its network (the copy review's ruling, 5 Nov: "Public on Ethereum."); a network not known, the plain form. */
   seen: (network?: string | null) => (network === PRIVATE_LANDS ? "Private." : network ? `Public on ${network}.` : "Anyone can see it land."),
@@ -33,7 +36,7 @@ export const OUTSIDE_WORDS = {
  *  never "Public on NEAR.". */
 export const PRIVATE_LANDS = "private";
 /** A coin's own name that already says its network (D124: "ETH (RH)" is ETH on Robinhood Chain). */
-const NAMED_ON: Record<string, RegExp> = { "Robinhood Chain": /\(RH\)$/ };
+const NAMED_ON: Record<string, RegExp> = { "Robinhood Chain": /\(RH\)$|\bRobinhood$/ };
 /** " on Ethereum" after a payee, once: never when the coin's words already name that network ("ETH on Base … on Base",
  *  "ETH (RH) … on Robinhood Chain"). */
 export const onNetwork = (coinWords: string, assetId: string, recipientType?: string): string => {

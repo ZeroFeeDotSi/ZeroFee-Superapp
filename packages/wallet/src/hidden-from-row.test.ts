@@ -242,7 +242,7 @@ test("D137: the payment is handed over in the same step that reads leg 1 landed,
 const HOOD_IN = "nep141:hood.omft.near";
 const hoodAsk = { chain: "hood", toTokenId: HOOD_IN, to: { kind: "chain", chain: "hood", address: "0x12345678901234567890123456789012345678ab" }, amountOut: "0.0019", caller: "wallet" };
 
-test("ETH (RH): leg 1 is the row's ETH into Hidden (its own coin, its own chain), leg 2 submitted once after it lands", async () => {
+test("Robinhood: leg 1 is the row's ETH into Hidden (its own coin, its own chain), leg 2 submitted once after it lands", async () => {
   const { ledger, calls, submitted } = setup({ leg1Status: ["PENDING_DEPOSIT", "SUCCESS"], leg2In: "1950000000000000" });
   const r = await ledger.call<Movement>("ledger.hiddenFromRow", hoodAsk);
   assert.ok("ok" in r, "problem" in r ? r.problem.code : "");
@@ -254,7 +254,7 @@ test("ETH (RH): leg 1 is the row's ETH into Hidden (its own coin, its own chain)
   assert.deepEqual(submitted, [{ signature: "sig" }]);
 });
 
-test("ETH (RH): back, landed short (control: exactly enough goes), or after a restart: never submitted, said in ETH", async () => {
+test("Robinhood: back, landed short (control: exactly enough goes), or after a restart: never submitted, said in ETH", async () => {
   const back = setup({ leg1Status: ["PENDING_DEPOSIT", "REFUNDED"] });
   const b = await back.ledger.call<Movement>("ledger.hiddenFromRow", hoodAsk);
   assert.ok("ok" in b);
@@ -280,7 +280,7 @@ test("ETH (RH): back, landed short (control: exactly enough goes), or after a re
   assert.deepEqual(a.submitted, []);
 });
 
-test("ETH (RH): a leg 1 minimum short of leg 2 is refused before the core is asked; a No or not sent moves nothing; other rows refused", async () => {
+test("Robinhood: a leg 1 minimum short of leg 2 is refused before the core is asked; a No or not sent moves nothing; other rows refused", async () => {
   const tight = setup({ leg1Status: ["SUCCESS"], minOut: "47000000" });
   assert.ok("problem" in (await tight.ledger.call("ledger.hiddenFromRow", hoodAsk)));
   assert.ok(!tight.calls.some((c) => c.method === "subwallet.hiddenFromRow"), "the core's sheet never rose");
@@ -292,7 +292,7 @@ test("ETH (RH): a leg 1 minimum short of leg 2 is refused before the core is ask
   assert.deepEqual([no.submitted, unsent.submitted], [[], []]);
   const bnb = setup({ leg1Status: ["SUCCESS"] });
   const x = await bnb.ledger.call("ledger.hiddenFromRow", { ...hoodAsk, chain: "bsc" });
-  assert.ok("problem" in x && /only from your SOL wallet or your ETH \(RH\) wallet/.test(JSON.stringify(x.problem)));
+  assert.ok("problem" in x && /only from your SOL wallet or your Robinhood wallet/.test(JSON.stringify(x.problem)));
   assert.ok(!bnb.calls.length, "nothing asked of the core");
 });
 

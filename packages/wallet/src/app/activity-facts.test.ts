@@ -59,3 +59,14 @@ test("a Spending move names both of the person's wallets", () => {
   const add = { ...s, kind: "top-up", network: undefined, to: undefined, site: "pump" } as unknown as SpendingActivity;
   assert.deepEqual(spendingFacts(add).map((f) => f.value), ["Safe", "Your pump wallet"]);
 });
+
+test("B11 (audit 11): a Kept for fees row went from the NEAR wallet to the chain's wallet, on its page and in the Statement [before: From SOL wallet, To Safe]", () => {
+  const s = { id: "gas:1", kind: "gas", usd: "2.50", status: "done", shown: true, atIso: at, words: "Kept for fees on Solana", network: "sol" } as unknown as SpendingActivity;
+  const f = Object.fromEntries(spendingFacts(s).map((x) => [x.label, x.value]));
+  assert.equal(f.From, "NEAR wallet");
+  assert.equal(f.To, "SOL wallet");
+  assert.equal(Object.fromEntries(spendingFacts({ ...s, network: "hood" } as SpendingActivity).map((x) => [x.label, x.value])).To, "Robinhood wallet");
+  // control: a put-away back from Solana still comes from the SOL wallet to the Safe
+  const back = Object.fromEntries(spendingFacts({ ...s, kind: "put-away" } as SpendingActivity).map((x) => [x.label, x.value]));
+  assert.deepEqual([back.From, back.To], ["SOL wallet", "Safe"]);
+});

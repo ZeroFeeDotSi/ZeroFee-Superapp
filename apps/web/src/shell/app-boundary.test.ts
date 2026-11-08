@@ -110,3 +110,45 @@ test("a missing chunk under an open page reloads it once and draws no error firs
   assert.equal(reloads, 1);
   cr.resetChunkReload();
 });
+
+// Audit 12 C1: offline, Trade's code didn't arrive; the page reloaded with no network and Chrome's "No internet" page took
+// the app. Offline the boundary says the app's own words, never reloads, and remounts the app once the phone is back.
+test("offline, an app whose code didn't arrive says the app's offline words and never reloads (control: online it reloads once)", async () => {
+  const cr = await server.ssrLoadModule("@zerofee/shell-api/chunk-reload.ts");
+  const m = new Map<string, string>();
+  let reloads = 0, on = false;
+  cr.resetChunkReload();
+  cr.setChunkReloadDeps({ storage: { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) }, now: () => 5_000, build: () => "/assets/index-AAA.js", reload: () => void reloads++, native: () => false, online: () => on, busy: () => false, settled: () => Promise.resolve() });
+  const ChunkGone = () => { throw new TypeError("Failed to fetch dynamically imported module: https://app.zerofee.si/assets/TradeApp-x.js"); };
+  const off = show("Trade", ChunkGone).html;
+  assert.match(off, /You&#x27;re offline\. Your money is safe\. Trade opens when you&#x27;re back\./);
+  assert.doesNotMatch(off, /stopped working/);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(reloads, 0, "offline: no reload into Chrome's page");
+  on = true;
+  assert.equal(show("Trade", ChunkGone).html, "", "control: online, it reloads and draws nothing first");
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(reloads, 1);
+  cr.resetChunkReload();
+  const src = readFileSync(new URL("./AppBoundary.tsx", import.meta.url), "utf8");
+  assert.match(src, /whenOnline\(\(\) => \{ this\.stopWaiting = null; this\.retry\(\); \}\)/, "back online, it mounts the app afresh");
+  const apps = readFileSync(new URL("../apps.ts", import.meta.url), "utf8");
+  assert.match(apps, /loading = null; Later = fresh\(\);/, "and the app's code is asked for again (React keeps a failed lazy as failed)");
+});
+
+// Audit 12 C1, the shot: a load still in flight when the phone went offline left Trade's page blank (Suspense's fallback
+// was nothing). Offline, the fallback says the same words; online it is nothing (the code arrives in ms).
+test("offline, an app whose code is still on its way says the offline words, not a blank page (control: online, nothing)", async () => {
+  const cr = await server.ssrLoadModule("@zerofee/shell-api/chunk-reload.ts");
+  const { AppWaiting } = await server.ssrLoadModule("./AppBoundary.tsx");
+  let on = false;
+  cr.resetChunkReload();
+  cr.setChunkReloadDeps({ online: () => on, storage: null });
+  try {
+    assert.match(renderToStaticMarkup(createElement(AppWaiting, { name: "Trade" })), /You&#x27;re offline\. Your money is safe\. Trade opens when you&#x27;re back\./);
+    on = true;
+    assert.equal(renderToStaticMarkup(createElement(AppWaiting, { name: "Trade" })), "", "control: online, nothing");
+  } finally { cr.resetChunkReload(); }
+  const host = readFileSync(new URL("./AppHost.tsx", import.meta.url), "utf8");
+  assert.match(host, /<Suspense fallback=\{<AppWaiting name=\{app\.name\} \/>\}>/);
+});

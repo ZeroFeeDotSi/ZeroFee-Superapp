@@ -12,7 +12,7 @@ test("no wallet yet: Welcome, or the wallet step once started (closing the panel
 test("a wallet made in the journey opens on the stored step after it, locked or not", () => {
   for (const stage of ["locked", "unlocked"] as const) {
     assert.equal(stepFor(stage, "money"), "money");
-    assert.equal(stepFor(stage, "link"), "link");
+    assert.equal(stepFor(stage, "link"), "set", "audit 15 FE1: no phone step while the phone's tab isn't shown");
     assert.equal(stepFor(stage, "set"), "set");
     assert.equal(stepFor(stage, "wallet"), "money");   // closed before the step was stored
   }

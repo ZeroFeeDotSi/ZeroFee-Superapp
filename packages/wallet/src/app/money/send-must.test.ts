@@ -39,7 +39,7 @@ test("MUST 1: Not now on a wallet's Send ask takes its job away: the row made at
   assert.equal(made, 1, "Job created. at the hold, before the ask (a hot wallet)");
   assert.equal(jobs().length, 1);
   // the core's own No on its Send sheet (subwallets.ts sendAsk)
-  c.answer({ problem: securityProblems.sendDeclined("in your ETH (RH) wallet") });
+  c.answer({ problem: securityProblems.sendDeclined("in your Robinhood wallet") });
   const r = await end;
   assert.ok("declined" in r && r.after, "a No: the sheet drops its receipt");
   assert.equal(jobs().length, 0, "the job's row is gone: no job that doesn't exist");
@@ -62,7 +62,7 @@ test("MUST 1: the person's No is theirs, by name: what happened, where the money
   assert.equal(no.whatHappened, "Nothing was sent.");
   assert.deepEqual(no.money, { state: "safe", where: "in your private balance" });
   assert.equal(declinedLine("$5.00", "your Safe"), "Nothing was sent. The $5.00 is still in your Safe.");
-  assert.doesNotMatch(declinedLine("$0.19", "your ETH (RH) wallet"), /ZeroFee|can't approve|Job created|Not now|Hold/);
+  assert.doesNotMatch(declinedLine("$0.19", "your Robinhood wallet"), /ZeroFee|can't approve|Job created|Not now|Hold/);
   assert.equal(securityProblems.subwalletRefused("x").code, "security.subwallet.refused", "control");
   const core = readFileSync(new URL("../../../../core/src/subwallets.ts", import.meta.url), "utf8");
   assert.equal((core.match(/throw new ProblemError\(securityProblems\.sendDeclined\(/g) ?? []).length, 4, "both Send paths (the private balance's share, a wallet's Send), each on its outside sheet and its cap sheet, say the person's No");
@@ -108,7 +108,7 @@ test("MUST 3: Send's Job created carries the time left, from the route's measure
   const sheet = src("./SendSheet.tsx");
   assert.match(sheet, /const eta = sendSec\(\{ row: a\.source\.row, toNear: payee\.kind === "ledger" \|\| a\.network === "near" \}\);\n\s+setEtaSec\(eta\);\n\s+const end = await runJob<Movement \| Movement\[\]>\(\{\n[^\n]*safe: fromSafe, onAnswer: true, etaSec: eta,/);
   assert.match(sheet, /<JobReceipt amount=\{flying\} icon=\{<ActSend \/>\} testid="send-sent" etaSec=\{etaSec\}/, "the receipt gets the route's time");
-  assert.match(src("./JobMade.tsx"), /setInterval\(\(\) => setNow\(Date\.now\(\)\), 1000\)/, "counted down each second (TimeLeft)");
+  assert.match(src("./JobMade.tsx"), /const tick = \(\) => \{ setNow\(Date\.now\(\)\); t = setTimeout\(tick, onSecond\(1000, Date\.now\(\)\)\); \};/, "counted down each second, on the second (TimeLeft, b12's one tick)");
 });
 
 test("MUST 4: Add's words never say a kept address is new or for one Add, used up, or Change wallet (owner's Bugs:, 6 Nov)", () => {

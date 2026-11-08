@@ -1,14 +1,15 @@
 // T-5 (master plan Part 1 §4, landing 1): "Your coins" on a chain's market, dollars first, with what each made or lost
 // since it was bought. The cost is Trade's own average cost (service.ts applyFill: every buy's dollars and fee in, each
 // sale takes out its share), kept on the device. Never a made-up number: no record of the buy says so, and a price that
-// can't be read is "—", never $0.
+// can't be read says "No price yet" where the figure goes, once (the audit's S11, 8 Nov: it was "—"), never $0.
 import type { Position } from "../service.ts";
 import type { ChainId } from "../types.ts";
 import { usd, usdChange } from "./format.ts";
 import { holdingChange } from "./coin-words.ts";
 
 export const NO_RECORD = "Bought before ZeroFee kept a record";
-export const NO_PRICE = "Its price can't be read right now";
+/** An unpriced coin's figure, said once in the figure's place (never a dash, never $0; no second line saying it again). */
+export const NO_PRICE = "No price yet";
 
 /** The coins held on `chain` (above zero), most valuable first; a coin with no price after those with one. */
 export function heldOn(chain: ChainId, positions: Position[]): Position[] {
@@ -35,7 +36,7 @@ const result = (value: number, cost: number) => {
 /** One row's words: its value now, and its result since bought (or why there is none). */
 export function coinRowWords(p: Position): { value: string; since: string } {
   // a value that is no number, below zero or past any real coin's worth (a hostile price) is unpriced (review L2)
-  if (!priced(p.valueUsd)) return { value: "—", since: NO_PRICE };
+  if (!priced(p.valueUsd)) return { value: NO_PRICE, since: "" };
   if (!recorded(p.costUsd)) return { value: usd(p.valueUsd), since: NO_RECORD };
   return { value: usd(p.valueUsd), since: result(p.valueUsd, p.costUsd) };
 }

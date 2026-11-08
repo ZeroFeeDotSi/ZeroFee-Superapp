@@ -17,7 +17,7 @@ export { markStep, stepTime, type JobProof, type JobStep, type JobStepState } fr
 
 /** A step's mark: the hollow dot while waiting, the live dot while being done (the screen's only moving thing), the tick
  *  with its time once done, the cross where it stopped. */
-function StepMark({ state }: { state: JobStepState }) {
+export function StepMark({ state }: { state: JobStepState }) {
   if (state === "done") return <svg className="zf-job__mark is-done" viewBox="0 0 16 16" aria-hidden="true"><path className="zf-draw" pathLength={1} d="M3.5 8.5l3 3 6-7" /></svg>;
   if (state === "doing") return <span className="zf-job__mark is-doing" aria-hidden="true"><span className="zf-live" /></span>;
   if (state === "failed") return <svg className="zf-job__mark is-failed" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>;

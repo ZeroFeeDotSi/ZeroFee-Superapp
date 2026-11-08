@@ -96,17 +96,15 @@ test("T2-4: one net figure per holding: the receipt's holding line and the Sell 
   assert.match(src("./held-net.ts"), /const p = await quote\("sell", chain, coin, \{ fraction: 1 \}\);\n\s*return heldNetUsd\(raw, p\.quote\);/);
   assert.match(tsx, /heldNet\?\.raw === moment\.held\.raw \? \{ usd: usd\(heldNet\.usd\) \} : \{\}/, "and shows it only for those very coins");
   assert.doesNotMatch(tsx, /usd: usd\(pos\.value\.valueUsd\)/, "never the market mark (service.ts pricedPositions) on the receipt");
-  // the fee said once on the Sell sheet, in the copy review's form
-  const { saleLine } = await import("./paid.ts");
-  assert.deepEqual(saleLine("7,505 DOPE", "$0.002"), { head: "7,505 DOPE", fee: " · Fee $0.002" });
-  assert.deepEqual(saleLine("", "$0.002"), { head: "", fee: "Fee $0.002" }, "control: no head, no leading dot");
-  assert.match(tsx, /saleLine\(soldText, usd\(q\.feeUsd\)\)/);
+  // changed pin (the audit's S1): the fee said once on the Sell sheet too, in the paid line above the button; under the figure
+  // only the coins it gives (get-line.test.ts)
+  assert.match(tsx, /: soldText \} : \{ head: "" \};/);
 });
 
 test("T2-5 over the wallet: head \"Your SOL wallet has $144.06, not $5,000.\", body \"Nothing was spent.\", the lit \"Buy $144.06 instead\" (cents), then the quiet 44 px \"Move money to your SOL wallet\"; the bold text line is gone; control: the move-more branch stays", async () => {
   const { overWalletWords } = await import("./boards.ts");
   assert.deepEqual(overWalletWords("your SOL wallet", "$144.06", "$5,000"), { head: "Your SOL wallet has $144.06, not $5,000.", body: "Nothing was spent." });
-  assert.equal(overWalletWords("your ETH (RH) wallet", "$28.17", "$50").head, "Your ETH (RH) wallet has $28.17, not $50.");
+  assert.equal(overWalletWords("your Robinhood wallet", "$28.17", "$50").head, "Your Robinhood wallet has $28.17, not $50.");
   const sheet = src("./screens/TradeSheet.tsx");
   assert.match(sheet, /const shortBuyNow = [^\n]*\? Math\.floor\(ready \* 100\) \/ 100 : undefined;/, "all it can spend, to the cent (was Math.floor to whole dollars)");
   assert.match(sheet, /\{`Buy \$\{usd\(shortBuyNow\)\} instead`\}/, "the lit button with cents, as every Buy button");
@@ -145,7 +143,7 @@ test("T2-5 trap coin: one block (head \"ZeroFee won't buy NOSELL.\", body \"Rece
   assert.equal(isNotForSale("bsc", "0x5a3e00000000000000000000000000000000400d"), false, "control: per chain");
   const list = src("./screens/Discover.tsx");
   assert.match(list, /const noSale = refused \|\| isNotForSale\(r\.chain, r\.address\);/);
-  assert.match(list, /\{noSale \? <span className="dc-nfs" data-testid="row-not-for-sale">\{NOT_FOR_SALE\}<\/span> : !buy && <RowBuy /, "in place of Buy");
+  assert.match(list, /\{noSale \? <span className="dc-nfs" data-testid="row-not-for-sale">\{NOT_FOR_SALE\}<\/span> : !buy && !down && <RowBuy /, "in place of Buy");
   assert.doesNotMatch(list, />Not offered</, "one word for it");
   const css = src("./discover.css");
   assert.match(rule(css, ".dc-nfs"), /color:\s*var\(--mute\)/, "in mute");

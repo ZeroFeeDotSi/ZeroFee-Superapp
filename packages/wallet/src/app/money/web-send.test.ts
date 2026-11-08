@@ -63,7 +63,7 @@ test("1Click's end, said on the row: done, sent back to the wallet, or not paid;
   const { webSendEnd } = await import("./web-send.ts");
   assert.deepEqual(webSendEnd("SUCCESS", "SOL"), { state: "done" });
   assert.deepEqual(webSendEnd("REFUNDED", "SOL"), { state: "failed", detail: "NEAR Confidential sent it back to your SOL wallet." });
-  assert.deepEqual(webSendEnd("FAILED", "ETH (RH)"), { state: "failed", detail: "NEAR Confidential didn't pay them. Check your ETH (RH) wallet." });
+  assert.deepEqual(webSendEnd("FAILED", "Robinhood"), { state: "failed", detail: "NEAR Confidential didn't pay them. Check your Robinhood wallet." });
   for (const going of ["PENDING_DEPOSIT", "KNOWN_DEPOSIT_TX", "PROCESSING", "UNKNOWN", ""]) assert.equal(webSendEnd(going, "SOL"), null, going);
 });
 

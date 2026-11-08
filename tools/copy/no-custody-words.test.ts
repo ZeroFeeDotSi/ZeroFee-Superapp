@@ -6,7 +6,8 @@ import { join } from "node:path";
 import test from "node:test";
 
 const ROOT = new URL("../../", import.meta.url).pathname;
-const CLAIM = /\bZeroFee (holds|keeps|has) (up to |your |the )?(\$|money|funds|coins)|\bheld by ZeroFee\b|\bZeroFee holds up to\b/i;
+// audit 13's D12 (8 Nov): "Its key stays in ZeroFee." read as ZeroFee holding the key: a key is on the phone or in its chip
+const CLAIM = /\bZeroFee (holds|keeps|has) (up to |your |the )?(\$|money|funds|coins|keys?\b)|\bheld by ZeroFee\b|\bZeroFee holds up to\b|\bkeys? (stays?|is kept|are kept|lives?) (in|with|at|inside) ZeroFee\b/i;
 
 function* sources(dir: string): Generator<string> {
   for (const name of readdirSync(dir)) {
@@ -35,4 +36,7 @@ test("D37: no string says ZeroFee holds money", () => {
 test("D37 control: the check catches the beta cap's old wording", () => {
   assert.ok(CLAIM.test("During the beta, ZeroFee holds up to $5,000 per account."));
   assert.ok(!CLAIM.test("During the beta, an account holds up to $5,000."));
+  // D12: fails on main's Details line; the true one passes
+  assert.ok(CLAIM.test("Its key stays in ZeroFee."));
+  assert.ok(!CLAIM.test("Its key stays on this phone."));
 });

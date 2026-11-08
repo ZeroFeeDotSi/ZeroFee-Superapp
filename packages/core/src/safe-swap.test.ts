@@ -84,7 +84,8 @@ test("refused: its deadline is past", async () => {
 });
 
 test("refused: minAmountOut under the figure shown (control: equal passes)", async () => {
-  await said(ask(setup({ minOut: "2899999999999999999999999" })), /price changed/);
+  // Send S8 (audit, 8 Nov): who (NEAR Intents), where the money is (your Safe), the next tap; never the bare "The price changed."
+  await said(ask(setup({ minOut: "2899999999999999999999999" })), /^NEAR Intents priced it lower than you saw\. Nothing moved\. It's still in your Safe\. Swap again for a new price\.$/);
   assert.ok(await ask(setup({ minOut: "2900000000000000000000000" })));
 });
 

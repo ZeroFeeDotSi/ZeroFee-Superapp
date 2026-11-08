@@ -105,7 +105,7 @@ export function JobsSheet({ bridge, open, onAsk, onClose }: { bridge: Bridge; op
         <div className="azj">
           {j.unread.map((u) => <p key={u} className="zf-small azj-unread" role="status">{u}</p>)}
           <p className="zf-label azj-head">Now</p>
-          {j.loading ? <p className="zf-small azj-none" role="status">Reading your activity…</p>
+          {j.loading ? <p className="zf-small azj-none" role="status">Reading your activity.</p>
             : j.now.length === 0 ? <p className="zf-small azj-none">Nothing is on its way, and AgentZero has no job running.</p>
             : <div className="azj-rows">{j.now.map((i) => <Row key={i.key} i={i} w={words(i)} nowMs={nowMs} onOpen={() => setShown(i.key)} />)}</div>}
           <p className="zf-label azj-head">Last 24 hours</p>
@@ -146,9 +146,9 @@ function JobDetail({ bridge, item, w, nowMs, stopRoutine, onBack, onAsk }: { bri
         <button type="button" className="zf-btn" onClick={() => onAsk(w.ask)}>Ask AgentZero about this</button>
         {url && <button type="button" className="zf-btn azc-btn-quiet" onClick={() => void bridge.call("device.openUrl", { url, mode: "sheet" })}>See its public record</button>}
         {item.kind === "job" && <button type="button" className="zf-btn azc-btn-quiet" onClick={() => setStopping(true)}>Stop this job</button>}
-        {item.kind === "routine" && stopRoutine && <button type="button" className="zf-btn azc-btn-quiet" disabled={busy} onClick={() => { setBusy(true); void stopRoutine(item.routine.id).finally(() => { setBusy(false); onBack(); }); }}>{busy ? "Stopping…" : "Stop this routine"}</button>}
+        {item.kind === "routine" && stopRoutine && <button type="button" className="zf-btn azc-btn-quiet" disabled={busy} onClick={() => { setBusy(true); void stopRoutine(item.routine.id).finally(() => { setBusy(false); onBack(); }); }}>Stop this routine</button>}
       </div>
-      {stopping && item.kind === "job" && <Suspense fallback={<p className="zf-small">Opening…</p>}><ChatSheetCard bridge={bridge} sheet={{ kind: "stop-job", job: item.job.kind }} onDone={() => (setStopping(false), onBack())} /></Suspense>}
+      {stopping && item.kind === "job" && <Suspense fallback={null}><ChatSheetCard bridge={bridge} sheet={{ kind: "stop-job", job: item.job.kind }} onDone={() => (setStopping(false), onBack())} /></Suspense>}
     </div>
   );
 }
@@ -177,12 +177,12 @@ export function JobCard({ bridge, since, onOpen, task, pay = false }: { bridge: 
   // the clock ticks while the move is on its way, and while its task waits for a confirmed end
   useEffect(() => { if (done && (!task || task.ended)) return; const t = setInterval(() => setNow(Date.now()), 15_000); return () => clearInterval(t); }, [done, task]);
   if (pay) {
-    const line = paid ? paid.title : st.agent === null ? "Reading AgentZero's receipts…" : late ? NOTHING_PAID : "Waiting for the payment's receipt…";
+    const line = paid ? paid.title : st.agent === null ? "Reading AgentZero's receipts." : late ? NOTHING_PAID : "Waiting for the payment's receipt.";
     const state = paid ? (paid.state === "done" ? "Paid" : paid.state === "refused" ? "AgentZero said no" : "Nothing moved") : "";
     return <button type="button" className={`azc-step azj-card${paid ? " is-done" : ""}`} onClick={() => onOpen(paid ? `receipt:${paid.id}` : null)}><span className={`azj-mark azj-mark--${!paid ? "fly" : paid.state === "done" ? "done" : "bad"}`} aria-hidden="true" /><span className="azj-text"><span className="azc-step-line">{line}</span><span className="zf-small azj-d">Open Jobs</span></span>{state && <span className="zf-small azj-s">{state}</span>}</button>;
   }
   if (!it) {
-    const line = st.ledger === "unread" ? "Your activity couldn't be read just now." : late ? NOTHING_MOVED : "Looking for it in your activity…";
+    const line = st.ledger === "unread" ? "Your activity couldn't be read just now." : late ? NOTHING_MOVED : "Looking for it in your activity.";
     return <button type="button" className="azc-step azj-card" onClick={() => onOpen(null)}><span className="azj-text"><span className="azc-step-line">{line}</span><span className="zf-small azj-d">Open Jobs</span></span></button>;
   }
   const w = itemWords(it, st.tokens, st.chains, nowMs);
@@ -199,7 +199,8 @@ export function JobCard({ bridge, since, onOpen, task, pay = false }: { bridge: 
 export function MailHint({ bridge }: { bridge: Bridge }) {
   const address = useMailAddress(bridge);
   if (address === undefined) return null;
-  return <span className="zf-small azj-d">{address === "unread" ? "Couldn't be read just now" : address && address.includes("@") ? `${address} · not working yet` : "No address yet"}</span>;
+  // FM1: shown only while mail comes in (MAIL_RECEIVE_LIVE), so the address is all it says; the sheet says what is off
+  return <span className="zf-small azj-d">{address === "unread" ? "Couldn't be read just now" : address && address.includes("@") ? address : "No address yet"}</span>;
 }
 
 /** AgentZero's address, kept on this device by the core (account.agent.mailAddress: nothing is fetched to read it; builder
@@ -226,7 +227,7 @@ export function MailSheet({ bridge, onClose }: { bridge: Bridge; onClose: () => 
   return (
     <Sheet title={MAIL_WORDS.title} onClose={onClose}>
       <div className="azj">
-        {address === undefined ? <p className="zf-small azj-none" role="status">Reading…</p> : (
+        {address === undefined ? <p className="zf-small azj-none" role="status">Reading its address.</p> : (
           <>
             <p className="zf-title azj-title">{has ? (address as string) : address === "unread" ? "Can't see it right now" : "No address yet"}</p>
             {mailLines(address).map((l) => <p key={l} className="zf-body azj-mail">{l}</p>)}

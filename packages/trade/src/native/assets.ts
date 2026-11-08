@@ -1,3 +1,4 @@
+import { APP_CHAINS } from "@zerofee/core/app-chains";
 // Native coins (product decision, 5 Nov, items 4-5): the coins NEAR Intents lists (1Click's GET /v0/tokens, ~215 assets), each
 // bought and sold from the Safe by ONE swap inside NEAR Intents (swap.ts). Pure: no fetch, no React. What this module
 // decides: which of the 215 are shown (one row per coin, its home asset), where its market data lives (CoinGecko's id,
@@ -214,6 +215,31 @@ export function rankNative(coins: readonly NativeCoin[], markets: ReadonlyMap<st
     if (ra) return b.change24h! - a.change24h!;
     return (b.volume24h ?? 0) - (a.volume24h ?? 0);
   });
+}
+
+/** The order a coin's row is picked from when NEAR Intents lists it on more than one rail: NEAR first (the Safe's own
+ *  chain), then the app's wallets' chains (core app-chains.ts), then any other, in the list's own (ranked) order. */
+const PICK_ORDER: readonly string[] = ["near", ...APP_CHAINS.filter((c) => c !== "near")];
+const pickRank = (chain: string): number => { const i = PICK_ORDER.indexOf(chain); return i < 0 ? PICK_ORDER.length : i; };
+/** The Safe's cash, by the name people know it: it pays a Buy and takes a Sell, so it is no row to buy. */
+const CASH_SYMBOL = "USDC";
+/**
+ * Audit 17's H1 (the review's ruling, 8 Nov: the owner's SOL, NEAR and Robinhood rule is about the wallets a person
+ * holds and trades from; the Safe holds any NEAR Intents coin). The list Trade's NEAR Intents tab shows: every coin the
+ * Safe can hold, ONE row per coin (ETH once, never "ETH · Base", "ETH · Arbitrum"): the row is the asset, not the rail
+ * it came by, so no chain word; never the Safe's cash. Ranked order is kept; a coin on several rails keeps its NEAR row,
+ * else its row on one of the app's chains, else its best-ranked one.
+ */
+export function appCoins<T extends { symbol: string; blockchain: string }>(rows: readonly T[]): T[] {
+  const pick = new Map<string, T>();
+  for (const r of rows) {
+    const k = r.symbol.toUpperCase();
+    if (k === CASH_SYMBOL) continue;
+    const had = pick.get(k);
+    if (!had || pickRank(r.blockchain) < pickRank(had.blockchain)) pick.set(k, r);
+  }
+  const keep = new Set(pick.values());
+  return rows.filter((r) => keep.has(r));
 }
 
 /** Search the list: symbol, name, chain or asset id, case-blind; the empty query is the whole list. */

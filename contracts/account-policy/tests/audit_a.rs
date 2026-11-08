@@ -204,7 +204,7 @@ fn a2_late_phone_stop_leaves_the_owner_one_day_not_eight() {
 fn a3_zero_value_requests_grow_state_without_bound() {
     let mut p = account();
     as_key(PHONE, DAY);
-    // Each carries 30 Tgas, which counts as NEAR (the Fable review, FB-1), so the 128-a-day cap holds them too.
+    // Each carries 30 Tgas, which counts as NEAR (the contract review, FB-1), so the 128-a-day cap holds them too.
     let mut ran = 0;
     for i in 0..3_000u64 {
         as_key(PHONE, DAY + i);

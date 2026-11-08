@@ -13,7 +13,7 @@
 import { effectText } from "./effect-text.ts";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PlainWords } from "@zerofee/core/signer";
-import { amountLine } from "@zerofee/core/sheet-amount";
+import { amountLine, sheetTitle } from "@zerofee/core/sheet-amount";
 import { Close, Face } from "@zerofee/design/icons.tsx";
 import { More } from "@zerofee/design/More.tsx";
 import { useBack } from "@zerofee/design/back.ts";
@@ -150,7 +150,7 @@ export function ApprovalSheetView({ id, words, onAnswer: answer, password, pendi
         <button type="button" className="zf-sheet__close approval__close" onClick={() => answer(false)} aria-label="Close" data-testid="approval-close"><Close /></button>
         <div className="approval__body" ref={body}>
           <div className="zf-label">Check this{words.testNetwork && <span className="approval__test"> · Test network</span>}</div>
-          <h2 id="approval-title" className="approval__title">{words.title}</h2>
+          <h2 id="approval-title" className="approval__title">{sheetTitle(words)}</h2>
           {pending && (
             <div className="approval__effects approval__pending" data-testid="approval-pending">
               {PENDING_WORDS.labels.map((l) => <div key={l} className="approval__kv"><span>{l}</span><span className="approval__checking">{PENDING_WORDS.checking}</span></div>)}

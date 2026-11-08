@@ -225,7 +225,7 @@ function PaysFromSpending({ ready, busy, onReady, onActivity }: { ready: Ready |
   return (
     <section className="st-strip" aria-label="Pays from Spending">
       <p className="zf-body" data-testid="social-pays">{ready ? `Pays from Spending · ${usd(ready.readyUsd)} ready on Solana` : "Pays from Spending."}</p>
-      <button className="zf-btn st-line-btn st-ready" disabled={making} onClick={onReady}>{making ? `Making $${ready?.making ?? READY_USD} ready…` : `Make $${READY_USD} ready`}</button>
+      <button className="zf-btn st-line-btn st-ready" disabled={making} onClick={onReady}>{making ? `Making $${ready?.making ?? READY_USD} ready` : `Make $${READY_USD} ready`}</button>
       {ready?.making && <p className="zf-small st-arriving" role="status">It comes from Spending. <button className="zf-link" onClick={onActivity}>See it in Activity</button></p>}
     </section>
   );

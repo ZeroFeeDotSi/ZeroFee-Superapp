@@ -10,7 +10,7 @@ import { amount, usd } from "@zerofee/trade/app/format.ts";
 import { CHAINS } from "@zerofee/trade/service.ts";
 import { MIN_PASSCODE } from "../../vault/seal.ts";
 import { ask, useLive, usePanel } from "../runtime.tsx";
-import type { SetupStep } from "../setup.ts";
+import { AFTER_MONEY, JOURNEY_STEPS, PHONE_LINK_SHOWN, type SetupStep } from "../setup.ts";
 import { AddMoney, Link, Passcode } from "./Access.tsx";
 
 type OnProblem = (p: Problem) => void;
@@ -28,11 +28,11 @@ export function Journey({ step, sol, limitUsd, linked, onStep, onMade, onLinked,
         <button className="zf-icon-btn p-top-l" aria-label="Back" onClick={() => setAdding(false)}><Back /></button>
         <span className="zf-label p-title">Add money</span>
       </header>
-      <main className="p-main p-main--pushed"><AddMoney address={sol} onDone={() => { setAdding(false); onStep("link"); }} /></main>
+      <main className="p-main p-main--pushed"><AddMoney address={sol} onDone={() => { setAdding(false); onStep(AFTER_MONEY); }} /></main>
     </>
   );
-  if (step === "money") return <MoneyStep linked={linked} onFromWallet={() => setAdding(true)} onLater={() => onStep("link")} />;
-  if (step === "link") return <div className="p-main p-main--pushed"><Link onProblem={onProblem} onShown={onLinked} journey={{ onDone: () => onStep("set"), onNotNow: () => onStep("set") }} /></div>;
+  if (step === "money") return <MoneyStep linked={PHONE_LINK_SHOWN && linked} onFromWallet={() => setAdding(true)} onLater={() => onStep(AFTER_MONEY)} />;
+  if (step === "link" && PHONE_LINK_SHOWN) return <div className="p-main p-main--pushed"><Link onProblem={onProblem} onShown={onLinked} journey={{ onDone: () => onStep("set"), onNotNow: () => onStep("set") }} /></div>;
   return <SetStep limitUsd={limitUsd} onFinish={() => onStep("done")} />;
 }
 
@@ -65,7 +65,7 @@ function WalletStep({ onMade, onProblem }: { onMade: () => void; onProblem: OnPr
   return (
     <form className="p-center zf-pad" onSubmit={submit}>
       <div className="p-head zf-enter">
-        <span className="zf-label">1 of 3</span>
+        <span className="zf-label">{`1 of ${JOURNEY_STEPS}`}</span>
         <h1 className="zf-title">A small wallet just for trading</h1>
         <p className="zf-body">It holds only what you move into it. Your main balance stays separate.</p>
       </div>
@@ -73,7 +73,7 @@ function WalletStep({ onMade, onProblem }: { onMade: () => void; onProblem: OnPr
       <Passcode id="new-pass" label="Choose a passcode" value={pass} onChange={setPass} fresh />
       <p className="zf-small p-left">At least {MIN_PASSCODE} characters. It unlocks this wallet in this browser. Nobody can reset it for you.</p>
       <div className="p-floor">
-        <button className="zf-btn" type="submit" disabled={busy || pass.length === 0}>{busy ? "Making it…" : "Make my trading wallet"}</button>
+        <button className="zf-btn" type="submit" disabled={busy || pass.length === 0}>Make my trading wallet</button>
         <p className="zf-small">Its keys are kept on this device, encrypted.</p>
       </div>
     </form>
@@ -85,7 +85,7 @@ function MoneyStep({ linked, onFromWallet, onLater }: { linked: boolean; onFromW
   return (
     <div className="p-center zf-pad">
       <div className="p-head zf-enter">
-        <span className="zf-label">2 of 3</span>
+        <span className="zf-label">{`2 of ${JOURNEY_STEPS}`}</span>
         <h1 className="zf-title">Add trading money</h1>
         <p className="zf-body">Your trading wallet is ready. Where should its SOL come from?</p>
       </div>

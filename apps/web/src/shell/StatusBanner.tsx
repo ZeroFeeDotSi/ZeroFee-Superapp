@@ -8,7 +8,7 @@
 // A service's own words (their note) are plain text, already cleaned and capped (core services.ts cleanNote).
 import { useEffect, useRef, useState } from "react";
 import type { Bridge } from "@zerofee/core/bridge";
-import { SERVICE_EFFECTS, SERVICE_NAMES, STATUS_LINKS, SUPPORT_EMAIL, backLine, downLine, reportText, type Service, type ServiceStatus } from "@zerofee/core/services";
+import { SERVICE_EFFECTS, SERVICE_NAMES, STATUS_LINKS, SUPPORT_EMAIL, backLine, downLine, noticeShows, reportText, type Service, type ServiceStatus } from "@zerofee/core/services";
 import { CLEAR_MS, FIRST, nextSpell, type Spell } from "./status-spell.ts";
 import { NoticeBar, RANK, type NoticeItem } from "./NoticeBar.tsx";
 
@@ -46,7 +46,7 @@ export function useServiceNotice(bridge: Bridge | null, { everyMs = STATUS_EVERY
         // first failure the other door covers says nothing; the phone keeps its last answer with its time meanwhile
         // Rule 9a (product decision, 5 Nov; QA's test, "NEAR is slow since <a time>"): busy or slow is never said, by
         // anyone's check: a slow or busy door is the failover's to cover, silently. Only down is, as above
-        const shows = (x: ServiceStatus) => x.state === "down" && (x.service === "gecko" ? x.seen !== "device" : x.seen === "both" || !x.seen);
+        const shows = noticeShows;
         const list = "ok" in r && Array.isArray(r.ok) ? r.ok.filter((x) => x && x.state !== "up" && FIRST.includes(x.service) && shows(x)) : [];
         // one notice, one clock (nextSpell): a re-read never moves "since", never shows two states
         const { spell: next, back: gone } = nextSpell(shown.current, list, now(), clearMs);

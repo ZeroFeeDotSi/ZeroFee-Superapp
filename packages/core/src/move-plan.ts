@@ -47,7 +47,7 @@ export function planBound(parts: readonly { wallet: string; v: bigint }[]): { le
 export interface MoveSheetOther { from: string; to: string; v: bigint }
 /** The plan's order of wallets (the Move sheet's PLACES: SOL, ETH (RH), NEAR, BNB): one order on the plan, this sheet, the
  *  receipt and the job's row (QA's 04b, 7 Nov: the sheet said "NEAR and SOL", the plan "SOL and NEAR"). */
-const PLAN_ORDER = ["SOL", "ETH (RH)", "NEAR", "BNB"];
+const PLAN_ORDER = ["SOL", "Robinhood", "NEAR", "BNB"];
 const planRank = (wallet: string) => { const i = PLAN_ORDER.indexOf(wallet.replace(/^your /i, "").replace(/ wallet$/, "")); return i < 0 ? PLAN_ORDER.length : i; };
 /** the copy review's words (7 Nov): the one quiet line under a Move sheet's rows, before "Anyone can see the Safe's part.", by its
  *  sources: Face ID approves only the Safe's part; a wallet's part and Private's send on their own. The Safe the only
@@ -148,7 +148,8 @@ export function moveSheet(
     ...head,
     ...(o.swapOut && wallets.length === 1 && !others.length ? [`You get · ${o.swapOut.words}`] : wallets.map(getsRow)),
     `${LEG_WORDS.safe} · ${say(safe)}`,
-    ...[...from.keys()].sort(byPlan).map((w) => `From ${w} · ${quoted(say(from.get(w)!))}`),
+    // one label for a wallet's row on the Move page's floor and here (QA 16, 8 Nov): "From Robinhood wallet", grade 5
+    ...[...from.keys()].sort(byPlan).map((w) => `From ${w.replace(/^your /i, "")} · ${quoted(say(from.get(w)!))}`),
     // Private by its net change: what the fill brings less every part it pays and every part Private pays itself
     ...privateRows(net, say, { about: brought !== safe }),
     feeRow(feeAll, say),
@@ -285,7 +286,7 @@ export const OTHERS_MS = 10 * 60_000;
 export const OTHERS_STORE = Symbol.for("zerofee.move-others");
 export type KeptOthers = { parts: OtherPart[]; atMs: number; dep?: string; used: Set<number> } | { ended: true; atMs: number };
 const keptOthers = (): Map<string, KeptOthers> => ((globalThis as Record<symbol, Map<string, KeptOthers>>)[OTHERS_STORE] ??= new Map());
-const WALLET_PLACE: Record<string, string> = { sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+const WALLET_PLACE: Record<string, string> = { sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 const centsOk = (c: unknown): c is string => typeof c === "string" && /^\d{1,12}$/.test(c) && BigInt(c) > 0n;
 /** The parts for the fill of this key only, bound to the first fill that reads them: never another fill's, never another key's. */
 export function othersForSheet(job: string, dep: string, now = Date.now()): OtherPart[] | undefined {

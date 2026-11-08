@@ -57,7 +57,7 @@ test("QA's condition 2: the fee line is never what a refusal replaces: the fee b
 test("button words, each state: Swap, Try again for a refusal or a price, Swap off under the least", () => {
   const under = swapBlock({ route: safeOut, usd: 1, most: 100 });
   assert.deepEqual(swapFloor({ ...idle, block: under }), { line: "why", tap: "swap", label: "Swap" }, "under the least: nothing to try again; the button stays Swap, off");
-  assert.match(sheet, /disabled=\{busy \|\| \(on\.tap === "swap" && \(nothing \|\| !!short \|\| services\.down \|\| \(!!block && block !== SWAP_WORDS\.amount\)\)\)\}/);
+  assert.match(sheet, /disabled=\{busy \|\| rests \|\| \(on\.tap === "swap" && \(nothing \|\| !!short \|\| services\.down \|\| \(!!block && block !== SWAP_WORDS\.amount\)\)\)\}/);
   assert.deepEqual(swapFloor({ ...idle, block: SWAP_WORDS.amount }), { line: "stays", tap: "swap", label: "Swap" }, "nothing typed: the privacy line stays");
   assert.deepEqual(swapFloor({ ...idle, block: SWAP_WORDS.amount, tried: true }), { line: "why", tap: "swap", label: "Swap" }, "a press at $0 says Pick an amount");
   assert.deepEqual(swapFloor({ ...idle, again: "Try again", block: null, said: true, priceDown: true }).line, "stopped", "a refusal comes first");
@@ -67,7 +67,7 @@ test("the price's Try again (no Sim switch, so proved here): its line in the slo
   assert.deepEqual(swapFloor({ ...idle, priceDown: true }), { line: "price", tap: "price", label: "Try again" });
   assert.deepEqual(swapFloor({ ...idle, priceDown: true, said: true }), { line: "said", tap: "price", label: "Try again" }, "the service's own line, with the same retry");
   assert.deepEqual(swapFloor({ ...idle, priceDown: true, block: SWAP_WORDS.most("$5.00") }), { line: "why", tap: "swap", label: "Swap" }, "an amount that can't go: its why first");
-  assert.match(sheet, /priceDown: price\.late \|\| !!price\.said/);
+  assert.match(sheet, /priceDown: !rests && \(price\.late \|\| !!price\.said\)/);
   assert.match(sheet, /\{on\.line === "price" && <p className="zf-small" role="status" data-testid="swap-price-late">\{price\.late \? SWAP_PRICE_LATE : price\.said\}<\/p>\}/);
   assert.match(sheet, /if \(on\.tap === "price"\) return price\.again\(\);/);
   assert.match(sheet, /again: \(\) => setTries\(\(n\) => n \+ 1\)/);
@@ -100,8 +100,8 @@ test("line 1 is the privacy line: its figure, with Who can see this? a link at i
   assert.match(sheet, /<MoneySheet title=\{MOVE_WORDS\.who\} onClose=\{\(\) => setWho\(false\)\}>/);
 });
 
-test("the shape, Send's: the keypad gives inside the box, 30 pt rows at least; the floor is its own box and keeps its room", () => {
-  assert.match(css, /\.wl-swap2__scroll > \.zf-keypad \{ flex: 0 1 224px; min-height: 120px;[^}]*grid-auto-rows: minmax\(0, 1fr\);/, "4 rows x 30");
+test("the shape, Send's: the keypad heads the floor at 56 pt (builder 25, J5: swap-keypad-b25); the form above scrolls; the floor is its own box and keeps its room", () => {
+  assert.match(css, /\.wl-swap2__floor > \.zf-keypad \{ flex: none; min-height: 224px; grid-auto-rows: 56px;/, "4 rows x 56");
   assert.match(css, /\.wl-swap2__scroll \{ flex: 1 1 auto; min-height: 0;[^}]*overflow-y: auto;/);
   assert.match(css, /\.wl-swap2__floor \{ position: relative; flex: none;/);
   assert.match(css, /\.wl-swap2__line \{ min-height: 36px;/, "two lines' room, so a refusal moves nothing");
@@ -125,7 +125,7 @@ test("nothing can go in one swap: the slot says so once, never \"Up to $0.00\", 
   assert.equal(safe.most, 0);
   assert.equal(safe.part, undefined, "no \"Up to $0.00\"");
   assert.match(sheet, /const nothing = !!route && most < 0\.01;/);
-  assert.match(sheet, /disabled=\{busy \|\| \(on\.tap === "swap" && \(nothing \|\|/);
+  assert.match(sheet, /disabled=\{busy \|\| rests \|\| \(on\.tap === "swap" && \(nothing \|\|/);
 });
 
 test("a refusal that stands when the amount can no longer go ends: never a lit Try again whose tap does nothing (audit, 6 Nov)", () => {

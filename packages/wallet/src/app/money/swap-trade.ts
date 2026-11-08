@@ -14,7 +14,7 @@ export interface CoinQuote { id: string; chain: "sol" | "hood"; legs: { side: "b
 export interface CoinDone { legs: { id: string; side: "buy" | "sell"; status: string; hashes: string[]; landedMs?: number }[]; stopped?: { code: string; whatHappened: string } }
 
 export const NATIVE_SYMBOL = { sol: "SOL", hood: "ETH" } as const;
-const WALLET = { sol: "your SOL wallet", hood: "your ETH (RH) wallet" } as const;
+const WALLET = { sol: "your SOL wallet", hood: "your Robinhood wallet" } as const;
 /** The exchanges a quote's legs trade on, each once: "Jupiter", "PumpSwap and Jupiter". */
 export const exchanges = (q: Pick<CoinQuote, "legs">): string => q.legs.map((l) => l.route).filter((x, i, a) => x && a.indexOf(x) === i).join(" and ") || "The exchange";
 /** No quote in time: who didn't answer, when known. */

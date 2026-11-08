@@ -35,7 +35,7 @@ export function Settings({ onWallets, onTrades }: { onWallets: () => void; onTra
       </button>
       <SlippageRow />
       <div className="zf-label tr-sec">Money</div>
-      <button className="zf-row" onClick={onWallets}><span><span className="t">Your wallets</span><span className="d">Your SOL, ETH (RH) and NEAR wallets, and what each holds</span></span><Forward /></button>
+      <button className="zf-row" onClick={onWallets}><span><span className="t">Your wallets</span><span className="d">Your SOL, Robinhood and NEAR wallets, and what each holds</span></span><Forward /></button>
       {onTrades && <button className="zf-row" onClick={onTrades}><span><span className="t">Your trades</span><span className="d">Every buy and sale, newest first</span></span><Forward /></button>}
     </div>
   );

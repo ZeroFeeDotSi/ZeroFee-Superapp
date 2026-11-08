@@ -8,7 +8,7 @@ import { shortTime } from "@zerofee/core/clock";
 export type RowChain = "sol" | "hood" | "near" | "bsc";
 
 /** A wallet's short name (D124: "ETH (RH)", never "ETH on Robinhood"), as read lines name it. */
-export const TAB_NAME: Record<"all" | "safe" | RowChain, string> = { all: "All", safe: "Safe", sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+export const TAB_NAME: Record<"all" | "safe" | RowChain, string> = { all: "All", safe: "Safe", sol: "SOL", hood: "Robinhood", near: "NEAR", bsc: "BNB" };
 
 /** The web wallet's Send (product decision, 4 Nov: every money move goes through NEAR Confidential). It was
  *  hidden while it paid straight from a wallet (product decision, 5 Nov: drop, don't degrade). Now private (QA's

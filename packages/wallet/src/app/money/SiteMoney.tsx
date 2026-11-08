@@ -30,7 +30,7 @@ import { dollars, privateFigure } from "../format.ts";
 import { ActAdd } from "../icons.tsx";
 import { trimCents, typedUsd, validUsd } from "../hub.ts";
 import { useMoveProblem } from "../screens/Spending.tsx";
-import { SHEET_NEEDS, readAgain, sheetLineOf, useServices } from "../services.ts";
+import { SHEET_NEEDS, readAgain, restsProps, sheetLineOf, useServices } from "../services.ts";
 import { backAmount, backLeast, backPicked, movesBackLine, type MoveBackRead } from "./site-moves.ts";
 import { keepPrice, keptPrice } from "./price-kept.ts";
 import { SAFE_LEG_MIN_USD } from "@zerofee/core/float-floors";
@@ -351,7 +351,11 @@ function SiteAddSheetFor({ wallet, name, network, safeUsd, coins, askedUsd, auto
   // Private's one figure (format.ts privateFigure, test MUST 3: "$25.00 available" under Move's $33.86); its USDC, the
   // part that pays a site, is said in its own line when it is less (site-route.ts privateFrom)
   const fromPriv = route.kind === "private" ? privateFrom(privateFigure(pocket), privUsd) : null;
-  const from = fromPriv ? fromLine(ROUTE_WORDS.fromPrivate, fromPriv.usd) : fromLine("your Safe", safeUsd);
+  const from = fromPriv ? (fromPriv.usdc ? `From ${ROUTE_WORDS.fromPrivate} · ${dollars(fromPriv.usd!)} ${ROUTE_WORDS.inUsdc}` : fromLine(ROUTE_WORDS.fromPrivate, fromPriv.usd)) : fromLine("your Safe", safeUsd);
+  // audit 15 FB2 (builder 14's rest rule): a service it needs is down, so its problem is the sheet's first line, the keypad
+  // and Max rest (inert, dimmed), and the line says the sheet checks again by itself (useServices asks every 30 s)
+  const rests = services.down && !busy;
+  const downTop = rests && services.line ? services.line : null;
   const openSite = onOpenSite && !busy ? <button className="zf-btn zf-btn--quiet wl-sheet-go" onClick={onOpenSite}>{`Open ${name}`}</button> : null;
   return (
     <MoneySheet title={ROUTE_WORDS.title(validUsd(usd) ? usdText(usd) : "$0", name)} away={busy} onClose={onClose}>
@@ -363,22 +367,22 @@ function SiteAddSheetFor({ wallet, name, network, safeUsd, coins, askedUsd, auto
         </>
       ) : (
         <>
+          {downTop && <div data-testid="site-add-down"><SheetLine text={downTop} /></div>}
           {/* Trade's Buy (product decision, 3 Nov): one number, where it comes from and how much is there, a keypad, one button */}
           <p className="zf-money__amount" aria-label={`Dollars to move to ${name}`} data-testid="site-add-amount" style={{ font: "200 56px/1.1 var(--font)", letterSpacing: "-.03em", color: "var(--ink)" }}>{`$${usd || "0"}`}</p>
           <div className="wl-swap-slide">
             <p className="zf-small wl-sheet-meta" data-testid="site-add-from">{from}</p>
-            {maxUsd && <button className="wl-swap-all" disabled={busy} onClick={() => { setFresh(true); setUsd(trimCents(maxUsd)); }} aria-label={`Max, ${dollars(maxUsd)}`}>Max</button>}
+            {maxUsd && <button className="wl-swap-all" disabled={busy || rests} onClick={() => { setFresh(true); setUsd(trimCents(maxUsd)); }} aria-label={`Max, ${dollars(maxUsd)}`}>Max</button>}
           </div>
-          {fromPriv?.part && <p className="zf-small wl-sheet-meta" data-testid="site-add-part">{fromPriv.part}</p>}
           {over && <p className="zf-small wl-sheet-meta" role="status" data-testid="site-add-over">{OVER_LINE}</p>}
           {(under || fresh) && !over && <p className="zf-small wl-sheet-meta" role="status" data-testid="site-add-least">{SITE_ADD_LEAST_LINE}</p>}
           {/* ST13: a site with a wallet per network says which one it goes to; a one-network site, where it comes from */}
           <p className="zf-small wl-sheet-meta" data-testid="site-add-route">{routeLine}</p>
           {(cost === "late" || (typeof cost === "object" && cost !== null)) && <button className="zf-btn zf-btn--quiet" onClick={() => setPriceAgain((n) => n + 1)}>Try again</button>}
-          <SheetLine text={line ?? services.line} />
+          <SheetLine text={line ?? (downTop ? null : services.line)} />
           {busyAgain !== null && !busy && <p className="zf-small wl-sheet-meta" role="status" data-testid="site-add-busy">{SITE_BUSY_LINE}</p>}
           {busyAgain !== null && !busy && <button className="zf-btn zf-btn--quiet" data-testid="site-add-busy-again" onClick={() => void go(busyAgain)}>Try again</button>}
-          {!busy && <Keypad value={fresh ? "" : usd} decimals={2} onChange={(v) => { setFresh(false); setUsd(v); }} />}
+          {!busy && <div {...restsProps(rests)} data-testid="site-add-pad"><Keypad value={fresh ? "" : usd} decimals={2} onChange={(v) => { setFresh(false); setUsd(v); }} /></div>}
           {/* the fee block, right above the button (the copy review, 6 Nov): one 1Click payment, site-route.ts */}
           <div className="zf-fee">
             {fee && <p className="zf-small" data-testid="site-add-fee">{fee}</p>}
@@ -391,7 +395,7 @@ function SiteAddSheetFor({ wallet, name, network, safeUsd, coins, askedUsd, auto
             </button>
           ) : (
             <button className="zf-btn wl-sheet-go" disabled={busy || services.down || over || route.kind === "closed" || !validUsd(usd) || Number(typedUsd(usd)) < SITE_ADD_LEAST_USD} onClick={() => void go()}>
-              {busy ? "Getting it ready…" : validUsd(usd) ? `Add ${usdText(usd)}` : "Add"}
+              {validUsd(usd) ? `Add ${usdText(usd)}` : "Add"}
             </button>
           )}
           {openSite}
@@ -597,7 +601,7 @@ function SiteBackSheetFor({ wallet, also = [], name, safeUsd, askedUsd, onClose,
           <SheetLine text={line ?? services.line} />
           {/* the fee block, right above the button (the copy review, 6 Nov): a take-out goes through NEAR Confidential */}
           {!Object.keys(legs).length && <div className="zf-fee"><p className="zf-small" data-testid="takeout-paid">{intentsPaid()}</p></div>}
-          {!Object.keys(legs).length && <button className="zf-btn wl-sheet-go" disabled={busy || services.down} onClick={() => void go()}>{busy ? "Getting it ready…" : `Take out ${dollars(String(picked))}`}</button>}
+          {!Object.keys(legs).length && <button className="zf-btn wl-sheet-go" disabled={busy || services.down} onClick={() => void go()}>{`Take out ${dollars(String(picked))}`}</button>}
         </>
       )}
       {onBack && !busy && !Object.keys(legs).length && <button className="zf-btn zf-btn--quiet wl-sheet-go" onClick={onBack}>Back</button>}

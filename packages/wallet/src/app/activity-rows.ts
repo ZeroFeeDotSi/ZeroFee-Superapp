@@ -7,6 +7,7 @@ import { statusWords } from "./hub.ts";
 import { ACTIVITY_WORDS, ago, dollars, movementDollars, payeeWords, whereNow } from "./format.ts";
 import { untilDate } from "./money/add-coins.ts";
 import type { Token } from "../types.ts";
+import { usdOf as coinUsd } from "../amount.ts";
 import { SAFE_LEG_MIN_USD } from "@zerofee/core/float-floors";
 import { swapLabel } from "./money/swap-follow.ts";
 import { isInplaceRow } from "./money/inplace-activity.ts";
@@ -34,7 +35,17 @@ export const jobLine = (t: LiveTrack): string => t.end?.line ?? t.steps.find((x)
 // the asked form, as Home's row says it (live-steps.ts rowTitle: "Move $30.00 to your Safe"; the line carries the state)
 export const nameOf = (s: SpendingActivity): string => { const t = jobOf(s); return t ? rowTitle(t) : swapLabel(s.id) ?? s.words; };
 /** A Spending row's dollars: its job's figure (what was asked, the receipt's), else the row's own. */
-export const usdOf = (s: SpendingActivity): string | undefined => carried(`move:${s.id}`)?.usd ?? (s.askedUsd ? `$${s.askedUsd}` : s.usd ? `$${s.usd}` : undefined);
+export const usdOf = (s: SpendingActivity): string | undefined => landedUsd(s) ?? carried(`move:${s.id}`)?.usd ?? (s.askedUsd ? `$${s.askedUsd}` : s.usd ? `$${s.usd}` : undefined);
+/** Audit 13's D2 (8 Nov): a Move into the Safe that landed said the figure that left ("$69.37") while $66.62 came in.
+ *  Landed, the row says what its record read came in: the USDC it landed as (amountOut), else the engine's own figure
+ *  (a done move's `usd` is what arrived, float-jobs). The sent figure stays on its Check and receipt. A move out to a
+ *  wallet lands in that chain's coin, so it keeps the figure asked. Pure. */
+const INTO_SAFE: ReadonlySet<SpendingActivity["kind"]> = new Set(["put-away", "over-cap", "older"]);
+export function landedUsd(s: Pick<SpendingActivity, "status" | "kind" | "usd" | "amountOut">): string | undefined {
+  if (s.status !== "done" || !INTO_SAFE.has(s.kind)) return undefined;
+  const n = s.amountOut?.symbol === "USDC" ? Number(s.amountOut.amount) : Number(s.usd);
+  return Number.isFinite(n) && n > 0 ? `$${(Math.floor(n * 100 + 1e-9) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined;
+}
 /** the audit's Trade audit T10 (8 Nov): a Home row in Activity said its figure twice, in its title ("Move $20.00 to your SOL
  *  wallet", "Send $5.00 to bob.near", "Moved $33.86 from Private to your Safe") and in its right column. The row's
  *  title drops its dollar figure ("about" with it) when the right column says one; the title stays whole when it doesn't. */
@@ -191,7 +202,7 @@ export function jobFrom(r: JobRow): string | undefined {
 }
 const FROM_ORDER = ["safe", "private", "sol", "hood", "near", "bsc"];
 const ORDER = ["safe", "sol", "hood", "near", "bsc"];
-const NAMES: Record<string, string> = { sol: "SOL", hood: "ETH (RH)", near: "NEAR", bsc: "BNB" };
+const NAMES: Record<string, string> = { sol: "SOL", hood: "Robinhood", near: "NEAR", bsc: "BNB" };
 
 /** What the Activity centre's store says ended (Home's tasks, "move:<row id>", "send:<movement id>"): its end and when. */
 export type TaskEnd = { state: "done" | "failed" | "stopped"; at: number; where?: string };
@@ -263,7 +274,7 @@ export const rowPayee = (full: string): string => {
   return `${full.slice(0, Math.min(head, i))}…${full.slice(-4)}`;
 };
 /** J3-4: a done Send's line is where it left from only ("From your Safe"): the title alone carries the address. */
-const LEFT: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your ETH (RH) wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
+const LEFT: Record<string, string> = { safe: "your Safe", private: "Private", sol: "your SOL wallet", hood: "your Robinhood wallet", near: "your NEAR wallet", bsc: "your BNB wallet" };
 export function sendRowOf(m: Movement, usd: string | undefined = carried(`send:${m.id}`)?.usd, tokens?: ReadonlyMap<string, Token>): { title: string; usd: string; line?: string } | null {
   const t = sendJobOf(m, tokens, usd);
   if (!t) return null;
@@ -287,8 +298,11 @@ export function sentUsd(m: Movement, tokens: ReadonlyMap<string, Token>): string
   const coin = tokens.get(m.from === "near" ? "nep141:wrap.near" : m.from ?? "");
   // QA 16's Send Max shots (7 Nov): cents down with its commas, as the form said it (maxSend's 1165.048543 is $1,165.04)
   if (coin && /^USD[CT]$/i.test(coin.symbol) && Number(m.amount) > 0) return dollars((Math.floor(Number(m.amount) * 100 + 1e-6) / 100).toFixed(2));
-  const d = movementDollars(m, tokens as Map<string, Token>);
-  return d && d.startsWith("$") ? d : undefined;
+  // the audit's S6 (7 Nov): one rounding rule with the Face ID sheet (core send-fill.ts centsOf: cents down, never says more
+  // went): any other coin at its price, cents down too (movementDollars rounds to the nearest, Activity's own rows)
+  // the price as its shortest text (a number's 18 places can sit under it: 4.43 is 4.4299…, $22.15 would read $22.14)
+  const usd = coin && Number(m.amount) > 0 && coin.priceUsd !== undefined ? coinUsd(m.amount, String(coin.priceUsd)) : undefined;
+  return usd !== undefined && Number(usd) >= 0.01 ? dollars(usd) : undefined;
 }
 /** A Send that came back: "Came back to Private." (whereNow's place, by the leg's own record). Pure. */
 export const backLine = (m: Movement): string => ACTIVITY_WORDS.cameBack(whereNow({ ...m, status: "refunded" }, "").replace(/^back in /, ""));

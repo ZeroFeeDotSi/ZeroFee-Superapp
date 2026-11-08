@@ -31,8 +31,8 @@ const START = { heading: LAPTOP_START.what, next: LAPTOP_START.next };
 
 test("the words, pinned (the design reviewer's finals, 5 Nov): one name everywhere, Add my laptop", () => {
   assert.equal(LAPTOP_START.what, "This page makes your laptop a second key for ZeroFee.");
-  assert.equal(LAPTOP_START.next, "Next: tap Use this laptop. Then on your phone: ZeroFee, Security, Add my laptop.");
-  assert.equal(LAPTOP_START.pairOn, "On your phone: ZeroFee, Security, Add my laptop.");
+  assert.equal(LAPTOP_START.next, "Next: tap Use this laptop. Then on your phone: ZeroFee, Your account, Devices, Add my laptop.");
+  assert.equal(LAPTOP_START.pairOn, "On your phone: ZeroFee, Your account, Devices, Add my laptop.");
   assert.equal(LAPTOP_START.late, "NEAR didn't answer, so this laptop's key didn't load. Nothing changed on your phone.");
   assert.equal(LAPTOP_START.notLoaded, "This page hasn't loaded. Check your internet, then reload.");
   // no "…ing" line anywhere on the laptop's first screens, and the phone's button is named one way

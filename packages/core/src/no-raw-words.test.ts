@@ -38,7 +38,7 @@ test("the sweep catches what the rehearsal saw (control: each old line is flagge
     `Pays 0.00125 NEAR so ${USDC.slice(0, 8)}…${USDC.slice(-4)} can hold it. That comes back later.`,
     `Pays 0.0013 NEAR so ${USDC} can hold it.`,
     "Send 0.127781877210164154267814 wNEAR privately from your SOL wallet",
-    "0.000195863293784041 ETH (RH) leaves your ETH (RH) wallet",
+    "0.000195863293784041 Robinhood leaves your Robinhood wallet",
     `Used ${BRIDGED}, paying 0.000000000000000000000001 NEAR`,
     `Sent 0.2939 NEAR · with ${STRANGER}`,
   ]) assert.ok(rawText(old).length > 0, old);

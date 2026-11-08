@@ -15,18 +15,21 @@ export const METHOD_NEEDS: Record<string, readonly Service[]> = {
   // the ledger (packages/wallet ledger.ts): the coin list is kept on the device, so only NEAR itself is needed to read
   "ledger.balances": ["near"],
   "ledger.activity": ["near"],
-  "ledger.toTrading": ["near", "oneclick"],
-  "ledger.quotePay": ["near"],
-  "ledger.pay": ["near"],
+  "ledger.toTrading": ["near", "oneclick", "confidential"],
+  "ledger.quotePay": ["near", "confidential"],
+  "ledger.pay": ["near", "confidential"],
+  // NEAR Confidential (audit 12's rig SHOULD, ?fault=confidential:521): every money move goes through it
+  "ledger.quoteToPrivate": ["confidential"],
+  "ledger.toPrivate": ["confidential"],
   "ledger.withdraw": ["near"],
   "ledger.transfer": ["near"],
   "ledger.quoteConvert": ["near", "oneclick"],
   "ledger.convert": ["near", "oneclick"],
   // the core's Spending (the relay prices every move privately; a site's wallet is on Solana)
-  "spending.topUp": ["near", "oneclick", "relay"],
-  "spending.putAway": ["oneclick", "relay"],
-  "subwallet.site.moveBack": ["solana", "oneclick", "relay"],
-  "subwallet.site.moveBackAll": ["solana", "oneclick", "relay"],
+  "spending.topUp": ["near", "oneclick", "relay", "confidential"],
+  "spending.putAway": ["oneclick", "relay", "confidential"],
+  "subwallet.site.moveBack": ["solana", "oneclick", "relay", "confidential"],
+  "subwallet.site.moveBackAll": ["solana", "oneclick", "relay", "confidential"],
   // Agent's model
   "agent.ask": ["nearai"],
 };
@@ -53,9 +56,11 @@ export function faultedBridge(inner: Bridge, given: Injected | (() => Injected |
         const code = method.startsWith("ledger.") ? (fault.service === "near" ? "ledger.nodes.unreachable" : "ledger.service.unreachable") : "security.partner.unreachable";
         return Promise.resolve({ problem: serviceProblem(code, fault.service, how) });
       }
-      // a site's wallet Solana didn't answer for is listed unread, as the core lists it
-      if (method === "spending.wallets" && fault.service === "solana") {
-        return inner.call<T>(method, params).then((r) => ("ok" in r && Array.isArray(r.ok) ? { ok: r.ok.map((w) => (w?.network === "sol" || w?.chain === "sol" ? { ...w, unread: true } : w)) as T } : r));
+      // a wallet its chain didn't answer for is listed unread, as the core lists it (Solana's wallets; builder 22's item 4,
+      // audit 12 S8 / S16-1: Robinhood Chain's wallet too, so Hot keeps its last read and says when, as it does for Solana)
+      const net = FAULT_NETWORK[fault.service];
+      if (method === "spending.wallets" && net) {
+        return inner.call<T>(method, params).then((r) => ("ok" in r && Array.isArray(r.ok) ? { ok: r.ok.map((w) => (w?.network === net || w?.chain === net ? { ...w, unread: true } : w)) as T } : r));
       }
       return inner.call<T>(method, params);
     },
@@ -63,8 +68,11 @@ export function faultedBridge(inner: Bridge, given: Injected | (() => Injected |
   };
 }
 
+/** The wallets' network a chain's fault leaves unread (spending.wallets `network`). */
+export const FAULT_NETWORK: Partial<Record<Service, string>> = { solana: "sol", hood: "hood" };
+
 /** The Status row each service is (a service with none, the bridge, isn't checked there). */
-const STATUS_ROW: Partial<Record<Service, StatusId>> = { relay: "relay", near: "near", solana: "solana", hood: "hood", gecko: "price", oneclick: "oneclick", nearai: "agentzero" };
+const STATUS_ROW: Partial<Record<Service, StatusId>> = { relay: "relay", near: "near", solana: "solana", hood: "hood", gecko: "price", oneclick: "oneclick", confidential: "confidential", nearai: "agentzero" };
 /** A look with `service` failing: its row Down (or Slow for a timeout), the relay's chain door with it for a chain. */
 export function faultedStatus(r: StatusReport, service: Service, how: Fault): StatusReport {
   const id = STATUS_ROW[service];

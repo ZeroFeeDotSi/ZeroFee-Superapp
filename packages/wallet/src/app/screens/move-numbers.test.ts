@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import type { SpendingActivity } from "@zerofee/core/spending";
 import { intentsKept } from "@zerofee/core/zero-fee";
-import { alsoMoved, costRows, fillLegs, fillOf, homeCut, MOVE_WORDS, moveFace, moveFee, moveSummary, placesWords, safeAfter, safeKeeps, type Leg, type PlaceNow, type SafeCoinRow, type SetOp } from "./move-split.ts";
+import { alsoMoved, costRows, fillLegs, fillOf, homeCut, MOVE_WORDS, moveFace, moveFee, moveSummary, placesWords, safeAfter, safeKeeps, WHERE, type Leg, type PlaceNow, type SafeCoinRow, type SetOp } from "./move-split.ts";
 import { goesWords, spendingFacts } from "../statement.ts";
 import { PROOF_WORDS, stepLine } from "../proof.ts";
 
@@ -16,21 +16,21 @@ const L = (from: Leg["from"], to: Leg["to"], usd: number): Leg => ({ from, to, u
 test("item 1: one summary line, where the plan moves it by name (its total the Leaves row's, said once: the audit's M6); none on an empty or blocked plan", () => {
   const table: [Leg["to"][], string][] = [
     [["sol"], "your SOL wallet"],
-    [["sol", "hood"], "your SOL and ETH (RH) wallets"],
-    [["hood", "sol"], "your SOL and ETH (RH) wallets"],
-    [["sol", "hood", "near"], "your SOL, ETH (RH) and NEAR wallets"],
+    [["sol", "hood"], "your SOL and Robinhood wallets"],
+    [["hood", "sol"], "your SOL and Robinhood wallets"],
+    [["sol", "hood", "near"], "your SOL, Robinhood and NEAR wallets"],
     [["safe"], "your Safe"],
     [["sol", "safe"], "your Safe and your SOL wallet"],
   ];
   for (const [to, words] of table) assert.equal(placesWords(to), words, to.join(","));
   const plan = [L("safe", "sol", 112.96), L("private", "hood", 22.04)];
-  assert.equal(moveSummary(plan, false), "Moves it to your SOL and ETH (RH) wallets.");
+  assert.equal(moveSummary(plan, false), "Moves it to your SOL and Robinhood wallets.");
   // its figure is the plan's "Leaves" row's alone, said once (the audit's M6)
   assert.equal(costRows(plan)!.rows[0]!.value, "$135.00");
   assert.equal(moveSummary([], false), null, "control: an empty plan");
   assert.equal(moveSummary(plan, true), null, "control: a plan that can't go");
   assert.match(sheet, /\{summary && <p className="zf-small" data-testid="move-summary">\{summary\}<\/p>\}<p className="zf-small" data-testid="move-paid">\{fee\.kept\}<\/p>/);
-  assert.match(sheet, /const summary = running \? null : moveSummary\(legs, !!block\);/);
+  assert.match(sheet, /const summary = running \|\| cantGo \? null : moveSummary\(legs, !!block\);/);
 });
 
 test("item 2: the fee's figure is said once (the plan's Fees row); the floor says who gets a fee with the same line on every state, never \"keep this\" after the summary's figure", () => {
@@ -83,8 +83,11 @@ test("item 5: what else the plan moves is said once, present tense, with the pla
   const walk = { legs: [L("safe", "hood", 222)], extra: 28, privateUsd: 28 };
   type Pays = { legs: Leg[]; extra: number; privateUsd: number };
   const table: [string, SetOp[], Pays, string | null][] = [
-    ["the walk: Private's row moves because of the fill", [op("sol"), op("hood")], walk, "Also moves $28.00 to Private."],
-    ["the reviewer's: the Safe set, Private ends up", [op("safe")], both, "Also moves $15.00 to Private."],
+    ["the walk: Private's row moves because of the fill", [op("sol"), op("hood")], walk, "$28.00 also goes into Private and stays there."],
+    ["the reviewer's: the Safe set, Private ends up", [op("safe")], both, "$15.00 also goes into Private and stays there."],
+    // QA 16's MUST 1 (b8's): Private's part first with its why, then the wallet that also gives
+    ["b8's: a wallet gave and Private ends up", [op("sol")], { legs: [L("safe", "sol", 20), L("hood", "sol", 4.36)], extra: 9.36, privateUsd: 9.36 }, `$9.36 also goes into Private and stays there. $4.36 also comes from ${WHERE.hood}.`],
+    ["two wallets gave and Private ends up", [op("sol")], { legs: [L("safe", "sol", 20), L("hood", "sol", 4.36), L("near", "sol", 3)], extra: 9.36, privateUsd: 9.36 }, `$9.36 also goes into Private and stays there. $4.36 also comes from ${WHERE.hood} and $3.00 from your NEAR wallet.`],
     ["Private set: the Safe paid, Private's own change is the person's", [op("private")], both, "Also moves $150.00 from your Safe."],
     ["Private pays down, not set", [op("sol")], { legs: [L("private", "sol", 9), L("near", "sol", 30)], extra: 0, privateUsd: -9 }, "Also moves $9.00 from Private."],
     ["a wallet set and another wallet gave", [op("sol", "type")], { legs: [L("hood", "sol", 10), L("near", "sol", 5)], extra: 0, privateUsd: 0 }, "Also moves $5.00 from your NEAR wallet."],
@@ -95,7 +98,7 @@ test("item 5: what else the plan moves is said once, present tense, with the pla
     ["control: no plan", [], { legs: [], extra: 0, privateUsd: 0 }, null],
   ];
   for (const [what, ops, pays, want] of table) assert.equal(alsoMoved(ops, pays), want, what);
-  assert.match(sheet, /const also = running \|\| block \? null : alsoMoved\(ops, pays\);/);
+  assert.match(sheet, /const also = running \|\| block \? null : saidOnce\(alsoMoved\(ops, pays\), floorRows\.length > 0\);/);
   assert.match(sheet, /\{also && <p className="zf-small wl-mv-foot" data-testid="move-also">\{also\}<\/p>\}/);
   // it says Private's change, so the fill's foot line isn't said a second time
   assert.match(sheet, /fill: block \|\| also \? null : fills,/);
@@ -118,11 +121,11 @@ test("item 6 (53 on T-B): no lift; the plan box fills to the floor (scroller fle
 test("item 7: a Move's landed row names every wallet it went to (control: one wallet, a missed part, a site)", () => {
   const row = (o: Partial<SpendingActivity>): SpendingActivity => ({ id: "m1", kind: "top-up", status: "done", usd: "$135.00", words: "Moved $135.00 to your wallets", atIso: "2026-01-01T00:00:00.000Z", ...o }) as SpendingActivity;
   const table: [string, Partial<SpendingActivity>, string][] = [
-    ["SOL and ETH (RH)", { goesTo: ["sol", "hood"] }, "SOL wallet and ETH (RH) wallet"],
-    ["three", { goesTo: ["sol", "hood", "bsc"] }, "SOL wallet, ETH (RH) wallet and BNB wallet"],
+    ["SOL and Robinhood", { goesTo: ["sol", "hood"] }, "SOL wallet and Robinhood wallet"],
+    ["three", { goesTo: ["sol", "hood", "bsc"] }, "SOL wallet, Robinhood wallet and BNB wallet"],
     ["one", { goesTo: ["sol"] }, "SOL wallet"],
     ["one part missed: the one it reached", { goesTo: ["sol", "hood"], missed: ["hood"] }, "SOL wallet"],
-    ["every part missed: where it was going", { goesTo: ["sol", "hood"], missed: ["sol", "hood"] }, "SOL wallet and ETH (RH) wallet"],
+    ["every part missed: where it was going", { goesTo: ["sol", "hood"], missed: ["sol", "hood"] }, "SOL wallet and Robinhood wallet"],
     ["control: none, it stays in the NEAR wallet", {}, "NEAR wallet"],
     ["control: a site's Add", { goesTo: ["sol"], site: "pump", siteName: "pump.fun" }, "Your pump.fun wallet"],
   ];

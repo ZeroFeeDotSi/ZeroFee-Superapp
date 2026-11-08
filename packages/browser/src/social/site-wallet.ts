@@ -11,11 +11,14 @@ import { outsideShort } from "@zerofee/core/format";
 import type { Tasks } from "@zerofee/shell-api/tasks.ts";
 import { usd } from "@zerofee/trade/app/format.ts";
 import { backSteps, type MoveBack } from "../site-tasks.ts";
+import { appChain } from "@zerofee/core/app-chains";
 import { CHAIN_NAME, SITE_CHAINS, notCarried, solOf, type HubRow, type SiteChain } from "./hub-state.ts";
 import { stays, takeOutAlso, tooSmall } from "./take-out.ts";
+import { shortTime } from "@zerofee/core/clock";
+import type { ServiceStatus } from "@zerofee/core/services";
 
 /** Each network's own coin, as the wallet holds it. */
-const COIN: Readonly<Record<string, string>> = { sol: "SOL", bsc: "BNB", base: "ETH", eth: "ETH" };
+const COIN: Readonly<Record<string, string>> = { sol: "SOL", hood: "ETH", near: "NEAR" };
 /** How many moves the page lists (the rest are in Activity). */
 export const MOVES_SHOWN = 4;
 /** An Add on its way longer than this is slow: said at the bottom, plainly. */
@@ -73,8 +76,11 @@ const proofOf = (p: MoveProof | undefined, first: "start" | "end"): { url?: stri
   return url ? { url } : {};
 };
 export interface WalletView {
-  /** The wallet's dollars: "$12.40"; "…" before the first read; never $0.00 for a wallet that can't be read. */
+  /** The wallet's dollars: "$12.40"; "Reading" before the first read with nothing kept; never $0.00 for a wallet that
+   *  can't be read. */
   dollars: string;
+  /** Audit 15 FB1: under a kept figure, the time it was read ("As of 10:52 AM"); under "Reading", who reads it. */
+  asOf?: string;
   /** Under the total when some coins have no price: "Plus coins with no price." */
   totalNote?: string;
   coins: WalletCoin[];
@@ -134,6 +140,17 @@ function backWords(name: string, m: SiteBack): WalletMove {
   return { id: m.back.id, title, detail: s.end.detail, state: s.end.state === "failed" ? "failed" : "done", at };
 }
 
+/** Audit 15 FB1: Solana is down when this phone and the relay's check agree (services.ts: one source alone is not down). */
+export const solanaDownOf = (rows: readonly ServiceStatus[]): boolean => rows.some((r) => r.service === "solana" && r.state === "down" && r.seen === "both");
+
+/** Audit 15 FB1: Solana down, the wallet page's Add is off, and says why once (the banner above says what else). */
+/** Builder 25 (item 2): a site wallet's figure before its first read, with nothing kept: the word, never "…". */
+export const READING = "Reading";
+/** Who reads it, under that word: the site wallets live on Solana. */
+export const readingWho = (name: string): string => `Solana is reading ${name}'s wallet.`;
+
+export const SOLANA_DOWN_ADD = "Solana is down, so Add waits. It checks again by itself.";
+
 /**
  * The wallet page. `row`: the site's wallets as the hub reads them (hubRows); `read`: how the last read went;
  * `moving`: an Add on its way (its dollars and since when); `adds`: Spending's moves; `backs`: the core's Take outs.
@@ -153,9 +170,19 @@ export function walletView(i: {
   /** The shell's jobs (the task store): an Add's job made at "Job created." is its row here on that same frame, before
    *  Spending's own row for it is read (5 Nov: "Nothing yet" for about 1 s). */
   jobs?: readonly JobRowIn[];
+  /** Audit 15 FB1: the last figure read (hub-state keptHub) and when; shown, with its time, when this read has none. */
+  kept?: { usd: number; at: number };
+  /** Audit 15 FB1: Solana is down (the relay's check and this phone agree): Add waits, said once. */
+  solanaDown?: boolean;
 }): WalletView {
   const { site, name, row, read } = i;
-  const dollars = row?.usd !== null && row?.usd !== undefined ? usd(row.usd) : read === "failed" ? "Can't see it now" : "…";
+  const fresh = row?.usd !== null && row?.usd !== undefined;
+  // rule 9a: a read with no figure (Solana didn't answer, or not read yet) keeps the last one with its time; nothing kept
+  // on the first read: "Reading" and who reads it (builder 25, item 2: never an ellipsis)
+  const keptShown = !fresh && i.kept ? i.kept : undefined;
+  const reading = !fresh && !keptShown && read === "first";
+  const dollars = fresh ? usd(row!.usd!) : keptShown ? usd(keptShown.usd) : reading ? READING : "Can't see it now";
+  const asOf = keptShown ? `As of ${shortTime(keptShown.at)}` : reading ? readingWho(name) : undefined;
   // the total is the wallet's one figure (spending.wallets: its coin and every priced coin bought on the site, the same
   // figure Home and the landing line say; QA 5 Nov: three figures for one wallet); a coin with no price is left
   // out of it and said so (independent UI grade, 3 Nov: "$0.00" above a $2.47 coin)
@@ -167,14 +194,15 @@ export function walletView(i: {
   }
   // its coins: each network's wallet with money in it, in the site's order; none yet: its Solana wallet at $0.00
   const order = (n: string) => { const k = (SITE_CHAINS[site] ?? ["sol"]).indexOf(n as SiteChain); return k < 0 ? 99 : k; };
-  const funded = (row?.wallets ?? []).filter((w) => siteWalletFunded(w.usd, w.holds)).sort((a, b) => order(a.network) - order(b.network));
+  // builder 25 (J8): the app's chains only (core app-chains.ts), never a BNB or Base coin row
+  const funded = (row?.wallets ?? []).filter((w) => appChain(w.network)).filter((w) => siteWalletFunded(w.usd, w.holds)).sort((a, b) => order(a.network) - order(b.network));
   const coins: WalletCoin[] = funded.map((w) => ({ network: w.network, name: CHAIN_NAME[w.network as SiteChain] ?? w.network, symbol: COIN[w.network] ?? "", dollars: w.usd !== null ? usd(w.usd) : w.holds!, native: true as const }));
   if (!coins.length && row && row.usd !== null) coins.push({ network: "sol", name: "Solana", symbol: "SOL", dollars: usd(0), native: true });
   // every coin the wallet holds (bought on the site too), when the core has listed them
   const listed = i.coins?.length ? coinsFromCore(i.coins) : [];
   if (listed.length) coins.splice(0, coins.length, ...listed);
   const moving = i.moving;
-  const canAdd = Boolean(row?.wallet) && !moving;
+  const canAdd = Boolean(row?.wallet) && !moving && !i.solanaDown;
   const canTakeOut = Boolean(row?.wallet) && ((solOf(row) ?? 0) >= 2 || takeOutAlso(row!).length > 0);
   const addRows = (i.adds ?? []).filter((a) => a.site === site && !a.of).map((a) => addMove(name, a));
   const moves = [
@@ -189,14 +217,15 @@ export function walletView(i: {
   const hasRow = moves.some((m) => m.state === "moving");
   if (moving && i.now - moving.sinceMs > SLOW_MS) lines.push(`NEAR is slow right now. ${usd(moving.usd)} is still on its way.`);
   else if (moving && !hasRow) lines.push(`${usd(moving.usd)} is on its way. NEAR takes 3–4 minutes.`);
-  if (read === "failed") lines.push("Solana didn't answer. This is from the last look.");
+  if (i.solanaDown) lines.push(SOLANA_DOWN_ADD);
+  else if (read === "failed" && !keptShown) lines.push("Solana didn't answer. This is from the last look.");
   const why = takeOutWhy({ name, canTakeOut, wallet: Boolean(row?.wallet), moving: Boolean(moving), sol: row ? solOf(row) : null, coins: listed });
   if (why) lines.push(why);
   if (row) {
     for (const c of stays(row)) lines.push(`${notCarried(c)} Take out leaves your ${CHAIN_NAME[c]} money here.`);
     for (const c of tooSmall(row)) lines.push(`Your ${CHAIN_NAME[c]} money is under $2, so Take out leaves it.`);
   }
-  return { dollars, ...(totalNote ? { totalNote } : {}), coins, ...(row?.address ? { address: row.address } : {}), canAdd, canTakeOut, moves, lines, open: `Open ${name}` };
+  return { dollars, ...(asOf ? { asOf } : {}), ...(totalNote ? { totalNote } : {}), coins, ...(row?.address ? { address: row.address } : {}), canAdd, canTakeOut, moves, lines, open: `Open ${name}` };
 }
 
 /**

@@ -24,7 +24,7 @@ test("the screen draws step 2 and its buttons from the table (a guardian's butto
   const sec = readFileSync(new URL("./SecurityApp.tsx", import.meta.url), "utf8");
   assert.match(sec, /\("step1" in t \? \[t\.step1, pairStepTwo\(phone\)\.step\] : t\.steps\)\.map/);
   assert.match(sec, /scanButton: PAIR_STEP_TWO\.iphone\.button,/);
-  assert.match(sec, /\{asking \? "Asking your account…" : PAIR_STEP_TWO\.web\.button\}/);
+  assert.match(sec, /\{asking \? "Asking your account" : PAIR_STEP_TWO\.web\.button\}/);
   // the floor: on the phone the scan button (t.scanButton), in a browser the paste button
   assert.match(sec, /phone \? <><button className="zf-btn" onClick=\{\(\) => setStep\("scan"\)\}>\{t\.scanButton\}<\/button>/);
   const guardianScan = /guardian: \{[\s\S]*?scanButton: "([^"]+)"/.exec(sec)![1]!;

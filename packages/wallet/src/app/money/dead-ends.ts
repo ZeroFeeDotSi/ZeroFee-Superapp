@@ -13,7 +13,7 @@ export const TEST_WORDS = { line: "This is a test account, so money can't move h
 
 /** Send with nothing a wallet can send: nothing anywhere, or all of it in the Safe (the Copywriter's words). */
 export const SEND_EMPTY = {
-  none: "Nothing to send yet. Add SOL or ETH (RH) to a wallet first.",
+  none: "Nothing to send yet. Add SOL or ETH to a wallet first.",
   inSafe: "Your money is in your Safe. Move some to a wallet to send it.",
   move: "Move money",
   reading: "Reading your money…",

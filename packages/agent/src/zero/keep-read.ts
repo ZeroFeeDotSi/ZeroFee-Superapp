@@ -5,7 +5,7 @@
 // offered there, and one saved before stops with one plain receipt.
 import { AGENT_PRIVATE_ROUTE, AGENTZERO_WALLET } from "@zerofee/core/agent-route";
 
-export type KeepWallet = "sol" | "hood" | "bsc";
+export type KeepWallet = "sol" | "hood";
 /** Spending's status, as much of it as the reading needs. */
 export interface KeepStatus {
   totalUsd: string;
@@ -30,7 +30,7 @@ export const KEEP_FROM_AGENT_OPEN = false;
  */
 export const keepRuns = (walletOn: boolean = AGENTZERO_WALLET, route: boolean = AGENT_PRIVATE_ROUTE, fromAgent: boolean = KEEP_FROM_AGENT_OPEN): boolean => route && (!walletOn || fromAgent);
 export const KEEP_FROM_AGENT_OFF = (wallet: KeepWallet) => `AgentZero can't fill ${KEEP_NAME[wallet]} from its own wallet yet. Nothing moved.`;
-const KEEP_NAME: Record<KeepWallet, string> = { sol: "your SOL wallet", hood: "your ETH (RH) wallet", bsc: "your BNB wallet" };
+const KEEP_NAME: Record<KeepWallet, string> = { sol: "your SOL wallet", hood: "your Robinhood wallet" };
 
 /**
  * What a keep job reads, in dollars: with AgentZero's own wallet on, the job's own wallet's cash (null when that network

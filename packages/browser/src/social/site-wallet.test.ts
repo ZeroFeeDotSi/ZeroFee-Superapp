@@ -34,12 +34,13 @@ test("the wallet page: its dollars, its coins, its address, Add and Take out, an
   const base = (holds: string) => ({ network: "base", usd: null, holds, id: "sw-site-gmgn-base", address: "0xb" });
   const gmgn = (holds: string) => walletView({ site: "gmgn", name: "GMGN", row: { ...row(0), site: "gmgn", name: "GMGN", wallets: [{ network: "sol", usd: 0, id: "s", address: ADDR }, base(holds)] }, read: "ok", now: NOW }).coins;
   assert.deepEqual(gmgn("0 ETH").map((c) => `${c.name} ${c.dollars}`), ["Solana $0.00"]);
-  assert.deepEqual(gmgn("0.0012 ETH").map((c) => `${c.name} ${c.dollars}`), ["Base 0.0012 ETH"], "control: some ETH is a coin");
+  // builder 25 (J8): a Base wallet holding some is no coin row in V1 either (core app-chains.ts): its Solana one shows
+  assert.deepEqual(gmgn("0.0012 ETH").map((c) => `${c.name} ${c.dollars}`), ["Solana $0.00"], "no Base row in V1");
 });
 
 test("never $0.00 for a wallet it can't see; before the first read, no money buttons", () => {
   const first = walletView({ site: "pump", name: "pump.fun", read: "first", now: NOW });
-  assert.equal(first.dollars, "…");
+  assert.equal(first.dollars, "Reading", "builder 25 (item 2): the word, never an ellipsis");
   assert.equal(first.canAdd, false);
   assert.equal(first.canTakeOut, false);
   const failed = walletView({ site: "pump", name: "pump.fun", row: row(null), read: "failed", now: NOW });
@@ -194,5 +195,5 @@ test("an Add's job is its row in Moves on the frame \"Job created.\" shows, neve
   assert.equal(walletView({ site: "pump", name: "pump.fun", row: row(0), read: "ok", now: NOW, jobs: [{ ...job, state: "failed" }] }).moves.length, 0, "a job that ended");
   const page = readFileSync(new URL("./SiteWalletApp.tsx", import.meta.url), "utf8");
   assert.match(page, /return st\.subscribe\(\(\) => setJobs\(st\.list\(\)\)\);/, "the page re-draws on the job's publish, the same frame");
-  assert.match(page, /now: Date\.now\(\), coins, jobs \}\);/);
+  assert.match(page, /now: Date\.now\(\), coins, jobs, \.\.\.\(kept \? \{ kept \} : \{\}\), solanaDown \}\);/);
 });

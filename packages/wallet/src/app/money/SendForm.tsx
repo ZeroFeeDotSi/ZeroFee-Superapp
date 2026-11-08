@@ -29,7 +29,8 @@ import { restStaysLine, coinShown, partShown, heldWords, overLine, overMax, priv
 import { lookupDelayMs } from "./send-lookup.ts";
 import { SEND_ROWS, type SendRowChain } from "./send-rows.ts";
 import { rentLine, sendable } from "./send-sources.ts";
-import { TOP_UP_PRIVATE, fillShutLine, onePart, withKept } from "./send-cap.ts";
+import { TOP_UP_PRIVATE, fillShutLine, fillStepLine, onePart, withKept } from "./send-cap.ts";
+import { restsProps } from "../services.ts";
 import "./send.css";
 
 /** One place a Send can come from: a wallet (its own coin on its chain) or a coin in the Safe. `max`: what it can send. */
@@ -95,7 +96,7 @@ const withChecks = (f: (c: Checks) => void) => (checks ? f(checks) : void loadCh
 const STEPS = 1000;
 const dollarsOf = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function SendForm({ prefill, typed: filled, sources, reading = false, history, busy, waits, notYet = null, blocked = null, said = null, again = null, onEdit, onSend, onWho, onScan, onLink, onAddMoney, onMove, fillShut, onSwap, onBack, feeOf, start = null, ownWallets, pickCoin = 0 }: {
+export function SendForm({ prefill, typed: filled, sources, reading = false, history, busy, waits, topSaid = false, offline = false, notYet = null, blocked = null, said = null, again = null, onEdit, onSend, onWho, onScan, onLink, onAddMoney, onMove, fillShut, onSwap, onBack, feeOf, start = null, ownWallets, pickCoin = 0 }: {
   prefill: Prefill | null;
   sources: SendSource[];
   /** The wallets or the Safe haven't answered yet: no source is "reading", never "Nothing to send yet"; "failed": the
@@ -106,6 +107,11 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
   busy: boolean;
   /** The sheet's own reason the Send can't go now (a service down on two sources, offline): the sheet says it in its line, over this form, and Hold is off. */
   waits: string | null;
+  /** Audit 13's D4: the sheet said `waits` on top (its Problem), so the floor doesn't say it again; Send stays off. */
+  topSaid?: boolean;
+  /** Offline (QA 16 on audit 12's C1 shot): the sheet's top says so once; the keypad and Send rest, dimmed, and no line
+   *  under them repeats it. */
+  offline?: boolean;
   /** Why Hold isn't on yet while the sheet itself gets ready (its safety check still loading, or failed): said under Hold. */
   notYet?: string | null;
   /** The guard's block for who To reads as, known before any tap (judge, when To is read): said in the line above Send
@@ -343,16 +349,22 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
     : notYet ? notYet
     // the guard's block, known when To is read (row 1): before any tap, Send off until To changes
     : blocked ? blockedLine(blocked, source.place)
-    : waits ? waits
+    : waits ? (topSaid ? null : waits)
     : amountNo ? amountNo
     : over ? overLine(source.place, most, Number(max) > 0)
-    : !who ? (line ? null : "Paste an address or a name.")
+    // QA 16's SHOULD (b8's): while To is empty its placeholder already asks ("Name or address"), so nothing more is
+    // said; typed or pasted but not taken, it still says so
+    : !who ? (line || !text.trim() ? null : "Paste an address or a name.")
     : lookalike ? LOOKALIKE_LINE
     : !network ? "Pick the network first."
     : exact ? (usd !== null && usd > RELAY_SEND_MAX_USD ? RELAY_LIMIT_LINE : null)
     : !(coinAmount! > 0) ? "Pick how much."
     : usd !== null && usd > RELAY_SEND_MAX_USD ? RELAY_LIMIT_LINE
     : null;
+  // D14 (QA, 8 Nov, f03-relay-send): while the sheet can't go (offline, or a service it needs is down: ZeroFee's server,
+  // NEAR Intents, NEAR Confidential), the keypad and the $5/$25/$50/Max chips rest as builder 13's offline keypad does:
+  // inert and dimmed; never a live keypad under "this can't go now"
+  const rests = offline || !!waits;
   const ready = !!source && !!who && !!network && !why && !waits && !busy && (!!exact || Number(amount) > 0);
   // one figure for the flow (test, MUST 1: "$6.85" over "Send $6.86"): the keypad's dollars and the button's are the
   // same cent figure (core cents.ts), the typed one when there is one, else the worked one rounded once
@@ -414,6 +426,8 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
   // QA 16 (7 Nov): by the one figure (`can`, maxSend's), the round sum's gap a part of its own, so the parts add up
   const restNow = source.privateOnly ? null : restStaysLine({ ...source, max: can, rest: withKept(source.rest, readyUsd(max, perCoin), readyNow) });
   const part = source.part && readyNow !== null ? onePart(source.part, dollarsOf(readyNow)) : source.part;
+  // the audit's S9 (7 Nov): the Safe's fill said before the tap, with its two figures, as the Face ID sheet will say them
+  const fillStep = exact || over ? null : fillStepLine({ place: source.place, row: source.row ?? null, ...(source.privateOnly ? { privateOnly: true } : {}), coins: atMax ? Number(can) : Number(amount), pocket: Number(source.pocket ?? 0) || 0, per: perCoin });
   return (
     <div className="wl-send2">
       {/* a16 (Sim re-walk, 5 Nov): the sheet is a column: the card, the amount, the chips, the one sub-line and the keypad
@@ -427,7 +441,7 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
         <button type="button" className="wl-pick zf-press" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid="send-from" disabled={busy}>
           <CoinIcon symbol={source.symbol} icon={source.icon} size={22} />
           {/* "From your SOL wallet": the row reads as one phrase, its coin in the line under it; the list keeps the full
-              words ("SOL · your SOL wallet"). Never cut: "ETH (RH) · your ETH (RH) …" was. */}
+              words ("SOL · your SOL wallet"). Never cut: "Robinhood · your Robinhood …" was. */}
           <b>{source.place}</b>
           <span className="zf-small">{heldNow(source)}</span>
           <svg className="wl-pick__chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" /></svg>
@@ -488,7 +502,7 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
           <div className="wl-chips" ref={netsRow}>
             {networks.map((n) => (
               <button key={n} type="button" role="radio" aria-checked={n === network} className={`wl-chip zf-press${n === network ? " on" : ""}`} onClick={() => setPicked(n)} disabled={busy}>
-                {n === "hood" ? "ETH (RH)" : LANDS_AS[n].network}
+                {n === "hood" ? "Robinhood" : LANDS_AS[n].network}
               </button>
             ))}
           </div>
@@ -499,11 +513,11 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
       <div className="wl-send2__amount" ref={amountBox}>
         <label className="wl-send2__money">
           {(perCoin !== null || exact) && <span aria-hidden="true">$</span>}
-          <input inputMode="none" autoComplete="off" placeholder="0" value={shown} onChange={(e) => paste(e.target.value)} aria-label={perCoin !== null ? "Amount in dollars" : `Amount in ${source.symbol}`} data-testid="send-amount" disabled={busy} />
+          <input inputMode="none" autoComplete="off" placeholder="0" value={shown} onChange={(e) => paste(e.target.value)} aria-label={perCoin !== null ? "Amount in dollars" : `Amount in ${source.symbol}`} data-testid="send-amount" disabled={busy || rests} />
         </label>
         {/* the grade's Send (the design review §4.5, the Buy pattern): chips, then the keypad; no range slider. Max is
             what the coin can send, never more (slide(STEPS), as the slider's top was) */}
-        <div className="wl-send2__chips" role="group" aria-label="How much of it">
+        <div className="wl-send2__chips" role="group" aria-label="How much of it" {...restsProps(rests)} data-testid="send-chips">
           {perCoin !== null && !exact && ["5", "25", "50"].map((d) => { const off = readyNow !== null && Number(d) > readyNow; return <button key={d} type="button" className={`zf-chip${off ? " is-off" : ""}`} aria-disabled={off || undefined} onClick={() => { setPreset(true); type(d); }} disabled={busy}>{`$${d}`}</button>; })}
           <button type="button" className="zf-chip" onClick={() => { setPreset(true); slide(STEPS); }} data-testid="send-max" disabled={busy || !(Number(max) > 0)}>Max</button>
         </div>
@@ -521,11 +535,12 @@ export function SendForm({ prefill, typed: filled, sources, reading = false, his
       <div className="wl-send2__floor">
       {/* J3-2 (the copy review's walk, MUST: ". 0 ⌫" sat under the fade): the keypad is pinned with its button, on the floor, never
           under the fade; the form above it scrolls (.wl-send2__scroll), the floor's fade over the form's tail only */}
-      {!exact && <Keypad value={padBase(shown || "0", preset)} decimals={perCoin !== null && !stable ? 2 : places} onChange={(v) => { setPreset(false); type(v === "0" ? "" : v); }} />}
+      {!exact && <div {...restsProps(rests)} data-testid="send-pad"><Keypad value={padBase(shown || "0", preset)} decimals={perCoin !== null && !stable ? 2 : places} onChange={(v) => { setPreset(false); type(v === "0" ? "" : v); }} /></div>}
       {/* the fee lines (what stays, the quote) sit on the floor over the button, with its line */}
       {rent && <p className="zf-small" data-testid="send-rent">{rent}</p>}
+      {fillStep && <p className="zf-small" data-testid="send-fill-step">{fillStep}</p>}
       {feeNow?.high && <p className="zf-small" role="status" data-testid="send-fee-high">{feeNow.high}</p>}
-      {floor.line === "said" ? <SheetLine text={said} /> : floor.line === "why" && <p className="zf-small wl-send2__why" role="status" data-testid="send-why">{why}</p>}
+      {offline ? null : floor.line === "said" ? <SheetLine text={said} /> : floor.line === "why" && <p className="zf-small wl-send2__why" role="status" data-testid="send-why">{why}</p>}
       {/* the fee block, right above the button (the copy review, 6 Nov): both of Send's routes go through NEAR Intents (SendSheet's two calls) */}
       <div className="zf-fee">
         {feeNow && <p className="zf-small" data-testid="send-fee">{feeNow.fees}</p>}

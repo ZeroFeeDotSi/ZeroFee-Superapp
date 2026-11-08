@@ -30,7 +30,7 @@ const DAY = 86_400_000;
 /** The core's answer to subwallet.add.quote for a request of $20. */
 const quote = (o: Record<string, unknown> = {}) => ({ key: "add-sol-wallet-0123456789", chain: "sol", to: "wallet", depositAddress: SOL_ADDR, tokenId: SOL.assetId, symbol: "SOL", decimals: 9, amountIn: "133333330", minAmountIn: "131999996", untilIso: new Date(NOW + DAY).toISOString(), etaSeconds: 20, usd: "20.00", ...o });
 
-test("D123: they pay in a chain's own coin only, SOL and ETH (RH) now: no USDC, no USDT, no Plain (control: the old token list has them)", () => {
+test("D123: they pay in a chain's own coin only, SOL and Robinhood now: no USDC, no USDT, no Plain (control: the old token list has them)", () => {
   assert.deepEqual(requestRows().map((r) => `${r.chain}:${r.symbol}`), ["sol:SOL", "hood:ETH"]);
   assert.deepEqual(requestRows({ sol: true, hood: true, near: true, bsc: true }).map((r) => r.chain), ["sol", "hood", "near", "bsc"], "control: NEAR and BNB join with their switch");
   assert.ok(ALL.some((t) => t.symbol === "USDC"), "control: the coin list carries USDC");

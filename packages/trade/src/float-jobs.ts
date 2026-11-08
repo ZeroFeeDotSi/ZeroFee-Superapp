@@ -130,7 +130,7 @@ export const STOPPED_BEFORE_D102 = `Stopped before it went · it's in your NEAR 
 const CHAIN_NAME: Record<string, string> = { sol: "Solana", hood: "Robinhood Chain", bsc: "BNB Chain" };
 /** A move in's end, in the take-out's line: one that never left its wallet just didn't go. */
 const goneWhy = (r: string) => (/^didn't go\b/i.test(r) ? `d${r.slice(1)}` : `didn't come back (${r})`);
-const WALLET_NAME: Record<string, string> = { sol: "SOL wallet", hood: "ETH (RH) wallet", bsc: "BNB wallet" };
+const WALLET_NAME: Record<string, string> = { sol: "SOL wallet", hood: "Robinhood wallet", bsc: "BNB wallet" };
 /** The core's floor for one move (subwallet.float.limits minUsd): a move sized under it isn't asked. */
 const MIN_ASK_USD = 2;
 /** The core's key format for float moves (Security, c068769). */

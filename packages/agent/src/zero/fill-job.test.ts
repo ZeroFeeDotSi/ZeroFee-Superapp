@@ -50,7 +50,7 @@ test("the funding page's Add on a real account is the real fill, a job at the ta
   assert.match(app, /data-agentzero-fill=\{String\(Math\.round\(choice \* 1e6\)\)\} onClick=\{\(e\) => void fillOwn\(choice, e\.nativeEvent\)\}>\{ADD_BUTTON\}/);
   // one funding receipt for both paths (main's az-fund-made sheet): the fill says its own source, the NEAR wallet
   assert.match(app, /const f = fillFundJob\(usd\);\n\s*const end = await fillJob\(\{ bridge, tasks, usd, tap, key: [^\n]*made: \(\) => \{ setSheet\(null\); setFunded\(\{ \.\.\.f\.said, startAt: Date\.now\(\), endsAt: Date\.now\(\) \+ f\.job\.etaSec \* 1000 \}\); \} \}\);/);
-  assert.match(app, /data-testid="az-fund-made"[^]*?\{JOB_WORDS\.created\}[^]*?data-testid="az-fund-from">\{funded\.from\}/);
+  assert.match(app, /data-testid="az-fund-made"[^]*?\{funded\.landedAt !== undefined && !funded\.slow \? JOB_WORDS\.landed : JOB_WORDS\.created\}[^]*?data-testid="az-fund-from">\{funded\.from\}/);
   assert.doesNotMatch(app, /kind: "filled"|ag-fill-made/, "control: no second receipt sheet");
   const { fillFundJob, FILL_FROM } = await import("../app/fund-words.ts");
   assert.deepEqual(fillFundJob(10), { job: { title: "Add $10.00 to AgentZero's wallet", usd: "$10.00", etaSec: LEG_SEC.nearToSafe }, said: { amount: "$10.00", from: FILL_FROM } });

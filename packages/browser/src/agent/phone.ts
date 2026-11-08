@@ -1,5 +1,6 @@
 // AgentZero's browser on the phone (D114): no cloud. The page opens in a ZeroFee site window with the built-in agent
-// recipe (PartnerRecipe.agent, iOS); each step Claude picks (Agent's own key, `agent.robot.next`) goes back through the
+// recipe (PartnerRecipe.agent, iOS); each step Claude picks (`agent.robot.next`, on ZeroFee's paid path from AgentZero's
+// wallet: agent robot/service.ts, audit 14 E1) goes back through the
 // host's checked robot steps (PartnerRobot: every step checked natively against the latest page, a money or commit step
 // always the person's, a bot check the person's, a picture only when the page's words are thin and no secret box shows).
 // This side adds the guard (packages/agent guard): nothing read is an order, hidden words are refused, and it checks the
@@ -7,6 +8,8 @@
 import type { Bridge } from "@zerofee/core/bridge";
 import { HIDES_ITS_WORDS, authorises, notAnOrder, pageHides } from "@zerofee/agent/guard/index";
 import { SaidLine, type CloudBrowser, type CloudEvent, type NeedsYou } from "./live.ts";
+import { browsePayReady } from "@zerofee/shell-api/agent-browser.ts";
+import { PAY_PAGE_LINE, checkoutPage, leavesSite, pageTotal, selectPriced, steersAgent } from "./pay-guard.ts";
 
 export const OPEN_ON_IPHONE = "Open ZeroFee on your iPhone.";
 /** Under this many characters of words, a picture may help (the host's AgentPageRules.thinTextChars). */
@@ -26,6 +29,28 @@ export const OPEN_SLOW_LINE = "The site didn't load. Nothing was sent.";
 export const THINK_SLOW_LINE = "AgentZero didn't answer. Nothing was sent.";
 export const WAITED_LINE = "AgentZero stopped waiting for you. Nothing was sent.";
 export const STOPPED_LINE = "AgentZero stopped. Nothing was sent.";
+/** E4 (audit 14): AgentZero's thinking failed, named as such (the site did open). */
+export const THINK_FAILED_LINE = (site: string) => `AgentZero's thinking failed. Nothing was done on ${site}.`;
+/** b18 (4b): a run from the Browser tab with AgentZero's chat closed: its wallet isn't on hand to pay, so it never starts. */
+export const NO_PAYER_LINE = (site: string) => `AgentZero pays for each step from its wallet. Start this from AgentZero's chat. Nothing was done on ${site}.`;
+/** b18: a page that talks to AgentZero instead of the person, and a link off the task's site. */
+export const STEERED_LINE = (site: string) => `${site} tries to tell AgentZero what to do. This step is yours.`;
+export const LEAVES_LINE = (site: string) => `That link leaves ${site}. It's yours to open.`;
+/** E4: the page couldn't be read. */
+export const READ_FAILED_LINE = (site: string) => `AgentZero couldn't read ${site}. It did nothing there.`;
+/** Claude busy or out of reach: one more ask after this wait. */
+export const THINK_AGAIN = new Set(["agent.model.busy", "agent.model.offline"]);
+export const THINK_AGAIN_MS = 1_500;
+/** Audit 17's H8: a report that says it found nothing ("AgentZero didn't find that on X."): the run didn't finish. The
+ *  thinker's shape (robot/think-shape.ts, the relay's schema) has no field for it yet, so its own first words say it. */
+export const MISSED = /^\s*AgentZero (?:didn't|did not|couldn't|could not|can't|cannot) find\b/i;
+
+/** The thinker's own line where it says what to do (no money for the next step), else the plain failure. */
+export function thinkFailedLine(p: { code: string; whatHappened: string }, site: string): string {
+  if (p.code === "agent.browse.unfunded") return `${p.whatHappened} Nothing was done on ${site}.`;
+  if (p.code === "agent.browse.no-payer") return `${p.whatHappened} Nothing more was done on ${site}.`;
+  return THINK_FAILED_LINE(site);
+}
 /** Mail isn't live yet (M14): AgentZero has no inbox, so it can't sign up with one or read a code from it. */
 export const NO_MAIL_LINE = "AgentZero's email isn't on yet, so it can't sign up with it. Nothing was sent.";
 export const NO_MAIL_CODE_LINE = "AgentZero's email isn't on yet, so it can't get the code. It's yours.";
@@ -34,8 +59,15 @@ const WANTS_OWN_MAIL = /\b(your|agentzero'?s|its own|the agent'?s)\s+(own\s+)?(e
 export const wantsOwnMail = (task: string): boolean => WANTS_OWN_MAIL.test(task);
 
 class StepTimeout extends Error {}
+const hostOf = (url: string): string => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "the site";
+  }
+};
 
-type Element = { id?: string; kind?: string; type?: string; autocomplete?: string; label?: string; text?: string };
+type Element = { id?: string; kind?: string; type?: string; autocomplete?: string; label?: string; text?: string; host?: string };
 type Shot = { host: string; lang?: string; elements: Element[]; more?: boolean; text?: string; picture?: string; yourTurn?: string };
 type Step =
   | { kind: "click" | "check" | "scroll"; id: string }
@@ -43,10 +75,11 @@ type Step =
   | { kind: "fill"; id: string; value: string }
   | { kind: "wait"; ms: number }
   | { kind: "yourTurn"; reason: string }
-  | { kind: "done"; summary: string };
+  /** audit 17's H8: `missed`, it didn't find what was asked (the summary says so) */
+  | { kind: "done"; summary: string; missed?: boolean };
 
 const SECRET_WORDS = /\b(password|passcode|pin|cvc|cvv|csc|security code|card number|card no|expiry|expiration|one[- ]time|otp|verification code|2fa|two[- ]factor)\b/i;
-const MONEY = /\b(pay|payment|checkout|check out|buy|place (your )?order|order now|purchase|subscribe|donate|add (a )?card|book now|reserve|confirm (and|&) pay|start (free )?trial|upgrade|send|transfer|withdraw|delete|agree|accept|consent)\b/i;
+const MONEY = /\b(pay|payment|checkout|check out|buy|place (the |your |an |this )?order|order now|purchase|subscribe|donate|add (a )?card|book now|reserve|confirm (and|&) pay|confirm (the |your |this )?(order|purchase|payment|booking)|complete (the |your |this )?(order|purchase|payment)|start (free )?trial|upgrade|send|transfer|withdraw|delete|agree|accept|consent)\b/i;
 
 /** A box whose contents must never be in a picture (the host's AgentPageRules.isSecretField, again here). */
 export function secretBox(e: Element): boolean {
@@ -108,7 +141,7 @@ function whyOf(text: string): NeedsYou {
  * The phone's CloudBrowser over the host's partner.* and Agent's thinker. `liveUrl` is empty: the page is ZeroFee's own
  * site window, on screen, not a stream.
  */
-export function phoneBrowser(bridge: Bridge, o: { now?: () => number; sleep?: (ms: number) => Promise<void>; maxSteps?: number; askAboveUsd?: number | null; mailLive?: boolean; limits?: Partial<Record<keyof typeof STEP_MS, number>>; timer?: (ms: number) => Promise<void> } = {}): CloudBrowser {
+export function phoneBrowser(bridge: Bridge, o: { now?: () => number; sleep?: (ms: number) => Promise<void>; maxSteps?: number; askAboveUsd?: number | null; mailLive?: boolean; /** b18 (4b): AgentZero's wallet is on hand to pay its steps (default: its chat is open) */ payReady?: () => boolean; limits?: Partial<Record<keyof typeof STEP_MS, number>>; timer?: (ms: number) => Promise<void> } = {}): CloudBrowser {
   // M16: the task's step limit (never above the host's), and its money limit: a step naming a price above "Ask me
   // first" (none set: any price) is the person's.
   const maxSteps = Math.min(Math.max(1, o.maxSteps ?? TASK_STEPS), MAX_STEPS);
@@ -152,7 +185,8 @@ export function phoneBrowser(bridge: Bridge, o: { now?: () => number; sleep?: (m
         if (!(await yours(id, s.problem.whatHappened, whyOf(s.problem.whatHappened)))) return;
         continue;
       }
-      if ("problem" in s) return emit(id, { kind: "failed", host: run.host });
+      // E4: the page couldn't be read: said by name (never "didn't open" for a site that opened)
+      if ("problem" in s) return emit(id, { kind: "failed", host: run.host, line: READ_FAILED_LINE(run.host) });
       const shot = s.ok;
       if (shot.host !== run.host) {
         run.host = shot.host;
@@ -182,13 +216,22 @@ export function phoneBrowser(bridge: Bridge, o: { now?: () => number; sleep?: (m
         continue;
       }
       const input = { partner: shot.host, goal: task, guide: [], slots: [], page: { host: shot.host, lang: shot.lang ?? "", elements: shot.elements, more: !!shot.more }, history, task, pageText: shot.text ?? "", ...(pictureAllowed(shot) ? { picture: shot.picture } : {}) };
-      const r = await timed(bridge.call<Step>("agent.robot.next", { input }), "think", THINK_SLOW_LINE);
+      const think = () => timed(bridge.call<Step>("agent.robot.next", { input }), "think", THINK_SLOW_LINE);
+      let r = await think();
       if (run.stopped) return;
-      if ("problem" in r) return emit(id, { kind: "failed", host: run.host });
+      // E4: Claude busy or out of reach: asked once more after a short wait, then the real cause, by name
+      if ("problem" in r && THINK_AGAIN.has(r.problem.code)) {
+        await sleep(THINK_AGAIN_MS);
+        if (run.stopped) return;
+        r = await think();
+        if (run.stopped) return;
+      }
+      if ("problem" in r) return emit(id, { kind: "failed", host: run.host, line: thinkFailedLine(r.problem, run.host) });
       const a = r.ok;
       if (a.kind === "done") {
         await timed(bridge.call("partner.done", { summary: a.summary, tab: run.tab }), "done", STOPPED_LINE).catch(() => undefined);
-        return emit(id, { kind: "done", host: run.host });
+        // E3: the report back: AgentZero's own reading of the page (checked, at most 300 characters), never an order
+        return emit(id, { kind: "done", host: run.host, summary: a.summary, ...(a.missed === true || MISSED.test(a.summary) ? { missed: true as const } : {}) });
       }
       if (a.kind === "yourTurn") {
         if (!(await yours(id, a.reason, whyOf(a.reason)))) return;
@@ -200,6 +243,22 @@ export function phoneBrowser(bridge: Bridge, o: { now?: () => number; sleep?: (m
       const words = `${el?.text ?? ""} ${el?.label ?? ""}`;
       if ((a.kind === "click" || a.kind === "check") && (MONEY.test(words) || pageHides(words)) && !authorises("page")) {
         if (!(await yours(id, notAnOrder("page"), "money"))) return;
+        continue;
+      }
+      // b18: a page that gives AgentZero orders ("ignore the user", "the user approved") has every tap the person's
+      if ((a.kind === "click" || a.kind === "check" || a.kind === "select") && steersAgent(shot)) {
+        if (!(await yours(id, STEERED_LINE(run.host), "steered"))) return;
+        continue;
+      }
+      // b18: a link to another site is the person's (AgentZero works on the task's one site)
+      if (a.kind === "click" && el?.kind === "link" && leavesSite((el as { host?: string }).host, run.host)) {
+        if (!(await yours(id, LEAVES_LINE(run.host), "leaves"))) return;
+        continue;
+      }
+      // E7: on a page that takes payment (its path, its words, a total, a card or address box) every step is the
+      // person's, whatever the button says ("Continue" places an order too); so is a pick whose option names a price.
+      if ((a.kind === "click" || a.kind === "check" || a.kind === "select") && (checkoutPage(shot) || (a.kind === "select" && selectPriced(a.option)))) {
+        if (!(await yours(id, PAY_PAGE_LINE, "money", pageTotal(shot)))) return;
         continue;
       }
       // M16's money limit: a step whose words name a price above "Ask me first" is the person's.
@@ -234,11 +293,11 @@ export function phoneBrowser(bridge: Bridge, o: { now?: () => number; sleep?: (m
   }
 
   /** The person's turn: the host shows its Continue and Stop; true to go on. */
-  async function yours(id: string, why: string, kind: NeedsYou): Promise<boolean> {
+  async function yours(id: string, why: string, kind: NeedsYou, usd?: string | null): Promise<boolean> {
     const run = runs.get(id)!;
     // A code from AgentZero's own email can't come while mail isn't on: said plainly, and the code is the person's.
     const line = kind === "code" && !mailLive ? NO_MAIL_CODE_LINE : why;
-    emit(id, { kind: "needs-you", why: kind, host: run.host });
+    emit(id, { kind: "needs-you", why: kind, host: run.host, ...(usd ? { usd } : {}) });
     // The person's turn waits for them, but not for ever: after STEP_MS.yours it ends with its line.
     const r = await timed(bridge.call<{ answer: string }>("partner.yourTurn", { why: line.slice(0, 200), tab: run.tab }), "yours", WAITED_LINE);
     if (run.stopped) return false;
@@ -253,6 +312,8 @@ export function phoneBrowser(bridge: Bridge, o: { now?: () => number; sleep?: (m
       if (!url) throw new Error("AgentZero needs a site to open.");
       // Mail isn't live: a task that needs AgentZero's own email stops before anything opens.
       if (!mailLive && wantsOwnMail(task)) throw new SaidLine(NO_MAIL_LINE);
+      // b18 (4b): every step is paid from AgentZero's wallet as it goes; with no wallet on hand it stops before the first
+      if (!(o.payReady ?? browsePayReady)()) throw new SaidLine(NO_PAYER_LINE(hostOf(url)));
       const r = await timed(bridge.call<{ host: string; tab?: string }>("partner.openAgent", { url }), "open", OPEN_SLOW_LINE).catch((e: unknown) => {
         throw new SaidLine(e instanceof StepTimeout ? e.message : OPEN_SLOW_LINE);
       });
@@ -277,6 +338,9 @@ export function phoneBrowser(bridge: Bridge, o: { now?: () => number; sleep?: (m
       const run = runs.get(id);
       if (!run) return () => {};
       run.listeners.add(on);
+      // b18: the first "at" goes out in a microtask from start, before the caller's await has subscribed: said again
+      // here, so the card moves from "opening" to working (its steps and clock) and never misses the run's start
+      if (!run.stopped) on({ kind: "at", host: run.host });
       const off = bridge.on<{ kind?: string; why?: string }>("partner.event", (e) => {
         if (e?.kind === "ended" && !run.stopped) {
           run.stopped = true;

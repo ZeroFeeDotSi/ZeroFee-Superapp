@@ -27,20 +27,24 @@ test("MUST 3: Private's one figure is the rows Home's Safe counts; Move and a si
   assert.equal(privateFigure({ ...POCKET, ready: false }), null, "control: not set up on this phone");
   // Move's Private row and a site's From line take it from there, never a sum of their own
   const move = read("./screens/MoveSheet.tsx");
-  assert.match(move, /const privUsd = useMemo\(\(\) => \{ const f = privateFigure\(pocket\); return f === null \? undefined : Number\(f\); \}, \[pocket\]\);/);
+  // the audit's S2 (8 Nov, b8): privateWhole, privateFigure's rule plus the old wallets' part (Home's Private figure)
+  assert.match(move, /const privParts = useMemo\(\(\) => privateWhole\(pocket\), \[pocket\]\);/);
+  assert.match(read("./format.ts"), /const own = privateFigure\(pocket\);\n  if \(own === null\) return null;/);
   assert.doesNotMatch(move, /privRows\.reduce\(\(n, r\) => n \+ \(Number\(r\.usd\)/, "control: Move's own sum is gone");
   const site = read("./money/SiteMoney.tsx");
   assert.match(site, /privateFrom\(privateFigure\(pocket\), privUsd\)/);
   assert.match(site, /fromLine\(ROUTE_WORDS\.fromPrivate, fromPriv\.usd\)/);
+  // audit 15 FB2: when Private holds more than its USDC, the one figure is the part that pays, said once
+  assert.match(site, /`From \$\{ROUTE_WORDS\.fromPrivate\} · \$\{dollars\(fromPriv\.usd!\)\} \$\{ROUTE_WORDS\.inUsdc\}`/);
   assert.doesNotMatch(site, /fromLine\(ROUTE_WORDS\.fromPrivate, String\(privUsd\)\)/, "control: never its USDC as Private's \"available\"");
-  assert.match(site, /\{fromPriv\?\.part && <p className="zf-small wl-sheet-meta" data-testid="site-add-part">\{fromPriv\.part\}<\/p>\}/);
+  assert.doesNotMatch(site, /site-add-part/, "audit 15 FB2: no second figure under the from line");
 });
 
-test("MUST 3: a site's Add says Private's figure, and the USDC that pays it in its own line (controls: all USDC, unread)", () => {
+test("MUST 3 + audit 15 FB2: a site's Add says the USDC that pays it, once, in its from line (controls: all USDC, unread)", () => {
   const usdc = privateUsdcOf(POCKET);
   assert.equal(usdc, 25);
-  assert.deepEqual(privateFrom(privateFigure(POCKET), usdc), { usd: "33.86", part: "Only the $25.00 in USDC can pay this." });
-  assert.equal(ROUTE_WORDS.usdcPart("$25.00"), "Only the $25.00 in USDC can pay this.");
+  assert.deepEqual(privateFrom(privateFigure(POCKET), usdc), { usd: "25.00", usdc: true });
+  assert.equal(ROUTE_WORDS.inUsdc, "in USDC");
   const all = { ...POCKET, rows: [row("USDC", "25", "25", "private")] };
   assert.deepEqual(privateFrom(privateFigure(all), privateUsdcOf(all)), { usd: "25.00" }, "control: all of it is USDC, no line");
   assert.deepEqual(privateFrom(null, null), { usd: null }, "control: unread, \"…\"");

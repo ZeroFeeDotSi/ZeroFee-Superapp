@@ -58,7 +58,7 @@ test("QA 16's guards (7 Nov): one quote in flight per coin; a touch that became 
 test("the chip warms its quote on pointerdown and focus, forgets it on pointercancel, and the tap takes it", () => {
   assert.match(src, /onPointerDown=\{warm\} onFocus=\{warm\} onPointerCancel=\{cancel\}/);
   assert.match(src, /const cancel = \(\) => chipQuotes\.drop\(key\);/);
-  assert.match(src, /const p = await chipQuotes\.take\(key, quoteNow\);/);
+  assert.match(src, /const p = await chipQuotes\.take\(key, \(\) => quoteNow\(quick\)\);/);
   assert.doesNotMatch(src, /await svc\.quote\("buy", r\.chain, r\.address, \{ usd: quick \}\);\n\s+await p\.ready\(\);/, "never quoted and built after the tap any more");
 });
 

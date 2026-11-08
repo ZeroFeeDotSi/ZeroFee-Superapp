@@ -54,7 +54,7 @@ const prompts = (FLOWS ? suite.flows : suite.prompts).filter((p) => !ONLY.length
 /** Words banned on AgentZero's screens (3 Nov): old place names, a fault line, raw table words. */
 const BANNED = [
   ["price server", /price server/i],
-  ["ETH on RH (say ETH (RH))", /\bETH on RH\b/i],
+  ["ETH on RH (say Robinhood)", /\bETH on RH\b/i],
   ["Hidden / Trading / Spending as a place", /(?<![.!?:]\s|^|\n|\n-\s|•\s)\b(Hidden|Trading|Spending)\b/],
   ["row", /\brows?\b/i],
 ];

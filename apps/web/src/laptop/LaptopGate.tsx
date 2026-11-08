@@ -5,7 +5,7 @@ import { LAPTOP_LOCK, LAPTOP_START } from "../unlock/laptop-lock-words.ts";
 import { Laptop } from "./Laptop.tsx";
 
 /** The first screen's heading (what this page is) and its next step (product decision, 5 Nov). */
-const START = { heading: LAPTOP_START.what, next: LAPTOP_START.next };
+const START = { heading: LAPTOP_START.what, next: LAPTOP_START.next, soon: LAPTOP_START.soon };
 
 /** `gate`: off on the phone (its own lock is the app's), on everywhere else. */
 export function LaptopGate({ gate = true }: { gate?: boolean }) {

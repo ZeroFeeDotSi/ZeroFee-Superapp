@@ -8,8 +8,8 @@ import { SOCIAL_TRADING, siteFigures, siteOf } from "./social-trading.ts";
 const src = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
 const w = (o: Record<string, unknown>) => ({ id: "x", role: "site", site: "pump", network: "sol", address: "a", label: "pump.fun wallet", current: true, inCap: false, keyExported: false, cashUsd: "0.00", coinsUsd: "0.00", ...o }) as never;
 
-test("the copy review's words: the entry is \"Social trading\", its line names the sites, more soon (control: never \"app\")", () => {
-  assert.deepEqual({ ...SOCIAL_TRADING }, { name: "Social trading", short: "Social", line: "pump.fun, GMGN, more soon" });
+test("the copy review's words: the entry is \"Social trading\", its line names the sites (control: never \"app\")", () => {
+  assert.deepEqual({ ...SOCIAL_TRADING }, { name: "Social trading", short: "Social", line: "pump.fun and GMGN" });
   assert.doesNotMatch(SOCIAL_TRADING.line, /\bapps?\b/i);
 });
 

@@ -158,7 +158,7 @@ export function SiteApp({ site, browser, pill, wallet, onLeave }: { site: string
       <main className="st-window-body">
         <img className="st-app-logo" src={PRESET_LOGO[site]} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 17 }} />
         {/* the design review §10 (7): in a browser, one line in the window's place */}
-        <p className="zf-body st-center">{onPhone() ? `Opening ${name}…` : `${name} opens inside the ZeroFee phone app.`}</p>
+        <p className="zf-body st-center">{onPhone() ? `Opening ${name}.` : `${name} opens inside the ZeroFee phone app.`}</p>
         {/* D87 (the web is first-class): never a dead end; the difference named. A site's page can't sign in from ours on
             the web, so it opens in a new tab, and this site's wallet (its money) stays here with Add and Take out. */}
         {!onPhone() && host && (

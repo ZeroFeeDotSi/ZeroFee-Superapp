@@ -1,6 +1,7 @@
 // D131, the Browser's Privacy screen (one row on the start page): private browsing on or off (the phone's own setting,
 // privacy.ts), the sites set to normal browsing, Clear history, Clear site data, and the plain fact that downloads are
-// off. Turning private browsing off asks once, on the phone's own alert. On the web there is no private browsing: it says so.
+// off. Turning private browsing off asks once, on the phone's own alert. With no Tor in the build (the web, the Sim, the
+// phone today) private browsing is hidden: no switch, no line (b23, end to end or hidden).
 import { useEffect, useState } from "react";
 import type { Bridge } from "@zerofee/core/bridge";
 import { PushedFrame } from "@zerofee/shell-api/AppFrame.tsx";
@@ -46,19 +47,11 @@ export function PrivacyPage({ browser, onBack }: { browser: Bridge; onBack: () =
     setLine("");
   };
   const phone = view?.kind === "phone" ? view : null;
-  // The web demo (the Sim) has no Tor: Private browsing is a sample switch, kept in this page only.
-  const [sample, setSample] = useState(false);
   return (
     <PushedFrame name={PRIVACY.row} onBack={onBack}>
       <div className="st-page sh-privacy">
-        {!simSitesOn() && view?.kind === "web" && <p className="zf-small sh-privacy-note" data-testid="privacy-web">{PRIVACY.web}</p>}
-        {!simSitesOn() && phone && !phone.built && <p className="zf-small sh-privacy-note" data-testid="privacy-not-built">{PRIVACY.notBuilt}</p>}
-        {simSitesOn() && (view?.kind === "web" || (phone && !phone.built)) && (
-          <button className="zf-row sh-privacy-switch" role="switch" aria-checked={sample} data-testid="privacy-switch-sample" onClick={() => { setSample(!sample); setLine(""); }}>
-            <span><span className="t">{PRIVACY.switchTitle}</span><span className="d">{sample ? PRIVACY.sampleOn : PRIVACY.sampleOff}</span></span>
-            <span className={`sh-toggle${sample ? " on" : ""}`} aria-hidden="true"><span /></span>
-          </button>
-        )}
+        {/* FB3 + b23 (end to end or hidden): no Tor in the build (the Sim says what the phone build has), no Private
+            browsing switch, no sites on normal browsing and no line about it; the switch only where Tor is built */}
         {phone && phone.built && (
           <button className="zf-row sh-privacy-switch" role="switch" aria-checked={phone.private} data-testid="privacy-switch" onClick={() => void change(!phone.private)}>
             <span><span className="t">{PRIVACY.switchTitle}</span><span className="d">{PRIVACY.switchLine}</span></span>
@@ -74,7 +67,7 @@ export function PrivacyPage({ browser, onBack }: { browser: Bridge; onBack: () =
             <p className="zf-small sh-privacy-note">{PRIVACY.trackersCredit}</p>
           </>
         )}
-        {phone && phone.normalSites.length > 0 && (
+        {phone && phone.built && phone.normalSites.length > 0 && (
           <>
             <div className="zf-label sh-privacy-head">{PRIVACY.normalHead}</div>
             <p className="zf-small sh-privacy-note">{PRIVACY.normalLine}</p>

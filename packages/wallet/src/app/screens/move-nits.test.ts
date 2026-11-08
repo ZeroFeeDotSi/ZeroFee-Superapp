@@ -18,7 +18,7 @@ test("Move's sliders (the Home plan §1.5): its head is where your money sits, n
     const t = typeof w === "function" ? (w as (a: string, b: string) => string)("SOL", "$2") : w;
     assert.doesNotMatch(t, /Hidden|\brow\b|Trading|ETH on Robinhood|please|!/i, t);
     // labels (a heading, a button, the grouped summary's row names) are not sentences
-    if (!["title", "head", "go", "moving", "done", "leavesFrom", "leaves", "arrivesIn", "arrives", "atLeast", "fees", "atMost", "time", "leave", "was", "who", "typed", "all"].includes(k)) assert.match(t, /[.…]$/, `a sentence ends with a full stop: ${t}`);
+    if (!["title", "head", "go", "moving", "done", "leavesFrom", "leaves", "from", "arrivesIn", "arrives", "atLeast", "fees", "atMost", "time", "leave", "was", "who", "typed", "all"].includes(k)) assert.match(t, /[.…]$/, `a sentence ends with a full stop: ${t}`);
   }
   assert.doesNotMatch(sheet, /homePots|MOVE_WORDS\.empty|Your Safe is empty/, "control: no pots line with Hidden and Trading, no empty-Safe stop");
   assert.match(sheet, /MOVE_WORDS\.nothing/, "only when nothing anywhere can move: Add money");
@@ -48,7 +48,7 @@ test("D140 (the grade of 3 Nov: the total fell by the $310 on its way): from the
 test("D137 follow-up: Move says before the tap what each wallet keeps for its fees (control: not while it runs)", () => {
   const sheet = readFileSync(new URL("./MoveSheet.tsx", import.meta.url), "utf8");
   assert.match(sheet, /const kept = keptLines\(now, legs\);/);
-  assert.match(sheet, /const foot = running \? null : footNote\(\{[^}]*\bkept\b/);
+  assert.match(sheet, /const foot = running \|\| cantGo \? null : footNote\(\{[^}]*\bkept\b/);
 });
 
 test("the copy review's Move walk (5 Nov): one note under the rows at a time, the most important first: no way back, then the fill, then hints (rounding, kept, time); controls: each lower one shows only when those above are absent, none when all are", async () => {

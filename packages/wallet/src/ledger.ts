@@ -1803,7 +1803,7 @@ export function createLedgerService(d: LedgerDeps): Bridge {
 
   // Swap in place (intents-swap.ts): its code loads with its first use, never in Home's first load.
   let swapCode: Promise<ReturnType<typeof import("./intents-swap.ts").createIntentsSwap>> | null = null;
-  const inPlace = () => (swapCode ??= import("./intents-swap.ts").then((m) => m.ledgerSwap({ chain: d.chain, catalogue, apis, relayed, bridgeFor, myAccount, now, iso, signAll, approvals, remember, trackQuote })));
+  const inPlace = () => (swapCode ??= import("./intents-swap.ts").then((m) => m.ledgerSwap({ chain: d.chain, catalogue, apis, relayed, bridgeFor, myAccount, now, iso, signAll, approvals, remember, trackQuote, throughPrivate: async (o, caller) => (await safeSends()).swapFromSafe(o, caller) })));
 
   /**
    * The Add (TRADE-FLOAT §1 S7): dollars of USDC from the main balance into the Trading balance (Trade's float). The core
@@ -1884,6 +1884,8 @@ export function createLedgerService(d: LedgerDeps): Bridge {
       caller,
       depositAddress: q.depositAddress,
       ...(Number.isInteger(q.etaSeconds) && q.etaSeconds! > 0 && q.etaSeconds! <= 3600 ? { etaSeconds: q.etaSeconds } : {}),
+      // K2 (audit 13, 8 Nov): the page's key for its job (its `job`) on the movement, so a reload before the answer finds it
+      ...(job ? { jobKey: job } : {}),
     };
     const f: Follow = { signer: accountId, to: "your NEAR wallet", next: { kind: "quote", depositAddress: q.depositAddress, sender: native ? accountId : INTENTS.account, via: relayed }, ...(signed.unsent ? { unsent: signed.unsent } : {}) };
     if (!signed.hold) return landed(movement, signed.txHash, f);

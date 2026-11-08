@@ -27,7 +27,8 @@ export const SWAP_PLACES: readonly SwapPlace[] = ["sol", "hood", "bsc", "near", 
 /** Each coin as Home names it (D124: "ETH (RH)"), its logo, and where it sits, in the Agent app's words ("your SOL wallet"). */
 export const SWAP_COIN: Record<SwapPlace, { symbol: string; label: string; icon: string; where: string }> = {
   sol: { symbol: "SOL", label: "SOL", icon: "sol", where: "your SOL wallet" },
-  hood: { symbol: "ETH", label: "ETH (RH)", icon: "hood", where: "your ETH (RH) wallet" },
+  // audit 11's B5 (8 Nov): the coin is ETH ("Swapping SOL for ETH."), its wallet the Robinhood wallet; never "Robinhood" as a coin
+  hood: { symbol: "ETH", label: "ETH", icon: "hood", where: "your Robinhood wallet" },
   bsc: { symbol: "BNB", label: "BNB", icon: "bnb", where: "your BNB wallet" },
   near: { symbol: "USDC", label: "USDC", icon: "usdc", where: "your NEAR wallet" },
   "safe-usdc": { symbol: "USDC", label: "USDC", icon: "usdc", where: "your Safe" },
@@ -236,6 +237,9 @@ export function swapSub(o: { back: string | null; arrives: string | null; part: 
   return o.part ? { id: "swap-part", text: o.part } : null;
 }
 
+/** Audit 16's G2 (8 Nov): offline, Swap says what Send and Move say (builder 13, D8), once, on top; its keypad and chips rest;
+ *  no Try again. The sheet checks again by itself: it draws again once the phone is back (useOffline, whenOnline). */
+export const SWAP_OFFLINE = "You're offline. Your money is safe. Swap works again when you're back. It checks again by itself.";
 /** The words of the sheet (a five-year-old can read them; under 12 words where a person acts). */
 export const SWAP_WORDS = {
   title: "Swap",

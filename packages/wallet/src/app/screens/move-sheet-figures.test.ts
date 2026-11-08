@@ -28,5 +28,5 @@ test("(b) Private's rise is said once, under Private, with why; controls: no ris
   assert.equal(privateGetsLine(33.86, 33.864), null);
   const sheet = readFileSync(new URL("./MoveSheet.tsx", import.meta.url), "utf8");
   assert.match(sheet, /x\.place === "private" && privGets && <p className="zf-small wl-mv-hint" data-testid="move-private-gets">\{privGets\}<\/p>/);
-  assert.match(sheet, /const privGets = running \|\| legs\.length === 0 \? null : privateGetsLine\(start\.private \?\? 0, privShown\);/);
+  assert.match(sheet, /const privGets = running \|\| cantGo \|\| legs\.length === 0 \|\| alsoSaysPrivate\(also\) \? null : privateGetsLine\(start\.private \?\? 0, privShown\);/);
 });

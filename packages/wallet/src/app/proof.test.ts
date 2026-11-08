@@ -36,7 +36,7 @@ test("1Click's status gives each leg its transactions: the chain end its own, th
   const status = { status: "SUCCESS", swapDetails: { originChainTxHashes: [], destinationChainTxHashes: [{ hash: SOL_TX, explorerUrl: "https://evil.example/tx" }] } };
   assert.deepEqual(moveProof(status, { from: "private", to: "sol", deposit: DEPOSIT }), { end: { chain: "sol", hash: SOL_TX, url: `https://solscan.io/tx/${SOL_TX}` }, deposit: DEPOSIT, privateStart: true }, "NEAR wallet → SOL wallet");
   const back = { status: "SUCCESS", swapDetails: { originChainTxHashes: [{ hash: EVM_TX, explorerUrl: "https://basescan.org/tx/" + EVM_TX }] } };
-  assert.deepEqual(moveProof(back, { from: "hood", to: "private", paid: EVM_TX }), { start: { chain: "hood", hash: EVM_TX }, privateEnd: true }, "ETH (RH) wallet → NEAR wallet: the core's own transfer, its id only");
+  assert.deepEqual(moveProof(back, { from: "hood", to: "private", paid: EVM_TX }), { start: { chain: "hood", hash: EVM_TX }, privateEnd: true }, "Robinhood wallet → NEAR wallet: the core's own transfer, its id only");
   assert.deepEqual(moveProof({ status: "PROCESSING" }, { from: "private", to: "sol" }), { privateStart: true }, "control: no hash yet: nothing made up");
   const kept = moveProof(status, { from: "private", to: "sol" });
   assert.deepEqual(moveProof({ status: "SUCCESS" }, { from: "private", to: "sol", was: kept }).end, kept.end, "an id once seen stays");

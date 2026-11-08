@@ -44,7 +44,7 @@ import { readRoutine, type RoutineTerms } from "../zero/routines.ts";
 import { NOT_OFFERED_LINE, POCKET_CHOICES, isNearName, payListRuns } from "../zero/jobs.ts";
 import { keepRuns } from "../zero/keep-read.ts";
 import type { PriceAsk, QuoteAsk, SkillHands } from "./skills.ts";
-import { ALL_WORDS, PLACE_WORD, SHOWN, moveLeast, addSheet, moveSheet, requestSheet, sendSheet, swapSheet, tradeSheet, tradeWant, type HomePlace, type HomeSheet } from "./home-ask.ts";
+import { ALL_WORDS, PLACE_WORD, SHOWN, moveLeast, addSheet, moveSheet, requestSheet, sendSheet, swapSheet, tradeSheet, tradeWant, appFound, type HomePlace, type HomeSheet } from "./home-ask.ts";
 import { maskMessages, unmaskInput, unmaskStream } from "./standins.ts";
 import { quickWord } from "./plan.ts";
 import { againPlan, askedPlan, attachSheet, coinAmountSaid, dropPlan, fit, fromSaid, pickSource, live, nextPlan, planContext, quickPlan, shareSaid, shareUsd, startPlan, wordsDone, type Balances, type Plan, type PlanMove, type TaggedSheet } from "./plan.ts";
@@ -132,10 +132,14 @@ export interface ChatHands {
   /** W7: the tool names this device offers (tools.ts webTools on the web wallet); absent: every tool. The relay is sent
    *  the same list, so the model never sees a tool that can't work here. */
   offered?: readonly string[];
+  /** The web wallet (its Send is approved with the password); unset: read from `offered` as before. */
+  web?: boolean;
 }
 
 /** W7: an ask to open a site on the web wallet (the copy review's words, pending): browse is the phone app's there. */
 export const WEB_BROWSE_LINE = "Opening sites works in the phone app, not here yet.";
+/** E2: a site ask on the phone while AgentZero's browser is off in this build. */
+export const SITES_OFF_LINE = "AgentZero can't open sites yet.";
 /** W7: the relay's refusal of a request shape it doesn't know (apps/quotes agentzero-chat.mjs, before `tools`). */
 const OLD_SHAPE_CODE = "quotes.request.refused";
 
@@ -461,7 +465,7 @@ async function swapsUpOf(hands: ChatHands): Promise<boolean | null> {
 export const PLAN_SHOWN = "ZeroFee showed the person the facts and a plan with a Start button (it starts on their Start or yes, one step at a time, each on its own sheet). Say nothing more now.";
 /** What Claude reads back when no place had enough and ZeroFee showed Add. */
 export const SHORT_SHOWN = "ZeroFee said this to the person and showed Add. Say nothing more now.";
-const PLACE_NAMES: Record<string, string> = { safe: "Your Safe", sol: "Your SOL wallet", hood: "Your ETH (RH) wallet", near: "Your NEAR wallet", bsc: "Your BNB wallet" };
+const PLACE_NAMES: Record<string, string> = { safe: "Your Safe", sol: "Your SOL wallet", hood: "Your Robinhood wallet", near: "Your NEAR wallet" };
 /** Where a sheet's money comes from (plan.ts sourceOf), for a share. */
 const sourceOfAsk = (h: HomeSheet): HomePlace | null => (h.ask.kind === "send" ? (h.ask.wallet ?? (h.ask.coin === "SOL" ? "sol" : h.ask.coin === "ETH" ? "hood" : h.ask.coin === "NEAR" || h.ask.coin === "USDC" ? "near" : null)) : h.ask.kind === "swap" ? (h.ask.wallet ?? null) : h.ask.kind === "move" ? h.ask.from : null);
 /** A read that failed once (a timeout, a chunk that didn't load) is asked once more after a moment; then its own failure. */
@@ -607,7 +611,7 @@ async function runTool(name: string, input: Record<string, unknown>, words: stri
         const find = hands.skills?.find;
         // every chain (the card filters by the chain named): a copy there is told apart from the real one elsewhere
         const found = w.address ? null : find ? await withinOr(find(w.symbol), LIMITS.read * 0.75, "Trade's market", null) : null;
-        r = tradeSheet(w, found);
+        r = tradeSheet(w, appFound(found));
       } else {
         // a share the person said ("half my SOL", "all of it"): ZeroFee works out the dollars from what's there now
         let ask = input;
@@ -628,7 +632,7 @@ async function runTool(name: string, input: Record<string, unknown>, words: stri
           if (!(usd >= 0.01)) return no(HOW_MUCH_LINE);
           const words2 = `${asked} $${usd.toFixed(2)}`;
           r = name === "send" ? sendSheet({ ...input, usd }, words2) : swapSheet({ ...input, usd }, words2);
-          if (typeof r !== "string") r = { ...r, line: r.line.replace(/^(\S+ \$[\d.]+)/, `$1 (${amount} ${coin.toUpperCase() === "ETH" ? "ETH (RH)" : coin.toUpperCase()})`) };
+          if (typeof r !== "string") r = { ...r, line: r.line.replace(/^(\S+ \$[\d.]+)/, `$1 (${amount} ${coin.toUpperCase()})`) };
         } else if ((name === "send" || name === "swap") && input.share !== undefined && input.usd === undefined) {
           const share = Number(input.share);
           if (!shareSaid(asked, share)) return no(HOW_MUCH_LINE);
@@ -895,9 +899,11 @@ export async function* chatTurn(history: ChatMessage[], words: string, o: ChatOp
   }
   // W7, the web wallet: browse isn't offered there (tools.ts WEB_ABSENT), so an ask to open a site is said in one line
   // by our own code (the copy review's words, QA's ruling), no model call and no tool
+  // E2 (audit 14), the phone with AgentZero's browser off: one plain line too, never a word about a browser
   if (!note && o.hands.offered && !o.hands.offered.includes("browse") && wantsSite(said)) {
-    yield { kind: "text", delta: WEB_BROWSE_LINE };
-    return yield { kind: "done", history: [...history, { role: "user", content: said }, { role: "assistant", content: WEB_BROWSE_LINE }] };
+    const line = (o.hands.web ?? true) ? WEB_BROWSE_LINE : SITES_OFF_LINE;
+    yield { kind: "text", delta: line };
+    return yield { kind: "done", history: [...history, { role: "user", content: said }, { role: "assistant", content: line }] };
   }
   // Mail isn't on (M14): a sign-up with AgentZero's own email is said by our own code, in the browser's own words, before
   // anything opens (phone test, 3 Nov: it opened the site, tried, then hung; 100-prompt suite email-02)
@@ -911,7 +917,7 @@ export async function* chatTurn(history: ChatMessage[], words: string, o: ChatOp
   const home = once ? sendSheet({ to: once.to, usd: once.usd }, said) : null;
   if (home && typeof home !== "string") {
     yield { kind: "needs-you", why: "home", sheet: { kind: "home", ...home } };
-    return yield { kind: "done", history: [...history, { role: "user", content: said }, { role: "assistant", content: `${home.line} ${readyLine(!!o.hands.offered)}` }] };
+    return yield { kind: "done", history: [...history, { role: "user", content: said }, { role: "assistant", content: `${home.line} ${readyLine(o.hands.web ?? !!o.hands.offered)}` }] };
   }
   // A routine moves money on its own later (or tells you): read by our own code only, as in the words box (A-2)
   const routine = once || note ? null : readRoutine(said);

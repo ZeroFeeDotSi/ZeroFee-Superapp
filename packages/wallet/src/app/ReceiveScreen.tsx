@@ -13,6 +13,7 @@ import { Receive } from "./screens/Receive.tsx";
 import { ChainSheet } from "./screens/Sheets.tsx";
 import { receiveChains } from "./money/add-coins.ts";
 import "./wallet.css";
+import { WAIT_WORDS } from "./wait-words.ts";
 
 export function ReceiveScreen({ bridge, onAskAmount, onProblem, chain: asked, title, amount, coin }: {
   bridge: Bridge;
@@ -59,7 +60,7 @@ export function ReceiveScreen({ bridge, onAskAmount, onProblem, chain: asked, ti
     void bridge.call("ledger.receiveChain", { chain: c.id });
   };
   const chain = chains.find((c) => c.id === chainId) ?? chains[0];
-  if (!chain) return <Waiting size={44} text="Reading the networks…" />;
+  if (!chain) return <Waiting size={44} text={WAIT_WORDS.networks} />;
   return (
     <>
       <Receive bridge={bridge} tokens={tokens} chain={chain} chains={chains} onChange={() => setPicking(true)} onProblem={onProblem} onAskAmount={onAskAmount} title={title} ask={amount && coin ? { amount, coin } : undefined} coin={coin} />

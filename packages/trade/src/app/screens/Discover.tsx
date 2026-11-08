@@ -21,6 +21,7 @@ import { createFeedback } from "../feedback.ts";
 import { followTurn, turnTask } from "../trade-turn.ts";
 import { rowSaid, whenBooked } from "../fill-words.ts";
 import { epochOf, tradeMs } from "../../tap-time.ts";
+import { tradeEndsAt } from "../trade-pace.ts";
 import { followRecord, recordOf, UNCONFIRMED } from "../unconfirmed-follow.ts";
 import { landedDetail, whenCosted } from "../landed-detail.ts";
 import { ROW_RECEIPT_MS, createChipQuotes, rowBuyEnd, rowBuyLanded, rowBuyLine, type RowBuy as RowBuyState } from "./row-buy.ts";
@@ -35,7 +36,8 @@ import { listPrice, pct } from "../format.ts";
 import { isNotForSale, markIfUnsellable, NOT_FOR_SALE, useNotForSale } from "../not-for-sale.ts";
 import { Gear, Search } from "../icons.tsx";
 import { readPasted } from "../paste.ts";
-import { OFFLINE_SHORT, useOnline } from "../online.ts";
+import { OFFLINE_SHORT, isOnline, useOnline } from "../online.ts";
+import { chainDown, downChip, downLabel, downRowLine, keptLine, useDownRows } from "../chain-down.ts";
 import { changeIn, moversOf } from "../movers.ts";
 import { LISTS, NOT_AN_ADDRESS, litRows, newestAcross, notAnAddress, risesIn, type Win } from "./discover-rules.ts";
 import { fromAgoText } from "../list-age.ts";
@@ -44,7 +46,7 @@ import { rowLogo } from "../../market/logo.ts";
 import "../discover.css";
 
 import { CHAIN_SHORT, rowLines, walletChip } from "../coin-words.ts";
-/** Home's words for each chain (D124): the coin, and ETH (RH) for Robinhood Chain (coin-words.ts; hood: "ETH (RH)"). */
+/** Home's words for each chain (D124): the coin, and Robinhood for Robinhood Chain (QA 16's MUST 2, 8 Nov; coin-words.ts; hood: "Robinhood"). */
 export { CHAIN_SHORT };
 /** The bundled logos, by trusted key. */
 const CHAIN_ICON: Record<ChainId, string> = { sol: "sol", hood: "hood", near: "near", bsc: "bsc" };
@@ -74,6 +76,9 @@ function useWalletUsd(): (c: ChainId) => number | undefined {
  *  marker slides under the chosen one. A wallet with no market yet shows its balance after the tabs, not as a tab. */
 function ChainTabs({ chain, onChain, onSettings, onMove }: { chain: ChainId | "all"; onChain: (c: ChainId | "all") => void; onSettings?: () => void; onMove?: () => void }) {
   const usdOf = useWalletUsd();
+  const { snap } = useFloat();
+  const { bridge } = useShell();
+  const downRows = useDownRows(bridge);
   const box = useRef<HTMLDivElement>(null);
   const [mark, setMark] = useState<{ x: number; w: number } | null>(null);
   useLayoutEffect(() => {
@@ -86,8 +91,17 @@ function ChainTabs({ chain, onChain, onSettings, onMove }: { chain: ChainId | "a
   }, [chain, usdOf("sol") === undefined, usdOf("hood") === undefined]);
   const quiet = LISTED.filter((c) => !MARKET.includes(c));
   // 53, 6 Nov, item 9: each chip names its wallet over its figure ("SOL wallet" / "$169.37"), never a bare amount
+  // audit 18 (S18-4): a chain down (the notice's rule) or a wallet that didn't answer, its chip keeps the last figure and
+  // one line under the strip says who and the figure's time, in Home's Hot words (keptLine)
+  const kept = [...MARKET, ...quiet].flatMap((c) => {
+    const view = snap.chains.find((x) => x.chain === c);
+    const down = chainDown(downRows, c);
+    if (usdOf(c) === undefined || view?.readAt === undefined || !(down || view.kept)) return [];
+    return [{ c, line: keptLine(c, down, `${c === "hood" ? "Robinhood" : CHAIN_SHORT[c]} wallet is`, view.readAt) }];
+  });
   const money = (c: ChainId) => { const w = walletChip(c, usdOf(c)); return <span className="dc-tab-two"><span className="dc-tab-name">{w.name}</span>{w.figure === null ? <span className="zf-shimmer dc-tab-sk" /> : <span className="dc-tab-usd">{w.figure}</span>}</span>; };
   return (
+    <>
     <div className="dc-top">
       <div className="dc-tabs" role="tablist" aria-label="Your wallets and their markets" ref={box}>
         <button data-chain="all" role="tab" aria-selected={chain === "all"} className={chain === "all" ? "on" : ""} onClick={() => onChain("all")}>All</button>
@@ -111,6 +125,8 @@ function ChainTabs({ chain, onChain, onSettings, onMove }: { chain: ChainId | "a
       {onMove && <button className="dc-move" aria-label="Move money between your Safe and your wallets" onClick={onMove}>Move</button>}
       {onSettings && <button className="dc-gear" aria-label="Settings" onClick={onSettings}><Gear /></button>}
     </div>
+    {kept.map((k) => <p key={k.c} className="zf-small dc-as-of" data-testid="dc-as-of">{k.line}</p>)}
+    </>
   );
 }
 
@@ -158,6 +174,10 @@ const Row = memo(function Row({ r, rise, win, showChain, refused, lit, needsLogo
   }, [buy]);
   useNotForSale();
   const noSale = refused || isNotForSale(r.chain, r.address);
+  // builder 24, item 1: on a down chain the row's second line says so ("Robinhood is down"), with no chip: "Robinhood
+  // down" was 124 pt in the chip's 76 pt slot and covered the price and change. A receipt or "Not for sale" keeps its own.
+  const downRows = useDownRows(useShell().bridge);
+  const down = chainDown(downRows, r.chain) && !buy && !noSale;
   // after every hook (the 5 Nov walk: returning before the chip's hooks crashed Trade, "Rendered fewer hooks", when a row's logo failed on New)
   if (needsLogo && logo.state === "none") return null;
   return (
@@ -170,14 +190,17 @@ const Row = memo(function Row({ r, rise, win, showChain, refused, lit, needsLogo
       // 53, 6 Nov, item 9: the worth beside the symbol, the name on its own line below, whole (2 lines at most)
       title={<span className="dc-sym">{r.symbol}{words.cap && <span className="dc-cap">{words.cap}</span>}{fresh && !buy && <span className="dc-age"><span className="zf-live" />{ageText(age!)}</span>}</span>}
       // the chain is the logo's badge, spoken as "on ETH (RH)" (webd-money2 crawl, 4 Nov: CASHCAT's row didn't say ETH (RH))
-      line={buy ? <span className="dc-sub--buy" role="status">{buy.phase === "away" && <span className="zf-live" aria-hidden="true" />}<span className="dc-sub__words">{rowBuyLine(buy, r.symbol, noSale)}</span></span>
+      // audit 11's B9 (8 Nov): a trap coin's refused row keeps its name, and its line says who and the money (row-buy.ts)
+      line={buy && noSale && buy.phase === "refused" ? <span className="dc-sub dc-sub--trap" role="status"><span className="dc-name">{words.name}</span><span className="dc-sub__words">{rowBuyLine(buy, r.symbol, noSale)}</span></span>
+        : down ? <span className="dc-sub dc-sub--down" data-testid="row-down">{downRowLine(r.chain)}</span>
+        : buy ? <span className="dc-sub--buy" role="status">{buy.phase === "away" && <span className="zf-live" aria-hidden="true" />}<span className="dc-sub__words">{rowBuyLine(buy, r.symbol, noSale)}</span></span>
         // product decision, 5 Nov (via a proxy): the line is the coin's name and worth ("Doge Pepe · $3.27M"); on All the chain is
         // the badge on the logo and the row's spoken label, never words that pushed the name to "SOL ·…" beside the chip
         : <span className="dc-sub dc-sub--name"><span className="dc-name dc-name--whole">{words.name}</span></span>}
       usd={<span className={`dc-px${tick === "up" ? " dc-glint-up" : tick === "down" ? " dc-glint-down" : ""}`}>{r.priceUsd ? listPrice(r.priceUsd) : ""}</span>}
       when={ch !== undefined ? <span className={`dc-chg ${ch > 0 ? "up" : ch < 0 ? "down" : ""}`}>{pct(ch)}</span> : undefined} />
     {/* T2-5 (the copy review's walk): a coin ZeroFee won't buy says so in mute where Buy was (not-for-sale.ts: only what is proven) */}
-    {noSale ? <span className="dc-nfs" data-testid="row-not-for-sale">{NOT_FOR_SALE}</span> : !buy && <RowBuy r={r} onState={setBuy} follow={follow} />}
+    {noSale ? <span className="dc-nfs" data-testid="row-not-for-sale">{NOT_FOR_SALE}</span> : !buy && !down && <RowBuy r={r} onState={setBuy} follow={follow} />}
     </div>
   );
 });
@@ -186,6 +209,10 @@ const Row = memo(function Row({ r, rise, win, showChain, refused, lit, needsLogo
  *  `chip:<address>` in the one-tap lock's key (a double tap is one trade; a chip beside an open sheet is another trade).
  *  It lights only under the finger. The checks are the sheet's: a chain with less than the preset ready refuses on the
  *  row before anything is asked; the core's refusal is said on the row in its own words; never a silent fail. */
+/** The chip's word offline, sized as "Buy $50" so the row's price stays whole (the Sim shot: "You're offline" covered
+ *  it); its label says the sheet button's words (buy-button.ts buttonWords), and the list's banner says the rest. */
+export const OFFLINE_CHIP = "Offline";
+export const OFFLINE_CHIP_LABEL = "You're offline";
 /** Every chip's quote, got from the touch (the audit's T3): one store for the list, so a row that re-mounts keeps its warm quote. */
 const chipQuotes = createChipQuotes<Prepared>();
 
@@ -196,18 +223,25 @@ function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: Dispatch<Se
   const { bridge, tasks } = useShell();
   const { snap } = useFloat();
   const feel = useMemo(() => createFeedback(bridge), [bridge]);
-  // Settings' Quick buy amount (quick-buy.ts): $25 unless the person picked another
+  // Settings' Quick buy amount (quick-buy.ts): $25 unless the person picked another; undefined until the store answers,
+  // and till then the chip is off and says no amount (the audit's S10: never a figure the person didn't pick)
   const quick = useQuickBuy(bridge);
+  // audit 12 C2: offline, the list's banner says nothing new moves, so the chip is off and says so (as the sheet's
+  // button does, buttonWords); one tap online stays one job
+  const online = useOnline();
+  // audit 13's D3: the row's chain down (the notice's own rule), the chip is off and says so, as offline
+  const down = chainDown(useDownRows(bridge), r.chain);
   const busy = useRef(false);
   // T3 (the audit's Trade audit, 8 Nov): the quote of the Quick buy amount, got and checked (ready(): built, the core's check of
   // its bytes) from the touch, so the tap only signs
   const key = `${r.chain}:${r.address}:${quick}`;
-  const quoteNow = async () => { const p = await svc.quote("buy", r.chain, r.address, { usd: quick }); await p.ready(); return p; };
-  const warm = () => { void chipQuotes.warm(key, quoteNow).catch(() => undefined); };
+  const quoteNow = async (usd: number) => { const p = await svc.quote("buy", r.chain, r.address, { usd }); await p.ready(); return p; };
+  const warm = () => { if (quick !== undefined) void chipQuotes.warm(key, () => quoteNow(quick)).catch(() => undefined); };
   // a touch that turned into a scroll: its quote is forgotten (one in flight per coin at most; never the next tap's)
   const cancel = () => chipQuotes.drop(key);
   const press = async (el: HTMLElement) => {
-    if (busy.current) return;
+    if (busy.current || quick === undefined) return;
+    if (!isOnline() || down) return;
     busy.current = true;
     tapBurst(el, () => feel.key());
     // inside the tap: a phone lets the fill's ting play only if its audio was woken by the touch (bug report, 5 Nov:
@@ -225,7 +259,8 @@ function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: Dispatch<Se
     const taskId = `trade-${Date.now()}`, taskAt = Date.now();
     const route = `coin:${r.chain}:${r.address}:${r.symbol}`;
     // T3: the job at the tap, before any network answer (its title is the ask)
-    tasks?.publish({ id: taskId, title: `Buy $${quick} of ${r.symbol}`, open: { route },
+    // builder 22's item 6: time left from its first frame, the chain's measured pace (trade-pace.ts), never none
+    tasks?.publish({ id: taskId, title: `Buy $${quick} of ${r.symbol}`, open: { route }, endsAt: tradeEndsAt(svc, r.chain, taskAt),
       steps: [{ label: "Sent", state: "doing", at: taskAt }, { label: "Landed", state: "waiting" }, { label: `In your ${CHAINS[r.chain].symbol} wallet`, state: "waiting" }] });
     const secs = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
     let got = "";
@@ -263,7 +298,7 @@ function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: Dispatch<Se
       });
     };
     try {
-      const p = await chipQuotes.take(key, quoteNow);
+      const p = await chipQuotes.take(key, () => quoteNow(quick));
       const q = p.quote;
       got = `${fmtAmount(q.getRaw, q.decimals)} ${r.symbol}`;
       onState({ phase: "away", at, got });
@@ -286,8 +321,9 @@ function RowBuy({ r, onState: tell, follow }: { r: CoinRow; onState: Dispatch<Se
     } finally { busy.current = false; }
   };
   return (
-    <button type="button" className="dc-qb" aria-label={`Buy $${quick} of ${r.symbol}`} onPointerDown={warm} onFocus={warm} onPointerCancel={cancel} onClick={(e) => void press(e.currentTarget)}>
-      <span className="dc-qb__pill" aria-hidden="true">Buy</span>
+    <button type="button" className="dc-qb" disabled={quick === undefined || !online || down} aria-label={!online ? OFFLINE_CHIP_LABEL : down ? downLabel(r.chain) : quick === undefined ? `Buy ${r.symbol}` : `Buy $${quick} of ${r.symbol}`} onPointerDown={warm} onFocus={warm} onPointerCancel={cancel} onClick={(e) => void press(e.currentTarget)}>
+      {/* QA 16 on the Sim shot (8 Nov): the figure one tap spends is on the chip ("Buy $5"), once Settings' amount is read */}
+      <span className="dc-qb__pill" aria-hidden="true">{!online ? OFFLINE_CHIP : down ? downChip(r.chain) : quick === undefined ? "Buy" : `Buy $${quick}`}</span>
     </button>
   );
 }

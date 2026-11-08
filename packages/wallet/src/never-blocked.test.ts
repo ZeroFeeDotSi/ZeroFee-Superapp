@@ -107,7 +107,9 @@ test("R2 + the auditor's console: Welcome's and set-up's reads never call the br
 
 test("R2 pins: each money sheet's needs, and the bridge only for another chain", () => {
   assert.deepEqual([...SHEET_NEEDS.add], [], "NEAR's own address is the account's name: nothing to wait on");
-  assert.deepEqual([...SHEET_NEEDS.send], ["near", "oneclick", "relay"], "every Send goes privately through NEAR on 1Click's quotes and settles on NEAR Intents (D128, review M3)");
+  assert.deepEqual([...SHEET_NEEDS.send], ["near", "oneclick", "relay", "confidential"], "every Send goes privately through NEAR on 1Click's quotes and settles on NEAR Intents (D128, review M3), through NEAR Confidential");
+  // every money move goes through NEAR Confidential (the hard rule, 4 Nov): its sheet says so when it is down (audit 12's rig)
+  for (const k of ["send", "swap", "move", "putaway", "siteadd", "takeout"] as const) assert.ok((SHEET_NEEDS[k] as readonly string[]).includes("confidential"), `${k} goes through NEAR Confidential`);
   for (const k of ["add", "send", "swap", "move", "putaway", "siteadd", "takeout"] as const) assert.ok(!(SHEET_NEEDS[k] as readonly string[]).includes("bridge"), `${k} never waits on the bridge`);
   for (const k of ["add", "send", "swap", "move", "putaway", "siteadd", "takeout"] as const) assert.ok(!(SHEET_NEEDS[k] as readonly string[]).includes("nearai"), `${k} never waits on NEAR AI Cloud`);
   assert.ok((SHEET_NEEDS.addOtherChain as readonly string[]).includes("bridge") && (SHEET_NEEDS.sendOtherChain as readonly string[]).includes("bridge"));
@@ -156,8 +158,9 @@ test("security review M2 + bug 8: one source alone never says down nor holds the
   assert.deepEqual(phoneOnly, { line: "NEAR didn't answer. Send may take longer.", down: false }, "the 10:13 line (one failed read) is no outage");
   // control: both sources agree, so it is down, and only then does the line say "waits" with the button held
   const both = servicesLine([{ service: "bridge", state: "down", seen: "both" }], ["near", "bridge"], "Add", false);
-  assert.deepEqual(both, { line: "NEAR Intents' bridge is down. Add waits until it's back.", down: true });
-  for (const r of [relayOnly, phoneOnly, both]) assert.equal(/waits/.test(r.line ?? ""), r.down, `the line and the button agree: ${r.line}`);
+  // (changed pin, audit 11's B4, 8 Nov: what failed, where the money is, what to do; never "waits" when nothing waits)
+  assert.deepEqual(both, { line: "NEAR Intents' bridge is down, so this can't go now. Your money stays where it is. It checks again by itself.", down: true });
+  for (const r of [relayOnly, phoneOnly, both]) assert.equal(/can't go now/.test(r.line ?? ""), r.down, `the line and the button agree: ${r.line}`);
   assert.deepEqual(servicesLine([{ service: "bridge", state: "down", seen: "both" }], ["near"], "Send", false), { line: null, down: false }, "a sheet that doesn't use it says nothing");
   assert.deepEqual(servicesLine([{ service: "near", state: "down", seen: "both" }], ["near"], "Send", true), { line: "You're offline.", down: true }, "offline: that, and no service blamed");
 });
@@ -266,7 +269,7 @@ test("review M3: NEAR is an outage (Send held, the line says waits) only when th
   // control: both say down, so Send waits and says so
   const downThere = await nearFailedBeside("down");
   assert.equal(downThere.seen, "both");
-  assert.deepEqual(servicesLine([downThere as never], SHEET_NEEDS.send, "Send", false), { line: "NEAR is down. Send waits until it's back.", down: true });
+  assert.deepEqual(servicesLine([downThere as never], SHEET_NEEDS.send, "Send", false), { line: "NEAR is down, so this can't go now. Your money stays in your Safe. It checks again by itself.", down: true });
   // rule 9a (product decision, 5 Nov): the relay's own slow (or busy) is never said; button on, the failover covers it
   assert.deepEqual(servicesLine([{ service: "near", state: "slow", seen: "relay" }], SHEET_NEEDS.send, "Send", false), { line: null, down: false });
   assert.deepEqual(servicesLine([{ service: "near", state: "busy", seen: "both" }], SHEET_NEEDS.send, "Send", false), { line: null, down: false });
@@ -300,4 +303,10 @@ test("review L7: 1Click (and the relay) are reached only through the relay, so t
   const near = await readFailedBeside("near");
   assert.equal(near.seen, "both");
   assert.equal(servicesLine([near as never], SHEET_NEEDS.send, "Send", false).down, true);
+});
+
+test("B4 (audit 11): a Send stopped by a down service says what failed, where the money is and what to do [before: \"NEAR Intents is down. Send waits until it's back.\"]", async () => {
+  const { servicesLine } = await import("./app/services.ts");
+  assert.deepEqual(servicesLine([{ service: "oneclick", state: "down", seen: "both" }], ["near", "oneclick"], "Send", false), { line: "NEAR Intents is down, so this can't go now. Your money stays in your Safe. It checks again by itself.", down: true });
+  assert.equal(servicesLine([{ service: "oneclick", state: "down", seen: "both" }], ["oneclick"], "Take out", false).line, "NEAR Intents is down, so this can't go now. Your money stays where it is. It checks again by itself.", "a Take out's money is in the site's wallet");
 });

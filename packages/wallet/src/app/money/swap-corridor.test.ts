@@ -77,11 +77,11 @@ test("a coin's figure has at most 4 decimals: what arrives rounds down, what mus
 
 test("each coin says its name and where it sits once each, in the Agent app's words: \"SOL · your SOL wallet\" (control: the old \"SOL  SOL wallet\")", () => {
   assert.equal(coinName("sol"), "SOL · your SOL wallet");
-  assert.equal(coinName("hood"), "ETH (RH) · your ETH (RH) wallet");
+  assert.equal(coinName("hood"), "ETH · your Robinhood wallet");
   assert.equal(coinName("near"), "USDC · your NEAR wallet");
   assert.equal(coinName("safe-near"), "NEAR · your Safe");
   for (const p of SWAP_PLACES) {
-    assert.match(SWAP_COIN[p].where, /^your (Safe|SOL wallet|ETH \(RH\) wallet|BNB wallet|NEAR wallet)$/, "control: the old \"SOL wallet\" fails this");
+    assert.match(SWAP_COIN[p].where, /^your (Safe|SOL wallet|Robinhood wallet|BNB wallet|NEAR wallet)$/, "control: the old \"SOL wallet\" fails this");
     assert.doesNotMatch(coinName(p), /Hidden|\brow\b|Trading|ETH on Robinhood/);
     assert.doesNotMatch(coinName(p), /^(\S+) \1 wallet/, "never the coin twice in a row");
   }
@@ -224,7 +224,7 @@ test("R3 (the design review §4.4): Swap's pickers say the coin over where it si
   assert.match(sheet, /<span className="zf-body wl-sw-name">\{SWAP_COIN\[pay\.place\]\.label\}<span className="zf-small wl-sw-where">\{payer\?\.where \?\? SWAP_COIN\[pay\.place\]\.where\}<\/span><\/span>/, "J3-3: where it sits is the real payer's");
   assert.doesNotMatch(sheet, /wl-sw-where"> · \{SWAP_COIN\[(pay\.place|get)\]|aria-hidden="true">▾</, "control: the wrapped phrase and the ▾ glyph (the list's one-line rows keep theirs)");
   assert.match(sheet, /<div className="wl-swap2__sub" data-testid="swap-sub">/, "the one slot, always rendered, so nothing jumps");
-  assert.match(sheet, /arrives: route && !block \? arrivesWith\(/);
+  assert.match(sheet, /arrives: route && !block && !rests \? arrivesWith\(/);
   assert.match(sheet, /\{who && <MoneySheet title=\{MOVE_WORDS\.who\} onClose=\{\(\) => setWho\(false\)\}><p className="zf-body wl-sheet-lead" data-testid="swap-private">\{privateLine\(route\)\}<\/p><\/MoneySheet>\}/);
   assert.doesNotMatch(sheet, /\{privateLine\(route\) && <p className="zf-small wl-sheet-lead">/, "control: the grey paragraph");
   // never a standing line; only once a press at $0 asked (a UI test, 4 Nov: $0 did nothing and said nothing)

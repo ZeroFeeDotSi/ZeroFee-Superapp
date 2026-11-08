@@ -68,6 +68,7 @@ import { termsAccepted } from "./terms-accepted.ts";
 import { chosenDelay, setChosenDelay, setupChoices, setupFinished, takeFirstChoice } from "./screens/first-run-state.ts";
 import { EXTENSION_BUILD, MAINNET, PUBLIC_BUILD, SAMPLE_LINK, SIM, WEB_MODES, WEB_WALLET, otherMode } from "./mode.ts";
 import { WEB_START, takeWebWords } from "./screens/web-words-held.ts";
+import { SETUP_WORDS } from "./screens/setup-words.ts";
 /** The web wallet's first screens (no Safe), when its words weren't chosen before the lock (a reload in between). */
 const WebStart = lazy(() => import("./screens/WebStart.tsx").then((m) => ({ default: m.WebStart })));
 /** The web wallet's account rows and their sheets (bug report, 5 Nov late): one chunk, loaded only on the web wallet, asked
@@ -270,13 +271,13 @@ export function App() {
   /** Remove another phone's key (e.g. a lost old phone). It's a signature, so the approval sheet comes up. */
   async function removeKey(account: AccountInfo, handle: string, what?: "second device") {
     // H09: a lost second device goes the same way (it waits first; the Waiting screen shows the date).
-    setView({ k: "working", text: what ? "Removing your lost second device…" : "Removing that phone…" });
+    setView({ k: "working", text: what ? SETUP_WORDS.removeLost : SETUP_WORDS.removePhone });
     await settle(account, await shellBridge.call<TxOutcome>("account.removeKey", { handle }), what ? "Removed a lost second device" : "Removed another phone's key");
   }
 
   /** Practise the backup words against the account's recovery key. Signs nothing. No words: typed on the phone's own screen. */
   async function checkWords(account: AccountInfo, words?: string[]) {
-    setView({ k: "working", text: words ? "Checking your words…" : "Your words go on ZeroFee's own screen…" });
+    setView({ k: "working", text: words ? SETUP_WORDS.checking : SETUP_WORDS.typeOnPhone });
     const res = await shellBridge.call<{ matches: boolean }>("recovery.check", words ? { words } : {});
     if ("ok" in res) return setView({ k: "checked", account, matches: res.ok.matches });
     if (res.problem.code === "security.words.stopped") return setView({ k: "home", account });
@@ -319,7 +320,7 @@ export function App() {
       // no account open here before: set-up's screens load while the title is up
       void setupScreens();
       // The title leaves the moment the core answers, with no floor (D134), a second at most; a slower core gets a plain screen.
-      if ((await whileTitle(asking)) === "late") setView({ k: "working", text: "Opening your account…" });
+      if ((await whileTitle(asking)) === "late") setView({ k: "working", text: SETUP_WORDS.reading });
       state = await asking;
     } else state = await asking;
     if (!state) return;
@@ -367,7 +368,7 @@ export function App() {
 
   /** New phone: the words find the account by themselves (the core retries a fresh key's index), then the wait. No words: typed on the phone's own screen. */
   async function restore(words?: string[]) {
-    setView({ k: "working", text: words ? "Finding your account…" : "Your words go on ZeroFee's own screen…" });
+    setView({ k: "working", text: words ? SETUP_WORDS.finding : SETUP_WORDS.typeOnPhone });
     const res = await shellBridge.call<{ readyAtIso: string }>("recovery.start", words ? { words } : {});
     if ("ok" in res) {
       setupFinished();
@@ -388,7 +389,7 @@ export function App() {
   }
 
   async function finishRestore(readyAtIso: string) {
-    setView({ k: "working", text: "Bringing your account to this device…" });
+    setView({ k: "working", text: SETUP_WORDS.bringing });
     const res = await shellBridge.call<AccountInfo>("recovery.finish");
     if ("ok" in res) {
       logEvent("Account moved to this device");
@@ -402,7 +403,7 @@ export function App() {
   /** New backup words (recovery.renew): on the phone they show and are checked on ZeroFee's own screen; here, on ours. */
   async function startRenew(account: AccountInfo, back?: Start) {
     if (coreIsIsolated(iosHost())) {
-      setView({ k: "working", text: "Your new words are on screen…" });
+      setView({ k: "working", text: SETUP_WORDS.newOnPhone });
       const out = await ask<TxOutcome>("recovery.renew", undefined, { k: "home", account });
       if (out) renewSettled(account, out);
       return;
@@ -412,7 +413,7 @@ export function App() {
   }
 
   async function renewConfirm(account: AccountInfo, words: string[], positions: number[], picked: string[]) {
-    setView({ k: "working", text: "Replacing your backup words…" });
+    setView({ k: "working", text: SETUP_WORDS.renewing });
     const out = await ask<TxOutcome>("recovery.renewConfirm", { positions, words: picked }, { k: "renewCheck", words, account });
     if (out) renewSettled(account, out);
   }
@@ -430,7 +431,7 @@ export function App() {
    * wallets, are moved from Trade, Browser and Pay, which mark them "Opens with your old words".
    */
   async function moveOld(account: AccountInfo, before: string[] = []) {
-    setView({ k: "working", text: "Moving your old money…" });
+    setView({ k: "working", text: SETUP_WORDS.movingOld });
     // Dead ends row 8: a failed read or move is named and offers Try again, never "Nothing here needed moving."
     const { moveOldHome } = await import("./screens/renew-move.ts");
     const out = await moveOldHome(shellBridge, Date.now().toString(36), before);
@@ -439,7 +440,7 @@ export function App() {
 
   /** Old phone: stop someone else's recovery. It's a signature, so the approval sheet comes up. */
   async function stopRecovery(account: AccountInfo) {
-    setView({ k: "working", text: "Stopping it…" });
+    setView({ k: "working", text: SETUP_WORDS.stopping });
     await settle(account, await shellBridge.call<TxOutcome>("recovery.cancel"), "Stopped someone moving your account");
   }
 
@@ -447,7 +448,7 @@ export function App() {
   async function showWords(first = false): Promise<void> {
     // On the phone with the isolated core, the words show on ZeroFee's own native screen and never reach this page.
     if (coreIsIsolated(iosHost())) {
-      setView({ k: "working", text: "Your backup words are on screen…" });
+      setView({ k: "working", text: SETUP_WORDS.backupOnPhone });
       const res = await shellBridge.call<{ ok: true }>("recovery.backup");
       if ("ok" in res) return afterBackup(first);
       if (first && res.problem.code === "security.backup.declined") return setView({ k: "problem", problem: WORDS_FIRST, then: { k: "reroute" } });
@@ -458,7 +459,7 @@ export function App() {
   }
 
   async function create() {
-    await startAccount("Opening your account…");
+    await startAccount(SETUP_WORDS.opening);
   }
 
   async function openFunding(): Promise<void> {
@@ -467,7 +468,7 @@ export function App() {
     // reopening lands on the address again.
     const seen = "ok" in r && r.ok.state !== "waiting" && r.ok.state !== "expired" && r.ok.steps.some((s) => s.state === "done" || s.state === "failed");
     if ("ok" in r) return setView({ k: "funding", ...(r.ok.away && r.ok.deposit && seen ? { away: true } : {}) });
-    return startAccount("Looking for your NEAR…");
+    return startAccount(SETUP_WORDS.lookingForMoney);
   }
 
   /** The account is open (the funding's checklist said so): its backup words next. */
@@ -481,7 +482,7 @@ export function App() {
     // Three short lines that tick as the core does them (account.create.step), instead of a bare wait.
     setView({ k: "working", text, steps: OPENING_STEPS, at: 0 });
     const off = shellBridge.on<{ step?: unknown; retrying?: unknown }>("account.create.step", ({ step, retrying }) => {
-      if (typeof step === "number") setView((v) => (v.k === "working" && v.steps ? { ...v, at: step, ...(retrying === true ? { text: "Still working…" } : {}) } : v));
+      if (typeof step === "number") setView((v) => (v.k === "working" && v.steps ? { ...v, at: step, ...(retrying === true ? { text: SETUP_WORDS.retrying } : {}) } : v));
     });
     const delay = chosenDelay();
     const params = delay ? { recoveryDelaySeconds: delay } : undefined;
@@ -495,7 +496,7 @@ export function App() {
   }
 
   async function confirm(words: string[], positions: number[], picked: string[], first = false) {
-    setView({ k: "working", text: first ? "Checking your words…" : "Adding your backup words…" });
+    setView({ k: "working", text: first ? SETUP_WORDS.checking : SETUP_WORDS.addingWords });
     const ok = await ask<{ ok: true }>("recovery.confirm", { positions, words: picked }, { k: "check", words, ...(first ? { first: true as const } : {}) });
     if (ok) await afterBackup(first);
   }
@@ -648,8 +649,8 @@ export function App() {
     case "makekey": screen = <MakeKey web={iosHost() ? undefined : lockedWith() ?? "passkey"} terms={!termsAccepted()} wait={{ choices: view.choices, seconds: view.seconds, onChange: (seconds) => setView({ ...view, seconds }) }} onBack={() => setView({ k: "welcome" })} onContinue={() => { setChosenDelay(view.seconds); void create(); }} />; break;
     case "working": screen = <Working text={view.text} steps={view.steps} at={view.at} />; break;
     // Every app is there to look at while the account opens, and each says so: never an error, never a half-made screen.
-    case "funding": screen = <Suspense fallback={<Working text="One moment…" />}><FundingShell bridge={shellBridge} wallet={APP_BRIDGES.get("wallet")!} away={view.away} apps={hostApps(appsFor(APPS, mvpOn(location.search, MAINNET), MAINNET), (id) => APP_BRIDGES.get(id as AppId)!).map(({ id, name, line, bridge }) => ({ id, name, line, bridge }))} onWords={fundOpened} onReroute={() => setView({ k: "reroute" })} onProblem={(problem) => setView({ k: "problem", problem, then: nextFor(problem, { k: "reroute" }) })} onMenu={() => openMenu()} leave={leaveSetup} /></Suspense>; break;
-    case "fundCheck": { const account = view.account; screen = <Suspense fallback={<Working text="One moment…" />}><FundFlow bridge={shellBridge} wallet={APP_BRIDGES.get("wallet")!} onAway={() => setView({ k: "home", account })} onWords={() => setView({ k: "home", account })} onDone={() => { setFundOn(false); setView({ k: "home", account }); }} onWordsFirst={() => setView({ k: "reroute" })} onProblem={(problem) => setView({ k: "problem", problem, then: { k: "home", account } })} /></Suspense>; break; }
+    case "funding": screen = <Suspense fallback={<Working text={SETUP_WORDS.loading} />}><FundingShell bridge={shellBridge} wallet={APP_BRIDGES.get("wallet")!} away={view.away} apps={hostApps(appsFor(APPS, mvpOn(location.search, MAINNET), MAINNET), (id) => APP_BRIDGES.get(id as AppId)!).map(({ id, name, line, bridge }) => ({ id, name, line, bridge }))} onWords={fundOpened} onReroute={() => setView({ k: "reroute" })} onProblem={(problem) => setView({ k: "problem", problem, then: nextFor(problem, { k: "reroute" }) })} onMenu={() => openMenu()} leave={leaveSetup} /></Suspense>; break;
+    case "fundCheck": { const account = view.account; screen = <Suspense fallback={<Working text={SETUP_WORDS.loading} />}><FundFlow bridge={shellBridge} wallet={APP_BRIDGES.get("wallet")!} onAway={() => setView({ k: "home", account })} onWords={() => setView({ k: "home", account })} onDone={() => { setFundOn(false); setView({ k: "home", account }); }} onWordsFirst={() => setView({ k: "reroute" })} onProblem={(problem) => setView({ k: "problem", problem, then: { k: "home", account } })} /></Suspense>; break; }
     case "words": { const first = view.first; screen = <Words words={view.words} moneyIn={MAINNET && !first} onDone={() => setView({ k: "check", words: view.words, ...(first ? { first } : {}) })} />; break; }
     case "renewWords": screen = <Words renew words={view.words} onBack={() => setView({ k: "home", account: view.account, start: view.back })} onDone={() => setView({ k: "renewCheck", words: view.words, account: view.account, back: view.back })} />; break;
     case "renewCheck": screen = <Check renew words={view.words} onBack={() => setView({ k: "renewWords", words: view.words, account: view.account, back: view.back })} onDone={(pos, picked) => void renewConfirm(view.account, view.words, pos, picked)} />; break;
@@ -702,8 +703,8 @@ export function App() {
       break;
     }
     case "webStart": screen = <Suspense fallback={<Title />}><WebStart onWords={(words, made) => void webImport(words, made)} /></Suspense>; break;
-    case "guard": screen = <Suspense fallback={<Working text="One moment…" />}><GuardianSide bridge={shellBridge} mainnet={MAINNET} onBack={() => setView({ k: "welcome" })} onProblem={(problem) => setView({ k: "problem", problem, then: { k: "welcome" } })} /></Suspense>; break;
-    case "reroute": screen = <Working text="One moment…" />; break;
+    case "guard": screen = <Suspense fallback={<Working text={SETUP_WORDS.loading} />}><GuardianSide bridge={shellBridge} mainnet={MAINNET} onBack={() => setView({ k: "welcome" })} onProblem={(problem) => setView({ k: "problem", problem, then: { k: "welcome" } })} /></Suspense>; break;
+    case "reroute": screen = <Working text={SETUP_WORDS.loading} />; break;
     // On the phone with the isolated core, the words are typed on ZeroFee's own screen and never reach this page.
     case "checkwords": screen = coreIsIsolated(iosHost()) ? <NativeWords run={() => checkWords(view.account)} /> : <RestoreWords purpose="check" badWord={view.badWord} wrong={view.wrong} initial={view.words} onBack={() => setView({ k: "home", account: view.account })} onSubmit={(w) => checkWords(view.account, w)} />; break;
     case "checked": screen = <ProblemView problem={{ code: "shell.words.checked", whatHappened: view.matches ? "Your words are right." : "These words don't match your account.", money: { state: "not-involved" }, more: view.matches ? "Keep your paper somewhere safe and dry. Check again every few months." : "Check your paper: a word is wrong or out of order.", next: { kind: "nothing", label: view.matches ? "Done" : "Try again" } }} onNext={() => setView(view.matches ? { k: "home", account: view.account } : { k: "checkwords", account: view.account })} />; break;
@@ -714,7 +715,7 @@ export function App() {
     // Done (and Back) return to the screen it was opened from; "See Activity" opens that tab (grade 01d, Q3 and Q11).
     case "held": { const back = view.back; screen = <WaitingView bridge={shellBridge} held={view.held} onClose={() => void route(false, back)} onOpen={(_, s) => { const to = parseScreen(s); void route(false, to ? { id: to.app, tab: to.tab } : back); }} />; break; }
     case "safeUpdate": { const back = view.back; const account = view.account; screen = <SafeUpdateHeld bridge={shellBridge} onClose={() => void route(false, back)} onProblem={(problem) => setView({ k: "problem", problem, then: { k: "safeUpdate", account, ...(back ? { back } : {}) } })} />; break; }
-    case "checkPhone": screen = <Working text="One moment…" />; break;
+    case "checkPhone": screen = <Working text={SETUP_WORDS.loading} />; break;
     // "Open Settings" (Face ID off for ZeroFee): ZeroFee's page in iOS Settings, then the check runs again on return.
     // Back (the arrow, Escape, browser Back) leaves without the next step: a set-up that couldn't go on returns to
     // Welcome, never into making the account again (grade 01d, Q8: the busy set-up screen had no way back).
@@ -752,5 +753,5 @@ function NativeWords({ run }: { run: () => Promise<void> }) {
     asked.current = true;
     void run();
   }, []);
-  return <Working text="Your words go on ZeroFee's own screen…" />;
+  return <Working text={SETUP_WORDS.typeOnPhone} />;
 }

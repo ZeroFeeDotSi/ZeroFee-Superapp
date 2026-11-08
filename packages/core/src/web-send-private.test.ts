@@ -97,7 +97,7 @@ test("refused before any price: another app, a chain with no wallet coin, a shor
   await assert.rejects(s.w.sendPrivate("sol", s.payee, SOL, "0.05", "wallet"), (e: any) => e.problem.code === "security.balance.low-coin", "50M + 1M room is more than 50.9M");
   await assert.rejects(s.w.sendPrivate("sol", "a1".repeat(32), SOL, "0.05", "wallet"), (e: any) => e.problem.code === "security.request.invalid");
   await assert.rejects(s.w.sendPrivate("sol", s.payee, "nep141:btc.omft.near", "0.05", "wallet"), (e: any) => e.problem.code === "security.request.invalid", "SOL to BTC: the same coin only");
-  await assert.rejects(s.w.sendPrivate("sol", s.payee, "nep141:hood.omft.near", "0.05", "wallet"), (e: any) => e.problem.code === "security.request.invalid", "SOL to ETH (RH)");
+  await assert.rejects(s.w.sendPrivate("sol", s.payee, "nep141:hood.omft.near", "0.05", "wallet"), (e: any) => e.problem.code === "security.request.invalid", "SOL to Robinhood");
   assert.equal(s.asked.length, 0, "no price asked");
   const enough = await setup({ held: 51_000_000n });
   assert.equal((await enough.w.sendPrivate("sol", enough.payee, SOL, "0.05", "wallet")).sent.status, "done", "control: just enough");
@@ -109,7 +109,7 @@ test("to the person's own other wallet: the one cap, no outside sheet under it (
   assert.equal(own.shown.length, 0, "$9.20 is under the cap: no sheet");
 });
 
-test("the web wallet's door lets only Wallet's own private Send through, from SOL or ETH (RH) (controls: another app, BNB Chain)", () => {
+test("the web wallet's door lets only Wallet's own private Send through, from SOL or Robinhood (controls: another app, BNB Chain)", () => {
   assert.equal(webAllows("subwallet.sendPrivate", { app: "wallet", chain: "sol" }), true);
   assert.equal(webAllows("subwallet.sendPrivate", { app: "wallet", chain: "hood" }), true);
   assert.equal(webAllows("subwallet.sendPrivate", { app: "trade", chain: "sol" }), false);

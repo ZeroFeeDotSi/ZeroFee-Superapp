@@ -3,10 +3,11 @@
 // it, never withdrawn, never bridged:
 //   ledger.swapQuote { from, to, amountIn, source }   a dry price (display only); amounts in the coin's own units
 //   ledger.swap      { quoteId }                      the job, at once; ledger.movementUpdated follows it to its end
-// source "safe": the Safe's intents.near balance. ONE on-chain call the account contract makes and counts (mt_transfer of
-//   exactly amountIn to the quote's deposit address), one Face ID; the quote is the core's own (subwallet.safeSwapQuote:
-//   asked through the pinned relay, held as 1Click signed it, at least the figure shown), and the Safe's sheet checks the
-//   transfer against it. No Safe key on intents.near (QA's rule).
+// source "safe": the Safe's intents.near balance, ONLY through NEAR Confidential (product decision, 8 Nov: "make it all
+//   confidential"; core safe-swap-private.ts SAFE_SWAP_PRIVATE): Home's Send's own two legs (safe-send.ts swapFromSafe),
+//   the coin into Private by ONE mt_transfer the account contract makes and counts, one Face ID, then Private pays NEAR
+//   Intents, which swaps it and lands the coin got back in the Safe. The public swap (the Safe paying an INTENTS-to-INTENTS
+//   quote straight) is gone. No Safe key on intents.near (QA's rule).
 // source "private": the NEAR wallet's private balance (NEAR Confidential): its cash (USDC) and a coin, ONE intent its
 //   key signs (subwallet.float.swap).
 // 1Click prices both today (only where no direct path is open; its name is on the fee line). The end is
@@ -24,8 +25,8 @@ import type { Caller } from "./ledger.ts";
 import { fromUnits, toUnits } from "./amount.ts";
 import { QuoteRefused, type Apis, type QuoteRequest, type QuoteResponse } from "./apis.ts";
 import type { Catalogue } from "./catalogue.ts";
-import { mtTransfer } from "./moves.ts";
 import { safeCanSell } from "@zerofee/core/band-coins";
+import { SAFE_SWAP_PRIVATE } from "@zerofee/core/safe-swap-private";
 import type { Movement, Quote } from "./types.ts";
 import { walletProblems } from "./wallet-problems.ts";
 
@@ -66,7 +67,15 @@ export interface IntentsSwapDeps {
   now: () => number;
   iso: () => string;
   sleep?: (ms: number) => Promise<void>;
+  /** The Safe's swap through NEAR Confidential (safe-send.ts swapFromSafe): into Private, swapped there, back to the Safe.
+   *  None, or SAFE_SWAP_PRIVATE off (`open`): a Safe swap is refused by name, before any price. */
+  throughPrivate?: (o: { from: string; to: string; units: bigint; least: bigint; key?: string }, caller: Caller) => Promise<Movement>;
+  open?: boolean;
 }
+
+/** What leg 2 of a Safe Swap can promise at least, from the market's least (units of the coin got): leg 1 into Private
+ *  keeps 1Click's 1% room (slippageTolerance 100), so leg 2 pays at least 99% of it in (safe-send.ts fromSafe askedShare). */
+export const throughLeast = (minRaw: string): bigint => (BigInt(minRaw) * 99n) / 100n;
 
 interface Kept { quote: Quote; source: SwapSource; units: string; minRaw: string; side?: "buy" | "sell"; coin?: string; at: number }
 
@@ -106,6 +115,8 @@ export function createIntentsSwap(d: IntentsSwapDeps) {
     // the Safe swaps only coins it can also pay out with Face ID today (band-coins.ts safeCanSell, the one switch): never
     // a Buy it can't Sell, never a Sell that would wait a day
     if (source === "safe" && (!safeCanSell(from) || !safeCanSell(to))) throw new ProblemError(walletProblems.swapNotYet());
+    // the Safe swaps only through NEAR Confidential: off (or no way through here), refused before any price
+    if (source === "safe" && !((d.open ?? SAFE_SWAP_PRIVATE) && d.throughPrivate)) throw new ProblemError(walletProblems.swapNotYet());
     const [fromCoin, toCoin] = await Promise.all([d.coin(from), d.coin(to)]);
     if (!fromCoin || !toCoin) throw new ProblemError(walletProblems.quoteUnavailable("NEAR Intents doesn't swap one of these coins."));
     const units = toUnits(amountIn, fromCoin.decimals);
@@ -137,13 +148,15 @@ export function createIntentsSwap(d: IntentsSwapDeps) {
     const r = await d.dryQuote(safeQuoteRequest({ from, to, units: units.toString(), account: accountId, deadlineIso: quoteDeadline(d.now(), 10 * 60_000) }));
     const inUsd = Number(r.quote.amountInUsd ?? NaN), outUsd = Number(r.quote.amountOutUsd ?? NaN);
     const feeUsd = Number.isFinite(inUsd) && Number.isFinite(outUsd) ? Math.max(0, inUsd - outUsd) : undefined;
+    // the least said is what leg 2 can promise through Private (throughLeast), the same figure the tap holds it to
+    const least = throughLeast(r.quote.minAmountOut).toString();
     const quote: Quote & { source: SwapSource } = {
-      id, from, to, amountIn, amountOut: fromUnits(r.quote.amountOut, toCoin.decimals), minOut: fromUnits(r.quote.minAmountOut, toCoin.decimals),
+      id, from, to, amountIn, amountOut: fromUnits(r.quote.amountOut, toCoin.decimals), minOut: fromUnits(least, toCoin.decimals),
       ...(feeUsd !== undefined ? { feeUsd: feeUsd.toFixed(2) } : {}), feeNote: feeNoteOf(feeUsd, inUsd),
       ...(typeof r.quote.timeEstimate === "number" && r.quote.timeEstimate > 0 ? { etaSeconds: r.quote.timeEstimate } : {}), expiresAtIso, source,
     };
     sweep();
-    kept.set(id, { quote, source, units: units.toString(), minRaw: r.quote.minAmountOut, at: d.now() });
+    kept.set(id, { quote, source, units: units.toString(), minRaw: least, at: d.now() });
     return quote;
   }
 
@@ -167,43 +180,12 @@ export function createIntentsSwap(d: IntentsSwapDeps) {
       void watchPrivate(job, r.ok.id, caller, since, to?.decimals);
       return job;
     }
-    // the Safe: the core's own quote (held to the figure shown), then ONE mt_transfer of exactly amountIn, one Face ID
-    const { accountId } = await d.myAccount(true);
-    const r = await d.bridgeFor(caller).call<{ depositAddress: string; amountIn: string; minAmountOut: string; statusTag?: string }>("subwallet.safeSwapQuote", { from: quote.from, to: quote.to, amount: k.units, atLeast: k.minRaw });
-    if ("problem" in r) throw new ProblemError(r.problem);
-    if (r.ok.amountIn !== k.units || !/^[0-9a-f]{64}$/.test(r.ok.depositAddress)) throw new ProblemError(walletProblems.quoteExpired());
-    const tag = typeof r.ok.statusTag === "string" && /^[A-Za-z0-9_-]{16,128}$/.test(r.ok.statusTag) ? r.ok.statusTag : undefined;
-    const why = `Swap ${quote.amountIn} in your Safe`;
-    const steps = [mtTransfer({ to: r.ok.depositAddress, tokenId: quote.from, units: BigInt(k.units), why })];
-    const signed = await d.signAll(d.approvals(steps, await d.canChain(accountId), caller), caller, since);
-    const job: SwapJob = { ...base, id: `swap:${signed.txHash}`, status: signed.hold ? "waiting" : "moving", explorerUrls: signed.explorerUrls, depositAddress: r.ok.depositAddress, ...(tag ? { statusTag: tag } : {}), ...(signed.hold ? { held: signed.hold } : {}), source: "safe" };
-    await d.remember(job);
-    if (!signed.hold) void watchSafe(job, since, to?.decimals);
-    return job;
-  }
-
-  /**
-   * The Safe's swap ends ONLY on 1Click's own status for its deposit address (B1): SUCCESS is done, with what arrived as
-   * 1Click settled it (swapDetails.amountOut, never the quote and never a balance rise, which is anyone's deposit);
-   * REFUNDED is refunded at once (B2), FAILED a problem. Read every 400 ms from the tap; past 10 minutes the ledger's
-   * follow (every 10 s, never giving up) takes over (B3).
-   */
-  async function watchSafe(job: SwapJob, tapMs: number, decimals?: number) {
-    const dep = job.depositAddress!;
-    const t0 = d.now();
-    while (d.now() - t0 < SAFE_WATCH_FOR_MS) {
-      await sleep(SAFE_WATCH_MS);
-      const s = await d.status(dep, job.statusTag).catch(() => null);
-      const status = s?.status ?? "";
-      if (status === "SUCCESS") {
-        const got = s?.amountOut && /^\d{1,40}$/.test(s.amountOut) && decimals !== undefined ? { amountOut: fromUnits(s.amountOut, decimals) } : {};
-        await d.remember({ ...job, status: "done", updatedAtIso: d.iso(), settledMs: Date.now() - tapMs, ...got });
-        return;
-      }
-      if (status === "REFUNDED") return void (await d.remember({ ...job, status: "refunded", updatedAtIso: d.iso() }));
-      if (status === "FAILED") return void (await d.remember({ ...job, status: "problem", updatedAtIso: d.iso(), problem: walletProblems.convertFailed() }));
-    }
-    d.follow(job, dep);
+    // the Safe: through NEAR Confidential only (safe-send.ts swapFromSafe), one Face ID; its end is the Send job's own
+    // follow (send-job.ts: leg 1 into Private on 1Click's status, then leg 2's, what arrived from 1Click's record)
+    if (!((d.open ?? SAFE_SWAP_PRIVATE) && d.throughPrivate)) throw new ProblemError(walletProblems.swapNotYet());
+    const key = typeof p.key === "string" && /^[\w-]{8,64}$/.test(p.key) ? p.key : undefined;
+    const m = await d.throughPrivate({ from: quote.from, to: quote.to, units: BigInt(k.units), least: BigInt(k.minRaw), ...(key ? { key } : {}) }, caller);
+    return { ...m, ...(quote.feeUsd !== undefined ? { feeUsd: quote.feeUsd } : {}), ...(quote.etaSeconds ? { etaSeconds: quote.etaSeconds } : {}), source: "safe" };
   }
 
   /** The NEAR wallet's swaps a reader follows now: Activity resumes a moving job on its every read, and one job has one reader. */
@@ -251,7 +233,7 @@ export function createIntentsSwap(d: IntentsSwapDeps) {
 }
 
 /** The ledger's own parts, wired here so the ledger (in Home's first load) carries one line for this. */
-export function ledgerSwap(l: Pick<IntentsSwapDeps, "bridgeFor" | "myAccount" | "now" | "iso" | "signAll" | "approvals" | "remember"> & {
+export function ledgerSwap(l: Pick<IntentsSwapDeps, "bridgeFor" | "myAccount" | "now" | "iso" | "signAll" | "approvals" | "remember" | "throughPrivate"> & {
   chain: { view(contract: string, method: string, args: object, block: Block): Promise<unknown>; account(id: string, block: Block): Promise<{ codeHash?: string } | null>; commonBlock(): Promise<Block> };
   catalogue: () => Promise<Catalogue>; apis: Apis; relayed?: string; trackQuote: (m: Movement, depositAddress: string, via?: string) => void;
 }) {

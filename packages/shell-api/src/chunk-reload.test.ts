@@ -3,7 +3,7 @@
 // never loops. Each test has its control.
 import { beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { CHUNK_RELOAD_KEY, RELOAD_WINDOW_MS, chunkReloading, installChunkReload, isChunkError, reloadForChunk, resetChunkReload, setChunkReloadDeps } from "./chunk-reload.ts";
+import { CHUNK_RELOAD_KEY, RELOAD_WINDOW_MS, chunkOffline, chunkReloading, offlineWords, whenOnline, installChunkReload, isChunkError, reloadForChunk, resetChunkReload, setChunkReloadDeps } from "./chunk-reload.ts";
 import { STARTING, jobStarting, jobsWritten, sealJobs, startJob } from "./job-start.ts";
 import { taskStore } from "./tasks.ts";
 import type { Bridge } from "@zerofee/core/bridge";
@@ -14,7 +14,7 @@ const FIREFOX = new TypeError("error loading dynamically imported module: https:
 const CSS = new Error("Unable to preload CSS for /assets/Trade-x.css");
 const flush = () => new Promise((r) => setTimeout(r, 5));
 
-function page(o: { native?: boolean; busy?: boolean; build?: string; storage?: boolean; settled?: () => Promise<unknown> } = {}) {
+function page(o: { native?: boolean; busy?: boolean; online?: () => boolean; build?: string; storage?: boolean; settled?: () => Promise<unknown> } = {}) {
   const m = new Map<string, string>();
   const p = { m, reloads: 0, now: 1_000_000, build: o.build ?? "/assets/index-AAA.js" };
   resetChunkReload();
@@ -24,6 +24,7 @@ function page(o: { native?: boolean; busy?: boolean; build?: string; storage?: b
     build: () => p.build,
     reload: () => void p.reloads++,
     native: () => o.native === true,
+    online: o.online ?? (() => true),
     busy: () => o.busy === true,
     settled: o.settled ?? (() => Promise.resolve()),
   });
@@ -175,4 +176,44 @@ test("Vite's vite:preloadError reloads the page once; the event's error still re
   await flush();
   assert.equal(p.reloads, 1);
   off();
+});
+
+// Audit 12 C1: offline on the web, a tap on Send loaded no code, the page reloaded with no network, and Chrome's "No
+// internet" page replaced the app. Offline it never reloads; back online, a chunk still missing is a deploy and reloads.
+test("offline, a missing chunk never reloads and stamps nothing; back online the same error reloads once (control: online it reloads)", async () => {
+  let on = false;
+  const p = page({ online: () => on });
+  assert.equal(chunkOffline(), true);
+  assert.equal(reloadForChunk(CHROME), false, "offline: the screen shows its own words");
+  assert.equal(chunkReloading(), false);
+  await flush();
+  assert.equal(p.reloads, 0);
+  assert.equal(p.m.get(CHUNK_RELOAD_KEY), undefined, "nothing stamped, so the online retry can still reload");
+  on = true;
+  assert.equal(chunkOffline(), false);
+  assert.equal(reloadForChunk(CHROME), true);
+  await flush();
+  assert.equal(p.reloads, 1);
+});
+
+test("offline words: the app's own, grade-5, no ellipsis; whenOnline calls back once on the window's online event", () => {
+  assert.equal(offlineWords("Send"), "You're offline. Your money is safe. Send opens when you're back.");
+  assert.equal(offlineWords(), "You're offline. Your money is safe. This opens when you're back.");
+  assert.doesNotMatch(offlineWords("Trade"), /…|\.\.\./);
+  const g = globalThis as unknown as { addEventListener?: unknown; removeEventListener?: unknown };
+  const had = { add: g.addEventListener, rm: g.removeEventListener };
+  const ls = new Set<() => void>();
+  g.addEventListener = (n: string, f: () => void) => { if (n === "online") ls.add(f); };
+  g.removeEventListener = (n: string, f: () => void) => { if (n === "online") ls.delete(f); };
+  try {
+    let n = 0;
+    whenOnline(() => n++);
+    for (const f of [...ls]) f();
+    for (const f of [...ls]) f();
+    assert.equal(n, 1);
+    const stop = whenOnline(() => n++);
+    stop();
+    for (const f of [...ls]) f();
+    assert.equal(n, 1, "stopped: never calls");
+  } finally { g.addEventListener = had.add; g.removeEventListener = had.rm; }
 });

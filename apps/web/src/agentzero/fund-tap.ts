@@ -4,7 +4,7 @@
 // fill sheet, a plain line right above the amounts, or quietly nothing (the person said no on the sheet).
 import type { Done } from "./use-agent-wallet.ts";
 
-export const OPENING = "Opening…";
+export const OPENING = "Opening";
 export const FAILED_LINE = "That didn't go through. Nothing moved.";
 /** Longer than a slow mainnet read; past it the person gets a line, never a button that seems dead. */
 export const SLOW_MS = 45_000;

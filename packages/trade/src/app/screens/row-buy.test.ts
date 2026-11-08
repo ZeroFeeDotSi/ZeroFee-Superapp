@@ -30,15 +30,15 @@ test("the service's answer: done = landed; unconfirmed = checking (never refused
 
 test("money rules in the source: the sheet's service with origin chip:<address>, the preset, the ready check before any ask, the core's refusal said on the row", () => {
   assert.match(src, /svc\.trade\(p, `chip:\$\{r\.address\}`, \{ task: taskId, tapAt: epochOf\(at\) \}\)/, "changed pin (T12, then 83\'s T4): with its task and its press");
-  assert.match(src, /svc\.quote\("buy", r\.chain, r\.address, \{ usd: quick \}\)/);
+  assert.match(src, /svc\.quote\("buy", r\.chain, r\.address, \{ usd \}\)/);
   assert.equal(QUICK_BUY_DEFAULT, 25);
   assert.match(src, /if \(ready !== undefined && ready < quick\) \{[\s\S]*?onState\(\{ phase: "refused", at, why: `Only \$/);
   assert.match(src, /const why = e instanceof ProblemError \? e\.problem\.whatHappened : "It didn't go through\. Nothing moved\.";/);
-  assert.match(src, /if \(busy\.current\) return;/, "a second tap while one is on its way does nothing (and the lock's origin makes it one trade anyway)");
+  assert.match(src, /if \(busy\.current \|\| quick === undefined\) return;/, "a second tap while one is on its way does nothing (and the lock's origin makes it one trade anyway)");
 });
 
 test("the chip is a sibling of the row (never a button inside the row's button), gone while the row is the receipt; 44 pt to hit; lit only under the finger", () => {
-  assert.match(src, /\{noSale \? <span className="dc-nfs" data-testid="row-not-for-sale">\{NOT_FOR_SALE\}<\/span> : !buy && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}\n    <\/div>/);
+  assert.match(src, /\{noSale \? <span className="dc-nfs" data-testid="row-not-for-sale">\{NOT_FOR_SALE\}<\/span> : !buy && !down && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}\n    <\/div>/);
   assert.doesNotMatch(src, /<button[^>]*className="dc-row[\s\S]*?<button[^>]*dc-qb[\s\S]*?<\/button>\s*<\/button>/, "control: no nested button");
   assert.match(css, /\.dc-qb \{[^}]*height: 44px/);
   assert.match(css, /\.dc-qb__pill \{[^}]*background: var\(--fill\)/);
@@ -64,7 +64,7 @@ test("QA's MUST: an unconfirmed trade is never shown as failed, never invites a 
   assert.match(src, /useEffect\(\(\) => \(\) => \{ follow\.current\?\.\(\); follow\.current = null; \}, \[\]\);/, "the Row's cleanup");
   // the row: checking is never cleared by the timer, so the chip (rendered only while !buy) cannot come back
   assert.match(src, /if \(!buy \|\| buy\.phase === "away" \|\| buy\.phase === "checking"\) return;/);
-  assert.match(src, /: !buy && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}/, "control: the chip is drawn only while the row holds no trade");
+  assert.match(src, /: !buy && !down && <RowBuy r=\{r\} onState=\{setBuy\} follow=\{follow\} \/>\}/, "control: the chip is drawn only while the row holds no trade");
   // control: landed and refused still end as before
   assert.match(src, /if \(end\.phase === "landed"\) \{ landed\(rec\); return; \}/);
   assert.match(src, /if \(end\.phase === "refused"\) \{ refused\(rec, end\.why\); return; \}/);

@@ -15,6 +15,7 @@ import { decodeTx, decompile, lookupTableAddresses } from "./sol/wire.ts";
 import type { LookupTable } from "./sol/wire.ts";
 import { readJson } from "./net.ts";
 import { isSolProxy, relayTakes, solPaidDoors, solProxyFor, solProxySaid } from "./sol-proxy.ts";
+import { isOwnServer, ownSaid } from "./own-servers.ts";
 import { HEALTH, scored } from "./node-health.ts";
 import { onCopy } from "./fork.ts";
 
@@ -447,7 +448,11 @@ export class RpcSolChain implements SolChain {
     // scored (node-health.ts): each node's time and its 429s, 5xx and refusals rank the next display read
     // a read the relay would refuse for its address (sol-proxy relayTakes: the Sim's sample wallet) never goes there
     if (isSolProxy(url) && !relayTakes(method, params)) throw new Error("not an address the relay reads");
-    const ask = () => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(8000) });
+    // the person's own server (own-core.ts): its answer or its miss is said, so Status never says "Using your server"
+    // while the core is on ZeroFee's (QA 16's MUST on builder 7's item 3)
+    const own = isOwnServer("solana", url);
+    const ask = () => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(8000) })
+      .then((res) => { if (own) ownSaid("solana", res.ok); return res; }, (e) => { if (own) ownSaid("solana", false); throw e; });
     const body: any = await scored(url, method, isSolProxy(url) ? () => ask().then((res) => (solProxySaid(res.status), res)) : ask, (res) => readJson(res));
     if (body?.error) throw new Error(JSON.stringify(body.error).slice(0, 200));
     return body.result;

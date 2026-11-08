@@ -28,7 +28,7 @@ test("two jobs within the slack, one going (a hot wallet's Send) and one stopped
   assert.deepEqual(aState, { state: "going" }, "A: its own row is going");
   assert.equal(receiptSaid(sendWords("bob.near"), aState), "Sending it to bob.near.", "A keeps the present, no stop words");
   assert.deepEqual(bState, { state: "stopped", words: STOP }, "B: its own stop words");
-  assert.equal(receiptSaid(sendWords("carol.near"), bState), `Sending it to carol.near. ${STOP}`);
+  assert.equal(receiptSaid(sendWords("carol.near"), bState), `Not sent to carol.near. ${STOP}`);
   assert.deepEqual(receiptStateOf(rows, T), { state: "stopped", words: STOP }, "control: with no job id (the fallback), the window takes B's stop words");
 });
 

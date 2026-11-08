@@ -20,6 +20,8 @@ function safeQuote(answer: () => Response, relayed: string | null = RELAY) {
     chain: { view: async () => "100000000", account: async () => null, commonBlock: async () => ({}) },
     catalogue: async () => ({ coin: (id: string) => (id === SWAP_USDC ? { decimals: 6, symbol: "USDC" } : id === NEAR ? { decimals: 24, symbol: "wNEAR" } : undefined) }),
     now: () => 0, iso: () => "2026-11-05T00:00:00.000Z", trackQuote: () => undefined,
+    // the Safe swaps only through NEAR Confidential (safe-send.ts swapFromSafe); its price is the same dry quote
+    throughPrivate: async () => { throw new Error("not tapped here"); },
   } as never);
   return s.swapQuote({ from: SWAP_USDC, to: NEAR, amountIn: "1", source: "safe" }, "trade" as never);
 }

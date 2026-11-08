@@ -37,8 +37,8 @@ after(async () => {
 const READY = { id: "3", title: "Change your protection", lines: ["Anything bigger: waits 1 hour."], readyAtIso: "2026-01-01T00:00:00.000Z", ready: true, needsSecondDevice: false, change: true };
 
 for (const [button, before, afterApprove] of [
-  [/^Finish it now$/, "Getting it ready to approve…", "Finishing it. This takes a few seconds…"],
-  [/^Cancel it$/, "Getting the cancel ready for you to approve…", "Cancelling it…"],
+  [/^Finish it now$/, "Getting it ready for you to approve.", "NEAR is making the change. About 2 s."],
+  [/^Cancel it$/, "Getting the cancel ready for you to approve.", "NEAR is cancelling it. About 2 s."],
 ] as const) {
   test(`${button.source}: says what it's doing at the tap ("${before}"), then "${afterApprove}" once Approve is tapped`, async () => {
     let finish: (r: BridgeResult<never>) => void = () => {};

@@ -55,6 +55,8 @@ test("the guard can fail: each banned word is caught where a person would read i
   assert.ok(bannedIn("packages/wallet/src/x.ts", "NEAR Intents' bridge").length > 0, "control: only there");
   assert.deepEqual(bannedIn("x.ts", "Your $20 is on its way to Spending."), []);
   assert.ok(bannedIn("packages/wallet/src/app/money/live-steps.ts", "Leaving your private balance").length > 0, "53, 7 Nov: \"Private\" outside the core");
+  for (const bad of ["Move $222.00 to your ETH (RH) wallet", "ETH (RH)"]) assert.ok(bannedIn("x.ts", bad).some((b) => b.word === "ETH (RH)"), `QA 16's MUST 2: ${bad}`);
+  for (const good of ["Move $222.00 to your Robinhood wallet", "Robinhood", "Robinhood Chain"]) assert.deepEqual(bannedIn("x.ts", good), [], good);
   // The product's F example (2 Nov) grades D or worse on its own, without the guard.
   assert.match(grade("x.ts", "Your protection was saved before it counted every coin, so it holds this as a big payment, and its price can't wait.").grade, /[DF]/);
   assert.equal(grade("x.ts", "NEAR didn't answer.").grade, "A");
@@ -117,6 +119,6 @@ test("the product Perps tile line may say Confidential, only that exact line in 
 
 test("the protocols' own names, 1Click and NEAR Intents, may be on screen (product decision, 5 Nov: name who is paid); other spellings and the bare word stay banned (controls)", () => {
   const f = "packages/wallet/src/app/money/x.tsx";
-  for (const ok of ["NEAR Intents and the network keep this. ZeroFee takes nothing.", "1Click prices it.", "NEAR Intents doesn't swap one of these coins.", "Paid to NEAR Intents' solver directly.", "1Click didn't sign this price. Nothing moved.", "1Click priced different coins. Nothing moved.", "NEAR Intents", "1Click"]) assert.deepEqual(bannedIn(f, ok).filter((b) => b.word === "1Click" || b.word === "intents").map((b) => b.word), [], ok);
+  for (const ok of ["NEAR Intents and the network keep this. ZeroFee takes nothing.", "1Click prices it.", "NEAR Intents doesn't swap one of these coins.", "Paid to NEAR Intents' solver directly.", "NEAR Intents is swapping it for NEAR.", "NEAR Intents swapped it for USDC.", "1Click didn't sign this price. Nothing moved.", "1Click priced different coins. Nothing moved.", "NEAR Intents", "1Click"]) assert.deepEqual(bannedIn(f, ok).filter((b) => b.word === "1Click" || b.word === "intents").map((b) => b.word), [], ok);
   for (const bad of ["Your intents balance.", "Intents is fast.", "Swap with 1Click today.", "NEAR Intents couldn't be faster, try it now", "1Click can't see what you buy."]) assert.ok(bannedIn(f, bad).some((b) => b.word === "1Click" || b.word === "intents"), bad);
 });

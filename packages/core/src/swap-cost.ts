@@ -99,6 +99,10 @@ async function priced(d: SwapCostDeps, p: Record<string, unknown>): Promise<Swap
   }
   // a quote that brings out more than goes in (beyond 1 %) is refused, never shown as a smaller fee
   if (arrives > n * 1.01) throw refused("NEAR Intents didn't give a safe price. Nothing moved.");
+  // the audit's S5 (7 Nov): the two figures were rounded each on its own, so at a half cent "about $4.85" + "about $0.16" said
+  // $5.01 of a $5.00 swap. One rounding: what arrives is rounded once, and the fee is the rest of the figure in cents
+  // (fee = n - cents(arrives)), so the two always add up to it
   const cents = (x: number) => Math.round(Math.max(0, x) * 100) / 100;
-  return { arrivesUsd: cents(arrives), feeUsd: cents(n - arrives) };
+  const arrivesUsd = cents(arrives);
+  return { arrivesUsd, feeUsd: cents(cents(n) - arrivesUsd) };
 }

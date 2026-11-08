@@ -121,9 +121,9 @@ test("a wallet → the Safe: its legs in come first (one tracker, even before th
 });
 
 test("a wallet → a wallet: Done only once its leg on has landed", () => {
-  const first = row({ id: "w1", kind: "move", usd: "10.00", status: "done", network: "sol", to: "hood", words: "Moved $10.00 from your SOL wallet to your ETH (RH) wallet" });
+  const first = row({ id: "w1", kind: "move", usd: "10.00", status: "done", network: "sol", to: "hood", words: "Moved $10.00 from your SOL wallet to your Robinhood wallet" });
   const t = moveTrack(first)!;
-  assert.equal(t.title, "Move $10.00 to your ETH (RH) wallet");
+  assert.equal(t.title, "Move $10.00 to your Robinhood wallet");
   assert.equal(states(t), "done done doing");
   const leg = row({ id: "w2", of: "w1", kind: "ready", status: "done", network: "hood", to: undefined, atIso: iso(30) });
   assert.equal(states(moveTrack(foldInto([first, leg])[0]!)), "done done done");

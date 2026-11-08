@@ -12,6 +12,9 @@ import { approveStep } from "./job-steps.ts";
 export const JOB_WORDS = {
   /** The sheet's line the moment the job exists (the product's own words). */
   created: "Job created.",
+  /** M12-1 (8 Nov): the receipt's head once its job landed (every row done on a chain read): never "Job created." over
+   *  a landed figure and how long it took. */
+  landed: "Done.",
   /** Under it (copywriter, 5 Nov). */
   watch: "You can close this. It keeps going.",
   /** The row's step until the core answers. */
@@ -75,6 +78,9 @@ export interface JobHandle {
 const rowsOfJob = new Map<string, Set<string>>();
 /** Whether the row `row` is one of job `job`'s own (its starting row, or one it was made with). */
 export const jobRows = (job: string): ((row: string) => boolean) => (row) => rowsOfJob.get(job)?.has(row) ?? false;
+/** A job that is its own one row (Trade's Safe Buy and Sell, native/swap.ts runSwap: published at the tap under `id`), so
+ *  its receipt follows that row and no other job's (builder 15, 8 Nov). Answers the id. */
+export const ownRowJob = (id: string): string => (rowsOfJob.has(id) || rowsOfJob.set(id, new Set([id])), id);
 
 const rand = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
 
@@ -86,7 +92,7 @@ const rand = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => 
 export function startJob(tasks: Tasks | undefined, job: { title: string; usd?: string; id?: string; etaSec?: number; /** a Safe job: its first step is its approval */ approve?: boolean; /** Private pays it whole: no Face ID, said (W1) */ fromPrivate?: boolean }, o: { now?: () => number; store?: { list(): { id: string }[]; subscribe(fn: () => void): () => void } } = {}): JobHandle {
   const now = o.now ?? Date.now;
   const id = job.id ?? `${STARTING}${rand()}`;
-  const endsAt = job.etaSec && job.etaSec > 0 ? now() + job.etaSec * 1000 : undefined;
+  let endsAt = job.etaSec && job.etaSec > 0 ? now() + job.etaSec * 1000 : undefined;
   rowsOfJob.set(id, new Set([id]));
   tasks?.publish({ id, title: job.title, ...(job.usd ? { usd: job.usd } : {}), steps: job.approve ? [{ label: JOB_WORDS.approve, state: "doing", at: now() }, { label: JOB_WORDS.starting, state: "waiting", at: now() }] : job.fromPrivate ? [{ label: JOB_WORDS.fromPrivate, state: "done", at: now() }, { label: JOB_WORDS.starting, state: "doing", at: now() }] : [{ label: JOB_WORDS.starting, state: "doing", at: now() }], ...(job.fromPrivate && !job.approve ? { detail: JOB_WORDS.fromPrivatePage } : {}), ...(endsAt !== undefined ? { endsAt } : {}), staleMs: STALE_MS, staleDetail: JOB_WORDS.stale, open: { route: "activity" } });
   tasks?.pulse?.();
@@ -96,13 +102,21 @@ export function startJob(tasks: Tasks | undefined, job: { title: string; usd?: s
   let over = false;
   const drop = () => { if (!tasks?.drop?.(id)) tasks?.end(id, "done"); };
   let yes = false;
+  /** A8: when the Approve came (ms), for "Done in". */
+  let approvedAt: number | undefined;
   let asking = false;
   return {
     id,
     approved() {
       if (over || !(job.approve || asking) || yes) return;
       yes = true;
-      tasks?.update(id, { steps: [{ label: JOB_WORDS.approved, state: "done", at: now() }, { label: JOB_WORDS.starting, state: "doing", at: now() }] });
+      // audit 10's A8 (8 Nov): the clock starts at the Approve. A Safe job waits on its Check sheet (12 s to fill, then the
+      // person reads it), so a clock from the tap said "Slower than usual" on its first frame after Approve and "Done in
+      // 1 min" for a Move done 6 s after it; now the whole job's time counts from here, and "Done in" too
+      approvedAt = now();
+      endsAt = job.etaSec && job.etaSec > 0 ? now() + job.etaSec * 1000 : undefined;
+      tasks?.update(id, { startedAt: now(), steps: [{ label: JOB_WORDS.approved, state: "done", at: now() }, { label: JOB_WORDS.starting, state: "doing", at: now() }], ...(endsAt !== undefined ? { endsAt } : {}) });
+      if (job.id) carryTo([job.id], { ...(job.usd ? { usd: job.usd } : {}), ...(endsAt !== undefined ? { endsAt, whole: true as const } : {}), from: approvedAt });
     },
     made(ids, missed) {
       if (over) return;
@@ -112,9 +126,11 @@ export function startJob(tasks: Tasks | undefined, job: { title: string; usd?: s
       if (missed) { tasks?.end(id, "failed", missed); return; }
       // the rows that take its place keep its dollars and its time left (job-carry.ts; Jobs hunt, 5 Nov)
       // and the job they are parts of: two core moves of one Move are its one Activity row (activity-rows.ts foldJobs)
-      carryTo(ids, { ...(job.usd ? { usd: job.usd } : {}), ...(endsAt !== undefined ? { endsAt } : {}), ...(new Set(ids).size > 1 ? { job: id } : {}) });
+      carryTo(ids, { ...(job.usd ? { usd: job.usd } : {}), ...(endsAt !== undefined ? { endsAt, ...(yes ? { whole: true as const } : {}) } : {}), ...(approvedAt !== undefined ? { from: approvedAt } : {}), ...(new Set(ids).size > 1 ? { job: id } : {}) });
       // the core's row IS this row (the same id): it carries on in place
       if (ids.includes(id)) return;
+      // B8: the rows that take its place, kept on its own carry by id, so a reload before the hand-off ends it by them
+      if (ids.length) carryTo([id], { parts: [...ids] });
       // the real rows are in the store: this one goes in the same change, so the row never blinks out
       const store = o.store ?? taskStore();
       const there = () => ids.every((x) => store.list().some((t) => t.id === x));
@@ -182,7 +198,7 @@ let sealed = false;
 export const PRIVATE_HOME_TITLE = "Move money from Private to your Safe";
 /** What a reopened page does with a starting row it kept: goes on (its parts are in the ledger: live-steps homeTracks
  *  follows them to done), ends it unsure, or ends it closed (today's words). */
-export type Reopen = (t: Partial<Task>) => "resume" | "unsure" | "closed";
+export type Reopen = (t: Partial<Task>) => "resume" | "unsure" | "closed" | "handed";
 /** A move out of Private as the ledger lists it (private-pay.ts fromPrivate "home:<id>", the Sim's own). */
 const outOfPrivate = (m: { kind?: unknown; from?: unknown }) => m.kind === "private" && m.from === "private";
 /** The ledger kinds each job's own movements can have, by its title's verb (m3's SHOULD, 7 Nov). A Send pays (a payee's
@@ -233,7 +249,7 @@ export async function reopenOf(bridge: Pick<Bridge, "call">, text: string | null
   const starting = (t: Partial<Task>) => typeof t?.id === "string" && t.id.startsWith(STARTING) && t.state === "pending";
   const home = (t: Partial<Task>) => starting(t) && t.title === PRIVATE_HOME_TITLE;
   if (!kept.some(starting)) return () => "closed";
-  const r = await bridge.call<{ id?: unknown; kind?: unknown; from?: unknown; to?: unknown; startedAtIso?: unknown }[]>("ledger.activity", { limit: 50 }).catch(() => null);
+  const r = await bridge.call<{ id?: unknown; kind?: unknown; from?: unknown; to?: unknown; startedAtIso?: unknown; jobKey?: unknown }[]>("ledger.activity", { limit: 50 }).catch(() => null);
   const rows = r && "ok" in r && Array.isArray(r.ok) ? r.ok : null;
   return (t) => {
     if (!starting(t)) return "closed";
@@ -244,11 +260,24 @@ export async function reopenOf(bridge: Pick<Bridge, "call">, text: string | null
       if (ids?.length) return rows.some((m) => typeof m.id === "string" && ids.includes(m.id)) ? "resume" : "unsure";
       return rows.some((m) => outOfPrivate(m) && Date.parse(String(m.startedAtIso)) >= since) ? "unsure" : "closed";
     }
+    // audit 11's B8 (8 Nov): the core answered before the page closed (made() kept its rows' ids on its own carry): its own
+    // movement in the ledger, by id, IS its end; its core row (send:, move:) says how it ended, so this row goes, never
+    // "stopped" over money that moved. Its ids not in the ledger: unsure, as before
+    const made = parts(t.id!);
+    // M12-5 (8 Nov): a part may be the page's own key for the job, kept at the tap (jobKeyPart) and stamped by the core
+    // on its movement (Movement.jobKey): a reload before the core answered finds it by that key, never by time or amount
+    if (made?.length) return rows.some((m) => (typeof m.id === "string" && made.some((x) => x === m.id || x.endsWith(`:${m.id}`))) || (typeof m.jobKey === "string" && made.includes(`${JOB_KEY_PART}${m.jobKey}`))) ? "handed" : "unsure";
     // M3: every other job; a start that won't read is no proof it came before (never "nothing moved" without proof);
     // only a row that could be its own (jobMatches: its kind, a Send's payee), never any row since its start
     return rows.some((m) => jobMatches(t.title, m) && !(Date.parse(String(m.startedAtIso)) < since)) ? "unsure" : "closed";
   };
 }
+/** M12-5: a job's carry part that is the page's own key (Movement.jobKey), not a core row's id. */
+export const JOB_KEY_PART = "key:";
+/** A new key for a job, made at the tap: passed to the core (its call's `key`) and kept on the job's carry by jobKeyPart. */
+export const newJobKey = (): string => `jk-${rand()}`;
+/** The job's carry part for its key (reopenOf matches it to a ledger row's jobKey). */
+export const jobKeyPart = (key: string): string => `${JOB_KEY_PART}${key}`;
 /** The starting rows ("job:") still going in what a closed page kept: each ends with JOB_WORDS.closed, unless `reopen`
  *  says it goes on (resume) or that the ledger can't prove nothing moved (unsure: JOB_WORDS.mayHaveMoved, Activity). */
 export function endOrphans(text: string | null, reopen: Reopen = () => "closed"): void {
@@ -259,6 +288,7 @@ export function endOrphans(text: string | null, reopen: Reopen = () => "closed")
     const tasks = taskStore().forApp(TASK_APP_HOME[t.app].app);
     const how = reopen(t);
     if (how === "resume") continue;
+    if (how === "handed") { if (!tasks.drop?.(t.id)) tasks.end(t.id, "done"); continue; }
     if (how === "unsure") { tasks.update(t.id, { where: JOB_WORDS.mayHaveMoved, open: { route: "activity" } }); tasks.end(t.id, "stopped", JOB_WORDS.mayHaveMoved); continue; }
     tasks.update(t.id, { steps: [{ label: JOB_WORDS.starting, state: "failed", at: Date.now() }] });
     tasks.end(t.id, "failed", JOB_WORDS.closed);

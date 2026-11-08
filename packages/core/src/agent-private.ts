@@ -356,12 +356,13 @@ export async function agentPairComputer(d: {
       `Your computer must show these words: ${words.join(" ")}.`,
       "If they don't match, say No. Someone else is asking.",
       // D104: the bounded loss, said plainly: it is the pocket-money promise.
+      // b23: grade 5, one idea a sentence (was one 12.0 sentence); the figure once
       d.pocketUsd && d.pocketUsd > 0
-        ? `The computer can spend from AgentZero's wallet, the same as AgentZero on this phone: up to $${Number.isInteger(d.pocketUsd) ? d.pocketUsd : d.pocketUsd.toFixed(2)} in any 24 hours, anywhere, until you tap Stop.`
-        : "The computer can spend from AgentZero's wallet, the same as AgentZero on this phone, until you tap Stop.",
+        ? `The computer pays from AgentZero's wallet. It spends at most $${Number.isInteger(d.pocketUsd) ? d.pocketUsd : d.pocketUsd.toFixed(2)} in any 24 hours. It stops when you tap Stop.`
+        : "The computer pays from AgentZero's wallet. It stops when you tap Stop.",
       "Your computer keeps its own day limit too. Your account's limit is the hard one.",
       "Your Safe's key and your words stay on this phone.",
-      "Stop AgentZero here any time: its key stops everywhere at once.",
+      "Tap Stop here any time. It stops on every device at once.",
     ],
     warnings: [],
     effect: [],

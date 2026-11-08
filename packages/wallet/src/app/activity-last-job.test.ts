@@ -118,7 +118,7 @@ test("item 8: money coming home says the wallet it left from, never the NEAR wal
   const table: [Partial<SpendingActivity>, string][] = [
     [{ network: "sol" }, "SOL wallet"],
     [{ legs: [{ network: "sol" } as SpendingActivity] }, "SOL wallet"],
-    [{ legs: [{ network: "sol" } as SpendingActivity, { network: "hood" } as SpendingActivity] }, "SOL wallet and ETH (RH) wallet"],
+    [{ legs: [{ network: "sol" } as SpendingActivity, { network: "hood" } as SpendingActivity] }, "SOL wallet and Robinhood wallet"],
     [{}, "NEAR wallet"],
   ];
   for (const [o, from] of table) assert.equal(homeFrom(o), from, JSON.stringify(o));

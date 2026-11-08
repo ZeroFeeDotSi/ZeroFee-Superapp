@@ -4,19 +4,22 @@
 // `wait`; a load that failed, `failed` (each drawn with the screen's own props, so its Close is the real one) (the next open loads again: codeGate never keeps a failure).
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { codeGate } from "./money/code-gate.ts";
-import { chunkReloading } from "@zerofee/shell-api/chunk-reload.ts";
+import { chunkReloading, whenOnline } from "@zerofee/shell-api/chunk-reload.ts";
 
 export function later<P extends object>(load: () => Promise<ComponentType<P>>, wait: (p: P) => ReactNode, failed: (p: P) => ReactNode): ComponentType<P> & { preload: () => void; loaded: () => Promise<unknown> } {
   const code = codeGate(load);
   const Later = (p: P) => {
     const [C, setC] = useState<ComponentType<P> | null>(() => code.here());
     const [bad, setBad] = useState(false);
+    const [tries, setTries] = useState(0);
     useEffect(() => {
       if (C) return;
       let live = true;
       code.load().then((c) => live && setC(() => c), () => live && setBad(true));
       return () => { live = false; };
-    }, []);
+    }, [tries]);
+    // offline (audit 12 C1): the failed screen says so, and its code is asked for again once the phone is back
+    useEffect(() => (bad && !C ? whenOnline(() => { setBad(false); setTries((n) => n + 1); }) : undefined), [bad, C]);
     // a deploy's missing chunk is reloading the page (codeGate): it waits, never flashes its error first
     return C ? <C {...p} /> : bad && !chunkReloading() ? failed(p) : wait(p);
   };
